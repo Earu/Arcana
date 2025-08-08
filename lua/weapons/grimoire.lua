@@ -1,7 +1,8 @@
 if SERVER then
     AddCSLuaFile()
-    resource.AddFile("models/arcana/Grimoire.mdl")
-    resource.AddFile("materials/models/arcana/Grimoire.vmt")
+    resource.AddFile("models/arcana/models/arcana/Grimoire.mdl")
+    resource.AddFile("materials/models/arcana/catalyst_apprentice.vmt")
+    resource.AddFile("materials/entities/grimoire.png")
 end
 
 SWEP.PrintName = "Grimoire of Arcane Arts"
@@ -12,8 +13,8 @@ SWEP.Instructions = "LMB: Cast | RMB: Open Grimoire | R: Quick Radial"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 
-SWEP.ViewModel = "models/arcana/Grimoire.mdl"
-SWEP.WorldModel = "models/arcana/Grimoire.mdl"
+SWEP.ViewModel = "models/arcana/models/arcana/Grimoire.mdl"
+SWEP.WorldModel = "models/arcana/models/arcana/Grimoire.mdl"
 SWEP.ViewModelFOV = 62
 SWEP.UseHands = true
 
@@ -50,7 +51,6 @@ function SWEP:Initialize()
 
     -- Store active magic circle reference
     self.ActiveMagicCircle = nil
-    self:SetMaterial("models/arcana/Grimoire")
 end
 
 function SWEP:Deploy()

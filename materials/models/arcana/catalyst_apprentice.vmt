@@ -1,6 +1,6 @@
 "VertexlitGeneric"
 {
-	"$basetexture" "models/arcana/grimoire"
+	"$basetexture" "models/arcana/catalyst_apprentice"
 	"$bumpmap" "models/arcana/normal"
 	//"$translucent" "1"
 	"$model" "1"
@@ -15,7 +15,7 @@
 	"$phong" "1"
 	"$phongboost"	"18"
 	"$phongalbedotint" "1"
-	"$phongexponenttexture" "phong_exp"
+	"$phongexponenttexture" "shared/phong_exp"
 	"$phongfresnelranges"	"[0.005 0.005 1]"
 
 	"$rimlight"               "1"
