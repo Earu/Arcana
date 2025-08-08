@@ -7,7 +7,7 @@ local Arcane = {}
 Arcane.VERSION = "1.0.0"
 
 function Arcane:Print(...)
-    MsgC(Color(147, 112, 219), "[Arcane] ", Color(255, 255, 255), ...)
+    MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), ...)
     MsgN()
 end
 
