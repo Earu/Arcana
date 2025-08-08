@@ -32,7 +32,7 @@ Arcane:RegisterSpell({
             pebble:Spawn()
             local phys = pebble:GetPhysicsObject()
             if IsValid(phys) then
-                phys:SetVelocity(dir * (700 + math.random(-80, 80)) + VectorRand() * 40)
+                phys:SetVelocity(dir * 2000 + VectorRand() * 40)
                 phys:AddAngleVelocity(VectorRand() * 200)
             end
             timer.Simple(4, function() if IsValid(pebble) then pebble:Remove() end end)
