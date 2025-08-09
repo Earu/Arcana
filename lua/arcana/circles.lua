@@ -1,9 +1,11 @@
 if SERVER then return end
-
 local render_DrawLine = _G.render.DrawLine
+local render_SetMaterial = _G.render.SetMaterial
 local render_PushRenderTarget = _G.render.PushRenderTarget
 local render_PopRenderTarget = _G.render.PopRenderTarget
 local render_Clear = _G.render.Clear
+local render_SetColorModulation = _G.render.SetColorModulation
+local render_SetBlend = _G.render.SetBlend
 local GetRenderTarget = _G.GetRenderTarget
 local CreateMaterial = _G.CreateMaterial
 local cam_Start3D2D = _G.cam.Start3D2D
@@ -18,14 +20,16 @@ local surface_GetTextSize = _G.surface.GetTextSize
 local surface_SetTextPos = _G.surface.SetTextPos
 local surface_DrawText = _G.surface.DrawText
 local surface_SetMaterial = _G.surface.SetMaterial
+local surface_DrawTexturedRect = _G.surface.DrawTexturedRect
+local surface_DrawRect = _G.surface.DrawRect
 local surface_SetDrawColor = _G.surface.SetDrawColor
 local surface_DrawTexturedRectRotated = _G.surface.DrawTexturedRectRotated
 local surface_DrawLine = _G.surface.DrawLine
 local surface_DrawCircle = _G.surface.DrawCircle
 local util_CRC = _G.util and _G.util.CRC
 local Matrix = _G.Matrix
+local Mesh = _G.Mesh
 local math_random = _G.math.random
-
 local math_pi = _G.math.pi
 local math_sin = _G.math.sin
 local math_cos = _G.math.cos
@@ -43,53 +47,29 @@ local utf8_codes = _G.utf8.codes
 local utf8_char = _G.utf8.char
 local Angle = _G.Angle
 local Vector = _G.Vector
-
 local Color = _G.Color
-
 local MagicCircle = {}
 MagicCircle.__index = MagicCircle
-
 -- Ring class definition
 local Ring = {}
 Ring.__index = Ring
 
 -- Ancient Greek symbols/runes for type 2 rings
-local GREEK_RUNES = {
-	"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ",
-	"Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω",
-	"α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ",
-	"ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"
-}
+local GREEK_RUNES = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"}
 
 -- Ancient Greek magical phrases and words for circular text
-local GREEK_PHRASES = {
-	"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας",
-	"αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ",
-	"αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα",
-	"θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις",
-	"κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα",
-	"φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια",
-	"αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",
-	"ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"
-}
+local GREEK_PHRASES = {"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας", "αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ", "αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα", "θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις", "κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα", "φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια", "αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος", "ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"}
 
 -- Arabic mystical phrases and words for circular text
-local ARABIC_PHRASES = {
-	"بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم",
-	"لاإلهإلاالله محمدرسولالله لاإلهإلاالله محمدرسولالله لاإلهإلاالله",
-	"الله نور السماوات والأرض الله نور السماوات والأرض الله نور",
-	"سبحان الله وبحمده سبحان الله العظيم سبحان الله وبحمده سبحان الله",
-	"أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله",
-	"الحمدلله رب العالمين الحمدلله رب العالمين الحمدلله رب العالمين",
-	"قل هو الله أحد الله الصمد قل هو الله أحد الله الصمد قل هو الله",
-	"وما توفيقي إلا بالله عليه توكلت وإليه أنيب وما توفيقي إلا بالله"
-}
+local ARABIC_PHRASES = {"بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم", "لاإلهإلاالله محمدرسولالله لاإلهإلاالله محمدرسولالله لاإلهإلاالله", "الله نور السماوات والأرض الله نور السماوات والأرض الله نور", "سبحان الله وبحمده سبحان الله العظيم سبحان الله وبحمده سبحان الله", "أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله", "الحمدلله رب العالمين الحمدلله رب العالمين الحمدلله رب العالمين", "قل هو الله أحد الله الصمد قل هو الله أحد الله الصمد قل هو الله", "وما توفيقي إلا بالله عليه توكلت وإليه أنيب وما توفيقي إلا بالله"}
 
 -- Combined phrases array for random selection
 local ALL_MYSTICAL_PHRASES = {}
+
 for _, phrase in ipairs(GREEK_PHRASES) do
 	table_insert(ALL_MYSTICAL_PHRASES, phrase)
 end
+
 for _, phrase in ipairs(ARABIC_PHRASES) do
 	table_insert(ALL_MYSTICAL_PHRASES, phrase)
 end
@@ -106,9 +86,11 @@ local RING_TYPES = {
 -- Utility functions
 local function GetRandomRune()
 	local allSymbols = {}
+
 	for _, rune in ipairs(GREEK_RUNES) do
 		table_insert(allSymbols, rune)
 	end
+
 	return allSymbols[math_random(#allSymbols)]
 end
 
@@ -117,16 +99,14 @@ local function LocalToWorld3D(localPos, centerPos, angles)
 	local right = angles:Right()
 	local up = angles:Up()
 
-	return centerPos +
-		   right * localPos.x +
-		   forward * localPos.y +
-		   up * localPos.z
+	return centerPos + right * localPos.x + forward * localPos.y + up * localPos.z
 end
 
 -- Helper function to draw thick lines using multiple parallel lines
 local function DrawThickLine(startPos, endPos, color, thickness, angles)
 	if thickness <= 1 then
 		render_DrawLine(startPos, endPos, color, true)
+
 		return
 	end
 
@@ -143,13 +123,12 @@ local function DrawThickLine(startPos, endPos, color, thickness, angles)
 
 	-- Draw multiple parallel lines to create thickness
 	local lineCount = math_max(1, math_floor(thickness))
+
 	for i = 0, lineCount - 1 do
 		local offset = (i / math_max(1, lineCount - 1) - 0.5) * 0.25
 		local offsetVector = perpendicular * offset
-
 		local start = startPos + offsetVector
 		local endPoint = endPos + offsetVector
-
 		render_DrawLine(start, endPoint, color, true)
 	end
 end
@@ -157,7 +136,6 @@ end
 -- Ring class implementation
 function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	local ring = setmetatable({}, Ring)
-
 	ring.type = ringType or RING_TYPES.SIMPLE_LINE
 	ring.radius = radius or 50
 	ring.height = height or 0
@@ -169,7 +147,6 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.pulseSpeed = math_random() * 2 + 1 -- 1-3 Hz
 	ring.pulseOffset = math_random() * math_pi * 2
 	ring.lineWidth = 2.0 -- Default line thickness
-
 	-- Render target cache (only for non-band rings)
 	ring.useRTCache = (ring.type ~= RING_TYPES.BAND_RING)
 	ring.rtBuilt = false
@@ -178,6 +155,14 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.rtMat = nil
 	ring.rtRadiusPx = nil
 	ring.unitToPx = nil
+	-- Band-specific RT + mesh
+	ring.bandRTBuilt = false
+	ring.bandRT = nil
+	ring.bandRTW = nil
+	ring.bandRTH = nil
+	ring.bandMat = nil
+	ring.bandMesh = nil
+	ring.bandPxPerUnit = 32
 
 	-- Type-specific properties
 	if ring.type == RING_TYPES.PATTERN_LINES then
@@ -189,9 +174,11 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 		ring.cachedTextData = ring:CacheTextProcessing()
 	elseif ring.type == RING_TYPES.RUNE_STAR then
 		ring.runes = {}
+
 		for i = 1, 4 do
 			ring.runes[i] = GetRandomRune()
 		end
+
 		ring.runeRadiusRatio = 0.15
 		ring.starConnections = true
 	elseif ring.type == RING_TYPES.STAR_RING then
@@ -214,40 +201,33 @@ end
 local function AngleFromForwardUp(forward, desiredUp)
 	local f = forward:GetNormalized()
 	local up = desiredUp:GetNormalized()
-
 	local ang = f:Angle()
-
 	-- Project vectors onto plane perpendicular to forward and align roll
 	local currentUp = ang:Up()
 	local projDesired = (up - f * up:Dot(f))
 	local projCurrent = (currentUp - f * currentUp:Dot(f))
-
 	local lenD = projDesired:Length()
 	local lenC = projCurrent:Length()
-	if lenD < 1e-6 or lenC < 1e-6 then
-		return ang
-	end
-
+	if lenD < 1e-6 or lenC < 1e-6 then return ang end
 	projDesired:Normalize()
 	projCurrent:Normalize()
-
 	local dot = math.Clamp(projCurrent:Dot(projDesired), -1, 1)
 	local angleRad = math_acos(dot)
 	local cross = projCurrent:Cross(projDesired)
 	local sign = (cross:Dot(f) < 0) and -1 or 1
 	ang:RotateAroundAxis(ang:Forward(), math_deg(sign * angleRad))
+
 	return ang
 end
 
 -- Cache text processing to avoid repeated UTF-8 operations
 function Ring:CacheTextProcessing()
 	if not self.mysticalPhrase then return nil end
-
 	local textLength = utf8_len(self.mysticalPhrase)
 	if not textLength or textLength == 0 then return nil end
-
 	-- Pre-process the mystical phrase into characters
 	local chars = {}
+
 	for pos, code in utf8_codes(self.mysticalPhrase) do
 		table_insert(chars, utf8_char(code))
 	end
@@ -276,6 +256,7 @@ end
 
 function Ring:GetCurrentOpacity(baseOpacity, time)
 	local pulse = math_sin(time * self.pulseSpeed + self.pulseOffset) * 0.3 + 0.7
+
 	return baseOpacity * self.opacity * pulse
 end
 
@@ -286,21 +267,28 @@ function Ring:Draw(centerPos, angles, color, time)
 	ringColor.a = currentOpacity
 
 	-- Pass the rotation angle directly to drawing functions instead of modifying angles
-	if self.type == RING_TYPES.PATTERN_LINES
-		or self.type == RING_TYPES.RUNE_STAR
-		or self.type == RING_TYPES.SIMPLE_LINE
-		or self.type == RING_TYPES.STAR_RING then
+	if self.type == RING_TYPES.PATTERN_LINES or self.type == RING_TYPES.RUNE_STAR or self.type == RING_TYPES.SIMPLE_LINE or self.type == RING_TYPES.STAR_RING then
 		-- Non-band rings use RT-only rendering now
 		self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation)
 	elseif self.type == RING_TYPES.BAND_RING then
 		local oriented = Angle(angles.p, angles.y, angles.r)
+
 		if self.axisAngles then
-			-- Apply local orientation offsets to allow arbitrary band axes
 			oriented:RotateAroundAxis(oriented:Right(), self.axisAngles.p or 0)
 			oriented:RotateAroundAxis(oriented:Up(), self.axisAngles.y or 0)
 			oriented:RotateAroundAxis(oriented:Forward(), self.axisAngles.r or 0)
 		end
-		self:DrawBandRing(ringPos, oriented, ringColor, angles, self.currentRotation)
+
+		-- Prefer RT + mesh path; fall back to line/text path if mesh/RT not ready
+		if not self.bandRTBuilt then
+			self:BuildBandRTAndMesh()
+		end
+
+		if self.bandRTBuilt and self.bandMat and self.bandMesh then
+			self:DrawBandMesh(ringPos, oriented, ringColor, self.currentRotation)
+		else
+			self:DrawBandRing(ringPos, oriented, ringColor, angles, self.currentRotation)
+		end
 	end
 end
 
@@ -311,16 +299,17 @@ function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
 	if not self.rtBuilt then
 		self:BuildRingRT()
 	end
-	if not self.rt or not self.rtMat then return false end
 
+	if not self.rt or not self.rtMat then return false end
 	-- 3D2D: map texture pixels to world units so that rtRadiusPx maps to self.radius
 	local pxToWorld = 1 / (self.unitToPx or 1)
 	local drawAngles = Angle(angles.p + 180, angles.y, angles.r)
 	cam_Start3D2D(centerPos, drawAngles, pxToWorld)
-		surface_SetMaterial(self.rtMat)
-		surface_SetDrawColor(color.r, color.g, color.b, color.a)
-		surface_DrawTexturedRectRotated(0, 0, self.rtSize, self.rtSize, rotationAngle or 0)
+	surface_SetMaterial(self.rtMat)
+	surface_SetDrawColor(color.r, color.g, color.b, color.a)
+	surface_DrawTexturedRectRotated(0, 0, self.rtSize, self.rtSize, rotationAngle or 0)
 	cam_End3D2D()
+
 	return true
 end
 
@@ -331,13 +320,12 @@ function Ring:BuildRingRT()
 	self.rtSize = size
 	self.rtRadiusPx = math_floor(size * 0.48) -- keep a small border to avoid clipping
 	self.unitToPx = self.rtRadiusPx / math_max(1, self.radius)
-
 	local rtName = "arcana_ring_rt_" .. tostring(self):gsub("%W", "") .. "_r" .. tostring(self.radius) .. "_s" .. tostring(size)
 	local tex = GetRenderTarget(rtName, size, size, true)
 	self.rt = tex
-
 	-- Create a material bound to this RT
 	local matName = "arcana_ring_mat_" .. tostring(self):gsub("%W", "")
+
 	self.rtMat = CreateMaterial(matName, "UnlitGeneric", {
 		["$basetexture"] = tex:GetName(),
 		["$translucent"] = 1,
@@ -357,29 +345,31 @@ function Ring:BuildRingRT()
 
 	-- Draw geometry for this ring into the RT (white on transparent)
 	render_PushRenderTarget(self.rt)
-		render_Clear(0, 0, 0, 0, true, true)
-		cam_Start2D()
-			surface_SetDrawColor(255, 255, 255, 255)
-			if self.type == RING_TYPES.PATTERN_LINES then
-				self:RT_DrawPatternLines2D()
-				self:RT_DrawCircularText2D()
-			elseif self.type == RING_TYPES.RUNE_STAR then
-				self:RT_DrawRuneStar2D()
-				self:RT_DrawRuneSymbols2D()
-			elseif self.type == RING_TYPES.SIMPLE_LINE then
-				self:RT_DrawSimpleLine2D()
-			elseif self.type == RING_TYPES.STAR_RING then
-				self:RT_DrawStarRing2D()
-			end
-		cam_End2D()
-	render_PopRenderTarget()
+	render_Clear(0, 0, 0, 0, true, true)
+	cam_Start2D()
+	surface_SetDrawColor(255, 255, 255, 255)
 
+	if self.type == RING_TYPES.PATTERN_LINES then
+		self:RT_DrawPatternLines2D()
+		self:RT_DrawCircularText2D()
+	elseif self.type == RING_TYPES.RUNE_STAR then
+		self:RT_DrawRuneStar2D()
+		self:RT_DrawRuneSymbols2D()
+	elseif self.type == RING_TYPES.SIMPLE_LINE then
+		self:RT_DrawSimpleLine2D()
+	elseif self.type == RING_TYPES.STAR_RING then
+		self:RT_DrawStarRing2D()
+	end
+
+	cam_End2D()
+	render_PopRenderTarget()
 	self.rtBuilt = true
 end
 
 -- 2D helpers for drawing into the RT
 local function RT_DrawThickCircle(cx, cy, radiusPx, thicknessPx)
 	thicknessPx = math_max(1, math_floor(thicknessPx or 1))
+
 	for i = 0, thicknessPx - 1 do
 		local r = radiusPx - (thicknessPx - 1) * 0.5 + i
 		surface_DrawCircle(cx, cy, math_max(1, math_floor(r)), 255, 255, 255, 255)
@@ -393,18 +383,16 @@ local function GetGlyphMaterial(fontName, char)
 	local key = (fontName or "") .. ":" .. (char or "")
 	local cached = GLYPH_CACHE[key]
 	if cached then return cached.mat, cached.w, cached.h end
-
 	surface_SetFont(fontName or "DermaDefault")
 	local w, h = surface_GetTextSize(char)
 	w = math.max(1, math.floor(w + 2))
 	h = math.max(1, math.floor(h + 2))
-
 	-- Unique RT/material names per glyph
 	local id = util_CRC and util_CRC(key) or tostring(key):gsub("%W", "")
 	local rtName = "arcana_glyph_rt_" .. id
 	local tex = GetRenderTarget(rtName, w, h, true)
-
 	local matName = "arcana_glyph_mat_" .. id
+
 	local mat = CreateMaterial(matName, "UnlitGeneric", {
 		["$basetexture"] = tex:GetName(),
 		["$translucent"] = 1,
@@ -415,30 +403,244 @@ local function GetGlyphMaterial(fontName, char)
 
 	-- Render the glyph (white) onto its RT
 	render_PushRenderTarget(tex)
-		render_Clear(0, 0, 0, 0, true, true)
-		cam_Start2D()
-			surface_SetFont(fontName or "DermaDefault")
-			surface_SetTextColor(255, 255, 255, 255)
-			surface_SetTextPos(1, 1)
-			surface_DrawText(char)
-		cam_End2D()
+	render_Clear(0, 0, 0, 0, true, true)
+	cam_Start2D()
+	surface_SetFont(fontName or "DermaDefault")
+	surface_SetTextColor(255, 255, 255, 255)
+	surface_SetTextPos(1, 1)
+	surface_DrawText(char)
+	cam_End2D()
 	render_PopRenderTarget()
 
-	GLYPH_CACHE[key] = { mat = mat, w = w, h = h }
+	GLYPH_CACHE[key] = {
+		mat = mat,
+		w = w,
+		h = h
+	}
+
 	return mat, w, h
+end
+
+-- Build rectangular RT and cylindrical mesh for band rings
+function Ring:BuildBandRTAndMesh()
+	local height = math_max(1, self.bandHeight or (self.radius * 0.15))
+	local circumference = 2 * math_pi * math_max(1, self.radius)
+	-- Choose pixels per unit to balance quality/perf
+	local pxPerUnit = math_max(8, math_min(64, self.bandPxPerUnit or 32))
+	local texW = math_max(256, math_floor(circumference * pxPerUnit))
+	-- Clamp texture width to something reasonable
+	texW = math_min(texW, 4096)
+	local texH = math_max(64, math_min(1024, math_floor(height * pxPerUnit)))
+	self.bandRTW = texW
+	self.bandRTH = texH
+	local rtName = "arcana_band_rt_" .. tostring(self):gsub("%W", "") .. "_w" .. texW .. "_h" .. texH
+	local tex = GetRenderTarget(rtName, texW, texH, true)
+	self.bandRT = tex
+	local matName = "arcana_band_mat_" .. tostring(self):gsub("%W", "")
+
+	self.bandMat = CreateMaterial(matName, "UnlitGeneric", {
+		["$basetexture"] = tex:GetName(),
+		["$translucent"] = 1,
+		["$vertexalpha"] = 1,
+		["$vertexcolor"] = 1,
+		["$nolod"] = 1,
+		["$nocull"] = 1,
+	})
+
+	-- Fill texture with repeating mystical text string
+	-- Precache all glyphs so the RT draw does not miss any during the same frame
+	self:RT_PrecacheCircularTextGlyphs()
+	render_PushRenderTarget(self.bandRT)
+	render_Clear(0, 0, 0, 0, true, true)
+	cam_Start2D()
+	surface_SetDrawColor(255, 255, 255, 255)
+	-- Build a long string of chars to span width
+	local textData = self.cachedTextData
+
+	if textData and textData.chars and textData.charCount > 0 then
+		local fontName = self.textFont or "MagicCircle_Medium"
+		surface_SetFont(fontName)
+		local sampleChar = textData.chars[1]
+		local cw, ch = surface_GetTextSize(sampleChar)
+
+		if cw <= 0 then
+			cw = 16
+		end
+
+		if ch <= 0 then
+			ch = 32
+		end
+
+		local scale = math_max(0.25, math_min(2.5, (texH * 0.7) / ch))
+
+		-- Horizontal guide lines above and below the text
+		do
+			local lineThickness = math_max(1, math_floor(texH * 0.06))
+			local drawHRef = math_max(1, ch * scale)
+			local yText = math_floor((texH - drawHRef) * 0.5)
+			local pad = math_max(1, math_floor(lineThickness * 1.2))
+			local yTop = math_max(0, yText - pad - math_floor(lineThickness * 0.5))
+			local yBot = math_min(texH - lineThickness, yText + drawHRef + pad - math_floor(lineThickness * 0.5))
+			surface_SetDrawColor(255, 255, 255, 255)
+			surface_DrawRect(0, yTop, texW, lineThickness)
+			surface_DrawRect(0, yBot, texW, lineThickness)
+		end
+
+		-- Draw horizontally tiled characters using cached glyph materials
+		local x = 0
+		local idx = 1
+
+		while x < texW + cw * scale do
+			local char = textData.chars[((idx - 1) % textData.charCount) + 1]
+			local mat, gw, gh = GetGlyphMaterial(fontName, char)
+			local drawW = math_max(1, gw * scale)
+			local drawH = math_max(1, gh * scale)
+			local y = math_floor((texH - drawH) * 0.5)
+			surface_SetMaterial(mat)
+			surface_DrawTexturedRect(x, y, drawW, drawH)
+			-- slight overlap to keep density consistent
+			x = x + math_max(1, drawW * 0.9)
+			idx = idx + 1
+		end
+	end
+
+	cam_End2D()
+	render_PopRenderTarget()
+	-- Build a simple cylindrical strip mesh around Z axis (height along Z)
+	local segments = math_max(24, math_min(128, self.segments or 64))
+	local radius = math_max(1, self.radius)
+	local halfH = height * 0.5
+	local vertices = {}
+
+	for i = 0, segments do
+		local t = i / segments
+		local ang = t * math_pi * 2
+		local cx = math_cos(ang) * radius
+		local cy = math_sin(ang) * radius
+
+		-- Two verts per slice (bottom, top)
+		table_insert(vertices, {
+			pos = Vector(cx, cy, -halfH),
+			u = t,
+			v = 1,
+			normal = Vector(cx, cy, 0):GetNormalized(),
+		})
+
+		table_insert(vertices, {
+			pos = Vector(cx, cy, halfH),
+			u = t,
+			v = 0,
+			normal = Vector(cx, cy, 0):GetNormalized(),
+		})
+	end
+
+	-- Convert to triangle list (two tris per quad)
+	local meshBuilder = Mesh()
+
+	meshBuilder:BuildFromTriangles((function()
+		local tris = {}
+
+		for i = 0, segments - 1 do
+			local i0 = i * 2 + 1
+			local i1 = i0 + 1
+			local i2 = i0 + 2
+			local i3 = i0 + 3
+
+			-- tri 1: i0, i2, i1
+			table_insert(tris, {
+				pos = vertices[i0].pos,
+				u = vertices[i0].u,
+				v = vertices[i0].v,
+				normal = vertices[i0].normal,
+			})
+
+			table_insert(tris, {
+				pos = vertices[i2].pos,
+				u = vertices[i2].u,
+				v = vertices[i2].v,
+				normal = vertices[i2].normal,
+			})
+
+			table_insert(tris, {
+				pos = vertices[i1].pos,
+				u = vertices[i1].u,
+				v = vertices[i1].v,
+				normal = vertices[i1].normal,
+			})
+
+			-- tri 2: i2, i3, i1
+			table_insert(tris, {
+				pos = vertices[i2].pos,
+				u = vertices[i2].u,
+				v = vertices[i2].v,
+				normal = vertices[i2].normal,
+			})
+
+			table_insert(tris, {
+				pos = vertices[i3].pos,
+				u = vertices[i3].u,
+				v = vertices[i3].v,
+				normal = vertices[i3].normal,
+			})
+
+			table_insert(tris, {
+				pos = vertices[i1].pos,
+				u = vertices[i1].u,
+				v = vertices[i1].v,
+				normal = vertices[i1].normal,
+			})
+		end
+
+		return tris
+	end)())
+
+	self.bandMesh = meshBuilder
+	self.bandRTBuilt = true
+end
+
+function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
+	if not (self.bandMesh and self.bandMat) then return end
+	local oriented = Angle(angles.p, angles.y, angles.r)
+	-- Apply rotation around band axis for spinning
+	oriented:RotateAroundAxis(oriented:Up(), rotationAngle or 0)
+	local m = Matrix()
+	m:SetTranslation(centerPos)
+	m:SetAngles(oriented)
+	cam_PushModelMatrix(m)
+
+	-- Apply color/alpha to the material so the band adopts ring color
+	if self.bandMat.SetVector then
+		self.bandMat:SetVector("$color", Vector((color.r or 255) / 255, (color.g or 255) / 255, (color.b or 255) / 255))
+	end
+
+	if self.bandMat.SetFloat then
+		self.bandMat:SetFloat("$alpha", (color.a or 255) / 255)
+	end
+
+	render_SetMaterial(self.bandMat)
+	render_SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
+	render_SetBlend((color.a or 255) / 255)
+	self.bandMesh:Draw()
+	render_SetColorModulation(1, 1, 1)
+	render_SetBlend(1)
+	cam_PopModelMatrix()
 end
 
 local function RT_DrawThickLine2D(x1, y1, x2, y2, thicknessPx)
 	thicknessPx = math_max(1, math_floor(thicknessPx or 1))
+
 	if thicknessPx <= 1 then
 		surface_DrawLine(x1, y1, x2, y2)
+
 		return
 	end
+
 	local dx, dy = x2 - x1, y2 - y1
 	local len = math.sqrt(dx * dx + dy * dy)
 	if len == 0 then return end
 	local nx = -dy / len
 	local ny = dx / len
+
 	for i = 0, thicknessPx - 1 do
 		local off = (i - (thicknessPx - 1) * 0.5)
 		local ox = nx * off
@@ -450,6 +652,7 @@ end
 -- map ring line thickness to a fixed world width so cache matches old look
 function Ring:GetRTThicknessPx()
 	local thicknessWorld = 0.6 -- world units
+
 	return math_max(1, math_floor((self.unitToPx or 1) * thicknessWorld))
 end
 
@@ -475,7 +678,6 @@ end
 function Ring:RT_DrawCircularText2D()
 	local textData = self.cachedTextData
 	if not textData or not textData.chars or textData.charCount == 0 then return end
-
 	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
 	local fontName = self.textFont or "MagicCircle_Small"
 	local fontSizeWorld = math_max(32, self.radius * 0.32)
@@ -483,17 +685,15 @@ function Ring:RT_DrawCircularText2D()
 	local inner = (self.innerTextRadius or (self.radius - 5))
 	local outer = (self.outerTextRadius or self.radius)
 	local radiusPx = math_floor((inner + (outer - inner) * 0.5) * (self.unitToPx or 1))
-
 	-- Estimate spacing using a constant proportion of font size to match previous look
 	local approxCharWidthPx = math_max(1, 0.1 * fontSizeWorld * (self.unitToPx or 1))
 	local circumferencePx = 2 * math_pi * radiusPx
 	local maxCharacters = math_max(1, math_floor(circumferencePx / approxCharWidthPx))
-
 	local sourceChars = textData.chars
 	local sourceCount = textData.charCount
 	if sourceCount == 0 then return end
-
 	surface_SetDrawColor(255, 255, 255, 255)
+
 	for i = 1, maxCharacters do
 		local char = sourceChars[((i - 1) % sourceCount) + 1]
 		local t = (i - 1) / maxCharacters
@@ -501,7 +701,6 @@ function Ring:RT_DrawCircularText2D()
 		local px = cx + math_cos(angleRad) * radiusPx
 		local py = cy + math_sin(angleRad) * radiusPx
 		local rotDeg = math_deg(angleRad + math_pi * 0.5)
-
 		local mat, gw, gh = GetGlyphMaterial(fontName, char)
 		local drawW = math_max(1, gw * pixelScale)
 		local drawH = math_max(1, gh * pixelScale)
@@ -515,9 +714,9 @@ function Ring:RT_DrawRuneStar2D()
 	local thick = self:GetRTThicknessPx()
 	local mainR = math_floor(self.radius * self.unitToPx)
 	RT_DrawThickCircle(cx, cy, mainR, thick)
-
 	-- 4 rune circles positions
 	local runeR = math_floor((self.radius * (self.runeRadiusRatio or 0.15)) * self.unitToPx)
+
 	for i = 1, 4 do
 		local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25
 		local x = cx + math_cos(a) * mainR
@@ -527,12 +726,18 @@ function Ring:RT_DrawRuneStar2D()
 
 	if self.starConnections then
 		local pts = {}
+
 		for i = 1, 4 do
 			local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25
 			local x = cx + math_cos(a) * mainR
 			local y = cy + math_sin(a) * mainR
-			pts[i] = { x = x, y = y }
+
+			pts[i] = {
+				x = x,
+				y = y
+			}
 		end
+
 		for i = 1, 4 do
 			for j = i + 1, 4 do
 				RT_DrawThickLine2D(pts[i].x, pts[i].y, pts[j].x, pts[j].y, thick)
@@ -550,7 +755,8 @@ function Ring:RT_DrawRuneSymbols2D()
 	local fontSize = math_max(48, runeRadius * 16)
 	local scale = (fontSize / 512) * (self.unitToPx or 1)
 	surface_SetFont("MagicCircle_Rune")
-	surface_SetTextColor(255,255,255,255)
+	surface_SetTextColor(255, 255, 255, 255)
+
 	for i = 1, 4 do
 		local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25
 		local x = cx + math_cos(a) * mainR
@@ -559,10 +765,10 @@ function Ring:RT_DrawRuneSymbols2D()
 		m:Translate(Vector(x, y, 0))
 		m:Scale(Vector(scale, scale, 1))
 		cam_PushModelMatrix(m, true)
-			local ch = self.runes[i]
-			local w, h = surface_GetTextSize(ch)
-			surface_SetTextPos(-w * 0.5, -h * 0.5)
-			surface_DrawText(ch)
+		local ch = self.runes[i]
+		local w, h = surface_GetTextSize(ch)
+		surface_SetTextPos(-w * 0.5, -h * 0.5)
+		surface_DrawText(ch)
 		cam_PopModelMatrix()
 	end
 end
@@ -571,6 +777,7 @@ end
 function Ring:RT_PrecacheRuneGlyphs()
 	if not self.runes then return end
 	surface_SetFont("MagicCircle_Rune")
+
 	for i = 1, 4 do
 		GetGlyphMaterial("MagicCircle_Rune", self.runes[i])
 	end
@@ -584,6 +791,7 @@ function Ring:RT_PrecacheCircularTextGlyphs()
 	surface_SetFont(fontName)
 	-- Precache the unique characters set to avoid duplicate work
 	local seen = {}
+
 	for _, ch in ipairs(textData.chars) do
 		if not seen[ch] then
 			GetGlyphMaterial(fontName, ch)
@@ -598,17 +806,23 @@ function Ring:RT_DrawStarRing2D()
 	local innerR = math_floor(self.innerRadius * self.unitToPx)
 	local outerR = math_floor(self.outerRadius * self.unitToPx)
 	local starPoints = math_max(5, self.starPoints or 5)
-
 	local pts = {}
+
 	for i = 0, starPoints * 2 - 1 do
 		local a = (i / (starPoints * 2)) * math_pi * 2
 		local r = (i % 2 == 0) and outerR or innerR
-		pts[i + 1] = { x = cx + math_cos(a) * r, y = cy + math_sin(a) * r }
+
+		pts[i + 1] = {
+			x = cx + math_cos(a) * r,
+			y = cy + math_sin(a) * r
+		}
 	end
+
 	for i = 1, #pts do
 		local ni = (i % #pts) + 1
 		RT_DrawThickLine2D(pts[i].x, pts[i].y, pts[ni].x, pts[ni].y, thick)
 	end
+
 	-- Inner spokes
 	for i = 1, starPoints do
 		local outerIndex = (i - 1) * 2 + 1
@@ -620,13 +834,12 @@ end
 function Ring:DrawBandRing(centerPos, angles, color, originalAngles, rotationAngle)
 	local halfH = (self.bandHeight or (self.radius * 0.15)) * 0.5
 	local rotRad = math_rad(rotationAngle or 0)
-
 	-- Top and bottom edge circles
 	self:DrawSimpleRingAtRadius(centerPos + angles:Up() * halfH, angles, color, self.radius, rotationAngle)
 	self:DrawSimpleRingAtRadius(centerPos - angles:Up() * halfH, angles, color, self.radius, rotationAngle)
-
 	-- Vertical segments to imply a glowing band
 	local step = math_max(1, math_floor(self.segments / 16))
+
 	for i = 0, self.segments - 1, step do
 		local a = (i / self.segments) * math_pi * 2 + rotRad
 		local x = math_cos(a) * self.radius
@@ -644,28 +857,27 @@ end
 function Ring:DrawBandText(centerPos, angles, color, originalAngles, rotationAngle, halfH)
 	local textData = self.cachedTextData
 	if not textData or not textData.chars or textData.charCount == 0 then return end
-
 	local fontSize = math_max(32, (self.bandHeight or (self.radius * 0.15)) * 2)
 	local circumference = 2 * math_pi * self.radius
 	local charWidth = fontSize * 0.1
 	local maxCharacters = math_floor(circumference / charWidth)
-
 	local chars = {}
 	local sourceChars = textData.chars
 	local sourceCount = textData.charCount
 	local currentLength = 0
+
 	while currentLength < maxCharacters do
 		for i = 1, sourceCount do
 			if currentLength >= maxCharacters then break end
 			table_insert(chars, sourceChars[i])
 			currentLength = currentLength + 1
 		end
+
 		if sourceCount == 0 then break end
 	end
 
 	local finalLength = #chars
 	if finalLength == 0 then return end
-
 	local scale = fontSize / 512
 	local rotRad = math_rad(rotationAngle or 0)
 	local upVec = angles:Up()
@@ -674,27 +886,23 @@ function Ring:DrawBandText(centerPos, angles, color, originalAngles, rotationAng
 		local char = chars[i]
 		local t = (i - 1) / finalLength
 		local a = t * math_pi * 2 + rotRad
-
 		local cosA = math_cos(a)
 		local sinA = math_sin(a)
 		local radial = angles:Right() * cosA + angles:Forward() * sinA
 		local worldPos = centerPos + radial * self.radius
-
 		-- Slightly outwards to avoid z-fighting
 		worldPos = worldPos + radial * 0.5
-
 		-- Build orientation: forward points outward, up follows circle up
 		local textAng = AngleFromForwardUp(radial, upVec)
 		-- Rotate so text planes face outward rather than toward band top/bottom
 		textAng:RotateAroundAxis(textAng:Right(), -90)
-
 		cam_Start3D2D(worldPos, textAng, scale)
-			surface_SetFont(self.textFont or "MagicCircle_Small")
-			surface_SetTextColor(color.r, color.g, color.b, color.a)
-			local w, h = surface_GetTextSize(char)
-			-- center vertically in the band
-			surface_SetTextPos(-w * 0.5, -h * 0.5)
-			surface_DrawText(char)
+		surface_SetFont(self.textFont or "MagicCircle_Small")
+		surface_SetTextColor(color.r, color.g, color.b, color.a)
+		local w, h = surface_GetTextSize(char)
+		-- center vertically in the band
+		surface_SetTextPos(-w * 0.5, -h * 0.5)
+		surface_DrawText(char)
 		cam_End3D2D()
 	end
 end
@@ -720,7 +928,6 @@ end
 -- MagicCircle class implementation
 function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	local circle = setmetatable({}, MagicCircle)
-
 	-- Core properties
 	circle.position = pos or Vector(0, 0, 0)
 	circle.angles = ang or Angle(0, 0, 0)
@@ -728,13 +935,11 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.intensity = math_max(1, intensity or 3)
 	circle.size = math_max(10, size or 100)
 	circle.lineWidth = math_max(1, lineWidth or 2)
-
 	-- Animation properties
 	circle.isAnimated = false
 	circle.startTime = CurTime()
 	circle.duration = 0
 	circle.isActive = true
-
 	-- Evolving-cast state
 	circle.isEvolving = false
 	circle.evolveStart = 0
@@ -743,7 +948,6 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.lastVisible = 0
 	circle.kLog = 9 -- control for logarithmic growth
 	circle.enableRingSounds = false
-
 	-- Generate rings
 	circle.rings = {}
 	circle:GenerateRings()
@@ -753,20 +957,15 @@ end
 
 function MagicCircle:GenerateRings()
 	self.rings = {}
-
 	-- Calculate number of rings based on intensity
 	local ringCount = math_max(4, math_min(self.intensity + math_random(1, 3), 8))
 
 	-- Standard magic circles should NOT include band rings (reserved for VFX)
-	local allTypes = {
-		RING_TYPES.PATTERN_LINES,
-		RING_TYPES.RUNE_STAR,
-		RING_TYPES.SIMPLE_LINE,
-		RING_TYPES.STAR_RING,
-	}
+	local allTypes = {RING_TYPES.PATTERN_LINES, RING_TYPES.RUNE_STAR, RING_TYPES.SIMPLE_LINE, RING_TYPES.STAR_RING,}
 
 	-- Create a list to track which ring types we need to place (one of each first)
 	local requiredTypes = {}
+
 	for _, t in ipairs(allTypes) do
 		table_insert(requiredTypes, t)
 	end
@@ -784,7 +983,6 @@ function MagicCircle:GenerateRings()
 		local height = 0
 		local rotationSpeed = (math_random() * 60 - 30) -- -30 to 30 degrees per second
 		local rotationDirection = math_random() > 0.5 and 1 or -1
-
 		local ring = Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 		ring.lineWidth = self.lineWidth -- Apply the magic circle's line width
 		table_insert(self.rings, ring)
@@ -793,18 +991,13 @@ function MagicCircle:GenerateRings()
 	-- Fill remaining slots with random types (excluding star ring to keep it special)
 	for i = #requiredTypes + 1, ringCount do
 		-- pool excludes STAR_RING
-		local pool = {
-			RING_TYPES.PATTERN_LINES,
-			RING_TYPES.RUNE_STAR,
-			RING_TYPES.SIMPLE_LINE,
-		}
-		local ringType = pool[math_random(#pool)]
+		local pool = {RING_TYPES.PATTERN_LINES, RING_TYPES.RUNE_STAR, RING_TYPES.SIMPLE_LINE,}
 
+		local ringType = pool[math_random(#pool)]
 		local radius = self.size * (0.2 + (i - 1) * 0.8 / (ringCount - 1))
 		local height = 0
 		local rotationSpeed = (math_random() * 60 - 30) -- -30 to 30 degrees per second
 		local rotationDirection = math_random() > 0.5 and 1 or -1
-
 		local ring = Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 		ring.lineWidth = self.lineWidth -- Apply the magic circle's line width
 		table_insert(self.rings, ring)
@@ -812,7 +1005,6 @@ function MagicCircle:GenerateRings()
 
 	-- Sort rings by radius (largest first) for proper layering
 	table_sort(self.rings, function(a, b) return a.radius > b.radius end)
-
 	-- Add central glow ring
 	local glowRing = Ring.new(RING_TYPES.SIMPLE_LINE, self.size * 0.1, 0, math_random() * 120 - 60, math_random() > 0.5 and 1 or -1)
 	glowRing.pulseSpeed = 4 -- Faster pulse for glow effect
@@ -846,19 +1038,22 @@ function MagicCircle:Update(deltaTime)
 			-- Play subtle mystical chime(s) when adding ring(s)
 			if self.enableRingSounds then
 				local addCount = shouldVisible - self.lastVisible
+
 				for i = 1, addCount do
 					local pitch = 100 + math.random(-8, 10)
 					local vol = 0.45
-					local posJitter = self.position + Vector(math.random(-2,2), math.random(-2,2), math.random(-1,1))
+					local posJitter = self.position + Vector(math.random(-2, 2), math.random(-2, 2), math.random(-1, 1))
 					sound.Play("arcana/magic" .. math.random(1, 4) .. ".ogg", posJitter, 70, pitch, vol)
 				end
 			end
+
 			self.lastVisible = shouldVisible
 		end
 
 		-- Move ring heights to create depth evolution
 		for i, ring in ipairs(self.rings) do
 			local target = 0
+
 			if i > 2 and i <= self.lastVisible then
 				local sign = (i % 2 == 0) and 1 or -1
 				local span = math.max(1, self.lastVisible - 2)
@@ -867,6 +1062,7 @@ function MagicCircle:Update(deltaTime)
 				local depthAmplitude = self.size * 0.35
 				target = sign * depthAmplitude * fraction * logp
 			end
+
 			ring.height = ring.height + (target - ring.height) * math.min(1, deltaTime * 6)
 		end
 	end
@@ -874,14 +1070,12 @@ end
 
 function MagicCircle:Draw()
 	if not self.isActive then return end
-
 	render.SetColorMaterial()
-
 	local currentTime = CurTime()
-
 	-- Draw all rings
 	local count = #self.rings
 	local maxToDraw = self.isEvolving and math.max(self.baseVisible, self.lastVisible) or count
+
 	for i = 1, math.min(count, maxToDraw) do
 		local ring = self.rings[i]
 		ring:Draw(self.position, self.angles, self.color, currentTime)
@@ -903,6 +1097,7 @@ function MagicCircle:StartEvolving(duration, enableSounds)
 	self.baseVisible = 2
 	self.lastVisible = 2
 	self.enableRingSounds = enableSounds == true
+
 	-- Initialize first two rings to baseline
 	for i, ring in ipairs(self.rings) do
 		ring.height = (i <= 2) and 0 or ring.height
@@ -949,7 +1144,10 @@ function MagicCircleManager:Update()
 	-- Update all circles and remove inactive ones
 	for i = #self.circles, 1, -1 do
 		local circle = self.circles[i]
-		if circle.Update then circle:Update(deltaTime) end
+
+		if circle.Update then
+			circle:Update(deltaTime)
+		end
 
 		if circle.IsActive and not circle:IsActive() then
 			table_remove(self.circles, i)
@@ -959,7 +1157,9 @@ end
 
 function MagicCircleManager:Draw()
 	for _, circle in ipairs(self.circles) do
-		if circle.Draw then circle:Draw() end
+		if circle.Draw then
+			circle:Draw()
+		end
 	end
 end
 
@@ -983,17 +1183,24 @@ net.Receive("Arcana_AttachParticles", function()
 	local duration = net.ReadFloat()
 	if not IsValid(ent) then return end
 	if not effectName or effectName == "" then return end
-	if not ent.ParticleEmitters then ent.ParticleEmitters = {} end
+
+	if not ent.ParticleEmitters then
+		ent.ParticleEmitters = {}
+	end
 
 	-- Attempt to use ParticleEffectAttach if available
 	if ParticleEffectAttach then
 		local attached = pcall(function()
 			ParticleEffectAttach(effectName, PATTACH_ABSORIGIN_FOLLOW, ent, 0)
 		end)
+
 		if attached then
 			timer.Simple(duration or 5, function()
-				if IsValid(ent) and ent.StopParticles then ent:StopParticles() end
+				if IsValid(ent) and ent.StopParticles then
+					ent:StopParticles()
+				end
 			end)
+
 			return
 		end
 	end
@@ -1009,6 +1216,7 @@ function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duratio
 	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle:SetAnimated(duration or 5)
 	MagicCircleManager:Add(circle)
+
 	return circle
 end
 
@@ -1058,6 +1266,7 @@ function BandCircle.new(pos, ang, color, size)
 	bc.isAnimated = false
 	bc.startTime = CurTime()
 	bc.duration = 0
+
 	return bc
 end
 
@@ -1066,16 +1275,22 @@ function BandCircle:AddBand(radius, height, axisSpin, lineWidth, phrase)
 	ring.bandHeight = height or (radius and radius * 0.2 or self.size * 0.12)
 	ring.axisSpin = axisSpin -- table: {p=,y=,r=} degrees/sec
 	ring.lineWidth = math_max(1, lineWidth or 2)
+
 	if phrase then
 		ring.mysticalPhrase = phrase
 		ring.cachedTextData = ring:CacheTextProcessing()
 	end
+
 	table_insert(self.rings, ring)
+
 	return ring
 end
 
 function BandCircle:Update(dt)
-	for _, r in ipairs(self.rings) do r:Update(dt) end
+	for _, r in ipairs(self.rings) do
+		r:Update(dt)
+	end
+
 	if self.isAnimated and (CurTime() - self.startTime) > (self.duration or 0) then
 		self.isActive = false
 	end
@@ -1085,6 +1300,7 @@ function BandCircle:Draw()
 	if not self.isActive then return end
 	render.SetColorMaterial()
 	local t = CurTime()
+
 	for _, r in ipairs(self.rings) do
 		r:Draw(self.position, self.angles, self.color, t)
 	end
@@ -1106,24 +1322,25 @@ end
 
 function BandCircle.Create(pos, ang, color, size, duration)
 	local bc = BandCircle.new(pos, ang, color, size)
+
 	if duration and duration > 0 then
 		bc:SetAnimated(duration)
 	end
+
 	if MagicCircleManager and MagicCircleManager.Add then
 		MagicCircleManager:Add(bc)
 	end
+
 	return bc
 end
 
 -- Console commands for testing
 concommand.Add("magic_circle_test", function(ply, cmd, args)
 	if not IsValid(ply) then return end
-
 	local tr = ply:GetEyeTrace()
 	local pos = tr.HitPos + tr.HitNormal * 5
 	local ang = tr.HitNormal:Angle()
 	ang:RotateAroundAxis(ang:Right(), 90)
-
 	local intensity = tonumber(args[1]) or 3
 	local size = tonumber(args[2]) or 100
 	local r = tonumber(args[3]) or 255
@@ -1131,13 +1348,13 @@ concommand.Add("magic_circle_test", function(ply, cmd, args)
 	local b = tonumber(args[5]) or 0
 	local duration = tonumber(args[6]) or 10
 	local lineWidth = tonumber(args[7]) or 3
-
 	local circle = MagicCircle.CreateMagicCircle(pos, ang, Color(r, g, b, 255), intensity, size, duration, lineWidth)
 	print("Magic circle created! ID: " .. tostring(circle) .. " Rings: " .. circle:GetRingCount() .. " Line Width: " .. lineWidth)
 end)
 
 concommand.Add("magic_circle_clear", function(ply, cmd, args)
 	MagicCircleManager:Clear()
+
 	if IsValid(ply) then
 		print("All magic circles cleared!")
 	end
@@ -1151,13 +1368,38 @@ concommand.Add("band_circle_test", function(ply, cmd, args)
 	local ang = Angle(0, 0, 0)
 	ang:RotateAroundAxis(tr.HitNormal:Angle():Right(), 0)
 	local bc = BandCircle.Create(pos, tr.HitNormal:Angle(), Color(100, 200, 255, 255), tonumber(args[1]) or 80, tonumber(args[2]) or 8)
+
 	if bc then
 		-- Add a few bands spinning on different axes
-		bc:AddBand(tonumber(args[3]) or 60, tonumber(args[4]) or 4, {p = 0, y = 35, r = 0}, 2)
-		bc:AddBand((tonumber(args[3]) or 60) * 0.8, (tonumber(args[4]) or 4) * 0.8, {p = 25, y = -20, r = 0}, 2)
-		bc:AddBand((tonumber(args[3]) or 60) * 1.1, (tonumber(args[4]) or 4) * 0.6, {p = 0, y = 0, r = 45}, 2)
-		bc:AddBand((tonumber(args[3]) or 60) * 1.25, (tonumber(args[4]) or 4) * 0.6, {p = 0, y = 45, r = 45}, 2)
-		bc:AddBand((tonumber(args[3]) or 60) * 1.9, (tonumber(args[4]) or 4) * 0.6, {p = -45, y = 0, r = 45}, 2)
+		bc:AddBand(tonumber(args[3]) or 60, tonumber(args[4]) or 4, {
+			p = 0,
+			y = 35,
+			r = 0
+		}, 2)
+
+		bc:AddBand((tonumber(args[3]) or 60) * 0.8, (tonumber(args[4]) or 4) * 0.8, {
+			p = 25,
+			y = -20,
+			r = 0
+		}, 2)
+
+		bc:AddBand((tonumber(args[3]) or 60) * 1.1, (tonumber(args[4]) or 4) * 0.6, {
+			p = 0,
+			y = 0,
+			r = 45
+		}, 2)
+
+		bc:AddBand((tonumber(args[3]) or 60) * 1.25, (tonumber(args[4]) or 4) * 0.6, {
+			p = 0,
+			y = 45,
+			r = 45
+		}, 2)
+
+		bc:AddBand((tonumber(args[3]) or 60) * 1.9, (tonumber(args[4]) or 4) * 0.6, {
+			p = -45,
+			y = 0,
+			r = 45
+		}, 2)
 	end
 end)
 
