@@ -34,29 +34,9 @@ Arcane:RegisterSpell({
 	end
 })
 
-local function resolveStrikeGround(ply, maxRange)
-	local eyePos = ply:EyePos()
-	local eyeDir = ply:GetAimVector()
-
-	-- Initial aim trace to anything the player points at
-	local trAim = util.TraceLine({
-		start = eyePos,
-		endpos = eyePos + eyeDir * maxRange,
-		mask = MASK_SHOT,
-		filter = ply
-	})
-
-	local candidatePos = trAim.HitPos
-
-	-- Ensure we end up on ground or on top of a surface
-	local trDown = util.TraceLine({
-		start = candidatePos + Vector(0, 0, 2048),
-		endpos = candidatePos - Vector(0, 0, 4096),
-		mask = MASK_SHOT,
-		filter = ply
-	})
-
-	return trDown.HitPos, trDown.HitNormal
+local function resolveStrikeGround(ply)
+	local tr = ply:GetEyeTrace()
+	return tr.HitPos, tr.HitNormal
 end
 
 if CLIENT then
@@ -65,7 +45,7 @@ if CLIENT then
 		if not MagicCircle then return end
 
 		local color = Color(100, 50, 200, 255)
-		local pos = resolveStrikeGround(caster, 2e6) or (caster:GetPos() + Vector(0, 0, 2))
+		local pos = resolveStrikeGround(caster) or (caster:GetPos() + Vector(0, 0, 2))
 		local ang = Angle(0, 0, 0)
 		local size = 300
 		local intensity = 100
@@ -82,7 +62,7 @@ if CLIENT then
 				return
 			end
 
-			local gpos = resolveStrikeGround(caster, 2e6)
+			local gpos = resolveStrikeGround(caster)
 			if gpos then
 				circle.position = gpos + Vector(0, 0, 0.5)
 				circle.angles = Angle(0, 0, 0)
