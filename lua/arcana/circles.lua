@@ -10,6 +10,8 @@ local cam_Start3D2D = _G.cam.Start3D2D
 local cam_End3D2D = _G.cam.End3D2D
 local cam_Start2D = _G.cam.Start2D
 local cam_End2D = _G.cam.End2D
+local cam_PushModelMatrix = _G.cam.PushModelMatrix
+local cam_PopModelMatrix = _G.cam.PopModelMatrix
 local surface_SetFont = _G.surface.SetFont
 local surface_SetTextColor = _G.surface.SetTextColor
 local surface_GetTextSize = _G.surface.GetTextSize
@@ -20,6 +22,8 @@ local surface_SetDrawColor = _G.surface.SetDrawColor
 local surface_DrawTexturedRectRotated = _G.surface.DrawTexturedRectRotated
 local surface_DrawLine = _G.surface.DrawLine
 local surface_DrawCircle = _G.surface.DrawCircle
+local util_CRC = _G.util and _G.util.CRC
+local Matrix = _G.Matrix
 local math_random = _G.math.random
 
 local math_pi = _G.math.pi
@@ -283,17 +287,11 @@ function Ring:Draw(centerPos, angles, color, time)
 
 	-- Pass the rotation angle directly to drawing functions instead of modifying angles
 	if self.type == RING_TYPES.PATTERN_LINES then
-		if self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
-			-- Draw text on top (not cached)
-			self:DrawCircularMysticalText(ringPos, angles, ringColor, self.innerTextRadius + (self.outerTextRadius - self.innerTextRadius) * 0.5, self.mysticalPhrase, true, angles, self.currentRotation)
-		else
+		if not self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
 			self:DrawPatternLines(ringPos, angles, ringColor, angles, self.currentRotation)
 		end
 	elseif self.type == RING_TYPES.RUNE_STAR then
-		if self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
-			-- Draw rune symbols on top (not cached)
-			self:DrawRuneSymbols(ringPos, angles, ringColor, angles, self.currentRotation)
-		else
+		if not self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
 			self:DrawRuneStar(ringPos, angles, ringColor, angles, self.currentRotation)
 		end
 	elseif self.type == RING_TYPES.SIMPLE_LINE then
@@ -339,7 +337,7 @@ end
 function Ring:BuildRingRT()
 	-- Select RT size based on radius for decent quality, with margins
 	local scale = 10
-	local size = math.Clamp(math_floor((self.radius or 128) * 2 * scale), 256, 2048)
+	local size = math.Clamp(math_floor((self.radius or 128) * 2 * scale), 256, 4096)
 	self.rtSize = size
 	self.rtRadiusPx = math_floor(size * 0.48) -- keep a small border to avoid clipping
 	self.unitToPx = self.rtRadiusPx / math_max(1, self.radius)
@@ -357,8 +355,15 @@ function Ring:BuildRingRT()
 		["$vertexcolor"] = 1,
 		["$nolod"] = 1,
 		["$nocull"] = 1,
-		["$additive"] = 1,
+		["$additive"] = 0,
 	})
+
+	-- Pre-cache any glyphs needed so we don't allocate RTs while drawing into the ring RT
+	if self.type == RING_TYPES.PATTERN_LINES then
+		self:RT_PrecacheCircularTextGlyphs()
+	elseif self.type == RING_TYPES.RUNE_STAR then
+		self:RT_PrecacheRuneGlyphs()
+	end
 
 	-- Draw geometry for this ring into the RT (white on transparent)
 	render_PushRenderTarget(self.rt)
@@ -367,8 +372,10 @@ function Ring:BuildRingRT()
 			surface_SetDrawColor(255, 255, 255, 255)
 			if self.type == RING_TYPES.PATTERN_LINES then
 				self:RT_DrawPatternLines2D()
+				self:RT_DrawCircularText2D()
 			elseif self.type == RING_TYPES.RUNE_STAR then
 				self:RT_DrawRuneStar2D()
+				self:RT_DrawRuneSymbols2D()
 			elseif self.type == RING_TYPES.SIMPLE_LINE then
 				self:RT_DrawSimpleLine2D()
 			elseif self.type == RING_TYPES.STAR_RING then
@@ -387,6 +394,48 @@ local function RT_DrawThickCircle(cx, cy, radiusPx, thicknessPx)
 		local r = radiusPx - (thicknessPx - 1) * 0.5 + i
 		surface_DrawCircle(cx, cy, math_max(1, math_floor(r)), 255, 255, 255, 255)
 	end
+end
+
+-- Simple glyph cache for rotated 2D text drawing into RTs
+local GLYPH_CACHE = {}
+
+local function GetGlyphMaterial(fontName, char)
+	local key = (fontName or "") .. ":" .. (char or "")
+	local cached = GLYPH_CACHE[key]
+	if cached then return cached.mat, cached.w, cached.h end
+
+	surface_SetFont(fontName or "DermaDefault")
+	local w, h = surface_GetTextSize(char)
+	w = math.max(1, math.floor(w + 2))
+	h = math.max(1, math.floor(h + 2))
+
+	-- Unique RT/material names per glyph
+	local id = util_CRC and util_CRC(key) or tostring(key):gsub("%W", "")
+	local rtName = "arcana_glyph_rt_" .. id
+	local tex = GetRenderTarget(rtName, w, h, true)
+
+	local matName = "arcana_glyph_mat_" .. id
+	local mat = CreateMaterial(matName, "UnlitGeneric", {
+		["$basetexture"] = tex:GetName(),
+		["$translucent"] = 1,
+		["$vertexalpha"] = 1,
+		["$vertexcolor"] = 1,
+		["$nolod"] = 1,
+	})
+
+	-- Render the glyph (white) onto its RT
+	render_PushRenderTarget(tex)
+		render_Clear(0, 0, 0, 0, true, true)
+		cam_Start2D()
+			surface_SetFont(fontName or "DermaDefault")
+			surface_SetTextColor(255, 255, 255, 255)
+			surface_SetTextPos(1, 1)
+			surface_DrawText(char)
+		cam_End2D()
+	render_PopRenderTarget()
+
+	GLYPH_CACHE[key] = { mat = mat, w = w, h = h }
+	return mat, w, h
 end
 
 local function RT_DrawThickLine2D(x1, y1, x2, y2, thicknessPx)
@@ -431,6 +480,46 @@ function Ring:RT_DrawPatternLines2D()
 	-- text is drawn at runtime on top
 end
 
+-- Draw cached circular mystical text into the RT using 2D transforms.
+-- We render the same cached characters but via matrix rotations around the RT center.
+function Ring:RT_DrawCircularText2D()
+	local textData = self.cachedTextData
+	if not textData or not textData.chars or textData.charCount == 0 then return end
+
+	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
+	local fontName = self.textFont or "MagicCircle_Small"
+	local fontSizeWorld = math_max(32, self.radius * 0.32)
+	local pixelScale = (fontSizeWorld / 512) * (self.unitToPx or 1)
+	local inner = (self.innerTextRadius or (self.radius - 5))
+	local outer = (self.outerTextRadius or self.radius)
+	local radiusPx = math_floor((inner + (outer - inner) * 0.5) * (self.unitToPx or 1))
+
+	-- Estimate spacing using a constant proportion of font size to match previous look
+	local approxCharWidthPx = math_max(1, 0.1 * fontSizeWorld * (self.unitToPx or 1))
+	local circumferencePx = 2 * math_pi * radiusPx
+	local maxCharacters = math_max(1, math_floor(circumferencePx / approxCharWidthPx))
+
+	local sourceChars = textData.chars
+	local sourceCount = textData.charCount
+	if sourceCount == 0 then return end
+
+	surface_SetDrawColor(255, 255, 255, 255)
+	for i = 1, maxCharacters do
+		local char = sourceChars[((i - 1) % sourceCount) + 1]
+		local t = (i - 1) / maxCharacters
+		local angleRad = -t * math_pi * 2 -- reversed
+		local px = cx + math_cos(angleRad) * radiusPx
+		local py = cy + math_sin(angleRad) * radiusPx
+		local rotDeg = math_deg(angleRad + math_pi * 0.5)
+
+		local mat, gw, gh = GetGlyphMaterial(fontName, char)
+		local drawW = math_max(1, gw * pixelScale)
+		local drawH = math_max(1, gh * pixelScale)
+		surface_SetMaterial(mat)
+		surface_DrawTexturedRectRotated(px, py, drawW, drawH, rotDeg)
+	end
+end
+
 function Ring:RT_DrawRuneStar2D()
 	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
 	local thick = self:GetRTThicknessPx()
@@ -458,6 +547,57 @@ function Ring:RT_DrawRuneStar2D()
 			for j = i + 1, 4 do
 				RT_DrawThickLine2D(pts[i].x, pts[i].y, pts[j].x, pts[j].y, thick)
 			end
+		end
+	end
+end
+
+-- Draw rune symbols into RT (white) at rune positions
+function Ring:RT_DrawRuneSymbols2D()
+	if not self.runes then return end
+	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
+	local mainR = math_floor(self.radius * self.unitToPx)
+	local runeRadius = self.radius * (self.runeRadiusRatio or 0.15)
+	local fontSize = math_max(48, runeRadius * 16)
+	local scale = (fontSize / 512) * (self.unitToPx or 1)
+	surface_SetFont("MagicCircle_Rune")
+	surface_SetTextColor(255,255,255,255)
+	for i = 1, 4 do
+		local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25
+		local x = cx + math_cos(a) * mainR
+		local y = cy + math_sin(a) * mainR
+		local m = Matrix()
+		m:Translate(Vector(x, y, 0))
+		m:Scale(Vector(scale, scale, 1))
+		cam_PushModelMatrix(m, true)
+			local ch = self.runes[i]
+			local w, h = surface_GetTextSize(ch)
+			surface_SetTextPos(-w * 0.5, -h * 0.5)
+			surface_DrawText(ch)
+		cam_PopModelMatrix()
+	end
+end
+
+-- Precache rune glyphs used by this ring
+function Ring:RT_PrecacheRuneGlyphs()
+	if not self.runes then return end
+	surface_SetFont("MagicCircle_Rune")
+	for i = 1, 4 do
+		GetGlyphMaterial("MagicCircle_Rune", self.runes[i])
+	end
+end
+
+-- Precache all glyphs needed to fill the circular text once
+function Ring:RT_PrecacheCircularTextGlyphs()
+	local textData = self.cachedTextData
+	if not textData or not textData.chars or textData.charCount == 0 then return end
+	local fontName = self.textFont or "MagicCircle_Small"
+	surface_SetFont(fontName)
+	-- Precache the unique characters set to avoid duplicate work
+	local seen = {}
+	for _, ch in ipairs(textData.chars) do
+		if not seen[ch] then
+			GetGlyphMaterial(fontName, ch)
+			seen[ch] = true
 		end
 	end
 end
