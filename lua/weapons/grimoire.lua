@@ -118,12 +118,12 @@ function SWEP:PrimaryAttack()
     -- Begin casting (server schedules execution after cast time)
     if SERVER then
         Arcane:StartCasting(owner, selectedSpellId)
-        local castTime = math.max(1, spell.cast_time or 0)
+        local castTime = math.max(0.1, spell.cast_time or 0)
         -- Only gate firing by cast time; actual per-spell cooldowns are enforced in Arcane core
         self:SetNextPrimaryFire(CurTime() + castTime)
     else
         -- Client prediction: throttle based on minimum cast time
-        local castTime = math.max(1, spell.cast_time or 0)
+        local castTime = math.max(0.1, spell.cast_time or 0)
         self:SetNextPrimaryFire(CurTime() + castTime)
     end
 
