@@ -11,6 +11,38 @@ function Arcane:Print(...)
     MsgN()
 end
 
+-- Client-side stub for autocomplete and help so players see the command
+if CLIENT then
+    local function arcanaAutoComplete(cmd, stringargs)
+        local input = string.lower(string.Trim(stringargs or ""))
+        local out = {}
+        for id, sp in pairs(Arcane and Arcane.RegisteredSpells or {}) do
+            local idLower = string.lower(id)
+            local nameLower = string.lower(sp.name or id)
+            if input == "" or string.find(idLower, input, 1, true) or string.find(nameLower, input, 1, true) then
+                out[#out + 1] = cmd .. " " .. id
+            end
+        end
+
+        table.sort(out)
+        return out
+    end
+
+    -- Forward to server so typing in client console still works
+    concommand.Add("arcana", function(_, _, args)
+        local raw = tostring(args and args[1] or "")
+        local spellId = string.lower(string.Trim(raw))
+        if spellId == "" then
+            Arcane:Print("Usage: arcana <spellId>")
+            return
+        end
+
+        net.Start("Arcane_ConsoleCastSpell")
+        net.WriteString(spellId)
+        net.SendToServer()
+    end, arcanaAutoComplete, "Cast an Arcana spell: arcana <spellId>")
+end
+
 -- Configuration
 Arcane.Config = {
     -- XP and Leveling
@@ -123,6 +155,7 @@ if SERVER then
     util.AddNetworkString("Arcane_PlayCastGesture")
     util.AddNetworkString("Arcana_AttachBandVFX")
     util.AddNetworkString("Arcana_AttachParticles")
+    util.AddNetworkString("Arcane_ConsoleCastSpell")
 
     function Arcane:SyncPlayerData(ply)
         if not IsValid(ply) then return end
@@ -682,6 +715,22 @@ if SERVER then
     net.Receive("Arcane_UnlockRitual", function(len, ply)
         local ritualId = net.ReadString()
         Arcane:UnlockRitual(ply, ritualId)
+    end)
+
+    -- Handle client-forwarded console cast: "arcana <spellId>"
+    net.Receive("Arcane_ConsoleCastSpell", function(_, ply)
+        if not IsValid(ply) then return end
+        local raw = net.ReadString() or ""
+        local spellId = string.lower(string.Trim(raw))
+        if spellId == "" then return end
+
+        local canCast, _ = Arcane:CanCastSpell(ply, spellId)
+        if not canCast then
+            ply:EmitSound("buttons/button8.wav", 100, 120)
+            return
+        end
+
+        Arcane:StartCasting(ply, spellId)
     end)
 
     -- Assign a spell to a quickslot
