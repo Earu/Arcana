@@ -183,19 +183,17 @@ if CLIENT then
         local hookName = "Arcana_LS_CircleFollow_" .. tostring(circle)
         local endTime = CurTime() + castTime + 0.05
         hook.Add("Think", hookName, function()
-            if not IsValid(caster) or not circle or not circle.isAlive or CurTime() > endTime then
+            if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
                 hook.Remove("Think", hookName)
                 return
             end
+
             local gpos = resolveStrikeGround(caster, 1500)
             if gpos then
                 circle.position = gpos + Vector(0, 0, 0.5)
                 circle.angles = Angle(0, 0, 0)
             end
         end)
-
-        -- Tell the default handler we handled the visuals
-        return true
     end)
 end
 
