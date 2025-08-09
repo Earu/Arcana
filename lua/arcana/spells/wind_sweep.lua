@@ -24,7 +24,7 @@ Arcane:RegisterSpell({
         local origin = (ctx and ctx.circlePos) or caster:GetShootPos()
         local forward = caster:GetAimVector()
         local cone = math.cos(math.rad(30))
-        local strength = 900
+        local strength = 1500
         local radius = 400
 
         for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
@@ -33,6 +33,7 @@ Arcane:RegisterSpell({
                 if dir:Dot(forward) >= cone then
                     if ent:IsPlayer() or ent:IsNPC() then
                         ent:SetVelocity(forward * strength + Vector(0, 0, 120))
+                        ent:SetGroundEntity(NULL)
                     else
                         local phys = ent:GetPhysicsObject()
                         if IsValid(phys) then
