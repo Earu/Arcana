@@ -1,28 +1,6 @@
--- Find a reliable strike point based on the player's aim, clamped to range,
--- and projected to ground with a downward trace.
-local function resolveStrikeGround(ply, maxRange)
-	local eyePos = ply:EyePos()
-	local eyeDir = ply:GetAimVector()
-
-	-- Initial aim trace to anything the player points at
-	local trAim = util.TraceLine({
-		start = eyePos,
-		endpos = eyePos + eyeDir * maxRange,
-		mask = MASK_SHOT,
-		filter = ply
-	})
-
-	local candidatePos = trAim.HitPos
-
-	-- Ensure we end up on ground or on top of a surface
-	local trDown = util.TraceLine({
-		start = candidatePos + Vector(0, 0, 2048),
-		endpos = candidatePos - Vector(0, 0, 4096),
-		mask = MASK_SHOT,
-		filter = ply
-	})
-
-	return trDown.HitPos, trDown.HitNormal
+local function resolveStrikeGround(ply)
+	local tr = ply:GetEyeTrace()
+	return tr.HitPos, tr.HitNormal
 end
 
 local function spawnTeslaBurst(pos)
@@ -114,7 +92,7 @@ Arcane:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		local targetPos = select(1, resolveStrikeGround(caster, 1500))
+		local targetPos = resolveStrikeGround(caster)
 
 		-- Perform 1 strong strike and 2 lighter offset strikes for style
 		local strikes = {
