@@ -13,9 +13,10 @@
 	"$lightwarptexture" "models/arcana/lightwarptexture"
 
 	"$phong" "1"
-	"$phongboost"	"18"
+	"$phongboost"	"1"
 	"$phongalbedotint" "1"
-	"$phongexponenttexture" "shared/phong_exp"
+	"$phongexponent" "15"
+	"$phongexponenttexture" "models/arcana/phong_exp"
 	"$phongfresnelranges"	"[0.005 0.005 1]"
 
 	"$rimlight"               "1"
