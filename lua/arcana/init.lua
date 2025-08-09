@@ -1,12 +1,14 @@
 if SERVER then
     AddCSLuaFile("arcana/core.lua")
     AddCSLuaFile("arcana/circles.lua")
+    AddCSLuaFile("arcana/hud.lua")
 end
 
 include("arcana/core.lua")
 
 if CLIENT then
     include("arcana/circles.lua")
+    include("arcana/hud.lua")
 end
 
 -- Load all spells from arcana/spells/*.lua so each spell can live in its own file

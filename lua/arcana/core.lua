@@ -149,7 +149,12 @@ function Arcane:StartCasting(ply, spellId)
     if not IsValid(ply) then return false end
     local canCast, reason = self:CanCastSpell(ply, spellId)
     if not canCast then
-        if SERVER then ply:ChatPrint("❌ Cannot cast spell: " .. reason) end
+        if CLIENT then
+            Arcane:Print("Cannot cast spell \"" .. spellId .. "\": " .. reason)
+        else
+            ply:EmitSound("buttons/button8.wav", 100, 120)
+        end
+
         return false
     end
 
@@ -434,9 +439,12 @@ function Arcane:CastSpell(ply, spellId, target, context)
 
     local canCast, reason = self:CanCastSpell(ply, spellId)
     if not canCast then
-        if SERVER then
-            ply:ChatPrint("❌ Cannot cast spell: " .. reason)
+        if CLIENT then
+            Arcane:Print("Cannot cast spell \"" .. spellId .. "\": " .. reason)
+        else
+            ply:EmitSound("buttons/button8.wav", 100, 120)
         end
+
         return false
     end
 
@@ -541,8 +549,10 @@ end
 function Arcane:UnlockSpell(ply, spellId)
     local canUnlock, reason = self:CanUnlockSpell(ply, spellId)
     if not canUnlock then
-        if SERVER then
-            ply:ChatPrint("❌ Cannot unlock spell: " .. reason)
+        if CLIENT then
+            Arcane:Print("Cannot unlock spell \"" .. spellId .. "\": " .. reason)
+        else
+            ply:EmitSound("buttons/button8.wav", 100, 120)
         end
         return false
     end
@@ -594,8 +604,10 @@ end
 function Arcane:UnlockRitual(ply, ritualId)
     local canUnlock, reason = self:CanUnlockRitual(ply, ritualId)
     if not canUnlock then
-        if SERVER then
-            ply:ChatPrint("❌ Cannot unlock ritual: " .. reason)
+        if CLIENT then
+            Arcane:Print("Cannot unlock ritual \"" .. ritualId .. "\": " .. reason)
+        else
+            ply:EmitSound("buttons/button8.wav", 100, 120)
         end
         return false
     end
