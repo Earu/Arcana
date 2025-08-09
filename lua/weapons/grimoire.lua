@@ -94,7 +94,7 @@ function SWEP:PrimaryAttack()
 
     if not selectedSpellId then
         if CLIENT and IsFirstTimePredicted() then
-            owner:ChatPrint("❌ No spell selected!")
+            Arcane:Print("❌ No spell selected!")
         end
         return
     end
@@ -103,14 +103,14 @@ function SWEP:PrimaryAttack()
     local spell = Arcane.RegisteredSpells[selectedSpellId]
     if not spell then
         if CLIENT and IsFirstTimePredicted() then
-            owner:ChatPrint("❌ Unknown spell: " .. tostring(selectedSpellId))
+            Arcane:Print("❌ Unknown spell: " .. tostring(selectedSpellId))
         end
         return
     end
 
     if not owner:HasSpellUnlocked(selectedSpellId) then
         if CLIENT and IsFirstTimePredicted() then
-            owner:ChatPrint("❌ Spell not unlocked: " .. spell.name)
+            Arcane:Print("❌ Spell not unlocked: " .. spell.name)
         end
         return
     end

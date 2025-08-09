@@ -20,7 +20,6 @@ Arcane:RegisterSpell({
         local perTick = 5
         local id = "Arcana_Regeneration_" .. caster:SteamID64()
         local endTime = CurTime() + duration
-        caster:ChatPrint("💚 Regeneration begins...")
 
         timer.Create(id, 1, duration, function()
             if not IsValid(caster) then return end
@@ -28,7 +27,6 @@ Arcane:RegisterSpell({
             caster:SetHealth(new)
             if CurTime() >= endTime or not IsValid(caster) then
                 timer.Remove(id)
-                caster:ChatPrint("💚 Regeneration fades.")
             end
         end)
 
