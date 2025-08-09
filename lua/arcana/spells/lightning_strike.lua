@@ -1,7 +1,3 @@
-AddCSLuaFile()
-
-if not Arcane then return end
-
 -- Find a reliable strike point based on the player's aim, clamped to range,
 -- and projected to ground with a downward trace.
 local function resolveStrikeGround(ply, maxRange)

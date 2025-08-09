@@ -1,5 +1,3 @@
-AddCSLuaFile()
-
 Arcane:RegisterSpell({
     id = "fireball",
     name = "Fireball",
