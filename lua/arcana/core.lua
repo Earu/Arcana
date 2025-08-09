@@ -192,7 +192,7 @@ function Arcane:StartCasting(ply, spellId)
     end
 
     local spell = self.RegisteredSpells[spellId]
-    local castTime = math.max(1, spell.cast_time or 0)
+    local castTime = math.max(0.1, spell.cast_time or 0)
 
     -- Decide gesture and broadcast to clients to play locally
     if SERVER then
