@@ -30,6 +30,11 @@ Arcane:RegisterSpell({
             pebble:SetModel("models/props_junk/rock001a.mdl")
             pebble:SetPos(start + VectorRand() * 10 + Vector(0,0,8))
             pebble:Spawn()
+
+            if pebble.CPPISetOwner then
+                pebble:CPPISetOwner(caster)
+            end
+
             local phys = pebble:GetPhysicsObject()
             if IsValid(phys) then
                 phys:SetVelocity(dir * 2000 + VectorRand() * 40)
