@@ -1,13 +1,25 @@
 if SERVER then return end
 
 local render_DrawLine = _G.render.DrawLine
+local render_PushRenderTarget = _G.render.PushRenderTarget
+local render_PopRenderTarget = _G.render.PopRenderTarget
+local render_Clear = _G.render.Clear
+local GetRenderTarget = _G.GetRenderTarget
+local CreateMaterial = _G.CreateMaterial
 local cam_Start3D2D = _G.cam.Start3D2D
 local cam_End3D2D = _G.cam.End3D2D
+local cam_Start2D = _G.cam.Start2D
+local cam_End2D = _G.cam.End2D
 local surface_SetFont = _G.surface.SetFont
 local surface_SetTextColor = _G.surface.SetTextColor
 local surface_GetTextSize = _G.surface.GetTextSize
 local surface_SetTextPos = _G.surface.SetTextPos
 local surface_DrawText = _G.surface.DrawText
+local surface_SetMaterial = _G.surface.SetMaterial
+local surface_SetDrawColor = _G.surface.SetDrawColor
+local surface_DrawTexturedRectRotated = _G.surface.DrawTexturedRectRotated
+local surface_DrawLine = _G.surface.DrawLine
+local surface_DrawCircle = _G.surface.DrawCircle
 local math_random = _G.math.random
 
 local math_pi = _G.math.pi
@@ -154,6 +166,15 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.pulseOffset = math_random() * math_pi * 2
 	ring.lineWidth = 2.0 -- Default line thickness
 
+	-- Render target cache (only for non-band rings)
+	ring.useRTCache = (ring.type ~= RING_TYPES.BAND_RING)
+	ring.rtBuilt = false
+	ring.rtSize = nil
+	ring.rt = nil
+	ring.rtMat = nil
+	ring.rtRadiusPx = nil
+	ring.unitToPx = nil
+
 	-- Type-specific properties
 	if ring.type == RING_TYPES.PATTERN_LINES then
 		ring.mysticalPhrase = ALL_MYSTICAL_PHRASES[math_random(#ALL_MYSTICAL_PHRASES)]
@@ -262,14 +283,28 @@ function Ring:Draw(centerPos, angles, color, time)
 
 	-- Pass the rotation angle directly to drawing functions instead of modifying angles
 	if self.type == RING_TYPES.PATTERN_LINES then
-		self:DrawPatternLines(ringPos, angles, ringColor, angles, self.currentRotation)
+		if self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
+			-- Draw text on top (not cached)
+			self:DrawCircularMysticalText(ringPos, angles, ringColor, self.innerTextRadius + (self.outerTextRadius - self.innerTextRadius) * 0.5, self.mysticalPhrase, true, angles, self.currentRotation)
+		else
+			self:DrawPatternLines(ringPos, angles, ringColor, angles, self.currentRotation)
+		end
 	elseif self.type == RING_TYPES.RUNE_STAR then
-		self:DrawRuneStar(ringPos, angles, ringColor, angles, self.currentRotation)
+		if self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
+			-- Draw rune symbols on top (not cached)
+			self:DrawRuneSymbols(ringPos, angles, ringColor, angles, self.currentRotation)
+		else
+			self:DrawRuneStar(ringPos, angles, ringColor, angles, self.currentRotation)
+		end
 	elseif self.type == RING_TYPES.SIMPLE_LINE then
-		self:DrawSimpleLine(ringPos, angles, ringColor, angles, self.currentRotation)
+		if not self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
+			self:DrawSimpleLine(ringPos, angles, ringColor, angles, self.currentRotation)
+		end
 	elseif self.type == RING_TYPES.STAR_RING then
-		self:DrawStarRing(ringPos, angles, ringColor, angles, self.currentRotation)
-elseif self.type == RING_TYPES.BAND_RING then
+		if not self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation) then
+			self:DrawStarRing(ringPos, angles, ringColor, angles, self.currentRotation)
+		end
+	elseif self.type == RING_TYPES.BAND_RING then
 		local oriented = Angle(angles.p, angles.y, angles.r)
 		if self.axisAngles then
 			-- Apply local orientation offsets to allow arbitrary band axes
@@ -278,6 +313,192 @@ elseif self.type == RING_TYPES.BAND_RING then
 			oriented:RotateAroundAxis(oriented:Forward(), self.axisAngles.r or 0)
 		end
 		self:DrawBandRing(ringPos, oriented, ringColor, angles, self.currentRotation)
+	end
+end
+
+-- Create and fill an RT for this ring if needed, return true if RT-based draw succeeds
+function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
+	if not self.useRTCache then return false end
+
+	if not self.rtBuilt then
+		self:BuildRingRT()
+	end
+	if not self.rt or not self.rtMat then return false end
+
+	-- 3D2D: map texture pixels to world units so that rtRadiusPx maps to self.radius
+	local pxToWorld = 1 / (self.unitToPx or 1)
+	local drawAngles = Angle(angles.p + 180, angles.y, angles.r)
+	cam_Start3D2D(centerPos, drawAngles, pxToWorld)
+		surface_SetMaterial(self.rtMat)
+		surface_SetDrawColor(color.r, color.g, color.b, color.a)
+		surface_DrawTexturedRectRotated(0, 0, self.rtSize, self.rtSize, rotationAngle or 0)
+	cam_End3D2D()
+	return true
+end
+
+function Ring:BuildRingRT()
+	-- Select RT size based on radius for decent quality, with margins
+	local scale = 10
+	local size = math.Clamp(math_floor((self.radius or 128) * 2 * scale), 256, 2048)
+	self.rtSize = size
+	self.rtRadiusPx = math_floor(size * 0.48) -- keep a small border to avoid clipping
+	self.unitToPx = self.rtRadiusPx / math_max(1, self.radius)
+
+	local rtName = "arcana_ring_rt_" .. tostring(self):gsub("%W", "") .. "_r" .. tostring(self.radius) .. "_s" .. tostring(size)
+	local tex = GetRenderTarget(rtName, size, size, true)
+	self.rt = tex
+
+	-- Create a material bound to this RT
+	local matName = "arcana_ring_mat_" .. tostring(self):gsub("%W", "")
+	self.rtMat = CreateMaterial(matName, "UnlitGeneric", {
+		["$basetexture"] = tex:GetName(),
+		["$translucent"] = 1,
+		["$vertexalpha"] = 1,
+		["$vertexcolor"] = 1,
+		["$nolod"] = 1,
+		["$nocull"] = 1,
+		["$additive"] = 1,
+	})
+
+	-- Draw geometry for this ring into the RT (white on transparent)
+	render_PushRenderTarget(self.rt)
+		render_Clear(0, 0, 0, 0, true, true)
+		cam_Start2D()
+			surface_SetDrawColor(255, 255, 255, 255)
+			if self.type == RING_TYPES.PATTERN_LINES then
+				self:RT_DrawPatternLines2D()
+			elseif self.type == RING_TYPES.RUNE_STAR then
+				self:RT_DrawRuneStar2D()
+			elseif self.type == RING_TYPES.SIMPLE_LINE then
+				self:RT_DrawSimpleLine2D()
+			elseif self.type == RING_TYPES.STAR_RING then
+				self:RT_DrawStarRing2D()
+			end
+		cam_End2D()
+	render_PopRenderTarget()
+
+	self.rtBuilt = true
+end
+
+-- 2D helpers for drawing into the RT
+local function RT_DrawThickCircle(cx, cy, radiusPx, thicknessPx)
+	thicknessPx = math_max(1, math_floor(thicknessPx or 1))
+	for i = 0, thicknessPx - 1 do
+		local r = radiusPx - (thicknessPx - 1) * 0.5 + i
+		surface_DrawCircle(cx, cy, math_max(1, math_floor(r)), 255, 255, 255, 255)
+	end
+end
+
+local function RT_DrawThickLine2D(x1, y1, x2, y2, thicknessPx)
+	thicknessPx = math_max(1, math_floor(thicknessPx or 1))
+	if thicknessPx <= 1 then
+		surface_DrawLine(x1, y1, x2, y2)
+		return
+	end
+	local dx, dy = x2 - x1, y2 - y1
+	local len = math.sqrt(dx * dx + dy * dy)
+	if len == 0 then return end
+	local nx = -dy / len
+	local ny = dx / len
+	for i = 0, thicknessPx - 1 do
+		local off = (i - (thicknessPx - 1) * 0.5)
+		local ox = nx * off
+		local oy = ny * off
+		surface_DrawLine(x1 + ox, y1 + oy, x2 + ox, y2 + oy)
+	end
+end
+
+-- map ring line thickness to a fixed world width so cache matches old look
+function Ring:GetRTThicknessPx()
+	local thicknessWorld = 0.6 -- world units
+	return math_max(1, math_floor((self.unitToPx or 1) * thicknessWorld))
+end
+
+function Ring:RT_DrawSimpleLine2D()
+	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
+	local rad = self.rtRadiusPx
+	local thick = self:GetRTThicknessPx()
+	RT_DrawThickCircle(cx, cy, rad, thick)
+end
+
+function Ring:RT_DrawPatternLines2D()
+	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
+	local thick = self:GetRTThicknessPx()
+	local outer = math_floor((self.outerTextRadius or self.radius) * self.unitToPx)
+	local inner = math_floor((self.innerTextRadius or (self.radius - 5)) * self.unitToPx)
+	RT_DrawThickCircle(cx, cy, outer, thick)
+	RT_DrawThickCircle(cx, cy, inner, thick)
+	-- text is drawn at runtime on top
+end
+
+function Ring:RT_DrawRuneStar2D()
+	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
+	local thick = self:GetRTThicknessPx()
+	local mainR = math_floor(self.radius * self.unitToPx)
+	RT_DrawThickCircle(cx, cy, mainR, thick)
+
+	-- 4 rune circles positions
+	local runeR = math_floor((self.radius * (self.runeRadiusRatio or 0.15)) * self.unitToPx)
+	for i = 1, 4 do
+		local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25
+		local x = cx + math_cos(a) * mainR
+		local y = cy + math_sin(a) * mainR
+		RT_DrawThickCircle(x, y, runeR, thick)
+	end
+
+	if self.starConnections then
+		local pts = {}
+		for i = 1, 4 do
+			local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25
+			local x = cx + math_cos(a) * mainR
+			local y = cy + math_sin(a) * mainR
+			pts[i] = { x = x, y = y }
+		end
+		for i = 1, 4 do
+			for j = i + 1, 4 do
+				RT_DrawThickLine2D(pts[i].x, pts[i].y, pts[j].x, pts[j].y, thick)
+			end
+		end
+	end
+end
+
+function Ring:RT_DrawStarRing2D()
+	local cx, cy = self.rtSize * 0.5, self.rtSize * 0.5
+	local thick = self:GetRTThicknessPx()
+	local innerR = math_floor(self.innerRadius * self.unitToPx)
+	local outerR = math_floor(self.outerRadius * self.unitToPx)
+	local starPoints = math_max(5, self.starPoints or 5)
+
+	local pts = {}
+	for i = 0, starPoints * 2 - 1 do
+		local a = (i / (starPoints * 2)) * math_pi * 2
+		local r = (i % 2 == 0) and outerR or innerR
+		pts[i + 1] = { x = cx + math_cos(a) * r, y = cy + math_sin(a) * r }
+	end
+	for i = 1, #pts do
+		local ni = (i % #pts) + 1
+		RT_DrawThickLine2D(pts[i].x, pts[i].y, pts[ni].x, pts[ni].y, thick)
+	end
+	-- Inner spokes
+	for i = 1, starPoints do
+		local outerIndex = (i - 1) * 2 + 1
+		RT_DrawThickLine2D(pts[outerIndex].x, pts[outerIndex].y, cx, cy, thick)
+	end
+end
+
+-- Draw only the rune symbols text (used with RT-cached geometry)
+function Ring:DrawRuneSymbols(centerPos, angles, color, originalAngles, rotationAngle)
+	local runeRadius = self.radius * (self.runeRadiusRatio or 0.15)
+	local rotRad = math_rad(rotationAngle or 0)
+	for i = 1, 4 do
+		local a = (i - 1) * math_pi * 0.5 + math_pi * 0.25 + rotRad
+		local x = math_cos(a) * self.radius
+		local y = math_sin(a) * self.radius
+		local runePos = LocalToWorld3D(Vector(x, y, 0), centerPos, angles)
+		local textAngles = originalAngles or angles
+		local runeAngles = Angle(textAngles.p + 180, textAngles.y, textAngles.r)
+		local runeFontSize = math_max(48, runeRadius * 16)
+		self:Draw3DText(runePos, runeAngles, self.runes and self.runes[i] or GetRandomRune(), runeFontSize, color, "MagicCircle_Rune")
 	end
 end
 
