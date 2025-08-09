@@ -1,5 +1,4 @@
 if SERVER then return end
-local render_DrawLine = _G.render.DrawLine
 local render_SetMaterial = _G.render.SetMaterial
 local render_PushRenderTarget = _G.render.PushRenderTarget
 local render_PopRenderTarget = _G.render.PopRenderTarget
@@ -34,8 +33,6 @@ local math_pi = _G.math.pi
 local math_sin = _G.math.sin
 local math_cos = _G.math.cos
 local math_deg = _G.math.deg
-local math_rad = _G.math.rad
-local math_acos = _G.math.acos
 local math_floor = _G.math.floor
 local math_max = _G.math.max
 local math_min = _G.math.min
@@ -94,44 +91,6 @@ local function GetRandomRune()
 	return allSymbols[math_random(#allSymbols)]
 end
 
-local function LocalToWorld3D(localPos, centerPos, angles)
-	local forward = angles:Forward()
-	local right = angles:Right()
-	local up = angles:Up()
-
-	return centerPos + right * localPos.x + forward * localPos.y + up * localPos.z
-end
-
--- Helper function to draw thick lines using multiple parallel lines
-local function DrawThickLine(startPos, endPos, color, thickness, angles)
-	if thickness <= 1 then
-		render_DrawLine(startPos, endPos, color, true)
-
-		return
-	end
-
-	-- Calculate the direction vector and perpendicular vectors
-	local direction = (endPos - startPos):GetNormalized()
-	local up = angles and angles:Up() or Vector(0, 0, 1)
-	local perpendicular = direction:Cross(up):GetNormalized()
-
-	-- If the perpendicular is zero (parallel to up), use right vector
-	if perpendicular:Length() < 0.01 then
-		local right = angles and angles:Right() or Vector(1, 0, 0)
-		perpendicular = direction:Cross(right):GetNormalized()
-	end
-
-	-- Draw multiple parallel lines to create thickness
-	local lineCount = math_max(1, math_floor(thickness))
-
-	for i = 0, lineCount - 1 do
-		local offset = (i / math_max(1, lineCount - 1) - 0.5) * 0.25
-		local offsetVector = perpendicular * offset
-		local start = startPos + offsetVector
-		local endPoint = endPos + offsetVector
-		render_DrawLine(start, endPoint, color, true)
-	end
-end
 
 -- Ring class implementation
 function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
@@ -197,28 +156,7 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	return ring
 end
 
--- Build an Angle from a forward vector and a desired up vector
-local function AngleFromForwardUp(forward, desiredUp)
-	local f = forward:GetNormalized()
-	local up = desiredUp:GetNormalized()
-	local ang = f:Angle()
-	-- Project vectors onto plane perpendicular to forward and align roll
-	local currentUp = ang:Up()
-	local projDesired = (up - f * up:Dot(f))
-	local projCurrent = (currentUp - f * currentUp:Dot(f))
-	local lenD = projDesired:Length()
-	local lenC = projCurrent:Length()
-	if lenD < 1e-6 or lenC < 1e-6 then return ang end
-	projDesired:Normalize()
-	projCurrent:Normalize()
-	local dot = math.Clamp(projCurrent:Dot(projDesired), -1, 1)
-	local angleRad = math_acos(dot)
-	local cross = projCurrent:Cross(projDesired)
-	local sign = (cross:Dot(f) < 0) and -1 or 1
-	ang:RotateAroundAxis(ang:Forward(), math_deg(sign * angleRad))
 
-	return ang
-end
 
 -- Cache text processing to avoid repeated UTF-8 operations
 function Ring:CacheTextProcessing()
@@ -279,15 +217,13 @@ function Ring:Draw(centerPos, angles, color, time)
 			oriented:RotateAroundAxis(oriented:Forward(), self.axisAngles.r or 0)
 		end
 
-		-- Prefer RT + mesh path; fall back to line/text path if mesh/RT not ready
+		-- RT + mesh-only path
 		if not self.bandRTBuilt then
 			self:BuildBandRTAndMesh()
 		end
 
 		if self.bandRTBuilt and self.bandMat and self.bandMesh then
 			self:DrawBandMesh(ringPos, oriented, ringColor, self.currentRotation)
-		else
-			self:DrawBandRing(ringPos, oriented, ringColor, angles, self.currentRotation)
 		end
 	end
 end
@@ -830,100 +766,6 @@ function Ring:RT_DrawStarRing2D()
 	end
 end
 
--- Draw a vertical band (wall ring) with outward-facing text
-function Ring:DrawBandRing(centerPos, angles, color, originalAngles, rotationAngle)
-	local halfH = (self.bandHeight or (self.radius * 0.15)) * 0.5
-	local rotRad = math_rad(rotationAngle or 0)
-	-- Top and bottom edge circles
-	self:DrawSimpleRingAtRadius(centerPos + angles:Up() * halfH, angles, color, self.radius, rotationAngle)
-	self:DrawSimpleRingAtRadius(centerPos - angles:Up() * halfH, angles, color, self.radius, rotationAngle)
-	-- Vertical segments to imply a glowing band
-	local step = math_max(1, math_floor(self.segments / 16))
-
-	for i = 0, self.segments - 1, step do
-		local a = (i / self.segments) * math_pi * 2 + rotRad
-		local x = math_cos(a) * self.radius
-		local y = math_sin(a) * self.radius
-		local top = LocalToWorld3D(Vector(x, y, halfH), centerPos, angles)
-		local bottom = LocalToWorld3D(Vector(x, y, -halfH), centerPos, angles)
-		DrawThickLine(bottom, top, color, self.lineWidth, angles)
-	end
-
-	-- Outward-facing text around the band
-	self:DrawBandText(centerPos, angles, color, originalAngles, rotationAngle, halfH)
-end
-
--- Text wrapped around the outward face of a 3D band
-function Ring:DrawBandText(centerPos, angles, color, originalAngles, rotationAngle, halfH)
-	local textData = self.cachedTextData
-	if not textData or not textData.chars or textData.charCount == 0 then return end
-	local fontSize = math_max(32, (self.bandHeight or (self.radius * 0.15)) * 2)
-	local circumference = 2 * math_pi * self.radius
-	local charWidth = fontSize * 0.1
-	local maxCharacters = math_floor(circumference / charWidth)
-	local chars = {}
-	local sourceChars = textData.chars
-	local sourceCount = textData.charCount
-	local currentLength = 0
-
-	while currentLength < maxCharacters do
-		for i = 1, sourceCount do
-			if currentLength >= maxCharacters then break end
-			table_insert(chars, sourceChars[i])
-			currentLength = currentLength + 1
-		end
-
-		if sourceCount == 0 then break end
-	end
-
-	local finalLength = #chars
-	if finalLength == 0 then return end
-	local scale = fontSize / 512
-	local rotRad = math_rad(rotationAngle or 0)
-	local upVec = angles:Up()
-
-	for i = 1, finalLength do
-		local char = chars[i]
-		local t = (i - 1) / finalLength
-		local a = t * math_pi * 2 + rotRad
-		local cosA = math_cos(a)
-		local sinA = math_sin(a)
-		local radial = angles:Right() * cosA + angles:Forward() * sinA
-		local worldPos = centerPos + radial * self.radius
-		-- Slightly outwards to avoid z-fighting
-		worldPos = worldPos + radial * 0.5
-		-- Build orientation: forward points outward, up follows circle up
-		local textAng = AngleFromForwardUp(radial, upVec)
-		-- Rotate so text planes face outward rather than toward band top/bottom
-		textAng:RotateAroundAxis(textAng:Right(), -90)
-		cam_Start3D2D(worldPos, textAng, scale)
-		surface_SetFont(self.textFont or "MagicCircle_Small")
-		surface_SetTextColor(color.r, color.g, color.b, color.a)
-		local w, h = surface_GetTextSize(char)
-		-- center vertically in the band
-		surface_SetTextPos(-w * 0.5, -h * 0.5)
-		surface_DrawText(char)
-		cam_End3D2D()
-	end
-end
-
-function Ring:DrawSimpleRingAtRadius(centerPos, angles, color, radius, rotationAngle)
-	local points = {}
-	local rotRad = math_rad(rotationAngle or 0)
-
-	for i = 0, self.segments - 1 do
-		local angle = (i / self.segments) * math_pi * 2 + rotRad
-		local x = math_cos(angle) * radius
-		local y = math_sin(angle) * radius
-		local localPos = Vector(x, y, 0)
-		table_insert(points, LocalToWorld3D(localPos, centerPos, angles))
-	end
-
-	for i = 1, #points do
-		local nextI = (i % #points) + 1
-		DrawThickLine(points[i], points[nextI], color, self.lineWidth, angles)
-	end
-end
 
 -- MagicCircle class implementation
 function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
