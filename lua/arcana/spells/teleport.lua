@@ -2,172 +2,212 @@
 -- Quickly relocate to the point you're aiming at, clamped to range and validated with a hull trace
 
 -- Find a good destination based on aim and ensure player hull fits there.
-local function findSafeTeleportDestination(ply, maxRange)
-    local eyePos = ply:EyePos()
-    local aimDir = ply:GetAimVector()
+local sv_gravity = GetConVar("sv_gravity")
+local vec_up = Vector(0, 0, 1)
+local trMins, trMaxs = Vector(-16, -16, 0), Vector(16, 16, 72)
 
-    -- First, trace along aim to find a candidate point
-    local trAim = util.TraceLine({
-        start = eyePos,
-        endpos = eyePos + aimDir * maxRange,
-        mask = MASK_SHOT,
-        filter = ply
-    })
+-- Common trace mask and small constants for clarity
+local TELEPORT_MASK = bit.bor(CONTENTS_PLAYERCLIP, MASK_PLAYERSOLID_BRUSHONLY, MASK_SHOT_HULL)
+local SURFACE_OFFSET = 120
+local SMALL_NUDGE = 3
+local MAX_BACKOFF_DISTANCE = 100
+local MIN_TRAVEL_DISTANCE = 4
 
-    local hitPos = trAim.Hit and trAim.HitPos or (eyePos + aimDir * math.min(maxRange, 1000))
-    local hitNormal = trAim.Hit and trAim.HitNormal or Vector(0, 0, 1)
+local function findSafeTeleportDestination(ply)
+	local startPos = ply:GetPos() + vec_up
 
-    -- Project down to ground to avoid hovering in air
-    local trDown = util.TraceLine({
-        start = hitPos + Vector(0, 0, 256),
-        endpos = hitPos - Vector(0, 0, 1024),
-        mask = MASK_PLAYERSOLID_BRUSHONLY,
-        filter = ply
-    })
+	-- Aim line trace from player
+	local playerTrace = util.GetPlayerTrace(ply)
+	playerTrace.mask = TELEPORT_MASK
+	local lineTrace = util.TraceLine(playerTrace)
 
-    local groundPos = trDown.Hit and trDown.HitPos or hitPos
-    local groundNormal = trDown.Hit and trDown.HitNormal or hitNormal
+	local function isInWorld(pos)
+		if SERVER then return util.IsInWorld(pos) end
+		return true
+	end
 
-    -- Slightly offset upward and away from the surface
-    local desired = groundPos + groundNormal * 2
+	local aimHitPos = lineTrace.HitPos
+	local wasInWorld = isInWorld(startPos)
 
-    -- Use player collision bounds for a hull fit test
-    local mins, maxs = ply:OBBMins(), ply:OBBMaxs()
-    -- Clamp mins to not go below feet too much
-    mins = Vector(mins.x, mins.y, math.max(mins.z, 0))
+	-- Back off slightly from the hit position in the opposite of the aim direction, clamped
+	local backOffVector = startPos - aimHitPos
+	local backOffLength = math.min(backOffVector:Length(), MAX_BACKOFF_DISTANCE)
+	if backOffLength > 0 then
+		backOffVector:Normalize()
+		backOffVector = backOffVector * backOffLength
+	else
+		backOffVector = Vector(0, 0, 0)
+	end
 
-    local function hullClearAt(pos)
-        local tr = util.TraceHull({
-            start = pos,
-            endpos = pos,
-            mins = mins,
-            maxs = maxs,
-            mask = MASK_PLAYERSOLID,
-            filter = ply
-        })
-        return not tr.Hit
-    end
+	-- If starting outside the world but the opposite side is valid, flip the normal
+	if not wasInWorld and isInWorld(aimHitPos - lineTrace.HitNormal * SURFACE_OFFSET) then
+		lineTrace.HitNormal = -lineTrace.HitNormal
+	end
 
-    -- Try a few adjustments to find a clear spot
-    local attempts = {}
-    attempts[#attempts + 1] = desired
-    attempts[#attempts + 1] = desired + aimDir * 12
-    attempts[#attempts + 1] = desired - aimDir * 12
-    attempts[#attempts + 1] = desired + Vector(0, 0, 12)
-    attempts[#attempts + 1] = desired + Vector(0, 0, 24)
+	-- Start a bit away from the surface we hit
+	local start = aimHitPos + lineTrace.HitNormal * SURFACE_OFFSET
 
-    -- Radial nudge attempts around the aim direction
-    for i = 1, 8 do
-        local ang = (i / 8) * math.pi * 2
-        local offset = Vector(math.cos(ang), math.sin(ang), 0) * 16
-        attempts[#attempts + 1] = desired + offset
-        attempts[#attempts + 1] = desired + offset + Vector(0, 0, 12)
-    end
+	if math.abs(aimHitPos.z - start.z) < 2 then
+		aimHitPos.z = start.z
+	end
 
-    for _, pos in ipairs(attempts) do
-        if hullClearAt(pos) then
-            return pos
-        end
-    end
+	local tracedata = {
+		start = start,
+		endpos = aimHitPos,
+		filter = ply,
+		mins = trMins,
+		maxs = trMaxs,
+		mask = TELEPORT_MASK
+	}
 
-    return nil
+	local function traceHullFrom(newStart)
+		tracedata.start = newStart
+		return util.TraceHull(tracedata)
+	end
+
+	local hullTrace = util.TraceHull(tracedata)
+
+	-- Try a few different candidate starts if the first is invalid
+	if hullTrace.StartSolid or (wasInWorld and not isInWorld(hullTrace.HitPos)) then
+		hullTrace = traceHullFrom(aimHitPos + lineTrace.HitNormal * SMALL_NUDGE)
+	end
+
+	if hullTrace.StartSolid or (wasInWorld and not isInWorld(hullTrace.HitPos)) then
+		hullTrace = traceHullFrom(ply:GetPos() + vec_up)
+	end
+
+	if hullTrace.StartSolid or (wasInWorld and not isInWorld(hullTrace.HitPos)) then
+		hullTrace = traceHullFrom(aimHitPos + backOffVector)
+	end
+
+	if hullTrace.StartSolid then return false, "unable to perform teleportation without getting stuck" end
+	if not isInWorld(hullTrace.HitPos) and wasInWorld then return false, "couldn't teleport there" end
+
+	-- If falling too fast, counteract vertical speed to avoid damage/stuckness
+	local verticalSpeed = math.abs(ply:GetVelocity().z)
+	if verticalSpeed > 100 * math.sqrt(sv_gravity:GetInt()) then
+		ply:EmitSound("physics/concrete/boulder_impact_hard" .. math.random(1, 4) .. ".wav")
+		ply:SetVelocity(-ply:GetVelocity())
+	end
+
+	local prev = ply:GetPos()
+	local newpos = hullTrace.HitPos
+	if newpos:Distance(prev) < MIN_TRAVEL_DISTANCE then
+		return ply:GetPos()
+	end
+
+	return newpos
 end
 
 Arcane:RegisterSpell({
-    id = "teleport",
-    name = "Teleport",
-    description = "Blink to your aim point within range, finding a safe landing spot",
-    category = Arcane.CATEGORIES.UTILITY,
-    level_required = 2,
-    knowledge_cost = 1,
-    cooldown = 0.1,
-    cost_type = Arcane.COST_TYPES.COINS,
-    cost_amount = 30,
-    cast_time = 0.1,
-    range = 0,
-    icon = "icon16/arrow_right.png",
-    has_target = false,
-    cast_anim = "becon",
+	id = "teleport",
+	name = "Teleport",
+	description = "Blink to your aim point within range, finding a safe landing spot",
+	category = Arcane.CATEGORIES.UTILITY,
+	level_required = 2,
+	knowledge_cost = 1,
+	cooldown = 0.1,
+	cost_type = Arcane.COST_TYPES.COINS,
+	cost_amount = 30,
+	cast_time = 0.1,
+	range = 0,
+	icon = "icon16/arrow_right.png",
+	has_target = false,
+	cast_anim = "becon",
 
-    can_cast = function(caster)
-        if caster:InVehicle() then
-            return false, "Cannot teleport while in a vehicle"
-        end
-        return true
-    end,
+	can_cast = function(caster)
+		if caster:InVehicle() then
+			return false, "Cannot teleport while in a vehicle"
+		end
 
-    cast = function(caster, _, _, _)
-        if not SERVER then return true end
+		local ok, reason = hook.Run("CanPlyTeleport", caster)
+		if ok == false then return false, reason or "Something is preventing teleporting" end
 
-        local dest = findSafeTeleportDestination(caster, 1200)
-        if not dest then
-            caster:EmitSound("buttons/button8.wav", 70, 100)
-            return false
-        end
+		return true
+	end,
 
-        local oldPos = caster:GetPos()
+	cast = function(caster, _, _, _)
+		if not SERVER then return true end
 
-        -- Departure effects
-        do
-            local ed = EffectData()
-            ed:SetOrigin(oldPos + Vector(0, 0, 4))
-            util.Effect("cball_explode", ed, true, true)
-            sound.Play("ambient/machines/teleport3.wav", oldPos, 80, 110)
-        end
+		local dest = findSafeTeleportDestination(caster)
+		if not dest then
+			caster:EmitSound("buttons/button8.wav", 70, 100)
+			return false
+		end
 
-        -- Actually move the player, zero their velocity, and ensure not stuck
-        caster:SetVelocity(-caster:GetVelocity())
-        caster:SetPos(dest)
-        caster:SetGroundEntity(NULL)
+		local oldPos = caster:GetPos()
 
-        -- Arrival effects
-        do
-            local ed = EffectData()
-            ed:SetOrigin(dest + Vector(0, 0, 4))
-            util.Effect("cball_explode", ed, true, true)
-            util.ScreenShake(dest, 2, 40, 0.25, 256)
-            sound.Play("ambient/machines/teleport1.wav", dest, 80, 100)
-        end
+		-- Departure effects
+		do
+			local ed = EffectData()
+			ed:SetOrigin(oldPos + Vector(0, 0, 4))
+			util.Effect("cball_explode", ed, true, true)
+			sound.Play("ambient/machines/teleport3.wav", oldPos, 80, 110)
+		end
 
-        -- Brief protective shimmer using band VFX
-        Arcane:SendAttachBandVFX(caster, Color(140, 200, 255, 255), 26, 1.2, {
-            { radius = 20, height = 3, spin = {p = 0, y = 140, r = 0}, lineWidth = 2 },
-        })
+		-- Actually move the player, zero their velocity, and ensure not stuck
+		caster:SetVelocity(-caster:GetVelocity())
+		caster:SetPos(dest)
+		caster:SetGroundEntity(NULL)
 
-        return true
-    end
+		if dest:Distance(oldPos) < 128 then
+			caster:EmitSound("physics/plaster/drywall_footstep" .. math.random(3) .. ".wav")
+		else
+			caster:EmitSound("ui/freeze_cam.wav")
+		end
+
+		hook.Run("PlayerTeleported", caster, dest, oldPos, { teleporting_type = "arcana" })
+
+		-- Arrival effects
+		do
+			local ed = EffectData()
+			ed:SetOrigin(dest + Vector(0, 0, 4))
+			util.Effect("cball_explode", ed, true, true)
+			util.ScreenShake(dest, 2, 40, 0.25, 256)
+			sound.Play("ambient/machines/teleport1.wav", dest, 80, 100)
+		end
+
+		-- Brief protective shimmer using band VFX
+		Arcane:SendAttachBandVFX(caster, Color(140, 200, 255, 255), 26, 1.2, {
+			{ radius = 20, height = 3, spin = {p = 0, y = 140, r = 0}, lineWidth = 2 },
+		})
+
+		return true
+	end
 })
 
 if CLIENT then
-    -- Show a small targeting circle at the prospective landing spot while casting
-    hook.Add("Arcane_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
-        if spellId ~= "teleport" then return end
-        if not MagicCircle then return end
+	-- Show a small targeting circle at the prospective landing spot while casting
+	hook.Add("Arcane_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
+		if spellId ~= "teleport" then return end
+		if not MagicCircle then return end
 
-        local pos = findSafeTeleportDestination(caster, 1200) or (caster:GetPos() + Vector(0, 0, 2))
-        local ang = Angle(0, 0, 0)
-        local color = Color(140, 200, 255, 255)
-        local size = 18
-        local intensity = 3
+		local pos = findSafeTeleportDestination(caster) or (caster:GetPos() + Vector(0, 0, 2))
+		if not pos then return end
 
-        local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
-        if not circle then return end
-        if circle.StartEvolving then circle:StartEvolving(castTime, true) end
+		local ang = Angle(0, 0, 0)
+		local color = Color(140, 200, 255, 255)
+		local size = 18
+		local intensity = 3
 
-        local hookName = "Arcana_TP_CircleFollow_" .. tostring(circle)
-        local endTime = CurTime() + castTime + 0.05
-        hook.Add("Think", hookName, function()
-            if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
-                hook.Remove("Think", hookName)
-                return
-            end
-            local p = findSafeTeleportDestination(caster, 1200)
-            if p then
-                circle.position = p + Vector(0, 0, 0.5)
-                circle.angles = Angle(0, 0, 0)
-            end
-        end)
-    end)
+		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
+		if not circle then return end
+		if circle.StartEvolving then circle:StartEvolving(castTime, true) end
+
+		local hookName = "Arcana_TP_CircleFollow_" .. tostring(circle)
+		local endTime = CurTime() + castTime + 0.05
+		hook.Add("Think", hookName, function()
+			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
+				hook.Remove("Think", hookName)
+				return
+			end
+			local p = findSafeTeleportDestination(caster)
+			if p then
+				circle.position = p + Vector(0, 0, 0.5)
+				circle.angles = Angle(0, 0, 0)
+			end
+		end)
+	end)
 end
 
 
