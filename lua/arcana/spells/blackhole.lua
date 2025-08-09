@@ -34,8 +34,6 @@ Arcane:RegisterSpell({
 	end
 })
 
--- Find a reliable strike point based on the player's aim, clamped to range,
--- and projected to ground with a downward trace.
 local function resolveStrikeGround(ply, maxRange)
 	local eyePos = ply:EyePos()
 	local eyeDir = ply:GetAimVector()
@@ -48,7 +46,7 @@ local function resolveStrikeGround(ply, maxRange)
 		filter = ply
 	})
 
-	local candidatePos = trAim.Hit and trAim.HitPos or (eyePos + eyeDir * math.min(maxRange, 1000))
+	local candidatePos = trAim.HitPos
 
 	-- Ensure we end up on ground or on top of a surface
 	local trDown = util.TraceLine({
@@ -58,11 +56,7 @@ local function resolveStrikeGround(ply, maxRange)
 		filter = ply
 	})
 
-	if trDown.Hit then
-		return trDown.HitPos, trDown.HitNormal
-	end
-
-	return candidatePos, Vector(0, 0, 1)
+	return trDown.HitPos, trDown.HitNormal
 end
 
 if CLIENT then
