@@ -8,8 +8,8 @@ ENT.AdminSpawnable = false
 
 -- Tunables
 ENT.FireballSpeed = 900
-ENT.FireballRadius = 180
-ENT.FireballDamage = 60
+ENT.FireballRadius = 300
+ENT.FireballDamage = 120
 ENT.FireballIgniteTime = 5
 ENT.MaxLifetime = 6
 
