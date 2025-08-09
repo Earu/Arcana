@@ -66,13 +66,8 @@ function ENT:PhysicsCollide(data, phys)
     if self._detonated then return end
     if (CurTime() - (self.Created or 0)) < 0.03 then return end
 
-    if data.HitWorld then
-        self:Detonate()
-        return
-    end
-
     local hit = data.HitEntity
-    if IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit) then
+    if (IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit)) or hit:IsWorld() then
         self:Detonate()
     end
 end
