@@ -378,16 +378,9 @@ function Arcane:CanCastSpell(ply, spellId)
         return false, "Spell on cooldown"
     end
 
-    -- Check costs
-    if spell.cost_type == Arcane.COST_TYPES.COINS then
-        if not ply.GetCoins or ply:GetCoins() < spell.cost_amount then
-            return false, "Insufficient coins"
-        end
-    elseif spell.cost_type == Arcane.COST_TYPES.HEALTH then
-        if ply:Health() <= spell.cost_amount then
-            return false, "Insufficient health"
-        end
-    end
+    -- Cost checks no longer block casting:
+    -- - If coins are insufficient or unavailable, the equivalent amount is taken as health damage on cast
+    -- - If health is insufficient, the player will take lethal damage on cast
 
     -- Custom validation
     if spell.can_cast then
@@ -449,12 +442,36 @@ function Arcane:CastSpell(ply, spellId, target, context)
 
     local spell = self.RegisteredSpells[spellId]
     local data = self:GetPlayerData(ply)
+    local takeDamageInfo = ply.ForceTakeDamageInfo or ply.TakeDamageInfo
 
     -- Apply costs
     if spell.cost_type == Arcane.COST_TYPES.COINS then
-        ply:TakeCoins(spell.cost_amount, "Spell: " .. spell.name)
+        local canPayWithCoins = ply.GetCoins and ply.TakeCoins and (ply:GetCoins() >= spell.cost_amount)
+        if canPayWithCoins then
+            ply:TakeCoins(spell.cost_amount, "Spell: " .. spell.name)
+        else
+            -- Fallback: pay with health as real damage
+            local dmg = DamageInfo()
+            dmg:SetDamage(spell.cost_amount)
+            dmg:SetAttacker(IsValid(ply) and ply or game.GetWorld())
+            dmg:SetInflictor(IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or ply)
+            -- Use DMG_DIRECT so armor is ignored by Source damage rules
+            dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_DIRECT))
+            takeDamageInfo(ply, dmg)
+
+            if spell.cost_amount > 100 then
+                return false, "Insufficient coins"
+            end
+        end
     elseif spell.cost_type == Arcane.COST_TYPES.HEALTH then
-        ply:SetHealth(ply:Health() - spell.cost_amount)
+        -- Health costs are applied as real damage, which can be lethal
+        local dmg = DamageInfo()
+        dmg:SetDamage(spell.cost_amount)
+        dmg:SetAttacker(IsValid(ply) and ply or game.GetWorld())
+        dmg:SetInflictor(IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or ply)
+        -- Use DMG_DIRECT so armor is ignored by Source damage rules
+        dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_DIRECT))
+        takeDamageInfo(ply, dmg)
     end
 
     -- Set cooldown
