@@ -2,6 +2,10 @@ if SERVER then
 	AddCSLuaFile("arcana/core.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/hud.lua")
+
+	resource.AddFile("sound/arcana/magic1.ogg")
+	resource.AddFile("sound/arcana/magic2.ogg")
+	resource.AddFile("sound/arcana/magic3.ogg")
 end
 
 include("arcana/core.lua")

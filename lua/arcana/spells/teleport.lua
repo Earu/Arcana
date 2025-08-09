@@ -142,7 +142,6 @@ Arcane:RegisterSpell({
 			local ed = EffectData()
 			ed:SetOrigin(oldPos + Vector(0, 0, 4))
 			util.Effect("cball_explode", ed, true, true)
-			sound.Play("ambient/machines/teleport3.wav", oldPos, 80, 110)
 		end
 
 		-- Actually move the player, zero their velocity, and ensure not stuck
@@ -164,7 +163,6 @@ Arcane:RegisterSpell({
 			ed:SetOrigin(dest + Vector(0, 0, 4))
 			util.Effect("cball_explode", ed, true, true)
 			util.ScreenShake(dest, 2, 40, 0.25, 256)
-			sound.Play("ambient/machines/teleport1.wav", dest, 80, 100)
 		end
 
 		-- Brief protective shimmer using band VFX

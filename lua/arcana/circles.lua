@@ -756,7 +756,7 @@ function MagicCircle:Update(deltaTime)
 					local pitch = 100 + math.random(-8, 10)
 					local vol = 0.45
 					local posJitter = self.position + Vector(math.random(-2,2), math.random(-2,2), math.random(-1,1))
-					sound.Play("ambient/machines/teleport3.wav", posJitter, 70, pitch, vol)
+					sound.Play("arcana/magic" .. math.random(1, 4) .. ".ogg", posJitter, 70, pitch, vol)
 				end
 			end
 			self.lastVisible = shouldVisible
