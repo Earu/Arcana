@@ -5,7 +5,7 @@ if SERVER then
     resource.AddFile("materials/entities/grimoire.png")
 end
 
-SWEP.PrintName = "Grimoire of Arcane Arts"
+SWEP.PrintName = "Grimoire"
 SWEP.Author = "Earu"
 SWEP.Purpose = "A mystical tome containing powerful spells and rituals"
 SWEP.Instructions = "LMB: Cast | RMB: Open Grimoire | R: Quick Radial"
@@ -571,7 +571,7 @@ if CLIENT then
             Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
             Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
             -- Title
-            local titleText = string.upper("Grimoire of Arcane Arts")
+            local titleText = string.upper("Grimoire")
             surface.SetFont("Arcana_DecoTitle")
             local tw = surface.GetTextSize(titleText)
             draw.SimpleText(titleText, "Arcana_DecoTitle", 18, 10, paleGold)

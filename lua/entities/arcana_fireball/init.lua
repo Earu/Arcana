@@ -53,13 +53,38 @@ function ENT:LaunchTowards(dir)
     end
 end
 
+local function isSolidNonTrigger(ent)
+    if not IsValid(ent) then return false end
+    if ent:IsWorld() then return true end
+    local solid = ent.GetSolid and ent:GetSolid() or SOLID_NONE
+    if solid == SOLID_NONE then return false end
+    local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
+    return bit.band(flags, FSOLID_TRIGGER) == 0
+end
+
 function ENT:PhysicsCollide(data, phys)
-    self:Detonate()
+    if self._detonated then return end
+    if (CurTime() - (self.Created or 0)) < 0.03 then return end
+
+    if data.HitWorld then
+        self:Detonate()
+        return
+    end
+
+    local hit = data.HitEntity
+    if IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit) then
+        self:Detonate()
+    end
 end
 
 function ENT:Touch(ent)
+    if self._detonated then return end
     if ent == self:GetSpellOwner() then return end
-    self:Detonate()
+    if (CurTime() - (self.Created or 0)) < 0.03 then return end
+
+    if isSolidNonTrigger(ent) then
+        self:Detonate()
+    end
 end
 
 function ENT:Detonate()
