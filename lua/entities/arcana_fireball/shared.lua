@@ -14,7 +14,5 @@ ENT.FireballIgniteTime = 5
 ENT.MaxLifetime = 6
 
 function ENT:SetupDataTables()
-    self:NetworkVar("Entity", 0, "SpellOwner")
+	self:NetworkVar("Entity", 0, "SpellOwner")
 end
-
-
