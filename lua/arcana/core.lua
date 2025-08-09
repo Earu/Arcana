@@ -742,6 +742,10 @@ if CLIENT then
         if not IsValid(caster) then return end
         if not MagicCircle then return end
 
+        -- Allow spells to override the default casting circle. If a hook returns true, stop.
+        local handled = hook.Run("Arcane_BeginCastingVisuals", caster, spellId, castTime, forwardLike)
+        if handled == true then return end
+
         local pos = caster:GetPos() + Vector(0, 0, 2)
         local ang = Angle(0, 180, 180)
         local size = 60
