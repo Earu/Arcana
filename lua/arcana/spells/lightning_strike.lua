@@ -6,6 +6,7 @@ end
 local function spawnTeslaBurst(pos)
 	local tesla = ents.Create("point_tesla")
 	if not IsValid(tesla) then return end
+
 	tesla:SetPos(pos)
 	tesla:SetKeyValue("targetname", "arcana_lightning")
 	tesla:SetKeyValue("m_SoundName", "DoSpark")
@@ -23,6 +24,8 @@ local function spawnTeslaBurst(pos)
 	tesla:Spawn()
 	tesla:Fire("DoSpark", "", 0)
 	tesla:Fire("Kill", "", 0.6)
+
+	return tesla
 end
 
 -- Draw a few quick effects at the impact point
@@ -62,7 +65,12 @@ local function applyLightningDamage(attacker, hitPos, normal)
 		local tpos = tgt:WorldSpaceCenter()
 		timer.Simple(0.03 * i, function()
 			if not IsValid(tgt) then return end
-			spawnTeslaBurst(tpos)
+
+			local tesla = spawnTeslaBurst(tpos)
+			if IsValid(tesla) and tesla.CPPISetOwner then
+				tesla:CPPISetOwner(attacker)
+			end
+
 			local dmg = DamageInfo()
 			dmg:SetDamage(24)
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
@@ -105,25 +113,20 @@ Arcane:RegisterSpell({
 			timer.Simple(s.delay, function()
 				if not IsValid(caster) then return end
 
-				local base = targetPos + s.offset
-				local tr = util.TraceLine({
-					start = base + Vector(0, 0, 2048),
-					endpos = base - Vector(0, 0, 4096),
-					mask = MASK_SHOT,
-					filter = caster
-				})
-				local hitPos = tr.Hit and tr.HitPos or (base + Vector(0, 0, 8))
-				local hitNormal = tr.Hit and tr.HitNormal or Vector(0, 0, 1)
-
 				-- Tesla burst at impact, plus supporting effects
-				spawnTeslaBurst(hitPos + hitNormal * 2)
-				impactVFX(hitPos, hitNormal)
+				local normal = Vector(0, 0, 1)
+				local tesla = spawnTeslaBurst(targetPos + s.offset)
+				if IsValid(tesla) and tesla.CPPISetOwner then
+					tesla:CPPISetOwner(caster)
+				end
+
+				impactVFX(targetPos + s.offset, normal)
 
 				-- Damage and short chains for the main strike only
 				if s.power >= 1.0 then
-					applyLightningDamage(caster, hitPos, hitNormal)
+					applyLightningDamage(caster, targetPos + s.offset, normal)
 				else
-					util.BlastDamage(caster, caster, hitPos, 120, 30)
+					util.BlastDamage(caster, caster, targetPos + s.offset, 120, 30)
 				end
 			end)
 		end
@@ -131,7 +134,6 @@ Arcane:RegisterSpell({
 		return true
 	end
 })
-
 
 if CLIENT then
 	-- Custom moving magic circle for lightning_strike that follows the player's aim on the ground
@@ -166,5 +168,3 @@ if CLIENT then
 		end)
 	end)
 end
-
-
