@@ -32,6 +32,7 @@ Arcane:RegisterSpell({
         ent:Spawn()
         ent:SetOwner(caster)
         if ent.SetSpellOwner then ent:SetSpellOwner(caster) end
+        if ent.CPPISetOwner then ent:CPPISetOwner(caster) end
 
         if ent.LaunchTowards then ent:LaunchTowards(caster:GetAimVector()) end
 
