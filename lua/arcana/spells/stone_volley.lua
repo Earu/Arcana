@@ -1,7 +1,3 @@
-AddCSLuaFile()
-
-if not Arcane then return end
-
 Arcane:RegisterSpell({
     id = "stone_volley",
     name = "Stone Volley",
