@@ -317,12 +317,6 @@ function Arcane:LevelUp(ply, oldLevel, newLevel)
 
 	-- Notify player
 	if SERVER then
-		ply:ChatPrint("🌟 Level Up! You are now level " .. newLevel .. "!")
-		ply:ChatPrint("💎 You gained " .. (levelsGained * Arcane.Config.KNOWLEDGE_POINTS_PER_LEVEL) .. " knowledge points!")
-
-		-- Visual/audio feedback
-		ply:EmitSound("buttons/bell1.wav", 75, 100)
-
 		-- Network level up notification
 		net.Start("Arcane_LevelUp")
 		net.WriteUInt(newLevel, 16)
