@@ -45,6 +45,11 @@ local utf8_char = _G.utf8.char
 local Angle = _G.Angle
 local Vector = _G.Vector
 local Color = _G.Color
+
+local function getRTBuildPasses()
+	return 4
+end
+
 local MagicCircle = {}
 MagicCircle.__index = MagicCircle
 -- Ring class definition
@@ -363,16 +368,20 @@ function Ring:BuildRingRT()
 		self.rtRadiusPx = entry.rtRadiusPx
 		self.unitToPx = entry.rtRadiusPx / math_max(1, entry.radiusBucket)
 
-		if self.type == RING_TYPES.PATTERN_LINES then
-			self:RT_DrawPatternLines2D()
-			self:RT_DrawCircularText2D()
-		elseif self.type == RING_TYPES.RUNE_STAR then
-			self:RT_DrawRuneStar2D()
-			self:RT_DrawRuneSymbols2D()
-		elseif self.type == RING_TYPES.SIMPLE_LINE then
-			self:RT_DrawSimpleLine2D()
-		elseif self.type == RING_TYPES.STAR_RING then
-			self:RT_DrawStarRing2D()
+		local passes = getRTBuildPasses()
+		for _pass = 1, passes do
+			surface_SetDrawColor(255, 255, 255, 255)
+			if self.type == RING_TYPES.PATTERN_LINES then
+				self:RT_DrawPatternLines2D()
+				self:RT_DrawCircularText2D()
+			elseif self.type == RING_TYPES.RUNE_STAR then
+				self:RT_DrawRuneStar2D()
+				self:RT_DrawRuneSymbols2D()
+			elseif self.type == RING_TYPES.SIMPLE_LINE then
+				self:RT_DrawSimpleLine2D()
+			elseif self.type == RING_TYPES.STAR_RING then
+				self:RT_DrawStarRing2D()
+			end
 		end
 
 		cam_End2D()
@@ -426,10 +435,13 @@ local function GetGlyphMaterial(fontName, char)
 	render_PushRenderTarget(tex)
 	render_Clear(0, 0, 0, 0, true, true)
 	cam_Start2D()
-	surface_SetFont(fontName or "DermaDefault")
-	surface_SetTextColor(255, 255, 255, 255)
-	surface_SetTextPos(1, 1)
-	surface_DrawText(char)
+		surface_SetFont(fontName or "DermaDefault")
+		surface_SetTextColor(255, 255, 255, 255)
+		local passes = getRTBuildPasses()
+		for _pass = 1, passes do
+			surface_SetTextPos(1, 1)
+			surface_DrawText(char)
+		end
 	cam_End2D()
 	render_PopRenderTarget()
 
@@ -479,30 +491,33 @@ function Ring:BuildBandRTAndMesh()
 
 			local scale = math_max(0.25, math_min(2.5, (texH * 0.7) / ch))
 
-			do
-				local lineThickness = math_max(1, math_floor(texH * 0.06))
-				local drawHRef = math_max(1, ch * scale)
-				local yText = math_floor((texH - drawHRef) * 0.5)
-				local pad = math_max(1, math_floor(lineThickness * 1.2))
-				local yTop = math_max(0, yText - pad - math_floor(lineThickness * 0.5))
-				local yBot = math_min(texH - lineThickness, yText + drawHRef + pad - math_floor(lineThickness * 0.5))
-				surface_SetDrawColor(255, 255, 255, 255)
-				surface_DrawRect(0, yTop, texW, lineThickness)
-				surface_DrawRect(0, yBot, texW, lineThickness)
-			end
+			local passes = getRTBuildPasses()
+			for _pass = 1, passes do
+				do
+					local lineThickness = math_max(1, math_floor(texH * 0.06))
+					local drawHRef = math_max(1, ch * scale)
+					local yText = math_floor((texH - drawHRef) * 0.5)
+					local pad = math_max(1, math_floor(lineThickness * 1.2))
+					local yTop = math_max(0, yText - pad - math_floor(lineThickness * 0.5))
+					local yBot = math_min(texH - lineThickness, yText + drawHRef + pad - math_floor(lineThickness * 0.5))
+					surface_SetDrawColor(255, 255, 255, 255)
+					surface_DrawRect(0, yTop, texW, lineThickness)
+					surface_DrawRect(0, yBot, texW, lineThickness)
+				end
 
-			local x = 0
-			local idx = 1
-			while x < texW + cw * scale do
-				local char = textData.chars[((idx - 1) % textData.charCount) + 1]
-				local gm, gw, gh = GetGlyphMaterial(fontName, char)
-				local drawW = math_max(1, gw * scale)
-				local drawH = math_max(1, gh * scale)
-				local y = math_floor((texH - drawH) * 0.5)
-				surface_SetMaterial(gm)
-				surface_DrawTexturedRect(x, y, drawW, drawH)
-				x = x + math_max(1, drawW * 0.9)
-				idx = idx + 1
+				local x = 0
+				local idx = 1
+				while x < texW + cw * scale do
+					local char = textData.chars[((idx - 1) % textData.charCount) + 1]
+					local gm, gw, gh = GetGlyphMaterial(fontName, char)
+					local drawW = math_max(1, gw * scale)
+					local drawH = math_max(1, gh * scale)
+					local y = math_floor((texH - drawH) * 0.5)
+					surface_SetMaterial(gm)
+					surface_DrawTexturedRect(x, y, drawW, drawH)
+					x = x + math_max(1, drawW * 0.9)
+					idx = idx + 1
+				end
 			end
 		end
 
