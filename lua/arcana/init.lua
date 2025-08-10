@@ -42,7 +42,7 @@ end)
 if SERVER then
 	-- Starter spell for new players
 	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function( wep, ply)
-		if wep:GetClass() == "grimoire" and IsValid(ply) and ply:CanUnlockSpell(ply, "fireball") then
+		if wep:GetClass() == "grimoire" and IsValid(ply) and Arcane:CanUnlockSpell(ply, "fireball") then
 			Arcane:UnlockSpell(ply, "fireball")
 		end
 	end)

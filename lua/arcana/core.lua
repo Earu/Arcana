@@ -157,6 +157,8 @@ if SERVER then
 	util.AddNetworkString("Arcana_AttachParticles")
 	util.AddNetworkString("Arcane_ConsoleCastSpell")
 	util.AddNetworkString("Arcane_ErrorNotification")
+	util.AddNetworkString("Arcane_SpellUnlocked")
+	util.AddNetworkString("Arcane_RitualUnlocked")
 
 	function Arcane:SyncPlayerData(ply)
 		if not IsValid(ply) then return end
@@ -619,8 +621,19 @@ function Arcane:UnlockSpell(ply, spellId)
 	end
 
 	if SERVER then
-		ply:ChatPrint("🎓 Unlocked spell: " .. spell.name .. "!")
 		self:SyncPlayerData(ply)
+
+		-- Brief celebratory rings around the player
+		self:SendAttachBandVFX(ply, Color(222, 198, 120, 255), 120, 4, {
+			{ radius = 60,  height = 14, spin = { p = 0.2, y = 0.6, r = 0.1 }, lineWidth = 3 },
+			{ radius = 90,  height = 12, spin = { p = -0.3, y = -0.4, r = 0.0 }, lineWidth = 2 },
+		})
+
+		-- Tell the unlocking client to show an on-screen announcement & play a sound
+		net.Start("Arcane_SpellUnlocked")
+			net.WriteString(spellId)
+			net.WriteString(spell.name or spellId)
+		net.Send(ply)
 	end
 
 	self:SavePlayerData(ply)
@@ -664,8 +677,19 @@ function Arcane:UnlockRitual(ply, ritualId)
 	data.unlocked_rituals[ritualId] = true
 
 	if SERVER then
-		ply:ChatPrint("🎓 Unlocked ritual: " .. ritual.name .. "!")
 		self:SyncPlayerData(ply)
+
+		-- Brief celebratory rings around the player
+		self:SendAttachBandVFX(ply, Color(222, 198, 120, 255), 120, 4, {
+			{ radius = 60,  height = 14, spin = { p = 0.2, y = 0.6, r = 0.1 }, lineWidth = 3 },
+			{ radius = 90,  height = 12, spin = { p = -0.3, y = -0.4, r = 0.0 }, lineWidth = 2 },
+		})
+
+		-- Tell the unlocking client to show an on-screen announcement & play a sound
+		net.Start("Arcane_RitualUnlocked")
+			net.WriteString(ritualId)
+			net.WriteString(ritual.name or ritualId)
+		net.Send(ply)
 	end
 
 	self:SavePlayerData(ply)
@@ -784,14 +808,20 @@ if CLIENT then
 	end)
 
 	net.Receive("Arcane_LevelUp", function()
-		local level = net.ReadUInt(16)
-		local knowledge = net.ReadUInt(16)
+		local newLevel = net.ReadUInt(16)
+		local newKnowledgeTotal = net.ReadUInt(16)
 
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
 		local data = Arcane:GetPlayerData(ply)
-		data.level = level
-		data.knowledge_points = knowledge
+		local prevLevel = data.level or 1
+		local prevKnowledge = data.knowledge_points or 0
+
+		data.level = newLevel
+		data.knowledge_points = newKnowledgeTotal
+
+		-- Notify UI (HUD) with deltas
+		hook.Run("Arcane_ClientLevelUp", prevLevel, newLevel, math.max(0, newKnowledgeTotal - prevKnowledge))
 	end)
 
 	net.Receive("Arcane_FullSync", function()
