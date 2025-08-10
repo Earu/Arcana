@@ -91,6 +91,60 @@ local function GetRandomRune()
 	return allSymbols[math_random(#allSymbols)]
 end
 
+-- Shared cache for ring render targets/materials to avoid per-instance VRAM growth
+local RING_RT_CACHE = {}
+local BAND_RT_CACHE = {}
+local BAND_MESH_CACHE = {}
+
+-- Quantize a numeric value to limit the number of RT variants produced
+local function quantize(value, step)
+	step = step or 1
+	return math_floor((value or 0) / step + 0.5) * step
+end
+
+-- Build a deterministic cache key for a ring RT based on the visual parameters
+-- that affect the RT contents. The function returns (key, sizeBucket)
+local function ringRTKey(r)
+	local ringType = r.type or 0
+	local radius = tonumber(r.radius or 128) or 128
+	-- Derive intended RT size (as before), then bucket to reduce permutations
+	local baseSize = math.Clamp(math_floor(radius * 2 * 10), 256, 4096)
+	local sizeBucket = math.min(4096, math.max(256, quantize(baseSize, 64)))
+	local radiusBucket = quantize(radius, 1)
+	local lineWidthBucket = quantize(r.lineWidth or 2, 0.5)
+	local fontName = r.textFont or "MagicCircle_Medium"
+	local phrase = r.mysticalPhrase or ""
+	local phraseId = (util_CRC and util_CRC(phrase)) or tostring(phrase)
+	local inner = quantize(r.innerTextRadius or (radius - 5), 1)
+	local outer = quantize(r.outerTextRadius or radius, 1)
+
+	local key = string.format(
+		"t%d_s%d_r%d_lw%.1f_f%s_p%s_in%d_out%d",
+		ringType, sizeBucket, radiusBucket, lineWidthBucket, fontName, tostring(phraseId), inner, outer
+	)
+
+	return key, sizeBucket, radiusBucket
+end
+
+-- Build a deterministic cache key for band rings' rectangular RT
+-- Returns (key, wBucket, hBucket)
+local function bandRTKey(r)
+	local radius = math_max(1, r.radius or 64)
+	local height = math_max(1, r.bandHeight or (radius * 0.15))
+	local pxPerUnit = math_max(8, math_min(64, r.bandPxPerUnit or 32))
+	local pxPerUnitBucket = quantize(pxPerUnit, 4)
+	local circumference = 2 * math_pi * radius
+	local texW = math_max(256, math_floor(circumference * pxPerUnitBucket))
+	texW = math_min(texW, 4096)
+	local wBucket = math_min(4096, math_max(256, quantize(texW, 128)))
+	local texH = math_max(64, math_min(1024, math_floor(height * pxPerUnitBucket)))
+	local hBucket = math_min(1024, math_max(64, quantize(texH, 16)))
+	local fontName = r.textFont or "MagicCircle_Medium"
+	local phrase = r.mysticalPhrase or ""
+	local phraseId = (util_CRC and util_CRC(phrase)) or tostring(phrase)
+	local key = string.format("w%d_h%d_px%d_f%s_p%s", wBucket, hBucket, pxPerUnitBucket, fontName, tostring(phraseId))
+	return key, wBucket, hBucket
+end
 
 -- Ring class implementation
 function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
@@ -250,55 +304,86 @@ function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
 end
 
 function Ring:BuildRingRT()
-	-- Select RT size based on radius for decent quality, with margins
-	local scale = 10
-	local size = math.Clamp(math_floor((self.radius or 128) * 2 * scale), 256, 4096)
-	self.rtSize = size
-	self.rtRadiusPx = math_floor(size * 0.48) -- keep a small border to avoid clipping
+	-- Resolve a shared cache entry or create one if missing
+	local key, size, radiusBucket = ringRTKey(self)
+	local entry = RING_RT_CACHE[key]
+
+	if not entry then
+		local rtName = "arcana_ring_rt_" .. key
+		local tex = GetRenderTarget(rtName, size, size, true)
+		local matName = "arcana_ring_mat_" .. key
+		local mat = CreateMaterial(matName, "UnlitGeneric", {
+			["$basetexture"] = tex:GetName(),
+			["$translucent"] = 1,
+			["$vertexalpha"] = 1,
+			["$vertexcolor"] = 1,
+			["$nolod"] = 1,
+			["$nocull"] = 1,
+			["$additive"] = 0,
+		})
+
+		entry = {
+			tex = tex,
+			mat = mat,
+			size = size,
+			rtRadiusPx = math_floor(size * 0.48),
+			radiusBucket = radiusBucket,
+			built = false,
+		}
+		RING_RT_CACHE[key] = entry
+	end
+
+	-- Bind shared RT/material to this instance
+	self.rtSize = entry.size
+	self.rtRadiusPx = entry.rtRadiusPx
 	self.unitToPx = self.rtRadiusPx / math_max(1, self.radius)
-	local rtName = "arcana_ring_rt_" .. tostring(self):gsub("%W", "") .. "_r" .. tostring(self.radius) .. "_s" .. tostring(size)
-	local tex = GetRenderTarget(rtName, size, size, true)
-	self.rt = tex
-	-- Create a material bound to this RT
-	local matName = "arcana_ring_mat_" .. tostring(self):gsub("%W", "")
+	self.rt = entry.tex
+	self.rtMat = entry.mat
 
-	self.rtMat = CreateMaterial(matName, "UnlitGeneric", {
-		["$basetexture"] = tex:GetName(),
-		["$translucent"] = 1,
-		["$vertexalpha"] = 1,
-		["$vertexcolor"] = 1,
-		["$nolod"] = 1,
-		["$nocull"] = 1,
-		["$additive"] = 0,
-	})
+	-- Pre-cache glyphs before first draw to avoid mid-draw allocations
+	if not entry.built then
+		if self.type == RING_TYPES.PATTERN_LINES then
+			self:RT_PrecacheCircularTextGlyphs()
+		elseif self.type == RING_TYPES.RUNE_STAR then
+			self:RT_PrecacheRuneGlyphs()
+		end
 
-	-- Pre-cache any glyphs needed so we don't allocate RTs while drawing into the ring RT
-	if self.type == RING_TYPES.PATTERN_LINES then
-		self:RT_PrecacheCircularTextGlyphs()
-	elseif self.type == RING_TYPES.RUNE_STAR then
-		self:RT_PrecacheRuneGlyphs()
+		-- Render geometry for this ring variant once
+		render_PushRenderTarget(entry.tex)
+		render_Clear(0, 0, 0, 0, true, true)
+		cam_Start2D()
+		surface_SetDrawColor(255, 255, 255, 255)
+
+		-- Build using a canonical unit-to-pixel mapping so all rings sharing
+		-- this cache key produce identical RT contents
+		local oldUnitToPx = self.unitToPx
+		local oldRtSize = self.rtSize
+		local oldRtRadiusPx = self.rtRadiusPx
+		self.rtSize = entry.size
+		self.rtRadiusPx = entry.rtRadiusPx
+		self.unitToPx = entry.rtRadiusPx / math_max(1, entry.radiusBucket)
+
+		if self.type == RING_TYPES.PATTERN_LINES then
+			self:RT_DrawPatternLines2D()
+			self:RT_DrawCircularText2D()
+		elseif self.type == RING_TYPES.RUNE_STAR then
+			self:RT_DrawRuneStar2D()
+			self:RT_DrawRuneSymbols2D()
+		elseif self.type == RING_TYPES.SIMPLE_LINE then
+			self:RT_DrawSimpleLine2D()
+		elseif self.type == RING_TYPES.STAR_RING then
+			self:RT_DrawStarRing2D()
+		end
+
+		cam_End2D()
+		render_PopRenderTarget()
+		-- Restore instance mapping
+		self.unitToPx = oldUnitToPx
+		self.rtSize = oldRtSize
+		self.rtRadiusPx = oldRtRadiusPx
+		entry.built = true
 	end
 
-	-- Draw geometry for this ring into the RT (white on transparent)
-	render_PushRenderTarget(self.rt)
-	render_Clear(0, 0, 0, 0, true, true)
-	cam_Start2D()
-	surface_SetDrawColor(255, 255, 255, 255)
-
-	if self.type == RING_TYPES.PATTERN_LINES then
-		self:RT_DrawPatternLines2D()
-		self:RT_DrawCircularText2D()
-	elseif self.type == RING_TYPES.RUNE_STAR then
-		self:RT_DrawRuneStar2D()
-		self:RT_DrawRuneSymbols2D()
-	elseif self.type == RING_TYPES.SIMPLE_LINE then
-		self:RT_DrawSimpleLine2D()
-	elseif self.type == RING_TYPES.STAR_RING then
-		self:RT_DrawStarRing2D()
-	end
-
-	cam_End2D()
-	render_PopRenderTarget()
 	self.rtBuilt = true
 end
 
@@ -359,178 +444,123 @@ end
 
 -- Build rectangular RT and cylindrical mesh for band rings
 function Ring:BuildBandRTAndMesh()
+	-- Shared band RT/material
+	local rtKey, texW, texH = bandRTKey(self)
+	local rtEntry = BAND_RT_CACHE[rtKey]
+
+	if not rtEntry then
+		local rtName = "arcana_band_rt_" .. rtKey
+		local tex = GetRenderTarget(rtName, texW, texH, true)
+		local matName = "arcana_band_mat_" .. rtKey
+		local mat = CreateMaterial(matName, "UnlitGeneric", {
+			["$basetexture"] = tex:GetName(),
+			["$translucent"] = 1,
+			["$vertexalpha"] = 1,
+			["$vertexcolor"] = 1,
+			["$nolod"] = 1,
+			["$nocull"] = 1,
+		})
+
+		self:RT_PrecacheCircularTextGlyphs()
+
+		render_PushRenderTarget(tex)
+		render_Clear(0, 0, 0, 0, true, true)
+		cam_Start2D()
+		surface_SetDrawColor(255, 255, 255, 255)
+
+		local textData = self.cachedTextData
+		if textData and textData.chars and textData.charCount > 0 then
+			local fontName = self.textFont or "MagicCircle_Medium"
+			surface_SetFont(fontName)
+			local sampleChar = textData.chars[1]
+			local cw, ch = surface_GetTextSize(sampleChar)
+			if cw <= 0 then cw = 16 end
+			if ch <= 0 then ch = 32 end
+
+			local scale = math_max(0.25, math_min(2.5, (texH * 0.7) / ch))
+
+			do
+				local lineThickness = math_max(1, math_floor(texH * 0.06))
+				local drawHRef = math_max(1, ch * scale)
+				local yText = math_floor((texH - drawHRef) * 0.5)
+				local pad = math_max(1, math_floor(lineThickness * 1.2))
+				local yTop = math_max(0, yText - pad - math_floor(lineThickness * 0.5))
+				local yBot = math_min(texH - lineThickness, yText + drawHRef + pad - math_floor(lineThickness * 0.5))
+				surface_SetDrawColor(255, 255, 255, 255)
+				surface_DrawRect(0, yTop, texW, lineThickness)
+				surface_DrawRect(0, yBot, texW, lineThickness)
+			end
+
+			local x = 0
+			local idx = 1
+			while x < texW + cw * scale do
+				local char = textData.chars[((idx - 1) % textData.charCount) + 1]
+				local gm, gw, gh = GetGlyphMaterial(fontName, char)
+				local drawW = math_max(1, gw * scale)
+				local drawH = math_max(1, gh * scale)
+				local y = math_floor((texH - drawH) * 0.5)
+				surface_SetMaterial(gm)
+				surface_DrawTexturedRect(x, y, drawW, drawH)
+				x = x + math_max(1, drawW * 0.9)
+				idx = idx + 1
+			end
+		end
+
+		cam_End2D()
+		render_PopRenderTarget()
+
+		rtEntry = { tex = tex, mat = mat, w = texW, h = texH }
+		BAND_RT_CACHE[rtKey] = rtEntry
+	end
+
+	self.bandRT = rtEntry.tex
+	self.bandMat = rtEntry.mat
+	self.bandRTW = rtEntry.w
+	self.bandRTH = rtEntry.h
+
+	-- Shared mesh for the cylindrical strip
 	local height = math_max(1, self.bandHeight or (self.radius * 0.15))
-	local circumference = 2 * math_pi * math_max(1, self.radius)
-	-- Choose pixels per unit to balance quality/perf
-	local pxPerUnit = math_max(8, math_min(64, self.bandPxPerUnit or 32))
-	local texW = math_max(256, math_floor(circumference * pxPerUnit))
-	-- Clamp texture width to something reasonable
-	texW = math_min(texW, 4096)
-	local texH = math_max(64, math_min(1024, math_floor(height * pxPerUnit)))
-	self.bandRTW = texW
-	self.bandRTH = texH
-	local rtName = "arcana_band_rt_" .. tostring(self):gsub("%W", "") .. "_w" .. texW .. "_h" .. texH
-	local tex = GetRenderTarget(rtName, texW, texH, true)
-	self.bandRT = tex
-	local matName = "arcana_band_mat_" .. tostring(self):gsub("%W", "")
-
-	self.bandMat = CreateMaterial(matName, "UnlitGeneric", {
-		["$basetexture"] = tex:GetName(),
-		["$translucent"] = 1,
-		["$vertexalpha"] = 1,
-		["$vertexcolor"] = 1,
-		["$nolod"] = 1,
-		["$nocull"] = 1,
-	})
-
-	-- Fill texture with repeating mystical text string
-	-- Precache all glyphs so the RT draw does not miss any during the same frame
-	self:RT_PrecacheCircularTextGlyphs()
-	render_PushRenderTarget(self.bandRT)
-	render_Clear(0, 0, 0, 0, true, true)
-	cam_Start2D()
-	surface_SetDrawColor(255, 255, 255, 255)
-	-- Build a long string of chars to span width
-	local textData = self.cachedTextData
-
-	if textData and textData.chars and textData.charCount > 0 then
-		local fontName = self.textFont or "MagicCircle_Medium"
-		surface_SetFont(fontName)
-		local sampleChar = textData.chars[1]
-		local cw, ch = surface_GetTextSize(sampleChar)
-
-		if cw <= 0 then
-			cw = 16
-		end
-
-		if ch <= 0 then
-			ch = 32
-		end
-
-		local scale = math_max(0.25, math_min(2.5, (texH * 0.7) / ch))
-
-		-- Horizontal guide lines above and below the text
-		do
-			local lineThickness = math_max(1, math_floor(texH * 0.06))
-			local drawHRef = math_max(1, ch * scale)
-			local yText = math_floor((texH - drawHRef) * 0.5)
-			local pad = math_max(1, math_floor(lineThickness * 1.2))
-			local yTop = math_max(0, yText - pad - math_floor(lineThickness * 0.5))
-			local yBot = math_min(texH - lineThickness, yText + drawHRef + pad - math_floor(lineThickness * 0.5))
-			surface_SetDrawColor(255, 255, 255, 255)
-			surface_DrawRect(0, yTop, texW, lineThickness)
-			surface_DrawRect(0, yBot, texW, lineThickness)
-		end
-
-		-- Draw horizontally tiled characters using cached glyph materials
-		local x = 0
-		local idx = 1
-
-		while x < texW + cw * scale do
-			local char = textData.chars[((idx - 1) % textData.charCount) + 1]
-			local mat, gw, gh = GetGlyphMaterial(fontName, char)
-			local drawW = math_max(1, gw * scale)
-			local drawH = math_max(1, gh * scale)
-			local y = math_floor((texH - drawH) * 0.5)
-			surface_SetMaterial(mat)
-			surface_DrawTexturedRect(x, y, drawW, drawH)
-			-- slight overlap to keep density consistent
-			x = x + math_max(1, drawW * 0.9)
-			idx = idx + 1
-		end
-	end
-
-	cam_End2D()
-	render_PopRenderTarget()
-	-- Build a simple cylindrical strip mesh around Z axis (height along Z)
+	local radiusBucket = quantize(self.radius or 1, 1)
+	local heightBucket = quantize(height, 0.25)
 	local segments = math_max(24, math_min(128, self.segments or 64))
-	local radius = math_max(1, self.radius)
-	local halfH = height * 0.5
-	local vertices = {}
+	local meshKey = string.format("r%d_h%.2f_s%d", radiusBucket, heightBucket, segments)
+	local meshEntry = BAND_MESH_CACHE[meshKey]
 
-	for i = 0, segments do
-		local t = i / segments
-		local ang = t * math_pi * 2
-		local cx = math_cos(ang) * radius
-		local cy = math_sin(ang) * radius
-
-		-- Two verts per slice (bottom, top)
-		table_insert(vertices, {
-			pos = Vector(cx, cy, -halfH),
-			u = t,
-			v = 1,
-			normal = Vector(cx, cy, 0):GetNormalized(),
-		})
-
-		table_insert(vertices, {
-			pos = Vector(cx, cy, halfH),
-			u = t,
-			v = 0,
-			normal = Vector(cx, cy, 0):GetNormalized(),
-		})
-	end
-
-	-- Convert to triangle list (two tris per quad)
-	local meshBuilder = Mesh()
-
-	meshBuilder:BuildFromTriangles((function()
-		local tris = {}
-
-		for i = 0, segments - 1 do
-			local i0 = i * 2 + 1
-			local i1 = i0 + 1
-			local i2 = i0 + 2
-			local i3 = i0 + 3
-
-			-- tri 1: i0, i2, i1
-			table_insert(tris, {
-				pos = vertices[i0].pos,
-				u = vertices[i0].u,
-				v = vertices[i0].v,
-				normal = vertices[i0].normal,
-			})
-
-			table_insert(tris, {
-				pos = vertices[i2].pos,
-				u = vertices[i2].u,
-				v = vertices[i2].v,
-				normal = vertices[i2].normal,
-			})
-
-			table_insert(tris, {
-				pos = vertices[i1].pos,
-				u = vertices[i1].u,
-				v = vertices[i1].v,
-				normal = vertices[i1].normal,
-			})
-
-			-- tri 2: i2, i3, i1
-			table_insert(tris, {
-				pos = vertices[i2].pos,
-				u = vertices[i2].u,
-				v = vertices[i2].v,
-				normal = vertices[i2].normal,
-			})
-
-			table_insert(tris, {
-				pos = vertices[i3].pos,
-				u = vertices[i3].u,
-				v = vertices[i3].v,
-				normal = vertices[i3].normal,
-			})
-
-			table_insert(tris, {
-				pos = vertices[i1].pos,
-				u = vertices[i1].u,
-				v = vertices[i1].v,
-				normal = vertices[i1].normal,
-			})
+	if not meshEntry then
+		local vertices = {}
+		local radius = math_max(1, radiusBucket)
+		local halfH = heightBucket * 0.5
+		for i = 0, segments do
+			local t = i / segments
+			local ang = t * math_pi * 2
+			local cx = math_cos(ang) * radius
+			local cy = math_sin(ang) * radius
+			table_insert(vertices, { pos = Vector(cx, cy, -halfH), u = t, v = 1, normal = Vector(cx, cy, 0):GetNormalized() })
+			table_insert(vertices, { pos = Vector(cx, cy,  halfH), u = t, v = 0, normal = Vector(cx, cy, 0):GetNormalized() })
 		end
 
-		return tris
-	end)())
+		local meshBuilder = Mesh()
+		meshBuilder:BuildFromTriangles((function()
+			local tris = {}
+			for i = 0, segments - 1 do
+				local i0 = i * 2 + 1
+				local i1 = i0 + 1
+				local i2 = i0 + 2
+				local i3 = i0 + 3
+				table_insert(tris, { pos = vertices[i0].pos, u = vertices[i0].u, v = vertices[i0].v, normal = vertices[i0].normal })
+				table_insert(tris, { pos = vertices[i2].pos, u = vertices[i2].u, v = vertices[i2].v, normal = vertices[i2].normal })
+				table_insert(tris, { pos = vertices[i1].pos, u = vertices[i1].u, v = vertices[i1].v, normal = vertices[i1].normal })
+				table_insert(tris, { pos = vertices[i2].pos, u = vertices[i2].u, v = vertices[i2].v, normal = vertices[i2].normal })
+				table_insert(tris, { pos = vertices[i3].pos, u = vertices[i3].u, v = vertices[i3].v, normal = vertices[i3].normal })
+				table_insert(tris, { pos = vertices[i1].pos, u = vertices[i1].u, v = vertices[i1].v, normal = vertices[i1].normal })
+			end
+			return tris
+		end)())
+		meshEntry = meshBuilder
+		BAND_MESH_CACHE[meshKey] = meshEntry
+	end
 
-	self.bandMesh = meshBuilder
+	self.bandMesh = meshEntry
 	self.bandRTBuilt = true
 end
 
@@ -952,6 +982,15 @@ end
 
 function MagicCircle:Destroy()
 	self.isActive = false
+	-- Drop heavy per-ring references to encourage GC; shared cache persists
+	if self.rings then
+		for _, r in ipairs(self.rings) do
+			if r then
+				r.rt = nil
+				r.rtMat = nil
+			end
+		end
+	end
 end
 
 function MagicCircle:GetRingCount()
