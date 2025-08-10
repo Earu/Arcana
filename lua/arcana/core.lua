@@ -921,24 +921,45 @@ if CLIENT then
 	end)
 end
 
--- Hooks
-hook.Add("PlayerInitialSpawn", "Arcane_PlayerJoin", function(ply)
-	timer.Simple(1, function()
-		if IsValid(ply) then
-			Arcane:LoadPlayerData(ply)
-			if SERVER then
-				Arcane:SyncPlayerData(ply)
-			end
-		end
-	end)
-end)
-
-hook.Add("PlayerDisconnected", "Arcane_PlayerLeave", function(ply)
-	Arcane:SavePlayerData(ply)
-end)
-
--- Console Commands for Testing
 if SERVER then
+	-- Hooks
+	hook.Add("PlayerInitialSpawn", "Arcane_PlayerJoin", function(ply)
+		timer.Simple(1, function()
+			if IsValid(ply) then
+				Arcane:LoadPlayerData(ply)
+				if SERVER then
+					Arcane:SyncPlayerData(ply)
+				end
+			end
+		end)
+	end)
+
+	hook.Add("PlayerDisconnected", "Arcane_PlayerLeave", function(ply)
+		Arcane:SavePlayerData(ply)
+	end)
+
+	local function SpawnAltar()
+		if not _G.landmark then return end
+		local pos = _G.landmark.get("slight")
+		if not pos then return end
+
+		local ent = ents.Create("arcana_altar")
+		if not IsValid(ent) then return end
+
+		ent:SetPos(pos)
+		ent:Spawn()
+		ent:Activate()
+		ent.ms_notouch = true
+
+		local phys = ent:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:EnableMotion(false)
+		end
+	end
+	hook.Add("InitPostEntity", "Arcane_SpawnAltar", SpawnAltar)
+	hook.Add("PostCleanupMap", "Arcane_SpawnAltar", SpawnAltar)
+
+	-- Console Commands for Testing
 	concommand.Add("arcane_give_xp", function(ply, cmd, args)
 		if not IsValid(ply) then return end
 		local amount = tonumber(args[1]) or 100
@@ -954,5 +975,4 @@ end
 
 -- Export the main module
 _G.Arcane = Arcane
-
 return Arcane

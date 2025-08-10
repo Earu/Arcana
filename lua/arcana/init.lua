@@ -39,11 +39,11 @@ hook.Add("InitPostEntity", "Arcana_Testing", function()
 	end
 end)
 
--- Starter spell for new players
-hook.Add("PlayerInitialSpawn", "Arcana_GiveStarterSpell", function(ply)
-	timer.Simple(2, function()
-		if IsValid(ply) and Arcane then
+if SERVER then
+	-- Starter spell for new players
+	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function( wep, ply)
+		if wep:GetClass() == "grimoire" and IsValid(ply) and ply:CanUnlockSpell(ply, "fireball") then
 			Arcane:UnlockSpell(ply, "fireball")
 		end
 	end)
-end)
+end
