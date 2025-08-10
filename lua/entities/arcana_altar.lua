@@ -20,6 +20,7 @@ end
 
 if SERVER then
 	util.AddNetworkString("Arcana_OpenAltarMenu")
+	resource.AddFile("materials/entities/arcana_altar.png")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
