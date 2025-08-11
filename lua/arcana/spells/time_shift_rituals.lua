@@ -53,7 +53,7 @@ local function registerRitual(id, name, description, is_night)
 			ent:Activate()
 
 			ent:Configure({
-				id = "Time Shift",
+				id = is_night and "ritual_of_night" or "ritual_of_day",
 				owner = caster,
 				lifetime = 300,
 				coin_cost = 2000,
