@@ -1,25 +1,27 @@
-local function setTime(val)
-	local time24 = val and tonumber(val) or 1
+local function registerRitual(id, name, description, is_night)
+	if not _G.tod then return end -- dont register if tod is not loaded
 
-	if time24 then
-		RunConsoleCommand("sv_tod", "0")
-		tod.SetCycle((time24 / 24) % 1)
-	elseif val == "demo" then
-		RunConsoleCommand("sv_tod", "2")
-	elseif val == "realtime" or time24 < 0 then
-		RunConsoleCommand("sv_tod", "1")
+	local function setTime(val)
+		local time24 = val and tonumber(val) or 1
+
+		if time24 then
+			RunConsoleCommand("sv_tod", "0")
+			tod.SetCycle((time24 / 24) % 1)
+		elseif val == "demo" then
+			RunConsoleCommand("sv_tod", "2")
+		elseif val == "realtime" or time24 < 0 then
+			RunConsoleCommand("sv_tod", "1")
+		end
+
+		timer.Simple(0.1, function()
+			tod.SetMode(tod.cvar:GetInt())
+
+			timer.Simple(0.5, function()
+				BroadcastLua[[render.RedownloadAllLightmaps()]]
+			end)
+		end)
 	end
 
-	timer.Simple(0.1, function()
-		tod.SetMode(tod.cvar:GetInt())
-
-		timer.Simple(0.5, function()
-			BroadcastLua[[render.RedownloadAllLightmaps()]]
-		end)
-	end)
-end
-
-local function registerRitual(id, name, description, is_night)
 	Arcane:RegisterSpell({
 		id = id,
 		name = name,
