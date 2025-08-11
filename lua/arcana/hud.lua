@@ -258,18 +258,6 @@ net.Receive("Arcane_SpellUnlocked", function()
 	showUnlockAnnouncement("spell", name, -cost)
 end)
 
-net.Receive("Arcane_RitualUnlocked", function()
-	local _id = net.ReadString()
-	local name = net.ReadString()
-	local cost = 0
-
-	if Arcane.RegisteredRituals[_id] then
-		cost = tonumber(Arcane.RegisteredRituals[_id].knowledge_cost or 0) or 0
-	end
-
-	showUnlockAnnouncement("ritual", name, -cost)
-end)
-
 -- Level-up / Knowledge announcement state
 local levelAnnounce = {
 	active = false,
