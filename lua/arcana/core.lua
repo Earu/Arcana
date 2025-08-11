@@ -55,17 +55,14 @@ Arcane.Config = {
 	DEFAULT_SPELL_COOLDOWN = 1.0,
 	SPELL_FAILURE_CHANCE = 0.05, -- 5% base failure chance
 
-	-- Ritual Configuration
-	RITUAL_PREPARATION_TIME = 5.0,
 	RITUAL_CASTING_TIME = 10.0,
 
 	-- Database
 	DATABASE_FILE = "arcane_data.txt"
 }
 
--- Storage for registered spells and rituals
+-- Storage for registered spells
 Arcane.RegisteredSpells = {}
-Arcane.RegisteredRituals = {}
 Arcane.PlayerData = {}
 
 -- Spell cost types
@@ -93,7 +90,6 @@ local function CreateDefaultPlayerData()
 		knowledge_points = Arcane.Config.KNOWLEDGE_POINTS_PER_LEVEL,
 		-- Note: coins are managed by your existing system
 		unlocked_spells = {},
-		unlocked_rituals = {},
 		spell_cooldowns = {},
 		active_effects = {},
 		-- Quickspell system
@@ -107,6 +103,7 @@ end
 function Arcane:GetXPRequiredForLevel(level)
 	return math.floor(Arcane.Config.BASE_XP_REQUIRED * (Arcane.Config.XP_MULTIPLIER ^ (level - 1)))
 end
+
 
 function Arcane:GetTotalXPForLevel(level)
 	local total = 0
@@ -158,7 +155,6 @@ if SERVER then
 	util.AddNetworkString("Arcane_ConsoleCastSpell")
 	util.AddNetworkString("Arcane_ErrorNotification")
 	util.AddNetworkString("Arcane_SpellUnlocked")
-	util.AddNetworkString("Arcane_RitualUnlocked")
 
 	function Arcane:SyncPlayerData(ply)
 		if not IsValid(ply) then return end
@@ -169,7 +165,6 @@ if SERVER then
 			level = data.level,
 			knowledge_points = data.knowledge_points,
 			unlocked_spells = table.Copy(data.unlocked_spells),
-			unlocked_rituals = table.Copy(data.unlocked_rituals),
 			spell_cooldowns = table.Copy(data.spell_cooldowns),
 			quickspell_slots = table.Copy(data.quickspell_slots),
 			selected_quickslot = data.selected_quickslot,
@@ -372,40 +367,6 @@ function Arcane:RegisterSpell(spellData)
 	return true
 end
 
--- Ritual Registration API
-function Arcane:RegisterRitual(ritualData)
-	if not ritualData.id or not ritualData.name or not ritualData.perform then
-		ErrorNoHalt("Ritual registration requires id, name, and perform function")
-		return false
-	end
-
-	local ritual = {
-		id = ritualData.id,
-		name = ritualData.name,
-		description = ritualData.description or "A mysterious ritual",
-		category = ritualData.category or Arcane.CATEGORIES.UTILITY,
-		level_required = ritualData.level_required or 1,
-		knowledge_cost = ritualData.knowledge_cost or 2,
-		preparation_time = ritualData.preparation_time or Arcane.Config.RITUAL_PREPARATION_TIME,
-		casting_time = ritualData.casting_time or Arcane.Config.RITUAL_CASTING_TIME,
-		coin_cost = ritualData.coin_cost or 50,
-		item_requirements = ritualData.item_requirements or {}, -- {item_name = amount}
-		participants_required = ritualData.participants_required or 1,
-		icon = ritualData.icon or "icon16/book.png",
-
-		-- Functions
-		perform = ritualData.perform, -- function(caster, participants, data)
-		can_perform = ritualData.can_perform, -- function(caster, participants, data)
-		on_success = ritualData.on_success,
-		on_failure = ritualData.on_failure,
-		on_interrupted = ritualData.on_interrupted
-	}
-
-	self.RegisteredRituals[ritual.id] = ritual
-
-	self:Print("Registered ritual '" .. ritual.name .. "' (ID: " .. ritual.id .. "')\n")
-	return true
-end
 
 -- Spell Casting System
 function Arcane:CanCastSpell(ply, spellId)
@@ -634,68 +595,13 @@ function Arcane:UnlockSpell(ply, spellId)
 	return true
 end
 
-function Arcane:CanUnlockRitual(ply, ritualId)
-	local ritual = self.RegisteredRituals[ritualId]
-	if not ritual then return false, "Ritual not found" end
-
-	local data = self:GetPlayerData(ply)
-
-	if data.unlocked_rituals[ritualId] then
-		return false, "Already unlocked"
-	end
-
-	if data.level < ritual.level_required then
-		return false, "Insufficient level"
-	end
-
-	if data.knowledge_points < ritual.knowledge_cost then
-		return false, "Insufficient knowledge points"
-	end
-
-	return true
-end
-
-function Arcane:UnlockRitual(ply, ritualId)
-	local canUnlock, reason = self:CanUnlockRitual(ply, ritualId)
-	if not canUnlock then
-		if SERVER then
-			Arcane:SendErrorNotification(ply, "Cannot unlock ritual \"" .. ritualId .. "\": " .. reason)
-		end
-		return false
-	end
-
-	local ritual = self.RegisteredRituals[ritualId]
-	local data = self:GetPlayerData(ply)
-
-	data.knowledge_points = data.knowledge_points - ritual.knowledge_cost
-	data.unlocked_rituals[ritualId] = true
-
-	if SERVER then
-		self:SyncPlayerData(ply)
-
-		-- Brief celebratory rings around the player
-		self:SendAttachBandVFX(ply, Color(222, 198, 120, 255), 120, 4, {
-			{ radius = 60,  height = 14, spin = { p = 0.2, y = 0.6, r = 0.1 }, lineWidth = 3 },
-			{ radius = 90,  height = 12, spin = { p = -0.3, y = -0.4, r = 0.0 }, lineWidth = 2 },
-		})
-
-		-- Tell the unlocking client to show an on-screen announcement & play a sound
-		net.Start("Arcane_RitualUnlocked")
-			net.WriteString(ritualId)
-			net.WriteString(ritual.name or ritualId)
-		net.Send(ply)
-	end
-
-	self:SavePlayerData(ply)
-	return true
-end
 
 -- Player Meta Extensions for Arcane-specific data only
 local PLAYER = FindMetaTable("Player")
 
 -- Note: This system assumes you already have:
 -- PLAYER:GetCoins(), PLAYER:TakeCoins(amount, reason), PLAYER:GiveCoins(amount, reason)
--- PLAYER:GetItemCount(itemName)
+-- PLAYER:GetItemCount(itemName), PLAYER:TakeItem(itemName, amount, reason), PLAYER:GiveItem(itemName, amount, reason)
 -- If your methods have different names, you'll need to update the calls in the spell/ritual casting functions
 
 function PLAYER:GetArcaneLevel()
@@ -714,9 +620,6 @@ function PLAYER:HasSpellUnlocked(spellId)
 	return Arcane:GetPlayerData(self).unlocked_spells[spellId] == true
 end
 
-function PLAYER:HasRitualUnlocked(ritualId)
-	return Arcane:GetPlayerData(self).unlocked_rituals[ritualId] == true
-end
 
 -- Networking
 if SERVER then
@@ -724,7 +627,6 @@ if SERVER then
 	util.AddNetworkString("Arcane_LevelUp")
 	util.AddNetworkString("Arcane_CastSpell")
 	util.AddNetworkString("Arcane_UnlockSpell")
-	util.AddNetworkString("Arcane_UnlockRitual")
 
 	-- Handle spell casting from client
 	net.Receive("Arcane_CastSpell", function(len, ply)
@@ -739,12 +641,6 @@ if SERVER then
 	net.Receive("Arcane_UnlockSpell", function(len, ply)
 		local spellId = net.ReadString()
 		Arcane:UnlockSpell(ply, spellId)
-	end)
-
-	-- Handle ritual unlocking
-	net.Receive("Arcane_UnlockRitual", function(len, ply)
-		local ritualId = net.ReadString()
-		Arcane:UnlockRitual(ply, ritualId)
 	end)
 
 	-- Handle client-forwarded console cast: "arcana <spellId>"
@@ -832,9 +728,6 @@ if CLIENT then
 
 		if istable(payload.unlocked_spells) then
 			data.unlocked_spells = payload.unlocked_spells
-		end
-		if istable(payload.unlocked_rituals) then
-			data.unlocked_rituals = payload.unlocked_rituals
 		end
 		if istable(payload.spell_cooldowns) then
 			data.spell_cooldowns = payload.spell_cooldowns
