@@ -371,7 +371,7 @@ if CLIENT then
 		surface.DrawRect(-180, -90, 360, 180)
 		surface.SetDrawColor(gold)
 		surface.DrawOutlinedRect(-180, -90, 360, 180, 2)
-		draw.SimpleText(string.upper(self:GetRitualId() or "RITUAL"), "Arcana_Ritual_Title", 0, -70, paleGold, TEXT_ALIGN_CENTER)
+		draw.SimpleText(string.upper((self:GetRitualId():gsub("%_", " ")) or "RITUAL"), "Arcana_Ritual_Title", 0, -70, paleGold, TEXT_ALIGN_CENTER)
 		local y = -40
 		draw.SimpleText("Coins: " .. tostring(data.coins or 0), "Arcana_Ritual_Row", -160, y, color_white)
 		y = y + 20
