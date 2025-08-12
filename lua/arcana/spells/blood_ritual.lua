@@ -1,6 +1,6 @@
 hook.Add("InitPostEntity", "arcana_blood_ritual", function()
-	local giveOre = _G.ms and _G.ms.Ores.GivePlayerOre
-	if not giveOre then return end
+	local ores = _G.ms and _G.ms.Ores
+	if not ores then return end
 
 	Arcane:RegisterSpell({
 		id = "blood_ritual",
@@ -40,7 +40,7 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 					poison = 20,
 				},
 				on_activate = function(_, ply)
-					giveOre(ply, 666, 100)
+					ores.GivePlayerOre(ply, 666, 100)
 					ply:EmitSound("ambient/halloween/female_scream_0" .. math.random(1, 10) .. ".wav", 100)
 				end,
 			})
