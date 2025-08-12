@@ -142,7 +142,7 @@ if SERVER then
 
 		-- Callback
 		if self._onActivate then
-			self:_onActivate(self)
+			self:_onActivate(ply)
 		end
 
 		-- Tell clients to evolve the circle then remove the entity after a short delay
