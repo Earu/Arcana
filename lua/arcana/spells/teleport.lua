@@ -157,19 +157,6 @@ Arcane:RegisterSpell({
 
 		hook.Run("PlayerTeleported", caster, dest, oldPos, { teleporting_type = "arcana" })
 
-		-- Arrival effects
-		do
-			local ed = EffectData()
-			ed:SetOrigin(dest + Vector(0, 0, 4))
-			util.Effect("cball_explode", ed, true, true)
-			util.ScreenShake(dest, 2, 40, 0.25, 256)
-		end
-
-		-- Brief protective shimmer using band VFX
-		Arcane:SendAttachBandVFX(caster, Color(140, 200, 255, 255), 26, 1.2, {
-			{ radius = 20, height = 3, spin = {p = 0, y = 140, r = 0}, lineWidth = 2 },
-		})
-
 		return true
 	end
 })
