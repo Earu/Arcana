@@ -73,5 +73,8 @@ local function registerRitual(id, name, description, is_night)
 	})
 end
 
-registerRitual("ritual_of_night", "Ritual: Night", "A ritual that calls to the goddess of the night to summon a night sky.", true)
-registerRitual("ritual_of_day", "Ritual: Day", "A ritual that calls to the god of the day to summon a bright sky.", false)
+-- let tod load first
+hook.Add("InitPostEntity", "arcana_time_shift_rituals", function()
+	registerRitual("ritual_of_night", "Ritual: Night", "A ritual that calls to the goddess of the night to summon a night sky.", true)
+	registerRitual("ritual_of_day", "Ritual: Day", "A ritual that calls to the god of the day to summon a bright sky.", false)
+end)
