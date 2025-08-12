@@ -39,8 +39,8 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		local phys = self:GetPhysicsObject()
 
+		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableGravity(false)
@@ -60,6 +60,16 @@ if SERVER then
 		self:NextThink(CurTime() + 0.2)
 
 		timer.Simple(0.1, function()
+			if not IsValid(self) then return end
+
+			self:StartMotionController()
+			self:SetPos(self:GetPos() + Vector(0, 0, 50))
+			phys = self:GetPhysicsObject()
+			if IsValid(phys) then
+				phys:Wake()
+				phys:EnableGravity(false)
+			end
+
 			Arcane:SendAttachBandVFX(self, self:GetColor(), 80, 0, {
 				{
 					radius = 20,
