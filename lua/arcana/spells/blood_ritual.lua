@@ -3,7 +3,7 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 	if not ores then return end
 
 	Arcane:RegisterSpell({
-		id = "blood_ritual",
+		id = "ritual_of_blood",
 		name = "Ritual: Blood",
 		description = "A ritual that summons a dark entity.",
 		category = Arcane.CATEGORIES.UTILITY,
