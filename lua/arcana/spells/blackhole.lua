@@ -18,7 +18,7 @@ Arcane:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		local blackhole = ents.Create("blackhole")
+		local blackhole = ents.Create("arcana_blackhole")
 		blackhole:SetPos(caster:GetEyeTrace().HitPos + Vector(0,0,200))
 		blackhole:Spawn()
 
