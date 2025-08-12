@@ -96,6 +96,7 @@ if SERVER then
 	end
 
 	function ENT:Use(ply)
+		if self._hasActivated then return end
 		if not IsValid(ply) or not ply:IsPlayer() then return end
 
 		-- Check requirements against the player who pressed use
@@ -143,6 +144,7 @@ if SERVER then
 		-- Callback
 		if self._onActivate then
 			self:_onActivate(ply)
+			self._hasActivated = true
 		end
 
 		-- Tell clients to evolve the circle then remove the entity after a short delay
