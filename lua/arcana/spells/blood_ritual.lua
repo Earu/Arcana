@@ -31,6 +31,10 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 			ent:Spawn()
 			ent:Activate()
 
+			if ent.CPPISetOwner then
+				ent:CPPISetOwner(caster)
+			end
+
 			ent:Configure({
 				id = "ritual_of_blood",
 				owner = caster,
@@ -39,9 +43,9 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 				items = {
 					poison = 20,
 				},
-				on_activate = function(_, ply)
+				on_activate = function(selfEnt, ply)
 					ores.GivePlayerOre(ply, 666, 100)
-					ply:EmitSound("ambient/halloween/female_scream_0" .. math.random(1, 10) .. ".wav", 100)
+					sound.Play("ambient/halloween/female_scream_0" .. math.random(1, 10) .. ".wav", selfEnt:GetPos(), 100)
 				end,
 			})
 

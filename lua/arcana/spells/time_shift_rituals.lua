@@ -52,6 +52,10 @@ local function registerRitual(id, name, description, is_night)
 			ent:Spawn()
 			ent:Activate()
 
+			if ent.CPPISetOwner then
+				ent:CPPISetOwner(caster)
+			end
+
 			ent:Configure({
 				id = is_night and "ritual_of_night" or "ritual_of_day",
 				owner = caster,
