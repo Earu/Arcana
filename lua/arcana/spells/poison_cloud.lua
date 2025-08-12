@@ -157,7 +157,15 @@ Arcane:RegisterSpell({
 			end
 		end)
 
-		SafeRemoveEntityDelayed(cloud, duration + 0.25)
+		timer.Simple(duration + 0.25, function()
+			if IsValid(cloud) then
+				for _, child in ipairs(cloud:GetChildren()) do
+					SafeRemoveEntity(child)
+				end
+
+				cloud:Remove()
+			end
+		end)
 
 		caster:EmitSound("npc/antlion/idle2.wav", 65, 120, 0.6)
 		return true
