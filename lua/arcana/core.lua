@@ -50,6 +50,8 @@ Arcane.Config = {
 	XP_MULTIPLIER = 1.25,
 	KNOWLEDGE_POINTS_PER_LEVEL = 1,
 	MAX_LEVEL = 100,
+	-- Full XP is awarded at this cast time; shorter casts scale down, longer casts scale up (clamped)
+	XP_BASE_CAST_TIME = 1.0,
 
 	-- Spell Configuration
 	DEFAULT_SPELL_COOLDOWN = 1.0,
@@ -499,7 +501,13 @@ function Arcane:CastSpell(ply, spellId, target, context)
 	-- Handle success/failure
 	if success then
 		-- Give XP
-		local xpGain = math.max(8, spell.knowledge_cost * 10)
+		local baseCast = math.max(0.1, Arcane.Config.XP_BASE_CAST_TIME or 1.0)
+		local castTime = math.max(0.05, tonumber(spell.cast_time) or 0)
+		local ratio = castTime / baseCast
+		-- Clamp ratio to avoid extreme values
+		ratio = math.Clamp(ratio, 0.25, 2.0)
+		local baseXP = math.max(5, (tonumber(spell.knowledge_cost) or 1) * 10)
+		local xpGain = math.floor(baseXP * ratio)
 		self:GiveXP(ply, xpGain, "Cast " .. spell.name)
 
 		if spell.on_success then
