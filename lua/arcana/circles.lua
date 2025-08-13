@@ -231,6 +231,12 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 		ring.mysticalPhrase = ALL_MYSTICAL_PHRASES[math_random(#ALL_MYSTICAL_PHRASES)]
 		ring.textFont = "MagicCircle_Medium"
 		ring.cachedTextData = ring:CacheTextProcessing()
+		-- Scaling animation state (similar to Entity:SetModelScale)
+		ring.currentScale = 1
+		ring.scaleFrom = 1
+		ring.scaleTarget = 1
+		ring.scaleStart = 0
+		ring.scaleDuration = 0
 	end
 
 	return ring
@@ -269,6 +275,19 @@ function Ring:Update(deltaTime)
 		self.axisAngles.p = (self.axisAngles.p + (self.axisSpin.p or 0) * deltaTime) % 360
 		self.axisAngles.y = (self.axisAngles.y + (self.axisSpin.y or 0) * deltaTime) % 360
 		self.axisAngles.r = (self.axisAngles.r + (self.axisSpin.r or 0) * deltaTime) % 360
+	end
+
+	-- Scaling animation (for band rings)
+	if self.scaleDuration and self.scaleDuration > 0 then
+		local elapsed = CurTime() - (self.scaleStart or 0)
+		local t = math_min(1, math_max(0, elapsed / math_max(0.000001, self.scaleDuration)))
+		local from = self.scaleFrom or 1
+		local to = self.scaleTarget or 1
+		self.currentScale = from + (to - from) * t
+		if t >= 1 then
+			self.scaleDuration = 0
+			self.currentScale = to
+		end
 	end
 end
 
@@ -606,8 +625,11 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	-- Apply rotation around band axis for spinning
 	oriented:RotateAroundAxis(oriented:Up(), rotationAngle or 0)
 	local m = Matrix()
-	m:SetTranslation(centerPos)
 	m:SetAngles(oriented)
+	-- Apply uniform scaling for band ring (animated)
+	local s = self.currentScale or 1
+	m:Scale(Vector(s, s, s))
+	m:SetTranslation(centerPos)
 	cam_PushModelMatrix(m)
 
 	-- Apply color/alpha to the material so the band adopts ring color
@@ -1242,6 +1264,25 @@ function BandCircle:AddBand(radius, height, axisSpin, lineWidth, phrase)
 	table_insert(self.rings, ring)
 
 	return ring
+end
+
+-- Smoothly animate all band rings' scale similar to Entity:SetModelScale(scale, deltaTime)
+-- If duration is 0 or nil, the scale is applied immediately.
+function BandCircle:SetScale(scale, duration)
+	scale = tonumber(scale) or 1
+	duration = tonumber(duration) or 0
+	for _, r in ipairs(self.rings) do
+		if r and r.type == RING_TYPES.BAND_RING then
+			r.scaleFrom = r.currentScale or 1
+			r.scaleTarget = scale
+			r.scaleStart = CurTime()
+			r.scaleDuration = math_max(0, duration)
+			if duration <= 0 then
+				r.currentScale = scale
+				r.scaleDuration = 0
+			end
+		end
+	end
 end
 
 function BandCircle:Update(dt)
