@@ -122,6 +122,13 @@ local RING_RT_CACHE = {}
 local BAND_RT_CACHE = {}
 local BAND_MESH_CACHE = {}
 
+-- Default ring ejection sound candidates (short, energetic)
+local MAGIC_EJECT_SOUNDS = {
+	"ambient/energy/zap1.wav",
+	"ambient/energy/zap2.wav",
+	"ambient/energy/zap3.wav",
+}
+
 -- Quantize a numeric value to limit the number of RT variants produced
 local function quantize(value, step)
 	step = step or 1
@@ -239,6 +246,21 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 		ring.scaleDuration = 0
 	end
 
+	-- Breakdown animation state (non-band rings)
+	ring.breaking = false
+	ring.breakStart = 0
+	ring.breakDuration = 0
+	ring.breakOffset = Vector(0, 0, 0) -- local space: x=fwd, y=right, z=up
+	ring.breakVelocity = Vector(0, 0, 0) -- local space units/sec
+	ring.breakSpinBoost = 0 -- extra deg/sec
+	ring.removed = false
+	-- Ejection control
+	ring.breakDelay = 0
+	ring.ejectStarted = false
+	ring.ejectDirXY = Vector(1, 0, 0) -- in-plane direction
+	ring.breakRemoveDistance = 0 -- world units threshold to remove
+	ring.ejectSoundPlayed = false
+
 	return ring
 end
 
@@ -289,16 +311,69 @@ function Ring:Update(deltaTime)
 			self.currentScale = to
 		end
 	end
+
+	-- Breakdown motion (for non-band rings)
+	if self.breaking and not self.removed then
+		local tNow = CurTime()
+		-- Wait for per-ring eject delay to spread out
+		if not self.ejectStarted then
+			if (tNow - (self.breakStart or 0)) >= (self.breakDelay or 0) then
+				self.ejectStarted = true
+				if not self.ejectSoundPlayed then
+					local pitch = 115 + math_random(-8, 12)
+					sound.Play(MAGIC_EJECT_SOUNDS[math_random(1, #MAGIC_EJECT_SOUNDS)], self._lastDrawCenter or Vector(0,0,0), 70, pitch, 0.6)
+					self.ejectSoundPlayed = true
+				end
+			end
+			return
+		end
+
+		-- Stronger, directed acceleration outward
+		local accel = 320 + math_random() * 240
+		local dir = self.ejectDirXY or Vector(1, 0, 0)
+		-- Normalize in-plane dir
+		local len = math.sqrt(dir.x * dir.x + dir.y * dir.y)
+		if len > 0 then
+			dir = Vector(dir.x / len, dir.y / len, 0)
+		else
+			dir = Vector(1, 0, 0)
+		end
+		self.breakVelocity.x = (self.breakVelocity.x or 0) + dir.x * accel * deltaTime
+		self.breakVelocity.y = (self.breakVelocity.y or 0) + dir.y * accel * deltaTime
+		self.breakVelocity.z = (self.breakVelocity.z or 0) + (math_random() * 18 - 9) * deltaTime
+		-- Integrate velocity
+		self.breakOffset.x = (self.breakOffset.x or 0) + (self.breakVelocity.x or 0) * deltaTime
+		self.breakOffset.y = (self.breakOffset.y or 0) + (self.breakVelocity.y or 0) * deltaTime
+		self.breakOffset.z = (self.breakOffset.z or 0) + (self.breakVelocity.z or 0) * deltaTime
+		-- add spin boost
+		self.currentRotation = self.currentRotation + self.breakSpinBoost * deltaTime
+		-- removal when far enough
+		local dist2 = (self.breakOffset.x or 0) ^ 2 + (self.breakOffset.y or 0) ^ 2 + (self.breakOffset.z or 0) ^ 2
+		local threshold = (self.breakRemoveDistance or (self.radius * 3))
+		if dist2 >= (threshold * threshold) then
+			self.removed = true
+		end
+	end
 end
 
 function Ring:GetCurrentOpacity(baseOpacity, time)
 	local pulse = math_sin(time * self.pulseSpeed + self.pulseOffset) * 0.3 + 0.7
-
 	return baseOpacity * self.opacity * pulse
 end
 
 function Ring:Draw(centerPos, angles, color, time)
 	local ringPos = centerPos + angles:Up() * self.height
+	-- remember last center for delayed ejection sounds
+	self._lastDrawCenter = centerPos
+	-- Apply breakdown offset in local ring plane (non-band rings)
+	if self.breaking and not self.removed and self.type ~= RING_TYPES.BAND_RING then
+		local off = self.breakOffset or Vector(0, 0, 0)
+		local oriented = Angle(angles.p, angles.y, angles.r)
+		local f = oriented:Forward()
+		local r = oriented:Right()
+		local u = oriented:Up()
+		ringPos = ringPos + f * (off.x or 0) + r * (off.y or 0) + u * (off.z or 0)
+	end
 	local currentOpacity = self:GetCurrentOpacity(color.a, time)
 	local ringColor = self.color or Color(color.r, color.g, color.b, currentOpacity)
 	ringColor.a = currentOpacity
@@ -882,6 +957,8 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.lastVisible = 0
 	circle.kLog = 9 -- control for logarithmic growth
 	circle.enableRingSounds = false
+	-- Breakdown state
+	circle.isBreaking = false
 	-- Generate rings
 	circle.rings = {}
 	circle:GenerateRings()
@@ -954,8 +1031,16 @@ function MagicCircle:Update(deltaTime)
 		ring:Update(deltaTime)
 	end
 
-		-- Check if animation should end
-		if self.isAnimated and (CurTime() - self.startTime) > self.duration and not self.isFading then
+	-- Cull rings removed by breakdown
+	for i = #self.rings, 1, -1 do
+		local r = self.rings[i]
+		if r and r.removed then
+			table_remove(self.rings, i)
+		end
+	end
+
+	-- Check if animation should end (skip while breaking)
+	if self.isAnimated and not self.isBreaking and (CurTime() - self.startTime) > self.duration and not self.isFading then
 			self:StartFadeOut(self.fadeDuration)
 		end
 
@@ -1016,7 +1101,7 @@ end
 	local currentTime = CurTime()
 		-- Apply fade alpha if fading
 		local fadeMul = 1
-		if self.isFading then
+	if self.isFading then
 			fadeMul = math_max(0, 1 - (currentTime - self.fadeStart) / math_max(0.01, self.fadeDuration))
 		end
 	-- Draw all rings
@@ -1025,7 +1110,7 @@ end
 
 	for i = 1, math.min(count, maxToDraw) do
 		local ring = self.rings[i]
-			local baseCol = self.color or Color(255, 255, 255, 255)
+		local baseCol = self.color or Color(255, 255, 255, 255)
 			local a = math_floor((baseCol.a or 255) * fadeMul)
 			if a > 0 then
 				ring:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
@@ -1037,6 +1122,45 @@ function MagicCircle:SetAnimated(duration)
 	self.isAnimated = true
 	self.duration = duration or 5
 	self.startTime = CurTime()
+end
+
+-- Trigger a breakdown animation: fling non-band rings outward with extra spin and sparks
+function MagicCircle:StartBreakdown(duration)
+	if self.isFading then return end -- don't conflict with fade
+	self.isBreaking = true
+	self.isAnimated = false
+	self.isEvolving = false
+	local d = math_max(0.1, tonumber(duration) or 0.6)
+	local num = #self.rings
+	local idx = 0
+	for _, r in ipairs(self.rings) do
+		idx = idx + 1
+		if r and r.type ~= RING_TYPES.BAND_RING then
+			r.breaking = true
+			r.breakStart = CurTime()
+			r.breakDuration = d * (0.7 + math_random() * 0.6)
+			r.breakOffset = Vector(0, 0, 0)
+			r.breakVelocity = Vector(0, 0, 0)
+			r.breakSpinBoost = 360 + math_random() * 360
+			-- Spread ejections: set per-ring delay and evenly distributed directions
+			r.breakDelay = (idx - 1) * (d / math_max(1, num)) * 0.5
+			local angle = ((idx - 1) / math_max(1, num)) * math_pi * 2 + math_random() * 0.35
+			r.ejectDirXY = Vector(math_cos(angle), math_sin(angle), 0)
+			r.breakRemoveDistance = self.size * 4
+			-- slight vertical stagger for variety
+			r.height = r.height + (math_random() * 2 - 1) * (self.size * 0.05)
+			-- sound cue will play when ejection actually starts in Update
+		end
+	end
+	-- Optional: schedule final cleanup if all rings gone
+	timer.Simple(d + 0.2, function()
+		if not self.isActive then return end
+		if #self.rings <= 0 then
+			-- No fade here; breakdown fully removes rings already
+			self.isActive = false
+			self:FinalizeDeactivate()
+		end
+	end)
 end
 
 -- Start evolving the circle over the given duration.
