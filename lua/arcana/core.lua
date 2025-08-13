@@ -3,8 +3,8 @@ AddCSLuaFile()
 -- Arcane Magic System Core
 -- A comprehensive magic system for Garry's Mod featuring spells, rituals, and progression
 
-local Arcane = {}
-Arcane.VERSION = "1.0.0"
+local Arcane = _G.Arcane or {}
+_G.Arcane = Arcane
 
 function Arcane:Print(...)
 	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), ...)
@@ -904,6 +904,4 @@ if SERVER then
 	end)
 end
 
--- Export the main module
-_G.Arcane = Arcane
 return Arcane
