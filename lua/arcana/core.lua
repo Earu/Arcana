@@ -886,9 +886,39 @@ if SERVER then
 		if IsValid(phys) then
 			phys:EnableMotion(false)
 		end
+
+		return ent
 	end
-	hook.Add("InitPostEntity", "Arcane_SpawnAltar", SpawnAltar)
-	hook.Add("PostCleanupMap", "Arcane_SpawnAltar", SpawnAltar)
+
+	local LOBBY3_OFFSET = Vector (-522, 285, 14)
+	local function SpawnPortalToAltar(altar)
+		if not IsValid(altar) then return end
+		if not _G.landmark then return end
+		local pos = _G.landmark.get("lobby_3")
+		if not pos then return end
+
+		local ent = ents.Create("arcana_portal")
+		if not IsValid(ent) then return end
+
+		ent:SetPos(pos + LOBBY3_OFFSET)
+		ent:Spawn()
+		ent:Activate()
+		ent:SetDestination(altar:WorldSpaceCenter() + altar:GetForward() * 200)
+		ent.ms_notouch = true
+
+		local phys = ent:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:EnableMotion(false)
+		end
+	end
+
+	local function SpawnMapEntities()
+		local altar = SpawnAltar()
+		SpawnPortalToAltar(altar)
+	end
+
+	hook.Add("InitPostEntity", "Arcane_SpawnAltar", SpawnMapEntities)
+	hook.Add("PostCleanupMap", "Arcane_SpawnAltar", SpawnMapEntities)
 
 	-- Console Commands for Testing
 	concommand.Add("arcane_give_xp", function(ply, cmd, args)
