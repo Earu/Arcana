@@ -308,8 +308,15 @@ if CLIENT then
 		local duration = net.ReadFloat()
 		if not IsValid(ent) then return end
 
-		if ent._circle and ent._circle.StartEvolving then
+		if ent._circle then
 			ent._circle:StartEvolving(math.max(0.1, duration or 2.0), true)
+
+			timer.Simple(duration - 1, function()
+				if not IsValid(ent) then return end
+				if not ent._circle then return end
+
+				ent._circle:SetScale(10, 1)
+			end)
 		end
 
 		surface.PlaySound("ambient/levels/canals/windchime2.wav")
