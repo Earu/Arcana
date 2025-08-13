@@ -69,39 +69,6 @@ if SERVER then
 				phys:Wake()
 				phys:EnableGravity(false)
 			end
-
-			Arcane:SendAttachBandVFX(self, self:GetColor(), 80, 0, {
-				{
-					radius = 20,
-					height = 5,
-					spin = {
-						p = 20,
-						y = 60,
-						r = 10
-					},
-					lineWidth = 2
-				},
-				{
-					radius = 32,
-					height = 4,
-					spin = {
-						p = -30,
-						y = -40,
-						r = 0
-					},
-					lineWidth = 2
-				},
-				{
-					radius = 26,
-					height = 6,
-					spin = {
-						p = -10,
-						y = -20,
-						r = 60
-					},
-					lineWidth = 2
-				},
-			})
 		end)
 	end
 
@@ -280,6 +247,7 @@ if CLIENT then
 	function ENT:Initialize()
 		self._glowMat = Material("sprites/light_glow02_add")
 		self._circle = nil
+		self._bands = nil
 	end
 
 	net.Receive("Arcana_Ritual_Update", function()
@@ -310,12 +278,15 @@ if CLIENT then
 
 		if ent._circle then
 			ent._circle:StartEvolving(math.max(0.1, duration or 2.0), true)
+		end
 
-			timer.Simple(duration - 1, function()
-				if not IsValid(ent) then return end
-				if not ent._circle then return end
-
-				ent._circle:SetScale(10, 1)
+		-- Animate the client-side bands scale so they pulse on activation
+		if ent._bands then
+			local bandDuration = math.max(0.1, (duration or 2.0) - 1)
+			timer.Simple(bandDuration, function()
+				if IsValid(ent) and ent._bands then
+					ent._bands:SetScale(10, bandDuration)
+				end
 			end)
 		end
 
@@ -330,6 +301,7 @@ if CLIENT then
 
 	function ENT:OnRemove()
 		if self._circle then self._circle:Destroy() end
+		if self._bands then self._bands:Remove() end
 	end
 
 	function ENT:DrawTranslucent()
@@ -375,6 +347,52 @@ if CLIENT then
 				dl.Size = 120
 				dl.DieTime = t + 0.1
 			end
+		end
+
+		-- Client-side BandCircle VFX around the ritual orb so we can scale it
+		if not self._bands and BandCircle then
+			local baseColor = self:GetColor()
+			local pos = self:WorldSpaceCenter()
+			local ang = self:GetAngles()
+			self._bands = BandCircle.Create(pos, ang, baseColor, 80, 0)
+			if self._bands then
+				self._bands.position = pos
+				self._bands.angles = ang
+				-- Bands config mirrors previous server call
+				self._bands:AddBand(20, 5, { p = 20, y = 60, r = 10 }, 2)
+				self._bands:AddBand(32, 4, { p = -30, y = -40, r = 0 }, 2)
+				self._bands:AddBand(26, 6, { p = -10, y = -20, r = 60 }, 2)
+			end
+		end
+
+		if self._bands then
+			-- keep the bands following the entity and adjust color to match ritual
+			self._bands.position = self:WorldSpaceCenter()
+			self._bands.angles = self:GetAngles()
+			self._bands.color = self:GetColor()
+		end
+
+		-- Client-side BandCircle VFX around the ritual orb so we can scale it
+		if not self._bands and BandCircle then
+			local baseColor = self:GetColor()
+			local pos = self:WorldSpaceCenter()
+			local ang = self:GetAngles()
+			self._bands = BandCircle.Create(pos, ang, baseColor, 80, 0)
+			if self._bands then
+				self._bands.position = pos
+				self._bands.angles = ang
+				-- Bands config mirrors previous server call
+				self._bands:AddBand(20, 5, { p = 20, y = 60, r = 10 }, 2)
+				self._bands:AddBand(32, 4, { p = -30, y = -40, r = 0 }, 2)
+				self._bands:AddBand(26, 6, { p = -10, y = -20, r = 60 }, 2)
+			end
+		end
+
+		if self._bands then
+			-- keep the bands following the entity and adjust color to match ritual
+			self._bands.position = self:WorldSpaceCenter()
+			self._bands.angles = self:GetAngles()
+			self._bands.color = self:GetColor()
 		end
 
 		local data = ritualState[self]

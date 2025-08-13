@@ -150,7 +150,7 @@ if SERVER then
 	util.AddNetworkString("Arcane_SetSelectedQuickslot")
 	util.AddNetworkString("Arcane_BeginCasting")
 	util.AddNetworkString("Arcane_PlayCastGesture")
-		util.AddNetworkString("Arcane_SpellFailed")
+	util.AddNetworkString("Arcane_SpellFailed")
 	util.AddNetworkString("Arcana_AttachBandVFX")
 	util.AddNetworkString("Arcana_AttachParticles")
 	util.AddNetworkString("Arcane_ConsoleCastSpell")
