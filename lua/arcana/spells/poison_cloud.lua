@@ -80,10 +80,15 @@ Arcane:RegisterSpell({
 		cloud:SetModel("models/props_junk/garbage_glassbottle002a.mdl")
 		cloud:SetPos(pos)
 		cloud:Spawn()
-		--cloud:SetNoDraw(true)
-		cloud:SetNotSolid(true)
 		cloud:SetMoveType(MOVETYPE_NONE)
 		if cloud.CPPISetOwner then cloud:CPPISetOwner(caster) end
+
+		local phys = cloud:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:Wake()
+			phys:EnableMotion(false)
+			phys:EnableCollisions(false)
+		end
 
 		-- Mark for client visuals
 		cloud:SetNWBool("ArcanaPoisonCloud", true)
