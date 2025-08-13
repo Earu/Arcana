@@ -408,17 +408,6 @@ function Arcane:StartCasting(ply, spellId)
 			net.Broadcast()
 		end
 
-		-- Compute a server-side circle context (position/angle/size)
-		local circlePos = ply:GetPos() + Vector(0, 0, 2)
-		local circleAng = Angle(0, 180, 180)
-		local circleSize = 60
-		if forwardLike then
-			local maxs = ply:OBBMaxs()
-			circlePos = ply:GetPos() + ply:GetForward() * maxs.x * 1.5 + ply:GetUp() * maxs.z / 2
-			circleAng = ply:EyeAngles()
-			circleAng:RotateAroundAxis(circleAng:Right(), 90)
-			circleSize = 30
-		end
 
 		-- Tell clients to show evolving circle for this cast
 		net.Start("Arcane_BeginCasting", true)
@@ -434,10 +423,23 @@ function Arcane:StartCasting(ply, spellId)
 			-- Re-check basic conditions before executing
 			local ok = select(1, self:CanCastSpell(ply, spellId))
 			if not ok then return end
+
+			-- Recompute circle context at actual cast moment so it follows the player
+			local ctxPos = ply:GetPos() + Vector(0, 0, 2)
+			local ctxAng = Angle(0, 180, 180)
+			local ctxSize = 60
+			if forwardLike then
+				local maxsNow = ply:OBBMaxs()
+				ctxPos = ply:GetPos() + ply:GetForward() * maxsNow.x * 1.5 + ply:GetUp() * maxsNow.z / 2
+				ctxAng = ply:EyeAngles()
+				ctxAng:RotateAroundAxis(ctxAng:Right(), 90)
+				ctxSize = 30
+			end
+
 			self:CastSpell(ply, spellId, nil, {
-				circlePos = circlePos,
-				circleAng = circleAng,
-				circleSize = circleSize,
+				circlePos = ctxPos,
+				circleAng = ctxAng,
+				circleSize = ctxSize,
 				forwardLike = forwardLike,
 				castTime = castTime,
 			})
@@ -967,6 +969,38 @@ if CLIENT then
 
 		-- Track as the current casting circle for this caster
 		caster._ArcanaCastingCircle = circle
+
+		-- While casting, continuously follow the caster so visuals stay attached
+		local followHook = "Arcane_FollowCasting_" .. tostring(caster)
+		hook.Remove("Think", followHook)
+		hook.Add("Think", followHook, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", followHook)
+				return
+			end
+
+			local c = caster._ArcanaCastingCircle
+			if not c or not c.IsActive or not c:IsActive() then
+				hook.Remove("Think", followHook)
+				return
+			end
+
+			-- Update circle position/orientation to follow current caster transform
+			local newPos = caster:GetPos() + Vector(0, 0, 2)
+			local newAng = Angle(0, 180, 180)
+			local newSize = size
+			if forwardLike then
+				local maxsF = caster:OBBMaxs()
+				newPos = caster:GetPos() + caster:GetForward() * maxsF.x * 1.5 + caster:GetUp() * maxsF.z / 2
+				newAng = caster:EyeAngles()
+				newAng:RotateAroundAxis(newAng:Right(), 90)
+				newSize = 30
+			end
+
+			c.position = newPos
+			c.angles = newAng
+			c.size = newSize
+		end)
 	end)
 
 	-- On spell failure, break down the tracked circle for the caster
