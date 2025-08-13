@@ -46,9 +46,9 @@ end
 -- Configuration
 Arcane.Config = {
 	-- XP and Leveling
-	BASE_XP_REQUIRED = 100,
-	XP_MULTIPLIER = 1.5,
-	KNOWLEDGE_POINTS_PER_LEVEL = 2,
+	BASE_XP_REQUIRED = 75,
+	XP_MULTIPLIER = 1.25,
+	KNOWLEDGE_POINTS_PER_LEVEL = 1,
 	MAX_LEVEL = 100,
 
 	-- Spell Configuration
@@ -499,7 +499,7 @@ function Arcane:CastSpell(ply, spellId, target, context)
 	-- Handle success/failure
 	if success then
 		-- Give XP
-		local xpGain = math.max(1, spell.knowledge_cost * 5)
+		local xpGain = math.max(8, spell.knowledge_cost * 10)
 		self:GiveXP(ply, xpGain, "Cast " .. spell.name)
 
 		if spell.on_success then

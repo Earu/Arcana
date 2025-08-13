@@ -7,8 +7,8 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 		name = "Ritual: Blood",
 		description = "A ritual that summons a dark entity.",
 		category = Arcane.CATEGORIES.UTILITY,
-		level_required = 15,
-		knowledge_cost = 1,
+		level_required = 12,
+		knowledge_cost = 5,
 		cooldown = 60 * 60, -- 1 hour
 		cost_type = Arcane.COST_TYPES.COINS,
 		cost_amount = 100, -- cost is in the ritual requirements itself

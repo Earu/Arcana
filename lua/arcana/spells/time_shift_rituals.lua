@@ -28,7 +28,7 @@ local function registerRitual(id, name, description, is_night)
 		description = description,
 		category = Arcane.CATEGORIES.UTILITY,
 		level_required = 10,
-		knowledge_cost = 1,
+		knowledge_cost = 4,
 		cooldown = 60 * 20, -- 20 minutes
 		cost_type = Arcane.COST_TYPES.COINS,
 		cost_amount = 100, -- cost is in the ritual requirements itself

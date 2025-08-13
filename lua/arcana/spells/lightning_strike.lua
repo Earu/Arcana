@@ -88,7 +88,7 @@ Arcane:RegisterSpell({
 	description = "Call a focused lightning bolt at your aim point, chaining to nearby foes",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 2,
-	knowledge_cost = 1,
+	knowledge_cost = 2,
 	cooldown = 6.0,
 	cost_type = Arcane.COST_TYPES.COINS,
 	cost_amount = 25,
