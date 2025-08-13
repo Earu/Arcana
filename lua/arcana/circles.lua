@@ -848,6 +848,10 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.startTime = CurTime()
 	circle.duration = 0
 	circle.isActive = true
+		-- Fade-out state
+		circle.isFading = false
+		circle.fadeStart = 0
+		circle.fadeDuration = 0.3
 	-- Evolving-cast state
 	circle.isEvolving = false
 	circle.evolveStart = 0
@@ -928,10 +932,10 @@ function MagicCircle:Update(deltaTime)
 		ring:Update(deltaTime)
 	end
 
-	-- Check if animation should end
-	if self.isAnimated and (CurTime() - self.startTime) > self.duration then
-		self.isActive = false
-	end
+		-- Check if animation should end
+		if self.isAnimated and (CurTime() - self.startTime) > self.duration and not self.isFading then
+			self:StartFadeOut(self.fadeDuration)
+		end
 
 	-- Update evolving behavior
 	if self.isEvolving then
@@ -973,20 +977,37 @@ function MagicCircle:Update(deltaTime)
 
 			ring.height = ring.height + (target - ring.height) * math.min(1, deltaTime * 6)
 		end
+		-- Handle fade-out completion
+		if self.isFading then
+			local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
+			if t >= 1 then
+				self:FinalizeDeactivate()
+				self.isActive = false
+			end
+		end
 	end
 end
 
-function MagicCircle:Draw()
+	function MagicCircle:Draw()
 	if not self.isActive then return end
 	render.SetColorMaterial()
 	local currentTime = CurTime()
+		-- Apply fade alpha if fading
+		local fadeMul = 1
+		if self.isFading then
+			fadeMul = math_max(0, 1 - (currentTime - self.fadeStart) / math_max(0.01, self.fadeDuration))
+		end
 	-- Draw all rings
 	local count = #self.rings
 	local maxToDraw = self.isEvolving and math.max(self.baseVisible, self.lastVisible) or count
 
 	for i = 1, math.min(count, maxToDraw) do
 		local ring = self.rings[i]
-		ring:Draw(self.position, self.angles, self.color, currentTime)
+			local baseCol = self.color or Color(255, 255, 255, 255)
+			local a = math_floor((baseCol.a or 255) * fadeMul)
+			if a > 0 then
+				ring:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
+			end
 	end
 end
 
@@ -1017,17 +1038,28 @@ function MagicCircle:IsActive()
 end
 
 function MagicCircle:Destroy()
-	self.isActive = false
-	-- Drop heavy per-ring references to encourage GC; shared cache persists
-	if self.rings then
-		for _, r in ipairs(self.rings) do
-			if r then
-				r.rt = nil
-				r.rtMat = nil
+		-- Trigger a quick fade-out instead of instant disappearance
+		self:StartFadeOut(self.fadeDuration)
+end
+
+	function MagicCircle:StartFadeOut(duration)
+		if self.isFading then return end
+		self.isFading = true
+		self.fadeStart = CurTime()
+		self.fadeDuration = math_max(0.05, duration or 0.3)
+	end
+
+	function MagicCircle:FinalizeDeactivate()
+		-- Drop heavy per-ring references to encourage GC; shared cache persists
+		if self.rings then
+			for _, r in ipairs(self.rings) do
+				if r then
+					r.rt = nil
+					r.rtMat = nil
+				end
 			end
 		end
 	end
-end
 
 function MagicCircle:GetRingCount()
 	return #self.rings
@@ -1081,7 +1113,12 @@ function MagicCircleManager:Draw()
 end
 
 function MagicCircleManager:Clear()
-	self.circles = {}
+	-- Trigger fade-out on all circles instead of instant removal
+	for _, circle in ipairs(self.circles) do
+		if circle and circle.StartFadeOut then
+			circle:StartFadeOut(0.25)
+		end
+	end
 end
 
 -- Hook for automatic updates
@@ -1183,6 +1220,10 @@ function BandCircle.new(pos, ang, color, size)
 	bc.isAnimated = false
 	bc.startTime = CurTime()
 	bc.duration = 0
+		-- Fade-out state
+		bc.isFading = false
+		bc.fadeStart = 0
+		bc.fadeDuration = 0.3
 
 	return bc
 end
@@ -1208,18 +1249,33 @@ function BandCircle:Update(dt)
 		r:Update(dt)
 	end
 
-	if self.isAnimated and (CurTime() - self.startTime) > (self.duration or 0) then
-		self.isActive = false
-	end
+		if self.isAnimated and (CurTime() - self.startTime) > (self.duration or 0) and not self.isFading then
+			self:StartFadeOut(self.fadeDuration)
+		end
+
+		if self.isFading then
+			local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
+			if t >= 1 then
+				self.isActive = false
+			end
+		end
 end
 
-function BandCircle:Draw()
+	function BandCircle:Draw()
 	if not self.isActive then return end
 	render.SetColorMaterial()
 	local t = CurTime()
+		local fadeMul = 1
+		if self.isFading then
+			fadeMul = math_max(0, 1 - (t - self.fadeStart) / math_max(0.01, self.fadeDuration))
+		end
 
 	for _, r in ipairs(self.rings) do
-		r:Draw(self.position, self.angles, self.color, t)
+			local baseCol = self.color or Color(255, 255, 255, 255)
+			local a = math_floor((baseCol.a or 255) * fadeMul)
+			if a > 0 then
+				r:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), t)
+			end
 	end
 end
 
@@ -1227,9 +1283,16 @@ function BandCircle:IsActive()
 	return self.isActive
 end
 
-function BandCircle:Remove()
-	self.isActive = false
-end
+	function BandCircle:Remove()
+		self:StartFadeOut(self.fadeDuration)
+	end
+
+	function BandCircle:StartFadeOut(duration)
+		if self.isFading then return end
+		self.isFading = true
+		self.fadeStart = CurTime()
+		self.fadeDuration = math_max(0.05, duration or 0.3)
+	end
 
 function BandCircle:SetAnimated(duration)
 	self.isAnimated = true
