@@ -62,8 +62,8 @@ Arcane.Config = {
 }
 
 -- Storage for registered spells
-Arcane.RegisteredSpells = {}
-Arcane.PlayerData = {}
+Arcane.RegisteredSpells = Arcane.RegisteredSpells or {}
+Arcane.PlayerData = Arcane.PlayerData or {}
 
 -- Spell cost types
 Arcane.COST_TYPES = {
