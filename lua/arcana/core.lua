@@ -101,6 +101,170 @@ local function CreateDefaultPlayerData()
 	}
 end
 
+-- Server-side persistence
+if SERVER then
+	local function dbLogError(prefix)
+		local err = sql.LastError() or "unknown error"
+		MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), prefix .. ": " .. tostring(err) .. "\n")
+	end
+
+	local function ensureDatabase()
+		if _G.co and _G.db then
+			-- if we have postgres use it
+			_G.co(function()
+				_G.db.Query([[CREATE TABLE IF NOT EXISTS arcane_players (
+					steamid	VARCHAR(255) PRIMARY KEY,
+					xp BIGINT NOT NULL DEFAULT 0,
+					level BIGINT NOT NULL DEFAULT 1,
+					knowledge_points BIGINT NOT NULL DEFAULT 1,
+					unlocked_spells TEXT NOT NULL DEFAULT '[]',
+					quickspell_slots TEXT NOT NULL DEFAULT '[]',
+					selected_quickslot INTEGER NOT NULL DEFAULT 1,
+					last_save BIGINT NOT NULL DEFAULT 0
+				)]])
+			end)
+
+			return true
+		else
+			-- fallback to sqlite
+			if sql.TableExists("arcane_players") then return true end
+
+			local ok = sql.Query([[CREATE TABLE IF NOT EXISTS arcane_players (
+				steamid	TEXT PRIMARY KEY,
+				xp INTEGER NOT NULL DEFAULT 0,
+				level INTEGER NOT NULL DEFAULT 1,
+				knowledge_points INTEGER NOT NULL DEFAULT 1,
+				unlocked_spells TEXT NOT NULL DEFAULT '[]',
+				quickspell_slots TEXT NOT NULL DEFAULT '[]',
+				selected_quickslot INTEGER NOT NULL DEFAULT 1,
+				last_save INTEGER NOT NULL DEFAULT 0
+			);]])
+
+			if ok == false then
+				dbLogError("CREATE TABLE arcane_players failed")
+				return false
+			end
+
+			return true
+		end
+	end
+
+	local function serializeUnlockedSpells(unlocked)
+		-- store as array of ids for compactness
+		local arr = {}
+		for id, v in pairs(unlocked or {}) do
+			if v then arr[#arr + 1] = id end
+		end
+		return util.TableToJSON(arr or {}) or "[]"
+	end
+
+	local function deserializeUnlockedSpells(json)
+		local ok, data = pcall(util.JSONToTable, json or "[]")
+		local map = {}
+		if ok and istable(data) then
+			for _, id in ipairs(data) do
+				map[tostring(id)] = true
+			end
+		end
+		return map
+	end
+
+	local function serializeQuickslots(slots)
+		-- preserve 8 positions; encode as array of strings with empty string for nil
+		local out = {}
+		for i = 1, 8 do
+			out[i] = tostring(slots and slots[i] or "")
+			if out[i] == "nil" then out[i] = "" end
+		end
+		return util.TableToJSON(out) or "[]"
+	end
+
+	local function deserializeQuickslots(json)
+		local ok, arr = pcall(util.JSONToTable, json or "[]")
+		local slots = { nil, nil, nil, nil, nil, nil, nil, nil }
+		if ok and istable(arr) then
+			for i = 1, 8 do
+				local v = arr[i]
+				if isstring(v) and v ~= "" then
+					slots[i] = v
+				end
+			end
+		end
+		return slots
+	end
+
+	function Arcane:SavePlayerDataToSQL(ply, data)
+		if not ensureDatabase() then return end
+		local steamid = sql.SQLStr(ply:SteamID64(), true)
+		local xp = tonumber(data.xp) or 0
+		local level = tonumber(data.level) or 1
+		local kp = tonumber(data.knowledge_points) or 0
+		local unlocked = sql.SQLStr(serializeUnlockedSpells(data.unlocked_spells))
+		local quick = sql.SQLStr(serializeQuickslots(data.quickspell_slots))
+		local selected = tonumber(data.selected_quickslot) or 1
+		local lastsave = tonumber(data.last_save) or os.time()
+
+		if _G.co and _G.db then
+			-- if we have postgres use it
+			_G.co(function()
+				local query = "UPDATE arcane_players SET xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save = $1, $2, $3, $4, $5, $6, $7 WHERE steamid = $8"
+				local rows = _G.db.Query(query, xp, level, kp, unlocked, quick, selected, lastsave, steamid)
+				if not rows or rows == 0 then
+					local insertQuery = "INSERT INTO arcane_players(steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES($1, $2, $3, $4, $5, $6, $7, $8)"
+					_G.db.Query(insertQuery, steamid, xp, level, kp, unlocked, quick, selected, lastsave)
+				end
+			end)
+
+			return
+		else
+			-- fallback to sqlite
+			local q = string.format(
+				"INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);",
+				steamid, xp, level, kp, unlocked, quick, selected, lastsave
+			)
+			local ok = sql.Query(q)
+			if ok == false then
+				dbLogError("SavePlayerDataToSQL failed")
+			end
+		end
+	end
+
+	function Arcane:LoadPlayerDataFromSQL(ply)
+		if not ensureDatabase() then return nil end
+
+		local rows
+		local steamid = sql.SQLStr(ply:SteamID64(), true)
+		if _G.co and _G.db then
+			-- if we have postgres use it
+			_G.co(function()
+				rows = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
+				if not (istable(rows) and #rows > 0) then return nil end
+			end)
+		else
+			-- fallback to sqlite
+			rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+			if rows == false then
+				dbLogError("LoadPlayerDataFromSQL failed")
+				return nil
+			end
+
+			if not rows or not rows[1] then return nil end
+		end
+
+		local row = rows[1]
+		local data = CreateDefaultPlayerData()
+		data.xp = tonumber(row.xp) or data.xp
+		data.level = tonumber(row.level) or data.level
+		data.knowledge_points = tonumber(row.knowledge_points) or data.knowledge_points
+		data.unlocked_spells = deserializeUnlockedSpells(row.unlocked_spells)
+		data.quickspell_slots = deserializeQuickslots(row.quickspell_slots)
+		data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
+		data.last_save = tonumber(row.last_save) or data.last_save
+
+		return data
+	end
+end
+
 -- Utility Functions
 function Arcane:GetXPRequiredForLevel(level)
 	return math.floor(Arcane.Config.BASE_XP_REQUIRED * (Arcane.Config.XP_MULTIPLIER ^ (level - 1)))
@@ -130,18 +294,27 @@ function Arcane:SavePlayerData(ply)
 	local data = self:GetPlayerData(ply)
 	data.last_save = os.time()
 
-	-- TODO: Implement file-based persistence
-	-- For now, data persists only during server session
+	if SERVER then
+		self:SavePlayerDataToSQL(ply, data)
+	end
 end
 
 function Arcane:LoadPlayerData(ply)
 	if not IsValid(ply) then return end
 
-	-- TODO: Implement file-based loading
-	-- For now, use default data
 	local steamid = ply:SteamID64()
-	if not self.PlayerData[steamid] then
-		self.PlayerData[steamid] = CreateDefaultPlayerData()
+	if SERVER then
+		local loaded = self:LoadPlayerDataFromSQL(ply)
+		if loaded then
+			self.PlayerData[steamid] = loaded
+		else
+			self.PlayerData[steamid] = CreateDefaultPlayerData()
+			self:SavePlayerDataToSQL(ply, self.PlayerData[steamid])
+		end
+	else
+		if not self.PlayerData[steamid] then
+			self.PlayerData[steamid] = CreateDefaultPlayerData()
+		end
 	end
 end
 
@@ -938,6 +1111,7 @@ if SERVER then
 	concommand.Add("arcane_reset", function(ply, cmd, args)
 		if not IsValid(ply) then return end
 		Arcane.PlayerData[ply:SteamID64()] = CreateDefaultPlayerData()
+		Arcane:SavePlayerData(ply)
 		Arcane:SyncPlayerData(ply)
 	end)
 end
