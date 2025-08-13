@@ -150,6 +150,7 @@ if SERVER then
 	util.AddNetworkString("Arcane_SetSelectedQuickslot")
 	util.AddNetworkString("Arcane_BeginCasting")
 	util.AddNetworkString("Arcane_PlayCastGesture")
+		util.AddNetworkString("Arcane_SpellFailed")
 	util.AddNetworkString("Arcana_AttachBandVFX")
 	util.AddNetworkString("Arcana_AttachParticles")
 	util.AddNetworkString("Arcane_ConsoleCastSpell")
@@ -214,7 +215,7 @@ function Arcane:StartCasting(ply, spellId)
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
 		local gesture = forwardLike and ACT_SIGNAL_FORWARD or ACT_GMOD_GESTURE_BECON
 		if gesture then
-			net.Start("Arcane_PlayCastGesture")
+			net.Start("Arcane_PlayCastGesture", true)
 			net.WriteEntity(ply)
 			net.WriteInt(gesture, 16)
 			net.Broadcast()
@@ -233,7 +234,7 @@ function Arcane:StartCasting(ply, spellId)
 		end
 
 		-- Tell clients to show evolving circle for this cast
-		net.Start("Arcane_BeginCasting")
+		net.Start("Arcane_BeginCasting", true)
 		net.WriteEntity(ply)
 		net.WriteString(spellId)
 		net.WriteFloat(castTime)
@@ -430,18 +431,6 @@ if SERVER then
 	end
 end
 
--- Server-side helper: ask clients to attach a particle system to an entity
-if SERVER then
-	function Arcane:SendAttachParticles(ent, effectName, duration)
-		if not IsValid(ent) or not isstring(effectName) or #effectName == 0 then return end
-		net.Start("Arcana_AttachParticles")
-			net.WriteEntity(ent)
-			net.WriteString(effectName)
-			net.WriteFloat(duration or 5)
-		net.Broadcast()
-	end
-end
-
 function Arcane:CastSpell(ply, spellId, target, context)
 	if not IsValid(ply) then return false end
 
@@ -519,6 +508,14 @@ function Arcane:CastSpell(ply, spellId, target, context)
 	else
 		if spell.on_failure then
 			spell.on_failure(ply, target, data)
+		end
+
+		-- Notify clients to break down the casting circle visuals
+		if SERVER then
+			net.Start("Arcane_SpellFailed", true)
+				net.WriteEntity(ply)
+				net.WriteFloat((context and context.castTime) or 0)
+			net.Broadcast()
 		end
 	end
 
@@ -773,6 +770,23 @@ if CLIENT then
 		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
 		if circle and circle.StartEvolving then
 			circle:StartEvolving(castTime, true)
+		end
+
+		-- Track as the current casting circle for this caster
+		caster._ArcanaCastingCircle = circle
+	end)
+
+	-- On spell failure, break down the tracked circle for the caster
+	net.Receive("Arcane_SpellFailed", function()
+		local caster = net.ReadEntity()
+		local castTime = net.ReadFloat() or 0
+		if not IsValid(caster) then return end
+
+		local circle = caster._ArcanaCastingCircle
+		if circle and circle.StartBreakdown then
+			local d = math.max(0.1, castTime)
+			circle:StartBreakdown(d)
+			caster._ArcanaCastingCircle = nil
 		end
 	end)
 
