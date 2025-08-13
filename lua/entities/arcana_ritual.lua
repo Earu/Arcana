@@ -290,7 +290,7 @@ if CLIENT then
 			end)
 		end
 
-		surface.PlaySound("ambient/levels/canals/windchime2.wav")
+		surface.PlaySound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
 	end)
 
 	function ENT:Draw()

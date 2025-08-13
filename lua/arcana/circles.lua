@@ -1062,7 +1062,7 @@ function MagicCircle:Update(deltaTime)
 					local pitch = 100 + math.random(-8, 10)
 					local vol = 0.45
 					local posJitter = self.position + Vector(math.random(-2, 2), math.random(-2, 2), math.random(-1, 1))
-					sound.Play("arcana/magic" .. math.random(1, 4) .. ".ogg", posJitter, 70, pitch, vol)
+					sound.Play("arcana/arcane_" .. math.random(1, 3) .. ".ogg", posJitter, 70, pitch, vol)
 				end
 			end
 
@@ -1165,13 +1165,13 @@ end
 
 -- Start evolving the circle over the given duration.
 -- This progressively reveals rings (logarithmically) and animates their height (depth).
-function MagicCircle:StartEvolving(duration, enableSounds)
+function MagicCircle:StartEvolving(duration)
 	self.isEvolving = true
 	self.evolveStart = CurTime()
 	self.evolveDuration = math.max(0.1, duration or 1)
 	self.baseVisible = 2
 	self.lastVisible = 2
-	self.enableRingSounds = enableSounds == true
+	self.enableRingSounds = true
 
 	-- Initialize first two rings to baseline
 	for i, ring in ipairs(self.rings) do
