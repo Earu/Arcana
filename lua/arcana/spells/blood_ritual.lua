@@ -44,7 +44,12 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 					poison = 20,
 				},
 				on_activate = function(selfEnt, ply)
-					ores.GivePlayerOre(ply, 666, 100)
+					ores.GivePlayerOre(ply, 666, 99)
+					timer.Simple(0.5, function()
+						if not IsValid(ply) then return end
+						ores.GivePlayerOre(ply, 666, 1) -- ensure it activates him
+					end)
+
 					sound.Play("ambient/halloween/female_scream_0" .. math.random(1, 10) .. ".wav", selfEnt:GetPos(), 100)
 				end,
 			})

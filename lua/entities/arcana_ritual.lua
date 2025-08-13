@@ -151,12 +151,6 @@ if SERVER then
 			end
 		end
 
-		-- Callback
-		if self._onActivate then
-			self:_onActivate(ply)
-			self._hasActivated = true
-		end
-
 		-- Tell clients to evolve the circle then remove the entity after a short delay
 		local evolveDur = 3.0
 		net.Start("Arcana_Ritual_Activated")
@@ -166,9 +160,16 @@ if SERVER then
 
 		timer.Simple(evolveDur + 0.1, function()
 			if IsValid(self) then
+				-- Callback
+				if self._onActivate then
+					self:_onActivate(ply)
+				end
+
 				self:Remove()
 			end
 		end)
+
+		self._hasActivated = true
 	end
 
 	function ENT:Configure(config)
