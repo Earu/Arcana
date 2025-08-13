@@ -229,39 +229,50 @@ if SERVER then
 		end
 	end
 
-	function Arcane:LoadPlayerDataFromSQL(ply)
+	function Arcane:LoadPlayerDataFromSQL(ply, callback)
 		if not ensureDatabase() then return nil end
 
-		local rows
+		local function processData(row)
+			local data = CreateDefaultPlayerData()
+			data.xp = tonumber(row.xp) or data.xp
+			data.level = tonumber(row.level) or data.level
+			data.knowledge_points = tonumber(row.knowledge_points) or data.knowledge_points
+			data.unlocked_spells = deserializeUnlockedSpells(row.unlocked_spells)
+			data.quickspell_slots = deserializeQuickslots(row.quickspell_slots)
+			data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
+			data.last_save = tonumber(row.last_save) or data.last_save
+
+			callback(true, data)
+		end
+
 		local steamid = sql.SQLStr(ply:SteamID64(), true)
 		if _G.co and _G.db then
 			-- if we have postgres use it
 			_G.co(function()
-				rows = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
-				if not (istable(rows) and #rows > 0) then return nil end
+				local rows = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
+				if not (istable(rows) and #rows > 0) then
+					callback(false)
+					return
+				end
+
+				processData(rows[1])
 			end)
 		else
 			-- fallback to sqlite
 			rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
 			if rows == false then
 				dbLogError("LoadPlayerDataFromSQL failed")
-				return nil
+				callback(false)
+				return
 			end
 
-			if not rows or not rows[1] then return nil end
+			if not rows or not rows[1] then
+				callback(false)
+				return
+			end
+
+			processData(rows[1])
 		end
-
-		local row = rows[1]
-		local data = CreateDefaultPlayerData()
-		data.xp = tonumber(row.xp) or data.xp
-		data.level = tonumber(row.level) or data.level
-		data.knowledge_points = tonumber(row.knowledge_points) or data.knowledge_points
-		data.unlocked_spells = deserializeUnlockedSpells(row.unlocked_spells)
-		data.quickspell_slots = deserializeQuickslots(row.quickspell_slots)
-		data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
-		data.last_save = tonumber(row.last_save) or data.last_save
-
-		return data
 	end
 end
 
@@ -304,13 +315,14 @@ function Arcane:LoadPlayerData(ply)
 
 	local steamid = ply:SteamID64()
 	if SERVER then
-		local loaded = self:LoadPlayerDataFromSQL(ply)
-		if loaded then
-			self.PlayerData[steamid] = loaded
-		else
-			self.PlayerData[steamid] = CreateDefaultPlayerData()
-			self:SavePlayerDataToSQL(ply, self.PlayerData[steamid])
-		end
+		self:LoadPlayerDataFromSQL(ply, function(loaded, data)
+			if loaded then
+				self.PlayerData[steamid] = data
+			else
+				self.PlayerData[steamid] = CreateDefaultPlayerData()
+				self:SavePlayerDataToSQL(ply, self.PlayerData[steamid])
+			end
+		end)
 	else
 		if not self.PlayerData[steamid] then
 			self.PlayerData[steamid] = CreateDefaultPlayerData()
