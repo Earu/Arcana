@@ -379,7 +379,7 @@ if CLIENT then
 
 	surface.CreateFont("Arcana_AncientGlyph", {
 		font = "Arial",
-		size = 30,
+		size = 60,
 		weight = 900,
 		antialias = true,
 		extended = true
@@ -560,37 +560,6 @@ if CLIENT then
 		surface.DrawPoly(poly)
 	end
 
-	-- Generic arc slice (small wedge not aligned to polygon vertices)
-	local function Arcana_DrawArcSlice(cx, cy, rInner, rOuter, ang0Deg, ang1Deg, color, segments)
-		local seg = math.max(4, segments or 10)
-		local ang0 = math.rad(ang0Deg)
-		local ang1 = math.rad(ang1Deg)
-		local step = (ang1 - ang0) / seg
-		local poly = {}
-
-		for i = 0, seg do
-			local a = ang0 + step * i
-
-			table.insert(poly, {
-				x = cx + math.cos(a) * rOuter,
-				y = cy + math.sin(a) * rOuter
-			})
-		end
-
-		for i = seg, 0, -1 do
-			local a = ang0 + step * i
-
-			table.insert(poly, {
-				x = cx + math.cos(a) * rInner,
-				y = cy + math.sin(a) * rInner
-			})
-		end
-
-		draw.NoTexture()
-		surface.SetDrawColor(color.r, color.g, color.b, color.a or 255)
-		surface.DrawPoly(poly)
-	end
-
 	-- Art-deco flourish accents for the radial
 	local function Arcana_DrawRadialFlourish(cx, cy, rInner, rOuter, sides, baseCol, accentCol)
 		local n = math.max(3, math.floor(sides or 8))
@@ -630,12 +599,6 @@ if CLIENT then
 			}
 
 			surface.DrawPoly(pts)
-		end
-
-		-- Inward notches around each face center
-		for i = 1, n do
-			local midDeg = (i - 0.5) * (360 / n)
-			Arcana_DrawArcSlice(cx, cy, rInner + 10, rInner + 18, midDeg - 5, midDeg + 5, Color(accentCol.r, accentCol.g, accentCol.b, 28), 8)
 		end
 	end
 
@@ -738,11 +701,11 @@ if CLIENT then
 			local a0 = (i - 1) * 45
 			local a1 = i * 45
 			local mid = math.rad((a0 + a1) * 0.5)
-			local rGlyph = rInner + (radius - rInner) * 0.40
+			local rGlyph = rInner + (radius - rInner) * 0.35
 			local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
 			local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
 			local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
-			draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(21, 20, 14, 190), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
 		-- Octagonal frame outlines + flourish
@@ -961,11 +924,11 @@ if CLIENT then
 				local a0 = (i - 1) * 45
 				local a1 = i * 45
 				local mid = math.rad((a0 + a1) * 0.5)
-				local rGlyph = rInner + (radius - rInner) * 0.40
+				local rGlyph = rInner + (radius - rInner) * 0.35
 				local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
 				local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
 				local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
-				draw.SimpleText(glyph, "Arcana_Ancient", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(21, 20, 14, 190), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
 			Arcana_DrawPolygonOutline(cx, cy, radius, 8, gold)
