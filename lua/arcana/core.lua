@@ -772,12 +772,6 @@ function Arcane:UnlockSpell(ply, spellId, force)
 	if SERVER then
 		self:SyncPlayerData(ply)
 
-		-- Brief celebratory rings around the player
-		self:SendAttachBandVFX(ply, Color(222, 198, 120, 255), 120, 4, {
-			{ radius = 60,  height = 14, spin = { p = 0.2, y = 0.6, r = 0.1 }, lineWidth = 3 },
-			{ radius = 90,  height = 12, spin = { p = -0.3, y = -0.4, r = 0.0 }, lineWidth = 2 },
-		})
-
 		-- Tell the unlocking client to show an on-screen announcement & play a sound
 		net.Start("Arcane_SpellUnlocked")
 			net.WriteString(spellId)

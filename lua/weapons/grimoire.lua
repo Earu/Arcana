@@ -387,6 +387,24 @@ if CLIENT then
 	local wedgeIdleFill = Color(gold.r, gold.g, gold.b, 24)
 	local wedgeHoverFill = Color(gold.r, gold.g, gold.b, 70)
 	local xpFill = Color(paleGold.r, paleGold.g, paleGold.b, 180)
+	-- Greek glyphs for subtle face accents
+	local greekGlyphs = {"Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω"}
+
+	-- Shared radial layout config
+	local RadialConfig = {
+		hud = {
+			outerRadius = 180,
+			innerGap = 70,
+			numberOffset = 14,
+			labelBias = 0.7,
+		},
+		menu = {
+			outerRadius = 180,
+			innerGap = 70,
+			numberOffset = 14,
+			labelBias = 0.7,
+		}
+	}
 
 	-- Modern blur helper (robust, with fallback if material missing)
 	local blurMat = Material("pp/blurscreen")
@@ -448,27 +466,51 @@ if CLIENT then
 		surface.DrawPoly(pts)
 	end
 
-	-- Simple circle outline helper
-	local function Arcana_DrawCircle(cx, cy, radius, thickness, col)
+	-- Regular polygon outline helper (e.g., octagon)
+	local function Arcana_DrawPolygonOutline(cx, cy, radius, sides, col)
+		local n = math.max(3, math.floor(sides or 6))
 		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		for r = radius - (thickness or 1), radius + (thickness or 1) do
-			surface.DrawCircle(cx, cy, r, col.r, col.g, col.b, col.a or 255)
+		local prevX, prevY
+		for i = 0, n do
+			local a = (math.pi * 2) * (i % n) / n
+			local x = math.floor(cx + math.cos(a) * radius + 0.5)
+			local y = math.floor(cy + math.sin(a) * radius + 0.5)
+			if prevX ~= nil then
+				surface.DrawLine(prevX, prevY, x, y)
+			end
+			prevX, prevY = x, y
 		end
 	end
 
-	-- Donut wedge fill helper for radial highlight
-	local function Arcana_DrawWedge(cx, cy, rInner, rOuter, ang0Deg, ang1Deg, color, segments)
-		local seg = math.max(4, segments or 12)
+	-- Filled polygon ring sector (between two vertices) for regular N-gon
+	local function Arcana_FillPolygonRingSector(cx, cy, rInner, rOuter, sides, index, color)
+		local n = math.max(3, math.floor(sides or 8))
+		local i = ((index - 1) % n) + 1
+		local step = (math.pi * 2) / n
+		local a0 = step * (i - 1)
+		local a1 = step * i
+		local poly = {
+			{ x = cx + math.cos(a0) * rOuter, y = cy + math.sin(a0) * rOuter },
+			{ x = cx + math.cos(a1) * rOuter, y = cy + math.sin(a1) * rOuter },
+			{ x = cx + math.cos(a1) * rInner, y = cy + math.sin(a1) * rInner },
+			{ x = cx + math.cos(a0) * rInner, y = cy + math.sin(a0) * rInner },
+		}
+		draw.NoTexture()
+		surface.SetDrawColor(color.r, color.g, color.b, color.a or 255)
+		surface.DrawPoly(poly)
+	end
+
+	-- Generic arc slice (small wedge not aligned to polygon vertices)
+	local function Arcana_DrawArcSlice(cx, cy, rInner, rOuter, ang0Deg, ang1Deg, color, segments)
+		local seg = math.max(4, segments or 10)
 		local ang0 = math.rad(ang0Deg)
 		local ang1 = math.rad(ang1Deg)
 		local step = (ang1 - ang0) / seg
 		local poly = {}
-		-- Outer arc
 		for i = 0, seg do
 			local a = ang0 + step * i
 			table.insert(poly, { x = cx + math.cos(a) * rOuter, y = cy + math.sin(a) * rOuter })
 		end
-		-- Inner arc (reverse)
 		for i = seg, 0, -1 do
 			local a = ang0 + step * i
 			table.insert(poly, { x = cx + math.cos(a) * rInner, y = cy + math.sin(a) * rInner })
@@ -476,6 +518,40 @@ if CLIENT then
 		draw.NoTexture()
 		surface.SetDrawColor(color.r, color.g, color.b, color.a or 255)
 		surface.DrawPoly(poly)
+	end
+
+	-- Art-deco flourish accents for the radial
+	local function Arcana_DrawRadialFlourish(cx, cy, rInner, rOuter, sides, baseCol, accentCol)
+		local n = math.max(3, math.floor(sides or 8))
+		-- Double-outline vibe
+		local outlineA = Color(baseCol.r, baseCol.g, baseCol.b, 90)
+		local outlineB = Color(baseCol.r, baseCol.g, baseCol.b, 60)
+		Arcana_DrawPolygonOutline(cx, cy, rOuter - 4, n, outlineA)
+		Arcana_DrawPolygonOutline(cx, cy, rOuter - 8, n, outlineB)
+		Arcana_DrawPolygonOutline(cx, cy, rInner + 6, n, outlineB)
+
+		-- Vertex diamonds
+		draw.NoTexture()
+		surface.SetDrawColor(accentCol.r, accentCol.g, accentCol.b, 40)
+		for i = 1, n do
+			local a = (i - 1) * (math.pi * 2) / n
+			local vx = cx + math.cos(a) * (rOuter - 2)
+			local vy = cy + math.sin(a) * (rOuter - 2)
+			local d = 5
+			local pts = {
+				{ x = vx,     y = vy - d },
+				{ x = vx + d, y = vy     },
+				{ x = vx,     y = vy + d },
+				{ x = vx - d, y = vy     },
+			}
+			surface.DrawPoly(pts)
+		end
+
+		-- Inward notches around each face center
+		for i = 1, n do
+			local midDeg = (i - 0.5) * (360 / n)
+			Arcana_DrawArcSlice(cx, cy, rInner + 10, rInner + 18, midDeg - 5, midDeg + 5, Color(accentCol.r, accentCol.g, accentCol.b, 28), 8)
+		end
 	end
 
 	function SWEP:GetSelectedFromQuickslot()
@@ -551,7 +627,8 @@ if CLIENT then
 
 	function SWEP:DrawQuickRadial(scrW, scrH, owner)
 		local cx, cy = scrW * 0.5, scrH * 0.5
-		local radius = 140
+		local radius = RadialConfig.hud.outerRadius
+		local rInner = radius - RadialConfig.hud.innerGap
 	local data = Arcane:GetPlayerData(owner)
 		if not data then return end
 
@@ -563,30 +640,58 @@ if CLIENT then
 		surface.SetDrawColor(backDim)
 		surface.DrawRect(0, 0, scrW, scrH)
 
-		-- Base ring and inner ring (brass tones)
-		Arcana_DrawCircle(cx, cy, radius, 2, gold)
-		Arcana_DrawCircle(cx, cy, radius - 60, 1, brassInner)
+		-- Octagonal background ring (filled between two octagons)
+		local sides = 8
+		for i = 1, sides do
+			local col = Color(gold.r, gold.g, gold.b, 24)
+			Arcana_FillPolygonRingSector(cx, cy, rInner, radius, sides, i, col)
+			-- Face center glyphs (Greek)
+			local a0 = (i - 1) * 45
+			local a1 = i * 45
+			local mid = math.rad((a0 + a1) * 0.5)
+			local rGlyph = rInner + (radius - rInner) * 0.40
+			local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
+			local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
+			local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
+			draw.SimpleText(glyph, "Arcana_Ancient", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+		-- Octagonal frame outlines + flourish
+		Arcana_DrawPolygonOutline(cx, cy, radius, sides, gold)
+		Arcana_DrawPolygonOutline(cx, cy, rInner, sides, brassInner)
+		Arcana_DrawRadialFlourish(cx, cy, rInner, radius, sides, gold, paleGold)
+
+		-- Precompute label radius using trapezoid centroid along face normal
+		local sinTerm = math.sin(math.pi / sides)
+		local baseOut = 2 * radius * sinTerm
+		local baseIn  = 2 * rInner * sinTerm
+		local h = radius - rInner
+		local yFromOuter = h * (2 * baseOut + baseIn) / (3 * (baseOut + baseIn))
+		local rLabelCentroid = radius - yFromOuter
+		-- Pull text closer to center than the geometric centroid for legibility
+		local rLabelText = rInner + (rLabelCentroid - rInner) * RadialConfig.hud.labelBias
 
 		-- Compute hover slot
 		local mx, my = gui.MousePos()
-		local ang = math.deg(math.atan2(my - cy, mx - cx))
-		ang = (ang + 360) % 360
-		local slot = math.floor((ang + 360 / 16) / (360 / 8)) % 8 + 1
-		self.RadialHoverSlot = slot
+		-- Use screen-space angle with clockwise increase (y grows downward in screen space)
+		local ang = (math.deg(math.atan2(my - cy, mx - cx)) + 360) % 360
+		-- Map to 8 faces with boundaries aligned to vertices (every 45°)
+		local hoverSlot = math.floor(ang / 45) % 8 + 1
+		self.RadialHoverSlot = hoverSlot
 
 		for i = 1, 8 do
-			local a0 = (i - 1) * (360 / 8)
-			local a1 = i * (360 / 8)
+			local a0 = (i - 1) * 45
+			local a1 = i * 45
 			local mid = math.rad((a0 + a1) * 0.5)
-			local txAbbr = math.floor(cx + math.cos(mid) * (radius - 32) + 0.5)
-			local tyAbbr = math.floor(cy + math.sin(mid) * (radius - 32) + 0.5)
-			local txNum = math.floor(cx + math.cos(mid) * (radius - 14) + 0.5)
-			local tyNum = math.floor(cy + math.sin(mid) * (radius - 14) + 0.5)
+			local txAbbr = math.floor(cx + math.cos(mid) * rLabelText + 0.5)
+			local tyAbbr = math.floor(cy + math.sin(mid) * rLabelText + 0.5)
+			local rNum = radius + RadialConfig.hud.numberOffset
+			local txNum = math.floor(cx + math.cos(mid) * rNum + 0.5)
+			local tyNum = math.floor(cy + math.sin(mid) * rNum + 0.5)
 
-			local isHover = (i == slot)
+			local isHover = (i == hoverSlot)
 
-			-- Wedge background (subtle parchment; brighter gold when hovered)
-			Arcana_DrawWedge(cx, cy, radius - 60, radius, a0, a1, isHover and wedgeHoverFill or wedgeIdleFill, isHover and 18 or 14)
+			-- Octagonal sector highlight (flat sides)
+			Arcana_FillPolygonRingSector(cx, cy, rInner, radius, sides, i, isHover and wedgeHoverFill or wedgeIdleFill)
 
 			draw.SimpleText(tostring(i), "Arcana_Ancient", txNum, tyNum, isHover and paleGold or textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
@@ -597,6 +702,18 @@ if CLIENT then
 			else
 				draw.SimpleText("-", "Arcana_AncientLarge", txAbbr, tyAbbr, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
+		end
+
+		-- Center hover details: name and cost for the hovered slot
+		local hsId = data.quickspell_slots[hoverSlot]
+		if hsId and Arcane.RegisteredSpells[hsId] then
+			local sp = Arcane.RegisteredSpells[hsId]
+			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			local ct = tostring(sp.cost_type or "")
+			local ca = tonumber(sp.cost_amount or 0) or 0
+			draw.SimpleText("Cost " .. ca .. " " .. ct, "Arcana_Ancient", cx, cy + 12, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		else
+			draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
 		-- Select on release
@@ -723,62 +840,110 @@ if CLIENT then
 			-- section separator
 		end
 
-		-- Left: quick slots
+		-- Left: radial quick access (drag and drop onto faces)
 		local left = vgui.Create("DPanel", content)
 		left:Dock(LEFT)
 		left:SetWide(440)
 		left:DockMargin(0, 0, 8, 0)
+		left._hoverSlot = nil
 		left.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
 			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
 			draw.SimpleText(string.upper("Quick Access"), "Arcana_Ancient", 14, 10, paleGold)
-		end
 
-		local grid = vgui.Create("DGrid", left)
-		grid:Dock(FILL)
-		grid:DockMargin(12, 36, 12, 12)
-		grid:SetCols(2)
-		grid:SetColWide(195)
-		grid:SetRowHeight(90)
-
-		local function rebuildSlots()
-			grid:Clear()
+			-- Center the wheel within the left panel using a content box (account for title area)
+			local titlePadTop = 36
+			local padSide = 16
+			local padBottom = 18
+			local contentW = w - padSide * 2
+			local contentH = h - titlePadTop - padBottom
+			local cx = padSide + contentW * 0.5
+			local cy = titlePadTop + contentH * 0.5
+			-- Fit radius to available space while keeping configured preference
+			local maxR = math.min(contentW, contentH) * 0.5 - RadialConfig.menu.numberOffset - 6
+			local radius = math.min(RadialConfig.menu.outerRadius, math.max(80, math.floor(maxR)))
+			local rInner = radius - RadialConfig.menu.innerGap
 			local pdata = Arcane:GetPlayerData(owner)
+			local mx, my = pnl:LocalCursorPos()
+			local ang = (math.deg(math.atan2(my - cy, mx - cx)) + 360) % 360
+			local hoverSlot = math.floor(ang / 45) % 8 + 1
+			pnl._hoverSlot = hoverSlot
+
+			-- Background ring with Greek glyphs
 			for i = 1, 8 do
-				local slot = vgui.Create("DButton")
-				slot:SetText("")
-				slot:SetSize(185, 78)
-				slot._index = i
-				slot.ReceiverName = "arcana_spell"
-				slot.Paint = function(pnl, w, h)
-					local hovered = pnl:IsHovered()
-					Arcana_FillDecoPanel(3, 3, w - 6, h - 6, hovered and cardHover or cardIdle, 10)
-					Arcana_DrawDecoFrame(3, 3, w - 6, h - 6, gold, 10)
-					draw.SimpleText("Slot " .. i, "Arcana_AncientSmall", 12, 8, textDim)
-					local sid = pdata.quickspell_slots[i]
-					if sid and Arcane.RegisteredSpells[sid] then
-						local sp = Arcane.RegisteredSpells[sid]
-						draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 34, textBright)
-					else
-						draw.SimpleText("Empty", "Arcana_AncientLarge", 12, 34, textDim)
-					end
+				local col = Color(gold.r, gold.g, gold.b, (i == hoverSlot) and 70 or 24)
+				Arcana_FillPolygonRingSector(cx, cy, rInner, radius, 8, i, col)
+				local a0 = (i - 1) * 45
+				local a1 = i * 45
+				local mid = math.rad((a0 + a1) * 0.5)
+				local rGlyph = rInner + (radius - rInner) * 0.40
+				local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
+				local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
+				local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
+				draw.SimpleText(glyph, "Arcana_Ancient", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+			Arcana_DrawPolygonOutline(cx, cy, radius, 8, gold)
+			Arcana_DrawPolygonOutline(cx, cy, rInner, 8, brassInner)
+			Arcana_DrawRadialFlourish(cx, cy, rInner, radius, 8, gold, paleGold)
+
+			-- Label radius (towards center for readability)
+			local sinTerm = math.sin(math.pi / 8)
+			local baseOut = 2 * radius * sinTerm
+			local baseIn = 2 * rInner * sinTerm
+			local hth = radius - rInner
+			local yFromOuter = hth * (2 * baseOut + baseIn) / (3 * (baseOut + baseIn))
+			local rCentroid = radius - yFromOuter
+			local rLabel = rInner + (rCentroid - rInner) * RadialConfig.menu.labelBias
+
+			for i = 1, 8 do
+				local a0 = (i - 1) * 45
+				local a1 = i * 45
+				local mid = math.rad((a0 + a1) * 0.5)
+				local tx = math.floor(cx + math.cos(mid) * rLabel + 0.5)
+				local ty = math.floor(cy + math.sin(mid) * rLabel + 0.5)
+				local rNum = radius + RadialConfig.menu.numberOffset
+				local tnX = math.floor(cx + math.cos(mid) * rNum + 0.5)
+				local tnY = math.floor(cy + math.sin(mid) * rNum + 0.5)
+
+				local isHover = (i == hoverSlot)
+				draw.SimpleText(tostring(i), "Arcana_AncientSmall", tnX, tnY, isHover and paleGold or textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+				local sid = pdata.quickspell_slots[i]
+				if sid and Arcane.RegisteredSpells[sid] then
+					local sp = Arcane.RegisteredSpells[sid]
+					draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", tx, ty, isHover and textBright or paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				else
+					draw.SimpleText("-", "Arcana_AncientLarge", tx, ty, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
-				slot:Receiver("arcana_spell", function(pnl, panels, dropped)
-					if dropped and panels and panels[1] and panels[1].SpellId then
-						local sid = panels[1].SpellId
-						local pdata2 = Arcane:GetPlayerData(owner)
-						pdata2.quickspell_slots[i] = sid
-						net.Start("Arcane_SetQuickslot")
-						net.WriteUInt(i, 4)
-						net.WriteString(sid)
-						net.SendToServer()
-						timer.Simple(0.01, rebuildSlots)
-					end
-				end)
-				grid:AddItem(slot)
 			end
 		end
-		rebuildSlots()
+
+		-- Select quickslot on click inside the wheel
+		left.OnMousePressed = function(pnl, mc)
+			if mc ~= MOUSE_LEFT then return end
+			local slotIndex = pnl._hoverSlot
+			if not slotIndex then return end
+			local pdata = Arcane:GetPlayerData(owner)
+			pdata.selected_quickslot = slotIndex
+			net.Start("Arcane_SetSelectedQuickslot")
+			net.WriteUInt(slotIndex, 4)
+			net.SendToServer()
+		end
+
+		-- Accept drops from learned spells
+		left:Receiver("arcana_spell", function(pnl, panels, dropped)
+			if dropped and panels and panels[1] and panels[1].SpellId then
+				local sid = panels[1].SpellId
+				local slotIndex = pnl._hoverSlot or 1
+				local pdata2 = Arcane:GetPlayerData(owner)
+				pdata2.quickspell_slots[slotIndex] = sid
+				net.Start("Arcane_SetQuickslot")
+				net.WriteUInt(slotIndex, 4)
+				net.WriteString(sid)
+				net.SendToServer()
+				pnl:InvalidateLayout(true)
+			end
+		end)
 
 		-- Middle: learned spells list with drag sources
 		local middle = vgui.Create("DPanel", content)
@@ -806,7 +971,7 @@ if CLIENT then
 			local sp = item.spell
 			local row = vgui.Create("DButton", listScroll)
 			row:Dock(TOP)
-			row:SetTall(46)
+			row:SetTall(56)
 			row:DockMargin(0, 0, 0, 6)
 			row:SetText("")
 			row.SpellId = item.id
@@ -815,10 +980,13 @@ if CLIENT then
 				local hovered = pnl:IsHovered()
 				Arcana_FillDecoPanel(2, 2, w - 4, h - 4, hovered and cardHover or cardIdle, 8)
 				Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
-				draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 12, textBright)
+				draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, textBright)
+				-- Subline: cost only
+				local ca = tonumber(sp.cost_amount or 0) or 0
+				local ct = tostring(sp.cost_type or "")
+				local sub = string.format("Cost %d %s", ca, ct)
+				draw.SimpleText(sub, "Arcana_Ancient", 12, 34, textDim)
 			end
 		end
-
-		-- Removed right-side stats panel; stats are now in title chip and global XP bar
 	end
 end

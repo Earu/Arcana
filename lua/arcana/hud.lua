@@ -233,12 +233,12 @@ local function showUnlockAnnouncement(kind, displayName, knowledgeDelta)
 	-- Play a deep, long sound. Prefer addon sounds; fallback to HL2 ambient if missing.
 	local snd = nil
 
-	if file.Exists("sound/arcana/magic3.ogg", "GAME") then
-		snd = "arcana/magic3.ogg"
-	elseif file.Exists("sound/arcana/magic2.ogg", "GAME") then
-		snd = "arcana/magic2.ogg"
-	elseif file.Exists("sound/arcana/magic1.ogg", "GAME") then
-		snd = "arcana/magic1.ogg"
+	if file.Exists("sound/arcana/arcane_1.ogg", "GAME") then
+		snd = "arcana/arcane_1.ogg"
+	elseif file.Exists("sound/arcana/arcane_2.ogg", "GAME") then
+		snd = "arcana/arcane_2.ogg"
+	elseif file.Exists("sound/arcana/arcane_3.ogg", "GAME") then
+		snd = "arcana/arcane_3.ogg"
 	else
 		snd = "ambient/atmosphere/terrain_rumble1.wav"
 	end
@@ -274,7 +274,7 @@ hook.Add("Arcane_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, 
 	levelAnnounce.newLevel = newLevel or prevLevel
 	levelAnnounce.knowledgeDelta = knowledgeDelta or 0
 	-- Distinct chime for level-up
-	surface.PlaySound("buttons/bell1.wav")
+	surface.PlaySound("arcana/arcane_1.ogg")
 end)
 
 local function DrawDecoFrame(x, y, w, h, col, corner)
