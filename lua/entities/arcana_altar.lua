@@ -22,7 +22,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_OpenAltarMenu")
 
 	resource.AddFile("materials/entities/arcana_altar.png")
-	resource.AddFile("sound/arcana/ambient_loop.wav")
+	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
@@ -250,7 +250,7 @@ if CLIENT then
 		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
 		if isCore then
 			if not self._ambient then
-				self._ambient = CreateSound(self, "arcana/ambient_loop.wav")
+				self._ambient = CreateSound(self, "arcana/altar_ambient_stereo.ogg")
 				if self._ambient then
 					self._ambient:PlayEx(0, 100)
 					self._ambient:SetSoundLevel(65)
