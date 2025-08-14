@@ -158,7 +158,9 @@ if SERVER then
 	end
 
 	local function deserializeUnlockedSpells(json)
-		local ok, data = pcall(util.JSONToTable, json or "[]")
+		json = json or "[]"
+		json = json:gsub("^\'", ""):gsub("\'$", "")
+		local ok, data = pcall(util.JSONToTable, json)
 		local map = {}
 		if ok and istable(data) then
 			for _, id in ipairs(data) do
@@ -179,7 +181,9 @@ if SERVER then
 	end
 
 	local function deserializeQuickslots(json)
-		local ok, arr = pcall(util.JSONToTable, json or "[]")
+		json = json or "[]"
+		json = json:gsub("^\'", ""):gsub("\'$", "")
+		local ok, arr = pcall(util.JSONToTable, json)
 		local slots = { nil, nil, nil, nil, nil, nil, nil, nil }
 		if ok and istable(arr) then
 			for i = 1, 8 do
