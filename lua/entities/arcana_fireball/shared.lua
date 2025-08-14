@@ -1,7 +1,7 @@
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 
-ENT.PrintName = "Arcana Fireball"
+ENT.PrintName = "Fireball"
 ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
