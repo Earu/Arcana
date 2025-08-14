@@ -9,10 +9,8 @@ SWEP.PrintName = "Grimoire"
 SWEP.Author = "Earu"
 SWEP.Purpose = "A mystical tome containing powerful spells and rituals"
 SWEP.Instructions = "LMB: Cast | RMB: Open Grimoire | R: Quick Radial"
-
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
-
 -- Use the default citizen arms as the first-person viewmodel and draw the
 -- grimoire ourselves attached to the right hand. Using the world model as a
 -- viewmodel makes it float in the camera.
@@ -20,28 +18,22 @@ SWEP.ViewModel = "models/weapons/c_arms_citizen.mdl"
 SWEP.WorldModel = "models/arcana/models/arcana/Grimoire.mdl"
 SWEP.ViewModelFOV = 62
 SWEP.UseHands = true
-
 SWEP.Primary.ClipSize = -1
 SWEP.Primary.DefaultClip = -1
 SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "none"
-
 SWEP.Secondary.ClipSize = -1
 SWEP.Secondary.DefaultClip = -1
 SWEP.Secondary.Automatic = false
 SWEP.Secondary.Ammo = "none"
-
 SWEP.Weight = 3
 SWEP.AutoSwitchTo = false
 SWEP.AutoSwitchFrom = false
-
 SWEP.Slot = 0
 SWEP.SlotPos = 1
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
-
 SWEP.HoldType = "slam"
-
 -- Grimoire-specific properties
 SWEP.SelectedSpell = "fireball"
 SWEP.MenuOpen = false
@@ -51,7 +43,6 @@ SWEP.RadialOpenTime = 0
 
 function SWEP:Initialize()
 	self:SetWeaponHoldType(self.HoldType)
-
 	-- Store active magic circle reference
 	self.ActiveMagicCircle = nil
 end
@@ -63,29 +54,31 @@ end
 function SWEP:Holster()
 	if CLIENT then
 		self.MenuOpen = false
+
 		if self.RadialOpen then
 			gui.EnableScreenClicker(false)
 			self.RadialOpen = false
 			self.RadialHoverSlot = nil
 		end
+
 		-- Clean up any active magic circle
 		if self.ActiveMagicCircle and IsValid(self.ActiveMagicCircle) then
 			self.ActiveMagicCircle:Destroy()
 			self.ActiveMagicCircle = nil
 		end
 	end
+
 	return true
 end
 
 function SWEP:PrimaryAttack()
 	if not Arcane then return end
-
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
-
 	-- Resolve selected spell from quickslot if present
 	local selectedSpellId = self.SelectedSpell
 	local pdata = Arcane:GetPlayerData(owner)
+
 	if pdata then
 		local qsIndex = math.Clamp(pdata.selected_quickslot or 1, 1, 8)
 		selectedSpellId = pdata.quickspell_slots[qsIndex] or selectedSpellId
@@ -96,15 +89,18 @@ function SWEP:PrimaryAttack()
 		if CLIENT and IsFirstTimePredicted() then
 			Arcane:Print("❌ No spell selected!")
 		end
+
 		return
 	end
 
 	-- Check if spell exists and is unlocked
 	local spell = Arcane.RegisteredSpells[selectedSpellId]
+
 	if not spell then
 		if CLIENT and IsFirstTimePredicted() then
 			Arcane:Print("❌ Unknown spell: " .. tostring(selectedSpellId))
 		end
+
 		return
 	end
 
@@ -112,6 +108,7 @@ function SWEP:PrimaryAttack()
 		if CLIENT and IsFirstTimePredicted() then
 			Arcane:Print("❌ Spell not unlocked: " .. spell.name)
 		end
+
 		return
 	end
 
@@ -126,7 +123,6 @@ function SWEP:PrimaryAttack()
 		local castTime = math.max(0.1, spell.cast_time or 0)
 		self:SetNextPrimaryFire(CurTime() + castTime)
 	end
-
 	-- Magic circle visuals now handled via networked casting in core
 end
 
@@ -140,7 +136,6 @@ end
 
 function SWEP:Reload()
 	if not Arcane then return false end
-
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return false end
 
@@ -162,6 +157,7 @@ SWEP.WorldModelOffset = {
 	pos = Vector(-1, -2, 0),
 	ang = Angle(-90, 180, 180), -- pitch, yaw, roll adjustments relative to the hand bone
 	size = 0.8 -- size of the world model
+
 }
 
 -- First-person (viewmodel) placement for the clientside grimoire model
@@ -179,20 +175,18 @@ function SWEP:DrawWorldModel()
 	if IsValid(owner) then
 		-- Prefer a hand attachment if available, fall back to the hand bone
 		local attId = owner:LookupAttachment("anim_attachment_RH") or owner:LookupAttachment("Anim_Attachment_RH")
+
 		if attId and attId > 0 then
 			local att = owner:GetAttachment(attId)
+
 			if att then
 				local pos = att.Pos
 				local ang = att.Ang
-
 				-- Apply positional offset in the bone's local space
-				pos = pos
-					+ ang:Forward() * (self.WorldModelOffset.pos.x or 0)
-					+ ang:Right()   * (self.WorldModelOffset.pos.y or 0)
-					+ ang:Up()      * (self.WorldModelOffset.pos.z or 0)
-
+				pos = pos + ang:Forward() * (self.WorldModelOffset.pos.x or 0) + ang:Right() * (self.WorldModelOffset.pos.y or 0) + ang:Up() * (self.WorldModelOffset.pos.z or 0)
 				-- Apply angular offsets
 				local a = self.WorldModelOffset.ang or angle_zero
+
 				if a then
 					ang:RotateAroundAxis(ang:Up(), a.y or 0)
 					ang:RotateAroundAxis(ang:Right(), a.p or 0)
@@ -205,25 +199,24 @@ function SWEP:DrawWorldModel()
 				self:DrawModel()
 				self:SetRenderOrigin()
 				self:SetRenderAngles()
+
 				return
 			end
 		end
 
 		local boneId = owner:LookupBone("ValveBiped.Bip01_R_Hand")
+
 		if boneId then
 			local matrix = owner:GetBoneMatrix(boneId)
+
 			if matrix then
 				local pos = matrix:GetTranslation()
 				local ang = matrix:GetAngles()
-
 				-- Apply positional offset in the bone's local space
-				pos = pos
-					+ ang:Forward() * (self.WorldModelOffset.pos.x or 0)
-					+ ang:Right()   * (self.WorldModelOffset.pos.y or 0)
-					+ ang:Up()      * (self.WorldModelOffset.pos.z or 0)
-
+				pos = pos + ang:Forward() * (self.WorldModelOffset.pos.x or 0) + ang:Right() * (self.WorldModelOffset.pos.y or 0) + ang:Up() * (self.WorldModelOffset.pos.z or 0)
 				-- Apply angular offsets
 				local a = self.WorldModelOffset.ang or angle_zero
+
 				if a then
 					ang:RotateAroundAxis(ang:Up(), a.y or 0)
 					ang:RotateAroundAxis(ang:Right(), a.p or 0)
@@ -236,6 +229,7 @@ function SWEP:DrawWorldModel()
 				self:DrawModel()
 				self:SetRenderOrigin()
 				self:SetRenderAngles()
+
 				return
 			end
 		end
@@ -248,10 +242,8 @@ end
 -- Get available spells for the player
 function SWEP:GetAvailableSpells()
 	if not Arcane then return {} end
-
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return {} end
-
 	local availableSpells = {}
 
 	for spellId, spell in pairs(Arcane.RegisteredSpells) do
@@ -264,9 +256,7 @@ function SWEP:GetAvailableSpells()
 	end
 
 	-- Sort by level requirement
-	table.sort(availableSpells, function(a, b)
-		return a.spell.level_required < b.spell.level_required
-	end)
+	table.sort(availableSpells, function(a, b) return a.spell.level_required < b.spell.level_required end)
 
 	return availableSpells
 end
@@ -275,8 +265,8 @@ end
 function SWEP:CycleSpells()
 	local availableSpells = self:GetAvailableSpells()
 	if #availableSpells == 0 then return end
-
 	local currentIndex = 1
+
 	for i, spellData in ipairs(availableSpells) do
 		if spellData.id == self.SelectedSpell then
 			currentIndex = i
@@ -290,10 +280,8 @@ end
 
 function SWEP:DrawHUD()
 	if not Arcane then return end
-
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
-
 	local scrW, scrH = ScrW(), ScrH()
 
 	-- Radial quickslot menu
@@ -318,24 +306,17 @@ if CLIENT then
 		-- Ensure we have a book model to draw
 		self:EnsureViewModelBook()
 		if not IsValid(self.VMBook) then return end
-
 		local boneId = vm:LookupBone("ValveBiped.Bip01_R_Hand")
 		if not boneId then return end
-
 		local matrix = vm:GetBoneMatrix(boneId)
 		if not matrix then return end
-
 		local pos = matrix:GetTranslation()
 		local ang = matrix:GetAngles()
-
 		-- Apply positional offset in the hand's local space
-		pos = pos
-			+ ang:Forward() * (self.ViewModelOffset.pos.x or 0)
-			+ ang:Right()   * (self.ViewModelOffset.pos.y or 0)
-			+ ang:Up()      * (self.ViewModelOffset.pos.z or 0)
-
+		pos = pos + ang:Forward() * (self.ViewModelOffset.pos.x or 0) + ang:Right() * (self.ViewModelOffset.pos.y or 0) + ang:Up() * (self.ViewModelOffset.pos.z or 0)
 		-- Apply angular offsets
 		local a = self.ViewModelOffset.ang or angle_zero
+
 		if a then
 			ang:RotateAroundAxis(ang:Up(), a.y or 0)
 			ang:RotateAroundAxis(ang:Right(), a.p or 0)
@@ -364,19 +345,53 @@ if CLIENT then
 	end
 
 	-- Fonts (Art-Deco / Fantasy inspired). Falls back if font not available.
-	surface.CreateFont("Arcana_AncientSmall", {font = "Georgia", size = 16, weight = 600, antialias = true, extended = true})
-	surface.CreateFont("Arcana_Ancient", {font = "Georgia", size = 20, weight = 700, antialias = true, extended = true})
-	surface.CreateFont("Arcana_AncientLarge", {font = "Georgia", size = 24, weight = 800, antialias = true, extended = true})
-	surface.CreateFont("Arcana_DecoTitle", {font = "Georgia", size = 26, weight = 900, antialias = true, extended = true})
+	surface.CreateFont("Arcana_AncientSmall", {
+		font = "Georgia",
+		size = 16,
+		weight = 600,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_Ancient", {
+		font = "Georgia",
+		size = 20,
+		weight = 700,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_AncientLarge", {
+		font = "Georgia",
+		size = 24,
+		weight = 800,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_DecoTitle", {
+		font = "Georgia",
+		size = 26,
+		weight = 900,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_AncientGlyph", {
+		font = "Arial",
+		size = 30,
+		weight = 900,
+		antialias = true,
+		extended = true
+	})
 
 	-- Palette tuned to the grimoire model (warm leather + brass)
-	local decoBg = Color(26, 20, 14, 235)          -- deep leather brown
-	local decoPanel = Color(32, 24, 18, 235)       -- panel leather
-	local gold = Color(198, 160, 74, 255)          -- brass gold
-	local paleGold = Color(222, 198, 120, 255)     -- soft brass
-	local textBright = Color(236, 230, 220, 255)   -- parchment white
-	local textDim = Color(180, 170, 150, 255)      -- muted parchment
-
+	local decoBg = Color(26, 20, 14, 235) -- deep leather brown
+	local decoPanel = Color(32, 24, 18, 235) -- panel leather
+	local gold = Color(198, 160, 74, 255) -- brass gold
+	local paleGold = Color(222, 198, 120, 255) -- soft brass
+	local textBright = Color(236, 230, 220, 255) -- parchment white
+	local textDim = Color(180, 170, 150, 255) -- muted parchment
 	-- Derived colors (centralize all manual Color usage)
 	local brassInner = Color(160, 130, 60, 220)
 	local backDim = Color(0, 0, 0, 140)
@@ -387,8 +402,9 @@ if CLIENT then
 	local wedgeIdleFill = Color(gold.r, gold.g, gold.b, 24)
 	local wedgeHoverFill = Color(gold.r, gold.g, gold.b, 70)
 	local xpFill = Color(paleGold.r, paleGold.g, paleGold.b, 180)
+
 	-- Greek glyphs for subtle face accents
-	local greekGlyphs = {"Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω"}
+	local greekGlyphs = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"}
 
 	-- Shared radial layout config
 	local RadialConfig = {
@@ -408,18 +424,19 @@ if CLIENT then
 
 	-- Modern blur helper (robust, with fallback if material missing)
 	local blurMat = Material("pp/blurscreen")
+
 	local function Arcana_DrawBlurRect(x, y, w, h, layers, density, alpha)
 		surface.SetMaterial(blurMat)
 		surface.SetDrawColor(255, 255, 255)
-
 		render.SetScissorRect(x, y, x + w, y + h, true)
-			for i = 1, layers do
-				blurMat:SetFloat("$blur", (i / layers) * density)
-				blurMat:Recompute()
 
-				render.UpdateScreenEffectTexture()
-				surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-			end
+		for i = 1, layers do
+			blurMat:SetFloat("$blur", (i / layers) * density)
+			blurMat:Recompute()
+			render.UpdateScreenEffectTexture()
+			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		end
+
 		render.SetScissorRect(0, 0, 0, 0, false)
 	end
 
@@ -453,16 +470,42 @@ if CLIENT then
 		local c = math.max(8, corner or 12)
 		draw.NoTexture()
 		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
+
 		local pts = {
-			{ x = x + c, y = y },
-			{ x = x + w - c, y = y },
-			{ x = x + w, y = y + c },
-			{ x = x + w, y = y + h - c },
-			{ x = x + w - c, y = y + h },
-			{ x = x + c, y = y + h },
-			{ x = x, y = y + h - c },
-			{ x = x, y = y + c },
+			{
+				x = x + c,
+				y = y
+			},
+			{
+				x = x + w - c,
+				y = y
+			},
+			{
+				x = x + w,
+				y = y + c
+			},
+			{
+				x = x + w,
+				y = y + h - c
+			},
+			{
+				x = x + w - c,
+				y = y + h
+			},
+			{
+				x = x + c,
+				y = y + h
+			},
+			{
+				x = x,
+				y = y + h - c
+			},
+			{
+				x = x,
+				y = y + c
+			},
 		}
+
 		surface.DrawPoly(pts)
 	end
 
@@ -471,13 +514,16 @@ if CLIENT then
 		local n = math.max(3, math.floor(sides or 6))
 		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
 		local prevX, prevY
+
 		for i = 0, n do
 			local a = (math.pi * 2) * (i % n) / n
 			local x = math.floor(cx + math.cos(a) * radius + 0.5)
 			local y = math.floor(cy + math.sin(a) * radius + 0.5)
+
 			if prevX ~= nil then
 				surface.DrawLine(prevX, prevY, x, y)
 			end
+
 			prevX, prevY = x, y
 		end
 	end
@@ -489,12 +535,26 @@ if CLIENT then
 		local step = (math.pi * 2) / n
 		local a0 = step * (i - 1)
 		local a1 = step * i
+
 		local poly = {
-			{ x = cx + math.cos(a0) * rOuter, y = cy + math.sin(a0) * rOuter },
-			{ x = cx + math.cos(a1) * rOuter, y = cy + math.sin(a1) * rOuter },
-			{ x = cx + math.cos(a1) * rInner, y = cy + math.sin(a1) * rInner },
-			{ x = cx + math.cos(a0) * rInner, y = cy + math.sin(a0) * rInner },
+			{
+				x = cx + math.cos(a0) * rOuter,
+				y = cy + math.sin(a0) * rOuter
+			},
+			{
+				x = cx + math.cos(a1) * rOuter,
+				y = cy + math.sin(a1) * rOuter
+			},
+			{
+				x = cx + math.cos(a1) * rInner,
+				y = cy + math.sin(a1) * rInner
+			},
+			{
+				x = cx + math.cos(a0) * rInner,
+				y = cy + math.sin(a0) * rInner
+			},
 		}
+
 		draw.NoTexture()
 		surface.SetDrawColor(color.r, color.g, color.b, color.a or 255)
 		surface.DrawPoly(poly)
@@ -507,14 +567,25 @@ if CLIENT then
 		local ang1 = math.rad(ang1Deg)
 		local step = (ang1 - ang0) / seg
 		local poly = {}
+
 		for i = 0, seg do
 			local a = ang0 + step * i
-			table.insert(poly, { x = cx + math.cos(a) * rOuter, y = cy + math.sin(a) * rOuter })
+
+			table.insert(poly, {
+				x = cx + math.cos(a) * rOuter,
+				y = cy + math.sin(a) * rOuter
+			})
 		end
+
 		for i = seg, 0, -1 do
 			local a = ang0 + step * i
-			table.insert(poly, { x = cx + math.cos(a) * rInner, y = cy + math.sin(a) * rInner })
+
+			table.insert(poly, {
+				x = cx + math.cos(a) * rInner,
+				y = cy + math.sin(a) * rInner
+			})
 		end
+
 		draw.NoTexture()
 		surface.SetDrawColor(color.r, color.g, color.b, color.a or 255)
 		surface.DrawPoly(poly)
@@ -529,21 +600,35 @@ if CLIENT then
 		Arcana_DrawPolygonOutline(cx, cy, rOuter - 4, n, outlineA)
 		Arcana_DrawPolygonOutline(cx, cy, rOuter - 8, n, outlineB)
 		Arcana_DrawPolygonOutline(cx, cy, rInner + 6, n, outlineB)
-
 		-- Vertex diamonds
 		draw.NoTexture()
 		surface.SetDrawColor(accentCol.r, accentCol.g, accentCol.b, 40)
+
 		for i = 1, n do
 			local a = (i - 1) * (math.pi * 2) / n
 			local vx = cx + math.cos(a) * (rOuter - 2)
 			local vy = cy + math.sin(a) * (rOuter - 2)
 			local d = 5
+
 			local pts = {
-				{ x = vx,     y = vy - d },
-				{ x = vx + d, y = vy     },
-				{ x = vx,     y = vy + d },
-				{ x = vx - d, y = vy     },
+				{
+					x = vx,
+					y = vy - d
+				},
+				{
+					x = vx + d,
+					y = vy
+				},
+				{
+					x = vx,
+					y = vy + d
+				},
+				{
+					x = vx - d,
+					y = vy
+				},
 			}
+
 			surface.DrawPoly(pts)
 		end
 
@@ -559,6 +644,7 @@ if CLIENT then
 		if not IsValid(owner) then return nil end
 		local data = Arcane:GetPlayerData(owner)
 		local index = math.Clamp(data.selected_quickslot or 1, 1, 8)
+
 		return data.quickspell_slots[index]
 	end
 
@@ -573,16 +659,15 @@ if CLIENT then
 	function SWEP:DrawOldSchoolHUD(scrW, scrH, owner)
 		local data = Arcane:GetPlayerData(owner)
 		if not data then return end
-
 		-- Quickslot parchment bar
 		local barW, barH = 420, 64
 		local barX, barY = (scrW - barW) * 0.5, scrH - barH - 20
 		draw.RoundedBox(8, barX, barY, barW, barH, parchment)
 		surface.SetDrawColor(parchmentDark)
 		surface.DrawOutlinedRect(barX, barY, barW, barH, 2)
-
 		local slotW, slotGap = 44, 8
 		local selected = math.Clamp(data.selected_quickslot or 1, 1, 8)
+
 		for i = 1, 8 do
 			local x = barX + 10 + (i - 1) * (slotW + slotGap)
 			local y = barY + 10
@@ -590,8 +675,8 @@ if CLIENT then
 			draw.RoundedBox(6, x, y, slotW, slotW, isSel and Color(235, 215, 160, 240) or Color(225, 210, 180, 220))
 			surface.SetDrawColor(isSel and gold or ink)
 			surface.DrawOutlinedRect(x, y, slotW, slotW, isSel and 3 or 2)
-
 			local spellId = data.quickspell_slots[i]
+
 			if spellId and Arcane.RegisteredSpells[spellId] then
 				local sp = Arcane.RegisteredSpells[spellId]
 				draw.SimpleText(string.upper(string.sub(sp.name, 1, 2)), "Arcana_Ancient", x + slotW * 0.5, y + slotW * 0.5, ink, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -605,6 +690,7 @@ if CLIENT then
 		-- Selected spell parchment card
 		local curSpellId = data.quickspell_slots[selected] or self.SelectedSpell
 		local spell = curSpellId and Arcane.RegisteredSpells[curSpellId] or Arcane.RegisteredSpells[self.SelectedSpell]
+
 		if spell then
 			local cardW, cardH = 300, 110
 			local x, y = scrW - cardW - 20, scrH - cardH - 20
@@ -613,14 +699,15 @@ if CLIENT then
 			surface.DrawOutlinedRect(x, y, cardW, cardH, 2)
 			draw.SimpleText(spell.name, "Arcana_AncientLarge", x + 12, y + 10, ink)
 			draw.SimpleText("Lvl " .. spell.level_required .. "  Cost " .. spell.cost_amount .. " " .. spell.cost_type, "Arcana_Ancient", x + 12, y + 40, ink)
-
 			local cdText = "Ready"
 			local cdCol = Color(32, 120, 48)
 			local cd = data.spell_cooldowns[curSpellId or self.SelectedSpell]
+
 			if cd and cd > CurTime() then
 				cdText = tostring(math.ceil(cd - CurTime())) .. "s"
 				cdCol = Color(140, 40, 40)
 			end
+
 			draw.SimpleText("Cooldown: " .. cdText, "Arcana_Ancient", x + 12, y + 64, cdCol)
 		end
 	end
@@ -629,19 +716,21 @@ if CLIENT then
 		local cx, cy = scrW * 0.5, scrH * 0.5
 		local radius = RadialConfig.hud.outerRadius
 		local rInner = radius - RadialConfig.hud.innerGap
-	local data = Arcane:GetPlayerData(owner)
+		local data = Arcane:GetPlayerData(owner)
 		if not data then return end
 
 		-- Ensure cursor is enabled while radial is open
-		if not vgui.CursorVisible() then gui.EnableScreenClicker(true) end
+		if not vgui.CursorVisible() then
+			gui.EnableScreenClicker(true)
+		end
 
 		-- Modern blurred backdrop + slight vignette
 		Arcana_DrawBlurRect(0, 0, scrW, scrH, 5, 8, 255)
 		surface.SetDrawColor(backDim)
 		surface.DrawRect(0, 0, scrW, scrH)
-
 		-- Octagonal background ring (filled between two octagons)
 		local sides = 8
+
 		for i = 1, sides do
 			local col = Color(gold.r, gold.g, gold.b, 24)
 			Arcana_FillPolygonRingSector(cx, cy, rInner, radius, sides, i, col)
@@ -653,23 +742,22 @@ if CLIENT then
 			local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
 			local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
 			local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
-			draw.SimpleText(glyph, "Arcana_Ancient", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
+
 		-- Octagonal frame outlines + flourish
 		Arcana_DrawPolygonOutline(cx, cy, radius, sides, gold)
 		Arcana_DrawPolygonOutline(cx, cy, rInner, sides, brassInner)
 		Arcana_DrawRadialFlourish(cx, cy, rInner, radius, sides, gold, paleGold)
-
 		-- Precompute label radius using trapezoid centroid along face normal
 		local sinTerm = math.sin(math.pi / sides)
 		local baseOut = 2 * radius * sinTerm
-		local baseIn  = 2 * rInner * sinTerm
+		local baseIn = 2 * rInner * sinTerm
 		local h = radius - rInner
 		local yFromOuter = h * (2 * baseOut + baseIn) / (3 * (baseOut + baseIn))
 		local rLabelCentroid = radius - yFromOuter
 		-- Pull text closer to center than the geometric centroid for legibility
 		local rLabelText = rInner + (rLabelCentroid - rInner) * RadialConfig.hud.labelBias
-
 		-- Compute hover slot
 		local mx, my = gui.MousePos()
 		-- Use screen-space angle with clockwise increase (y grows downward in screen space)
@@ -687,15 +775,12 @@ if CLIENT then
 			local rNum = radius + RadialConfig.hud.numberOffset
 			local txNum = math.floor(cx + math.cos(mid) * rNum + 0.5)
 			local tyNum = math.floor(cy + math.sin(mid) * rNum + 0.5)
-
 			local isHover = (i == hoverSlot)
-
 			-- Octagonal sector highlight (flat sides)
 			Arcana_FillPolygonRingSector(cx, cy, rInner, radius, sides, i, isHover and wedgeHoverFill or wedgeIdleFill)
-
 			draw.SimpleText(tostring(i), "Arcana_Ancient", txNum, tyNum, isHover and paleGold or textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
 			local spellId = data.quickspell_slots[i]
+
 			if spellId and Arcane.RegisteredSpells[spellId] then
 				local sp = Arcane.RegisteredSpells[spellId]
 				draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", txAbbr, tyAbbr, isHover and textBright or paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -706,6 +791,7 @@ if CLIENT then
 
 		-- Center hover details: name and cost for the hovered slot
 		local hsId = data.quickspell_slots[hoverSlot]
+
 		if hsId and Arcane.RegisteredSpells[hsId] then
 			local sp = Arcane.RegisteredSpells[hsId]
 			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -722,23 +808,21 @@ if CLIENT then
 				-- Update locally for instant feedback
 				local pdata = Arcane:GetPlayerData(owner)
 				pdata.selected_quickslot = self.RadialHoverSlot
-
 				net.Start("Arcane_SetSelectedQuickslot")
 				net.WriteUInt(self.RadialHoverSlot, 4)
 				net.SendToServer()
 			end
+
 			self.RadialOpen = false
 			gui.EnableScreenClicker(false)
 		end
 	end
+
 	function SWEP:OpenGrimoireMenu()
 		if self.MenuOpen then return end
-
 		local owner = self:GetOwner()
 		if not IsValid(owner) or not owner:IsPlayer() then return end
-
 		self.MenuOpen = true
-
 		-- Create the menu frame
 		local frame = vgui.Create("DFrame")
 		frame:SetSize(820, 560)
@@ -763,9 +847,9 @@ if CLIENT then
 			surface.SetFont("Arcana_DecoTitle")
 			local tw = surface.GetTextSize(titleText)
 			draw.SimpleText(titleText, "Arcana_DecoTitle", 18, 10, paleGold)
-
 			-- Level chip next to title
 			local data = Arcane and IsValid(owner) and Arcane:GetPlayerData(owner) or nil
+
 			if data then
 				local chipText = "LVL " .. tostring(data.level or 1)
 				surface.SetFont("Arcana_Ancient")
@@ -776,25 +860,21 @@ if CLIENT then
 				local chipH = ch + 6
 				Arcana_FillDecoPanel(chipX, chipY, chipW, chipH, paleGold, 8)
 				draw.SimpleText(chipText, "Arcana_Ancient", chipX + (chipW - cw) * 0.5, chipY + (chipH - ch) * 0.5, chipTextCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-
 				-- XP bar under title, full width inside the frame
 				local totalForCurrent = Arcane:GetTotalXPForLevel(data.level)
 				local neededForNext = Arcane:GetXPRequiredForLevel(data.level)
 				local xpInto = math.max(0, (data.xp or 0) - totalForCurrent)
 				local progress = neededForNext > 0 and math.Clamp(xpInto / neededForNext, 0, 1) or 1
-
 				local barX = 18
 				local barW = w - 36
 				local barH = 12
 				local barY = 42
-
 				-- Fill
 				local innerPad = 4
 				local fillW = math.floor((barW - innerPad * 2) * progress)
 				draw.NoTexture()
 				surface.SetDrawColor(xpFill)
 				surface.DrawRect(barX + innerPad, barY + innerPad, fillW, barH - innerPad * 2)
-
 				-- XP label centered over the bar
 				local xpLabel = tostring(xpInto) .. " / " .. tostring(neededForNext)
 				surface.SetFont("Arcana_Ancient")
@@ -804,17 +884,25 @@ if CLIENT then
 		end
 
 		-- Hide minimize/maximize and reskin close button
-		if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
-		if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
+		if IsValid(frame.btnMinim) then
+			frame.btnMinim:Hide()
+		end
+
+		if IsValid(frame.btnMaxim) then
+			frame.btnMaxim:Hide()
+		end
+
 		if IsValid(frame.btnClose) then
 			local close = frame.btnClose
 			close:SetText("")
 			close:SetSize(26, 26)
+
 			function frame:PerformLayout(w, h)
 				if IsValid(close) then
 					close:SetPos(w - 26 - 10, 8)
 				end
 			end
+
 			close.Paint = function(pnl, w, h)
 				--local hovered = pnl:IsHovered()
 				--Arcana_FillDecoPanel(0, 0, w, h, hovered and Color(40, 32, 24, 220) or Color(26, 22, 18, 220), 6)
@@ -836,21 +924,18 @@ if CLIENT then
 		content:Dock(FILL)
 		-- Leave space for the XP bar under the title
 		content:DockMargin(12, 32, 12, 12)
-		content.Paint = function(pnl, w, h)
-			-- section separator
-		end
-
+		content.Paint = function(pnl, w, h) end -- section separator
 		-- Left: radial quick access (drag and drop onto faces)
 		local left = vgui.Create("DPanel", content)
 		left:Dock(LEFT)
 		left:SetWide(440)
 		left:DockMargin(0, 0, 8, 0)
 		left._hoverSlot = nil
+
 		left.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
 			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
 			draw.SimpleText(string.upper("Quick Access"), "Arcana_Ancient", 14, 10, paleGold)
-
 			-- Center the wheel within the left panel using a content box (account for title area)
 			local titlePadTop = 36
 			local padSide = 16
@@ -882,10 +967,10 @@ if CLIENT then
 				local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
 				draw.SimpleText(glyph, "Arcana_Ancient", gx, gy, Color(220, 200, 140, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
+
 			Arcana_DrawPolygonOutline(cx, cy, radius, 8, gold)
 			Arcana_DrawPolygonOutline(cx, cy, rInner, 8, brassInner)
 			Arcana_DrawRadialFlourish(cx, cy, rInner, radius, 8, gold, paleGold)
-
 			-- Label radius (towards center for readability)
 			local sinTerm = math.sin(math.pi / 8)
 			local baseOut = 2 * radius * sinTerm
@@ -904,11 +989,10 @@ if CLIENT then
 				local rNum = radius + RadialConfig.menu.numberOffset
 				local tnX = math.floor(cx + math.cos(mid) * rNum + 0.5)
 				local tnY = math.floor(cy + math.sin(mid) * rNum + 0.5)
-
 				local isHover = (i == hoverSlot)
 				draw.SimpleText(tostring(i), "Arcana_AncientSmall", tnX, tnY, isHover and paleGold or textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
 				local sid = pdata.quickspell_slots[i]
+
 				if sid and Arcane.RegisteredSpells[sid] then
 					local sp = Arcane.RegisteredSpells[sid]
 					draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", tx, ty, isHover and textBright or paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -949,6 +1033,7 @@ if CLIENT then
 		local middle = vgui.Create("DPanel", content)
 		middle:Dock(FILL)
 		middle:DockMargin(0, 0, 0, 0)
+
 		middle.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
 			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
@@ -958,13 +1043,17 @@ if CLIENT then
 		local listScroll = vgui.Create("DScrollPanel", middle)
 		listScroll:Dock(FILL)
 		listScroll:DockMargin(12, 36, 12, 12)
-
 		local unlocked = {}
+
 		for sid, sp in pairs(Arcane.RegisteredSpells) do
 			if owner:HasSpellUnlocked(sid) then
-				table.insert(unlocked, { id = sid, spell = sp })
+				table.insert(unlocked, {
+					id = sid,
+					spell = sp
+				})
 			end
 		end
+
 		table.sort(unlocked, function(a, b) return a.spell.name < b.spell.name end)
 
 		for _, item in ipairs(unlocked) do
@@ -976,6 +1065,7 @@ if CLIENT then
 			row:SetText("")
 			row.SpellId = item.id
 			row:Droppable("arcana_spell")
+
 			row.Paint = function(pnl, w, h)
 				local hovered = pnl:IsHovered()
 				Arcana_FillDecoPanel(2, 2, w - 4, h - 4, hovered and cardHover or cardIdle, 8)
