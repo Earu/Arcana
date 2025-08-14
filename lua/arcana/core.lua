@@ -207,9 +207,14 @@ if SERVER then
 		if _G.co and _G.db then
 			-- if we have postgres use it
 			_G.co(function()
-				local query = "UPDATE arcane_players SET xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save = $1, $2, $3, $4, $5, $6, $7 WHERE steamid = $8"
-				local rows = _G.db.Query(query, xp, level, kp, unlocked, quick, selected, lastsave, steamid)
+				local query = "UPDATE arcane_players SET xp = $2, level = $3, knowledge_points = $4, unlocked_spells = $5, quickspell_slots = $6, selected_quickslot = $7, last_save = $8 WHERE steamid = $1"
+				local rows, err = _G.db.Query(query, steamid, xp, level, kp, unlocked, quick, selected, lastsave)
 				if not rows or rows == 0 then
+					if isstring(err) then
+						dbLogError("SavePlayerDataToSQL failed")
+						return
+					end
+
 					local insertQuery = "INSERT INTO arcane_players(steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES($1, $2, $3, $4, $5, $6, $7, $8)"
 					_G.db.Query(insertQuery, steamid, xp, level, kp, unlocked, quick, selected, lastsave)
 				end
