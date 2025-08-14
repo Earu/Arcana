@@ -81,6 +81,7 @@ Arcane:RegisterSpell({
 		cloud:SetPos(pos)
 		cloud:Spawn()
 		cloud:SetMoveType(MOVETYPE_NONE)
+		cloud:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 		if cloud.CPPISetOwner then cloud:CPPISetOwner(caster) end
 
 		local phys = cloud:GetPhysicsObject()

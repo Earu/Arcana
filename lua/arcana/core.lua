@@ -55,7 +55,6 @@ Arcane.Config = {
 
 	-- Spell Configuration
 	DEFAULT_SPELL_COOLDOWN = 1.0,
-	SPELL_FAILURE_CHANCE = 0.05, -- 5% base failure chance
 
 	RITUAL_CASTING_TIME = 10.0,
 
@@ -676,18 +675,9 @@ function Arcane:CastSpell(ply, spellId, target, context)
 
 	-- Cast the spell
 	local success = true
-	local failureChance = Arcane.Config.SPELL_FAILURE_CHANCE
-
-	if math.random() < failureChance then
+	local result = spell.cast(ply, target, data, context)
+	if result == false then
 		success = false
-	else
-		-- Gesture is handled at StartCasting
-
-		-- Execute the spell
-		local result = spell.cast(ply, target, data, context)
-		if result == false then
-			success = false
-		end
 	end
 
 	-- Handle success/failure
