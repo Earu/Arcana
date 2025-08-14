@@ -1099,6 +1099,8 @@ if SERVER then
 		ent:Spawn()
 		ent:Activate()
 		ent.ms_notouch = true
+		-- Mark this altar so clients can treat it as the core-spawned one (for ambient loop, etc.)
+		ent:SetNWBool("ArcanaCoreSpawned", true)
 
 		local phys = ent:GetPhysicsObject()
 		if IsValid(phys) then
