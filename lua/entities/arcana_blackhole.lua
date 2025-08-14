@@ -46,7 +46,7 @@ function ENT:Think()
 
 			-- Find all entities within radius
 			for _, ent in pairs(ents.FindInSphere(pos, radius)) do
-				if IsValid(ent) and ent != self then
+				if IsValid(ent) and ent != self and not ent:CreatedByMap() then
 					local physObj = ent:GetPhysicsObject()
 					local entPos = ent:GetPos()
 					local direction = (pos - entPos):GetNormalized()

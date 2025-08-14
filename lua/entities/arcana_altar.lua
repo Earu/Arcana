@@ -20,7 +20,9 @@ end
 
 if SERVER then
 	util.AddNetworkString("Arcana_OpenAltarMenu")
+
 	resource.AddFile("materials/entities/arcana_altar.png")
+	resource.AddFile("sound/arcana/ambient_loop.wav")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
@@ -132,6 +134,10 @@ if CLIENT then
 		self._topGlyphPhrase = "αβραξασ  θεοσ  γνωσις  φως  ζωη  αληθεια  κοσμος  ψυχη  πνευμα  "
 		self._lastThink = CurTime()
 
+		-- Ambient loop state (only for the altar spawned by core.lua)
+		self._ambient = nil
+		self._ambientTargetVol = 0
+
 		self:PrepareGlyphParticles()
 	end
 
@@ -199,6 +205,12 @@ if CLIENT then
 			self._band:Remove()
 		end
 		self._band = nil
+
+		-- Stop ambient sound cleanly
+		if self._ambient then
+			self._ambient:Stop()
+			self._ambient = nil
+		end
 	end
 
 	function ENT:Draw()
@@ -233,6 +245,36 @@ if CLIENT then
 	function ENT:Think()
 		local now = CurTime()
 		self._lastThink = now
+
+		-- Ensure/drive ambient loop only for the core-spawned altar
+		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
+		if isCore then
+			if not self._ambient then
+				self._ambient = CreateSound(self, "arcana/ambient_loop.wav")
+				if self._ambient then
+					self._ambient:PlayEx(0, 100)
+					self._ambient:SetSoundLevel(65)
+				end
+			end
+
+			if self._ambient then
+				local listenerPos = EyePos()
+				local dist = listenerPos:Distance(self:GetPos())
+				-- Fade from 100% at <= 600u to 0% at >= 2000u
+				local v = 1 - math.Clamp((dist - 600) / (2000 - 600), 0, 1)
+				local target = math.Clamp(v, 0, 1)
+				if math.abs((self._ambientTargetVol or 0) - target) > 0.01 then
+					self._ambientTargetVol = target
+					self._ambient:ChangeVolume(target, 0.2)
+				end
+			end
+		else
+			-- Not the core altar; ensure any stray ambient is silenced
+			if self._ambient then
+				self._ambient:Stop()
+				self._ambient = nil
+			end
+		end
 
 		ensureBands(self)
 		if self._band and self._band.IsActive and self._band:IsActive() then
