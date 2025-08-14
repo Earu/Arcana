@@ -744,13 +744,15 @@ function Arcane:CanUnlockSpell(ply, spellId)
 	return true
 end
 
-function Arcane:UnlockSpell(ply, spellId)
-	local canUnlock, reason = self:CanUnlockSpell(ply, spellId)
-	if not canUnlock then
-		if SERVER then
-			Arcane:SendErrorNotification(ply, "Cannot unlock spell \"" .. spellId .. "\": " .. reason)
+function Arcane:UnlockSpell(ply, spellId, force)
+	if not force then
+		local canUnlock, reason = self:CanUnlockSpell(ply, spellId)
+		if not canUnlock then
+			if SERVER then
+				Arcane:SendErrorNotification(ply, "Cannot unlock spell \"" .. spellId .. "\": " .. reason)
+			end
+			return false
 		end
-		return false
 	end
 
 	local spell = self.RegisteredSpells[spellId]
