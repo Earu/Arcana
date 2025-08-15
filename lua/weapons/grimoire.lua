@@ -661,7 +661,7 @@ if CLIENT then
 			surface.SetDrawColor(parchmentDark)
 			surface.DrawOutlinedRect(x, y, cardW, cardH, 2)
 			draw.SimpleText(spell.name, "Arcana_AncientLarge", x + 12, y + 10, ink)
-			draw.SimpleText("Lvl " .. spell.level_required .. "  Cost " .. spell.cost_amount .. " " .. spell.cost_type, "Arcana_Ancient", x + 12, y + 40, ink)
+			draw.SimpleText("Lvl " .. spell.level_required .. "  Cost " .. string.Comma(spell.cost_amount) .. " " .. spell.cost_type, "Arcana_Ancient", x + 12, y + 40, ink)
 			local cdText = "Ready"
 			local cdCol = Color(32, 120, 48)
 			local cd = data.spell_cooldowns[curSpellId or self.SelectedSpell]
@@ -760,7 +760,7 @@ if CLIENT then
 			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local ct = tostring(sp.cost_type or "")
 			local ca = tonumber(sp.cost_amount or 0) or 0
-			draw.SimpleText("Cost " .. ca .. " " .. ct, "Arcana_Ancient", cx, cy + 12, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		else
 			draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
@@ -963,6 +963,19 @@ if CLIENT then
 					draw.SimpleText("-", "Arcana_AncientLarge", tx, ty, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 			end
+
+			-- Center hover details: name and cost for the hovered slot (matching HUD radial functionality)
+			local hsId = pdata.quickspell_slots[hoverSlot]
+
+			if hsId and Arcane.RegisteredSpells[hsId] then
+				local sp = Arcane.RegisteredSpells[hsId]
+				draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				local ct = tostring(sp.cost_type or "")
+				local ca = tonumber(sp.cost_amount or 0) or 0
+				draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			else
+				draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
 		end
 
 		-- Select quickslot on click inside the wheel
@@ -1006,6 +1019,24 @@ if CLIENT then
 		local listScroll = vgui.Create("DScrollPanel", middle)
 		listScroll:Dock(FILL)
 		listScroll:DockMargin(12, 36, 12, 12)
+
+		local vbar = listScroll:GetVBar()
+		vbar:SetWide(8)
+
+		vbar.Paint = function(pnl, w, h)
+			surface.DisableClipping(true)
+			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
+			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			surface.DisableClipping(false)
+		end
+
+		vbar.btnGrip.Paint = function(pnl, w, h)
+			surface.DisableClipping(true)
+			surface.SetDrawColor(gold)
+			surface.DrawRect(0, 0, w, h)
+			surface.DisableClipping(false)
+		end
+
 		local unlocked = {}
 
 		for sid, sp in pairs(Arcane.RegisteredSpells) do
@@ -1037,7 +1068,7 @@ if CLIENT then
 				-- Subline: cost only
 				local ca = tonumber(sp.cost_amount or 0) or 0
 				local ct = tostring(sp.cost_type or "")
-				local sub = string.format("Cost %d %s", ca, ct)
+				local sub = string.format("Cost %s %s", string.Comma(ca), ct)
 				draw.SimpleText(sub, "Arcana_Ancient", 12, 34, textDim)
 			end
 		end

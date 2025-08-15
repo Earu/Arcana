@@ -1,5 +1,4 @@
 AddCSLuaFile()
-
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Altar"
@@ -7,12 +6,12 @@ ENT.Category = "Arcana"
 ENT.Spawnable = true
 ENT.AdminSpawnable = true
 ENT.RenderGroup = RENDERGROUP_BOTH
-
 ENT.UseCooldown = 0.75
 ENT.HintDistance = 140
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "AuraSize")
+
 	if SERVER then
 		self:SetAuraSize(200)
 	end
@@ -20,7 +19,6 @@ end
 
 if SERVER then
 	util.AddNetworkString("Arcana_OpenAltarMenu")
-
 	resource.AddFile("materials/entities/arcana_altar.png")
 	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
 
@@ -32,8 +30,8 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-
 		local phys = self:GetPhysicsObject()
+
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableMotion(false)
@@ -52,6 +50,7 @@ if SERVER then
 		ent:SetAngles(ang)
 		ent:Spawn()
 		ent:Activate()
+
 		return ent
 	end
 
@@ -60,21 +59,46 @@ if SERVER then
 		local now = CurTime()
 		if now < (self._nextUse or 0) then return end
 		self._nextUse = now + self.UseCooldown
-
 		net.Start("Arcana_OpenAltarMenu")
-			net.WriteEntity(self)
+		net.WriteEntity(self)
 		net.Send(ply)
-
 		self:EmitSound("buttons/button9.wav", 60, 110)
 	end
 end
 
 if CLIENT then
 	-- Fonts and styling (reused from grimoire/hud)
-	surface.CreateFont("Arcana_AncientSmall", {font = "Georgia", size = 16, weight = 600, antialias = true, extended = true})
-	surface.CreateFont("Arcana_Ancient", {font = "Georgia", size = 20, weight = 700, antialias = true, extended = true})
-	surface.CreateFont("Arcana_AncientLarge", {font = "Georgia", size = 24, weight = 800, antialias = true, extended = true})
-	surface.CreateFont("Arcana_DecoTitle", {font = "Georgia", size = 26, weight = 900, antialias = true, extended = true})
+	surface.CreateFont("Arcana_AncientSmall", {
+		font = "Georgia",
+		size = 16,
+		weight = 600,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_Ancient", {
+		font = "Georgia",
+		size = 20,
+		weight = 700,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_AncientLarge", {
+		font = "Georgia",
+		size = 24,
+		weight = 800,
+		antialias = true,
+		extended = true
+	})
+
+	surface.CreateFont("Arcana_DecoTitle", {
+		font = "Georgia",
+		size = 26,
+		weight = 900,
+		antialias = true,
+		extended = true
+	})
 
 	local decoBg = Color(26, 20, 14, 235)
 	local decoPanel = Color(32, 24, 18, 235)
@@ -85,18 +109,20 @@ if CLIENT then
 	local chipTextCol = Color(24, 26, 36, 230)
 	-- Removed XP fill color (XP bar hidden in altar UI)
 	-- local backDim = Color(0, 0, 0, 140)
-
 	local blurMat = Material("pp/blurscreen")
+
 	local function Arcana_DrawBlurRect(x, y, w, h, layers, density)
 		surface.SetMaterial(blurMat)
 		surface.SetDrawColor(255, 255, 255)
 		render.SetScissorRect(x, y, x + w, y + h, true)
+
 		for i = 1, layers do
 			blurMat:SetFloat("$blur", (i / layers) * density)
 			blurMat:Recompute()
 			render.UpdateScreenEffectTexture()
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 		end
+
 		render.SetScissorRect(0, 0, 0, 0, false)
 	end
 
@@ -117,12 +143,42 @@ if CLIENT then
 		local c = math.max(8, corner or 12)
 		draw.NoTexture()
 		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
+
 		local pts = {
-			{ x = x + c, y = y }, { x = x + w - c, y = y },
-			{ x = x + w, y = y + c }, { x = x + w, y = y + h - c },
-			{ x = x + w - c, y = y + h }, { x = x + c, y = y + h },
-			{ x = x, y = y + h - c }, { x = x, y = y + c },
+			{
+				x = x + c,
+				y = y
+			},
+			{
+				x = x + w - c,
+				y = y
+			},
+			{
+				x = x + w,
+				y = y + c
+			},
+			{
+				x = x + w,
+				y = y + h - c
+			},
+			{
+				x = x + w - c,
+				y = y + h
+			},
+			{
+				x = x + c,
+				y = y + h
+			},
+			{
+				x = x,
+				y = y + h - c
+			},
+			{
+				x = x,
+				y = y + c
+			},
 		}
+
 		surface.DrawPoly(pts)
 	end
 
@@ -133,11 +189,9 @@ if CLIENT then
 		self._glowMat = Material("sprites/light_glow02_add")
 		self._topGlyphPhrase = "αβραξασ  θεοσ  γνωσις  φως  ζωη  αληθεια  κοσμος  ψυχη  πνευμα  "
 		self._lastThink = CurTime()
-
 		-- Ambient loop state (only for the altar spawned by core.lua)
 		self._ambient = nil
 		self._ambientTargetVol = 0
-
 		self:PrepareGlyphParticles()
 	end
 
@@ -151,19 +205,16 @@ if CLIENT then
 		local r = math.Rand(rMin, rMax)
 		local baseX = math.cos(ang) * r
 		local baseY = math.sin(ang) * r
-
 		-- Diverse speeds and travel distances
 		local speed = math.random(30, 200)
 		local travel = math.random(220, 900)
 		local life = travel / speed
-
 		-- Minor horizontal drift and a gentle orbit to keep it lively
 		local driftX = math.Rand(-14, 14)
 		local driftY = math.Rand(-14, 14)
 		local orbitRadius = math.Rand(0, 10)
 		local orbitSpeed = math.Rand(-4, 4)
 		local orbitPhase = math.Rand(0, math.pi * 2)
-
 		local phrase = self._topGlyphPhrase or "ARCANA "
 		local phraseLen = (utf8 and utf8.len and utf8.len(phrase)) or #phrase
 		local charIndex = math.random(1, math.max(1, phraseLen))
@@ -185,6 +236,7 @@ if CLIENT then
 			orbitW = orbitSpeed,
 			orbitP = orbitPhase,
 		}
+
 		self._glyphParticles[#self._glyphParticles + 1] = particle
 	end
 
@@ -199,11 +251,13 @@ if CLIENT then
 		if self._circle and self._circle.Destroy then
 			self._circle:Destroy()
 		end
+
 		self._circle = nil
 
 		if self._band and self._band.Remove then
 			self._band:Remove()
 		end
+
 		self._band = nil
 
 		-- Stop ambient sound cleanly
@@ -218,14 +272,9 @@ if CLIENT then
 	end
 
 	-- Removed ground magic circle to reduce visual noise
-
 	local function ensureBands(self)
 		if not BandCircle or not BandCircle.Create then return end
-		if self._band and self._band.IsActive and self._band:IsActive() then
-			-- keep following in Think; nothing to do here
-			return
-		end
-
+		if self._band and self._band.IsActive and self._band:IsActive() then return end -- keep following in Think; nothing to do here
 		-- Position a bit above the pillar top
 		local top = self:GetPos() + self:GetUp() * (self:OBBMaxs().z + 30)
 		local ang = self:GetAngles()
@@ -233,9 +282,24 @@ if CLIENT then
 		if not self._band then return end
 		-- Three fast rotating bands on different axes
 		local baseR = math.max(24, self:GetAuraSize() * 0.18)
-		self._band:AddBand(baseR * 0.90, 6, { p = 0,  y = 120, r = 0 }, 2)
-		self._band:AddBand(baseR * 1.10, 6, { p = 80, y = 0,   r = 0 }, 2)
-		self._band:AddBand(baseR * 1.35, 6, { p = 0,  y = 0,   r = 140 }, 2)
+
+		self._band:AddBand(baseR * 0.90, 6, {
+			p = 0,
+			y = 120,
+			r = 0
+		}, 2)
+
+		self._band:AddBand(baseR * 1.10, 6, {
+			p = 80,
+			y = 0,
+			r = 0
+		}, 2)
+
+		self._band:AddBand(baseR * 1.35, 6, {
+			p = 0,
+			y = 0,
+			r = 140
+		}, 2)
 	end
 
 	local function getOrbPos(self)
@@ -245,12 +309,13 @@ if CLIENT then
 	function ENT:Think()
 		local now = CurTime()
 		self._lastThink = now
-
 		-- Ensure/drive ambient loop only for the core-spawned altar
 		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
+
 		if isCore then
 			if not self._ambient then
 				self._ambient = CreateSound(self, "arcana/altar_ambient_stereo.ogg")
+
 				if self._ambient then
 					self._ambient:PlayEx(0, 100)
 					self._ambient:SetSoundLevel(65)
@@ -263,6 +328,7 @@ if CLIENT then
 				-- Fade from 100% at <= 600u to 0% at >= 2000u
 				local v = 1 - math.Clamp((dist - 600) / (2000 - 600), 0, 1)
 				local target = math.Clamp(v, 0, 1)
+
 				if math.abs((self._ambientTargetVol or 0) - target) > 0.01 then
 					self._ambientTargetVol = target
 					self._ambient:ChangeVolume(target, 0.2)
@@ -277,6 +343,7 @@ if CLIENT then
 		end
 
 		ensureBands(self)
+
 		if self._band and self._band.IsActive and self._band:IsActive() then
 			local top = getOrbPos(self)
 			self._band.position = top
@@ -285,6 +352,7 @@ if CLIENT then
 
 		-- Dynamic light at exact orb sprite position
 		local dl = DynamicLight(self:EntIndex())
+
 		if dl then
 			local orbPos = getOrbPos(self)
 			dl.pos = orbPos
@@ -302,6 +370,7 @@ if CLIENT then
 		self._glyphSpawnAccumulator = (self._glyphSpawnAccumulator or 0) + (self._glyphSpawnRate or 120) * dt
 		local toSpawn = math.floor(self._glyphSpawnAccumulator)
 		self._glyphSpawnAccumulator = self._glyphSpawnAccumulator - toSpawn
+
 		if self._glyphParticles and #self._glyphParticles < (self._glyphMaxParticles or 160) then
 			for i = 1, math.min(toSpawn, (self._glyphMaxParticles or 160) - #self._glyphParticles) do
 				self:_SpawnGlyphParticle()
@@ -311,20 +380,24 @@ if CLIENT then
 		-- advance and cull
 		if self._glyphParticles and #self._glyphParticles > 0 then
 			local write = 1
+
 			for read = 1, #self._glyphParticles do
 				local p = self._glyphParticles[read]
+
 				if p and now < (p.dieAt or 0) then
 					p.h = (p.h or 0) + (p.speed or 60) * dt
 					self._glyphParticles[write] = p
 					write = write + 1
 				end
 			end
+
 			for i = write, #self._glyphParticles do
 				self._glyphParticles[i] = nil
 			end
 		end
 
 		self:NextThink(now + 0.05)
+
 		return true
 	end
 
@@ -334,20 +407,26 @@ if CLIENT then
 		local data = Arcane:GetPlayerData(ply)
 		if not data then return {} end
 		local out = {}
+
 		for sid, sp in pairs(Arcane.RegisteredSpells or {}) do
 			local already = data.unlocked_spells and data.unlocked_spells[sid]
 			local levelOk = (data.level or 1) >= (sp.level_required or 1)
 			local kpOk = (data.knowledge_points or 0) >= (sp.knowledge_cost or 1)
+
 			if not already and levelOk and kpOk then
-				table.insert(out, { id = sid, spell = sp })
+				table.insert(out, {
+					id = sid,
+					spell = sp
+				})
 			end
 		end
+
 		table.sort(out, function(a, b)
-			if a.spell.level_required == b.spell.level_required then
-				return a.spell.name < b.spell.name
-			end
+			if a.spell.level_required == b.spell.level_required then return a.spell.name < b.spell.name end
+
 			return a.spell.level_required < b.spell.level_required
 		end)
+
 		return out
 	end
 
@@ -355,7 +434,6 @@ if CLIENT then
 		if not Arcane then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
-
 		local frame = vgui.Create("DFrame")
 		frame:SetSize(760, 520)
 		frame:Center()
@@ -371,9 +449,9 @@ if CLIENT then
 			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
 			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
 			draw.SimpleText("ALTAR", "Arcana_DecoTitle", 18, 10, paleGold)
-
 			-- Level and Knowledge Points chips (XP progression hidden by request)
 			local data = Arcane:GetPlayerData(ply)
+
 			if data then
 				-- Level chip
 				local lvlText = "LVL " .. tostring(data.level or 1)
@@ -384,7 +462,6 @@ if CLIENT then
 				local lvlChipW, chipH = lvlW + 18, lvlH + 6
 				Arcana_FillDecoPanel(chipX, chipY, lvlChipW, chipH, paleGold, 8)
 				draw.SimpleText(lvlText, "Arcana_Ancient", chipX + (lvlChipW - lvlW) * 0.5, chipY + (chipH - lvlH) * 0.5, chipTextCol)
-
 				-- KP chip to the right
 				local kpText = "KP " .. tostring(data.knowledge_points or 0)
 				local kpW, kpH = surface.GetTextSize(kpText)
@@ -396,15 +473,25 @@ if CLIENT then
 			end
 		end
 
-		if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
-		if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
+		if IsValid(frame.btnMinim) then
+			frame.btnMinim:Hide()
+		end
+
+		if IsValid(frame.btnMaxim) then
+			frame.btnMaxim:Hide()
+		end
+
 		if IsValid(frame.btnClose) then
 			local close = frame.btnClose
 			close:SetText("")
 			close:SetSize(26, 26)
+
 			function frame:PerformLayout(w, h)
-				if IsValid(close) then close:SetPos(w - 26 - 10, 8) end
+				if IsValid(close) then
+					close:SetPos(w - 26 - 10, 8)
+				end
 			end
+
 			close.Paint = function(pnl, w, h)
 				surface.SetDrawColor(paleGold)
 				local pad = 8
@@ -417,9 +504,9 @@ if CLIENT then
 		content:Dock(FILL)
 		content:DockMargin(12, 34, 12, 12)
 		content.Paint = nil
-
 		local listPanel = vgui.Create("DPanel", content)
 		listPanel:Dock(FILL)
+
 		listPanel.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
 			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
@@ -430,9 +517,27 @@ if CLIENT then
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
 
+		local vbar = scroll:GetVBar()
+		vbar:SetWide(8)
+
+		vbar.Paint = function(pnl, w, h)
+			surface.DisableClipping(true)
+			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
+			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			surface.DisableClipping(false)
+		end
+
+		vbar.btnGrip.Paint = function(pnl, w, h)
+			surface.DisableClipping(true)
+			surface.SetDrawColor(gold)
+			surface.DrawRect(0, 0, w, h)
+			surface.DisableClipping(false)
+		end
+
 		local function rebuild()
 			scroll:Clear()
 			local eligible = BuildEligibleSpellList(ply)
+
 			if #eligible == 0 then
 				local lbl = vgui.Create("DLabel", scroll)
 				lbl:SetText("No spells available to unlock right now.")
@@ -440,14 +545,17 @@ if CLIENT then
 				lbl:Dock(TOP)
 				lbl:DockMargin(0, 6, 0, 0)
 				lbl:SetTextColor(textDim)
+
 				return
 			end
+
 			for _, item in ipairs(eligible) do
 				local sp = item.spell
 				local row = vgui.Create("DPanel", scroll)
 				row:Dock(TOP)
 				row:SetTall(60)
 				row:DockMargin(0, 0, 0, 8)
+
 				row.Paint = function(pnl, w, h)
 					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, Color(46, 36, 26, 235), 8)
 					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
@@ -461,6 +569,7 @@ if CLIENT then
 				btn:DockMargin(6, 10, 10, 10)
 				btn:SetWide(120)
 				btn:SetText("")
+
 				-- Determine affordability live from current data
 				local function updateEnabled()
 					local d = Arcane:GetPlayerData(ply)
@@ -468,26 +577,34 @@ if CLIENT then
 					local cost = sp.knowledge_cost or 1
 					btn:SetEnabled(curKP >= cost)
 				end
+
 				updateEnabled()
+
 				btn.Paint = function(pnl, w, h)
 					local enabled = pnl:IsEnabled()
 					local hovered = enabled and pnl:IsHovered()
 					local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+					surface.DisableClipping(true)
 					Arcana_FillDecoPanel(0, 0, w, h, bgCol, 8)
 					Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+					surface.DisableClipping(false)
 					local col = enabled and textBright or textDim
 					draw.SimpleText("Unlock", "Arcana_AncientLarge", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
+
 				function btn:DoClick()
 					local d = Arcane:GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
+
 					if curKP < cost then
 						surface.PlaySound("buttons/button8.wav")
 						notification.AddLegacy("Not enough Knowledge Points", NOTIFY_ERROR, 3)
 						rebuild()
+
 						return
 					end
+
 					net.Start("Arcane_UnlockSpell")
 					net.WriteString(item.id)
 					net.SendToServer()
@@ -499,12 +616,13 @@ if CLIENT then
 		end
 
 		rebuild()
-
 		-- Live-rebuild when KP changes while the menu is open
 		local lastKP = (Arcane:GetPlayerData(ply) and Arcane:GetPlayerData(ply).knowledge_points) or 0
+
 		function frame:Think()
 			local d = Arcane:GetPlayerData(ply)
 			local kp = (d and d.knowledge_points) or 0
+
 			if kp ~= lastKP then
 				lastKP = kp
 				rebuild()
@@ -514,6 +632,7 @@ if CLIENT then
 
 	net.Receive("Arcana_OpenAltarMenu", function()
 		local ent = net.ReadEntity()
+
 		if IsValid(ent) then
 			OpenAltarMenu(ent)
 		end
@@ -526,48 +645,49 @@ if CLIENT then
 		local t = CurTime()
 		local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
 		local size = 48 + 24 * pulse
-
 		render.SetMaterial(self._glowMat)
 		render.DrawSprite(pos, size, size, Color(255, 230, 160, 230))
-
 		-- Lightweight glyph particles rising like sparks around the pillar top
 		surface.SetFont("MagicCircle_Medium")
 		-- local _, charH = surface.GetTextSize("A")
 		local ply = LocalPlayer()
 		local topAng = self:GetAngles()
+
 		if IsValid(ply) then
 			local toPlayer = (ply:GetPos() - self:GetPos()):GetNormalized()
 			topAng = toPlayer:Angle()
 		end
+
 		topAng:RotateAroundAxis(topAng:Right(), -90)
 		topAng:RotateAroundAxis(topAng:Up(), 90)
-
 		-- ensure the font and color will show up clearly
 		surface.SetFont("MagicCircle_Medium")
-
 		local baseTop = self:GetPos() + Vector(0, 0, 10)
 		if not self._glyphParticles then return end
-
 		draw.NoTexture()
+
 		for _, p in ipairs(self._glyphParticles) do
 			local lifeFrac = 1
+
 			if p.dieAt then
 				local remain = p.dieAt - t
 				local total = (p.dieAt - (p.born or t))
 				lifeFrac = math.Clamp(remain / math.max(0.001, total), 0, 1)
 			end
+
 			local travelFrac = math.Clamp((p.h or 0) / math.max(1, p.travel or 200), 0, 1)
 			local tailFadeStart = 0.9
 			local tailFade = travelFrac >= tailFadeStart and (1 - (travelFrac - tailFadeStart) / (1 - tailFadeStart)) or 1
 			local alpha = math.floor((p.alpha or 36) * lifeFrac * tailFade)
+
 			if alpha > 0 then
 				local ox = (p.baseX or 0) + (p.driftX or 0) + (p.orbitR or 0) * math.cos((p.orbitW or 0) * t + (p.orbitP or 0))
 				local oy = (p.baseY or 0) + (p.driftY or 0) + (p.orbitR or 0) * math.sin((p.orbitW or 0) * t + (p.orbitP or 0))
 				local worldPos = baseTop + Vector(ox, oy, 0)
 				cam.Start3D2D(worldPos, topAng, 0.06)
-					surface.SetTextColor(255, 240, 180, alpha)
-					surface.SetTextPos(0, -math.floor(p.h or 0))
-					surface.DrawText(p.char or "")
+				surface.SetTextColor(255, 240, 180, alpha)
+				surface.SetTextPos(0, -math.floor(p.h or 0))
+				surface.DrawText(p.char or "")
 				cam.End3D2D()
 			end
 		end
