@@ -313,12 +313,27 @@ if CLIENT then
 		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
 
 		if isCore then
-			if not self._ambient or not self._ambient:IsPlaying() then
+			if not self._ambient then
 				self._ambient = CreateSound(self, "arcana/altar_ambient_stereo.ogg")
 
 				if self._ambient then
-					self._ambient:PlayEx(0, 100)
+					self._ambient:Play()
 					self._ambient:SetSoundLevel(65)
+					self._ambient:SetDSP(111)
+
+					local timerName = "Arcana_AmbientLoop" .. self:EntIndex()
+					timer.Create(timerName, 200, 0, function()
+						if not self._ambient then return end
+						if not IsValid(self) then
+							timer.Remove(timerName)
+							return
+						end
+
+						self._ambient:Stop()
+						self._ambient:Play()
+						self._ambient:SetSoundLevel(65)
+						self._ambient:SetDSP(111)
+					end)
 				end
 			end
 
@@ -326,7 +341,7 @@ if CLIENT then
 				local listenerPos = EyePos()
 				local dist = listenerPos:Distance(self:GetPos())
 				-- Fade from 100% at <= 600u to 0% at >= 2000u
-				local v = 1 - math.Clamp((dist - 600) / (2000 - 600), 0, 1)
+				local v = 1 - math.Clamp((dist - 1000) / (3000 - 1000), 0, 1)
 				local target = math.Clamp(v, 0, 1)
 
 				if math.abs((self._ambientTargetVol or 0) - target) > 0.01 then
