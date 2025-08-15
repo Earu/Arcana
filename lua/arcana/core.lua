@@ -416,7 +416,6 @@ function Arcane:StartCasting(ply, spellId)
 			net.Broadcast()
 		end
 
-
 		-- Tell clients to show evolving circle for this cast
 		net.Start("Arcane_BeginCasting", true)
 		net.WriteEntity(ply)
@@ -628,7 +627,7 @@ if SERVER then
 	end
 end
 
-function Arcane:CastSpell(ply, spellId, target, context)
+function Arcane:CastSpell(ply, spellId, has_target, context)
 	if not IsValid(ply) then return false end
 
 	local canCast, reason = self:CanCastSpell(ply, spellId)
@@ -679,7 +678,7 @@ function Arcane:CastSpell(ply, spellId, target, context)
 
 	-- Cast the spell
 	local success = true
-	local result = spell.cast(ply, target, data, context)
+	local result = spell.cast(ply, has_target, data, context)
 	if result == false then
 		success = false
 	end
@@ -697,11 +696,11 @@ function Arcane:CastSpell(ply, spellId, target, context)
 		self:GiveXP(ply, xpGain, "Cast " .. spell.name)
 
 		if spell.on_success then
-			spell.on_success(ply, target, data)
+			spell.on_success(ply, has_target, data)
 		end
 	else
 		if spell.on_failure then
-			spell.on_failure(ply, target, data)
+			spell.on_failure(ply, has_target, data)
 		end
 
 		-- Notify clients to break down the casting circle visuals
@@ -812,17 +811,7 @@ end
 if SERVER then
 	util.AddNetworkString("Arcane_XPUpdate")
 	util.AddNetworkString("Arcane_LevelUp")
-	util.AddNetworkString("Arcane_CastSpell")
 	util.AddNetworkString("Arcane_UnlockSpell")
-
-	-- Handle spell casting from client
-	net.Receive("Arcane_CastSpell", function(len, ply)
-		local spellId = net.ReadString()
-		local hasTarget = net.ReadBool()
-		local target = hasTarget and net.ReadEntity() or nil
-
-		Arcane:CastSpell(ply, spellId, target)
-	end)
 
 	-- Handle spell unlocking
 	net.Receive("Arcane_UnlockSpell", function(len, ply)
