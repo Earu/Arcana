@@ -324,10 +324,7 @@ if CLIENT then
 					local timerName = "Arcana_AmbientLoop" .. self:EntIndex()
 					timer.Create(timerName, 200, 0, function()
 						if not self._ambient then return end
-						if not IsValid(self) then
-							timer.Remove(timerName)
-							return
-						end
+						if not IsValid(self) then return end
 
 						self._ambient:Stop()
 						self._ambient:Play()
