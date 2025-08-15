@@ -313,7 +313,7 @@ if CLIENT then
 		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
 
 		if isCore then
-			if not self._ambient then
+			if not self._ambient or not self._ambient:IsPlaying() then
 				self._ambient = CreateSound(self, "arcana/altar_ambient_stereo.ogg")
 
 				if self._ambient then
