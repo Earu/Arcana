@@ -318,7 +318,7 @@ function Arcane:SavePlayerData(ply)
 	end
 end
 
-function Arcane:LoadPlayerData(ply)
+function Arcane:LoadPlayerData(ply, callback)
 	if not IsValid(ply) then return end
 
 	local steamid = ply:SteamID64()
@@ -330,11 +330,15 @@ function Arcane:LoadPlayerData(ply)
 				self.PlayerData[steamid] = CreateDefaultPlayerData()
 				self:SavePlayerDataToSQL(ply, self.PlayerData[steamid])
 			end
+
+			callback()
 		end)
 	else
 		if not self.PlayerData[steamid] then
 			self.PlayerData[steamid] = CreateDefaultPlayerData()
 		end
+
+		callback()
 	end
 end
 
@@ -1073,8 +1077,9 @@ if SERVER then
 	hook.Add("SetupMove", "Arcane_PlayerJoin", function(ply, _, ucmd)
 		if justSpawned[ply] and not ucmd:IsForced() then
 			justSpawned[ply] = nil
-			Arcane:LoadPlayerData(ply)
-			Arcane:SyncPlayerData(ply)
+			Arcane:LoadPlayerData(ply, function()
+				Arcane:SyncPlayerData(ply)
+			end)
 		end
 	end)
 
