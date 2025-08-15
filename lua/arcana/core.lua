@@ -1085,9 +1085,7 @@ if SERVER then
 		if justSpawned[ply] and not ucmd:IsForced() then
 			justSpawned[ply] = nil
 			Arcane:LoadPlayerData(ply)
-			if SERVER then
-				Arcane:SyncPlayerData(ply)
-			end
+			Arcane:SyncPlayerData(ply)
 		end
 	end)
 
