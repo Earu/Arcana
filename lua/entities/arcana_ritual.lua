@@ -421,7 +421,9 @@ if CLIENT then
 		end
 
 		local remain = math.max(0, (data.expireAt or 0) - CurTime())
-		draw.SimpleText(string.format("Expires in %.0fs", remain), "Arcana_Ritual_Row", -160, 66, color_white)
+		local key = input.LookupBinding("+use") or "UNBOUND"
+		draw.SimpleText(string.format("Expires in %s", string.NiceTime(remain)), "Arcana_Ritual_Row", -160, 45, color_white)
+		draw.SimpleText("Press [" .. string.upper(key) .. "] to activate", "Arcana_Ritual_Row", -160, 66, color_white)
 		cam.End3D2D()
 	end
 end
