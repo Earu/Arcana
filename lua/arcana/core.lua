@@ -1076,15 +1076,19 @@ end
 
 if SERVER then
 	-- Hooks
+	local justSpawned = {}
 	hook.Add("PlayerInitialSpawn", "Arcane_PlayerJoin", function(ply)
-		timer.Simple(1, function()
-			if IsValid(ply) then
-				Arcane:LoadPlayerData(ply)
-				if SERVER then
-					Arcane:SyncPlayerData(ply)
-				end
+		justSpawned[ply] = true
+	end)
+
+	hook.Add("SetupMove", "Arcane_PlayerJoin", function(ply, _, ucmd)
+		if justSpawned[ply] and not ucmd:IsForced() then
+			justSpawned[ply] = nil
+			Arcane:LoadPlayerData(ply)
+			if SERVER then
+				Arcane:SyncPlayerData(ply)
 			end
-		end)
+		end
 	end)
 
 	hook.Add("PlayerDisconnected", "Arcane_PlayerLeave", function(ply)
