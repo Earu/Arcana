@@ -2,7 +2,7 @@ local function minify_bandvfx(target)
 	local r = math.max(target:OBBMaxs():Unpack()) * 0.5
 	Arcane:SendAttachBandVFX(target, Color(150, 220, 255, 255), 30, .5, {
 		{ radius = r * 0.9, height = 10, spin = {p = 0, y = 35, r = 0}, lineWidth = 2 },
-	})	
+	})
 end
 
 Arcane:RegisterSpell({
@@ -14,7 +14,7 @@ Arcane:RegisterSpell({
 	knowledge_cost = 1,
 	cooldown = 10.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 1000,
+	cost_amount = 500,
 	cast_time = 3.0,
 	range = 1200,
 	icon = "icon16/zoom_out.png",
@@ -28,21 +28,21 @@ Arcane:RegisterSpell({
 		if not target or not target:IsPlayer() then
 			target = caster
 		end
-		
+
 		if not target._arcanaminified then
 			target:SetModelScale(target:GetModelScale() * .75, .5)
 			target:EmitSound("player/suit_sprint.wav", 70, 90)
-			
+
 			minify_bandvfx(target)
 			target._arcanaminified = true
-			
-			timer.Simple(60, function()
+
+			timer.Simple(20, function()
 				target:SetModelScale(1, .5)
 				target._arcanaminified = nil
-				
+
 				minify_bandvfx(target)
 			end)
-			
+
 			return true
 		else
 			return false
