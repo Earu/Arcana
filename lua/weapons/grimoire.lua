@@ -2,6 +2,10 @@ if SERVER then
 	AddCSLuaFile()
 	resource.AddFile("models/arcana/models/arcana/Grimoire.mdl")
 	resource.AddFile("materials/models/arcana/catalyst_apprentice.vmt")
+	resource.AddFile("materials/models/arcana/catalyst_apprentice.vtf")
+	resource.AddFile("materials/models/arcana/normal.vtf")
+	resource.AddFile("materials/models/arcana/lightwarptexture.vtf")
+	resource.AddFile("materials/models/arcana/phong_exp.vtf")
 	resource.AddFile("materials/entities/grimoire.png")
 end
 
