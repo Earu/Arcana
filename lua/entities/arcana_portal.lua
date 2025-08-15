@@ -6,7 +6,7 @@ ENT.PrintName = "Arcana Portal"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
 
-ENT.DefaultRadius = 96
+ENT.DefaultRadius = 64
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Vector", 0, "Destination")
