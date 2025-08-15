@@ -571,6 +571,8 @@ end
 
 -- Spell Casting System
 function Arcane:CanCastSpell(ply, spellId)
+	if not ply:Alive() then return false, "You are dead" end
+
 	local spell = self.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
 
