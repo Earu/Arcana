@@ -696,7 +696,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		local castTime = math.max(0.05, tonumber(spell.cast_time) or 0)
 		local ratio = castTime / baseCast
 		-- Clamp ratio to avoid extreme values
-		ratio = math.Clamp(ratio, 0.25, 2.0)
+		ratio = math.Clamp(ratio, 0.001, 2.0)
 		local baseXP = math.max(5, (tonumber(spell.knowledge_cost) or 1) * 10)
 		local xpGain = math.floor(baseXP * ratio)
 		self:GiveXP(ply, xpGain, "Cast " .. spell.name)
