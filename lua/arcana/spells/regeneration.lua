@@ -1,36 +1,38 @@
 Arcane:RegisterSpell({
-	id = "healing",
-	name = "Healing",
-	description = "Instantly restore health to a targeted ally, or yourself if no target is found",
+	id = "regeneration",
+	name = "Regeneration",
+	description = "Gradually heal over time",
 	category = Arcane.CATEGORIES.PROTECTION,
-	level_required = 2,
-	knowledge_cost = 2,
-	cooldown = 6.0,
+	level_required = 1,
+	knowledge_cost = 1,
+	cooldown = 10.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 25,
-	cast_time = 1.2,
-	range = 400,
-	icon = "icon16/heart_add.png",
-	has_target = true,
-	cast_anim = "forward",
+	cost_amount = 15,
+	cast_time = 0.5,
+	range = 0,
+	icon = "icon16/heart.png",
+	cast_anim = "becon",
 
 	cast = function(caster, _, _, ctx)
-		local target = caster:GetEyeTrace().Entity
-		if not IsValid(target) or not target:IsPlayer() or not target:Alive() then
-			return false
-		end
-
-		if target:Health() >= target:GetMaxHealth() then return false end
 		if not SERVER then return true end
 
-		-- Apply healing
-		target:SetHealth(math.min(target:GetMaxHealth(), target:Health() + 40))
+		local duration = 20
+		local perTick = 5
+		local id = "Arcana_Regeneration_" .. caster:SteamID64()
+		local endTime = CurTime() + duration
 
+		timer.Create(id, 1, duration, function()
+			if not IsValid(caster) then return end
+			local new = math.min(caster:GetMaxHealth(), caster:Health() + perTick)
+			caster:SetHealth(new)
+			if CurTime() >= endTime or not IsValid(caster) then
+				timer.Remove(id)
+			end
+		end)
 
-		-- Beautiful healing aura effect
-		local healColor = Color(120, 255, 140, 255) -- Golden healing light
+		-- Subtle VFX band
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
-		Arcane:SendAttachBandVFX(target, healColor, 26, 2.5, {
+		Arcane:SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
 			{ radius = r * 0.9, height = 3, spin = {p = 0, y = 35, r = 0}, lineWidth = 2 },
 		})
 
