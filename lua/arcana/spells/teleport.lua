@@ -102,7 +102,7 @@ end
 Arcane:RegisterSpell({
 	id = "teleport",
 	name = "Teleport",
-	description = "Blink to your aim point within range, finding a safe landing spot",
+	description = "Teleport to your aim point within range, finding a safe landing spot.",
 	category = Arcane.CATEGORIES.UTILITY,
 	level_required = 3,
 	knowledge_cost = 2,

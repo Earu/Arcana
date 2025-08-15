@@ -85,7 +85,7 @@ end
 Arcane:RegisterSpell({
 	id = "lightning_strike",
 	name = "Lightning Strike",
-	description = "Call a focused lightning bolt at your aim point, chaining to nearby foes",
+	description = "Call a focused lightning bolt at your aim point, chaining to nearby foes.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 2,
 	knowledge_cost = 2,

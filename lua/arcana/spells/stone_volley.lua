@@ -1,7 +1,7 @@
 Arcane:RegisterSpell({
 	id = "stone_volley",
 	name = "Stone Volley",
-	description = "Summon pebbles above and launch them forward",
+	description = "Summon pebbles above and launch them forward.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,

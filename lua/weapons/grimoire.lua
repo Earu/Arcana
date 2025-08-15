@@ -1075,6 +1075,82 @@ if CLIENT then
 			row.SpellId = item.id
 			row:Droppable("arcana_spell")
 
+			-- Create info icon for spell description tooltip
+			local infoIcon = vgui.Create("DPanel", row)
+			infoIcon:SetSize(20, 20)
+			infoIcon:SetPos(0, 0) -- Will be positioned in PerformLayout
+			infoIcon:SetCursor("hand")
+			infoIcon.SpellDescription = sp.description or "No description available"
+
+			infoIcon.Paint = function(pnl, w, h)
+				-- Draw a simple "i" icon in a circle using lines to create outline
+				local cx, cy = w / 2, h / 2
+				local radius = 8
+				surface.SetDrawColor(paleGold)
+				-- Draw circle outline by drawing lines in a circle pattern
+				local segments = 16
+				for i = 0, segments - 1 do
+					local angle1 = (i / segments) * math.pi * 2
+					local angle2 = ((i + 1) / segments) * math.pi * 2
+					local x1 = cx + math.cos(angle1) * radius
+					local y1 = cy + math.sin(angle1) * radius
+					local x2 = cx + math.cos(angle2) * radius
+					local y2 = cy + math.sin(angle2) * radius
+					surface.DrawLine(x1, y1, x2, y2)
+				end
+				draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+
+			-- Tooltip functionality
+			infoIcon.OnCursorEntered = function()
+				if IsValid(infoIcon.tooltip) then return end
+
+				local tooltip = vgui.Create("DLabel")
+				tooltip:SetSize(300, 60)
+				tooltip:SetWrap(true)
+				tooltip:SetText(infoIcon.SpellDescription)
+				tooltip:SetFont("Arcana_AncientSmall")
+				tooltip:SetTextColor(textBright)
+				tooltip:SetDrawOnTop(true)
+				tooltip:SetMouseInputEnabled(false)
+				tooltip:SetKeyboardInputEnabled(false)
+
+				tooltip.Paint = function(pnl, w, h)
+					surface.DisableClipping(true)
+					Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
+					Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
+					surface.DisableClipping(false)
+				end
+
+				infoIcon.tooltip = tooltip
+
+				-- Position tooltip near cursor
+				local function updateTooltipPos()
+					if not IsValid(tooltip) then return end
+					local x, y = gui.MousePos()
+					tooltip:SetPos(x + 15, y - 30)
+				end
+
+				updateTooltipPos()
+
+				-- Update position if mouse moves
+				hook.Add("Think", "ArcanaTooltipPos_" .. tostring(tooltip), function()
+					if not IsValid(tooltip) then
+						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
+						return
+					end
+					updateTooltipPos()
+				end)
+			end
+
+			infoIcon.OnCursorExited = function()
+				if IsValid(infoIcon.tooltip) then
+					hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(infoIcon.tooltip))
+					infoIcon.tooltip:Remove()
+					infoIcon.tooltip = nil
+				end
+			end
+
 			row.Paint = function(pnl, w, h)
 				local hovered = pnl:IsHovered()
 				Arcana_FillDecoPanel(2, 2, w - 4, h - 4, hovered and cardHover or cardIdle, 8)
@@ -1085,6 +1161,16 @@ if CLIENT then
 				local ct = tostring(sp.cost_type or "")
 				local sub = string.format("Cost %s %s", string.Comma(ca), ct)
 				draw.SimpleText(sub, "Arcana_Ancient", 12, 34, textDim)
+			end
+
+			-- Position the info icon next to the spell name
+			row.PerformLayout = function(pnl, w, h)
+				if IsValid(infoIcon) then
+					-- Get the width of the spell name to position icon after it
+					surface.SetFont("Arcana_AncientLarge")
+					local nameW, nameH = surface.GetTextSize(sp.name)
+					infoIcon:SetPos(16 + nameW, 8 + (nameH - 20) / 2)
+				end
 			end
 		end
 	end

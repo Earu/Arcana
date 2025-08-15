@@ -1,7 +1,7 @@
 Arcane:RegisterSpell({
 	id = "fireball",
 	name = "Fireball",
-	description = "Launch a blazing orb that explodes and ignites on impact",
+	description = "Launch a blazing orb that explodes and ignites on impact.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,

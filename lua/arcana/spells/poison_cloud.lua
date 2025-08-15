@@ -44,7 +44,7 @@ end
 Arcane:RegisterSpell({
 	id = "poison_cloud",
 	name = "Poison Cloud",
-	description = "Deploy a lingering toxic cloud that poisons and slows enemies inside",
+	description = "Deploy a lingering toxic cloud that poisons and slows enemies inside.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 6,
 	knowledge_cost = 3,
