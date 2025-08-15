@@ -978,16 +978,27 @@ if CLIENT then
 			end
 		end
 
-		-- Select quickslot on click inside the wheel
+		-- Select quickslot on left click, remove spell on right click
 		left.OnMousePressed = function(pnl, mc)
-			if mc ~= MOUSE_LEFT then return end
 			local slotIndex = pnl._hoverSlot
 			if not slotIndex then return end
-			local pdata = Arcane:GetPlayerData(owner)
-			pdata.selected_quickslot = slotIndex
-			net.Start("Arcane_SetSelectedQuickslot")
-			net.WriteUInt(slotIndex, 4)
-			net.SendToServer()
+
+			if mc == MOUSE_LEFT then
+				-- Select the quickslot
+				local pdata = Arcane:GetPlayerData(owner)
+				pdata.selected_quickslot = slotIndex
+				net.Start("Arcane_SetSelectedQuickslot")
+				net.WriteUInt(slotIndex, 4)
+				net.SendToServer()
+			elseif mc == MOUSE_RIGHT then
+				-- Remove spell from the quickslot
+				local pdata = Arcane:GetPlayerData(owner)
+				pdata.quickspell_slots[slotIndex] = nil
+				net.Start("Arcane_SetQuickslot")
+				net.WriteUInt(slotIndex, 4)
+				net.WriteString("") -- Empty string clears the slot
+				net.SendToServer()
+			end
 		end
 
 		-- Accept drops from learned spells
