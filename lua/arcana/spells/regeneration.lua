@@ -1,7 +1,7 @@
 Arcane:RegisterSpell({
 	id = "regeneration",
 	name = "Regeneration",
-	description = "Gradually heal over time",
+	description = "Gradually heal over time.",
 	category = Arcane.CATEGORIES.PROTECTION,
 	level_required = 1,
 	knowledge_cost = 1,

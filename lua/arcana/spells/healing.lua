@@ -1,7 +1,7 @@
 Arcane:RegisterSpell({
 	id = "healing",
 	name = "Healing",
-	description = "Restore a player's health",
+	description = "Restore a player's health.",
 	category = Arcane.CATEGORIES.PROTECTION,
 	level_required = 2,
 	knowledge_cost = 2,

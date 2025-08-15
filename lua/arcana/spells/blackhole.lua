@@ -1,7 +1,7 @@
 Arcane:RegisterSpell({
 	id = "blackhole",
 	name = "Blackhole",
-	description = "Summons a very dangerous blackhole",
+	description = "Summons a very dangerous blackhole.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 25,
 	knowledge_cost = 10,

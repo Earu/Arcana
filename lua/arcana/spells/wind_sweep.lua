@@ -1,7 +1,7 @@
 Arcane:RegisterSpell({
 	id = "wind_sweep",
 	name = "Wind Sweep",
-	description = "Unleash a violent gust pushing foes away",
+	description = "Unleash a violent gust pushing foes away.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,
