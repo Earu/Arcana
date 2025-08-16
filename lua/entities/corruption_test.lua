@@ -10,7 +10,7 @@ ENT.AdminOnly = true
 
 if SERVER then
 	resource.AddFile("materials/arcana/corruption.vmt")
-	resource.AddFile("shaders/fxc/arcana_corruption.vcs")
+	resource.AddFile("shaders/fxc/arcana_corruption_ps20b.vcs")
 
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
