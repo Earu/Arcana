@@ -1,0 +1,20 @@
+screenspace_general
+{
+	$pixshader "arcana_corruption_ps20b"
+	$basetexture "_rt_FullFrameFB"
+
+	// Time and animation parameters
+	$c0_x 0			// time (updated by Lua)
+	$c0_y 0.8		// pollution_intensity
+	$c0_z 0.4		// corruption_radius
+	$c0_w 0.0		// unused (was particle_density)
+
+	// Pollution effect parameters
+	$c1_x 0.5		// center_x (pollution center)
+	$c1_y 0.5		// center_y (pollution center)
+	$c1_z 0.4		// darkening_strength
+	$c1_w 0.6		// desaturation_amount
+
+	$ignorez 1
+	$vertextransform 1
+}
