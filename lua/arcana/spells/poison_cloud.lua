@@ -91,10 +91,11 @@ Arcane:RegisterSpell({
 			phys:EnableCollisions(false)
 		end
 
-		-- Mark for client visuals
-		cloud:SetNWBool("ArcanaPoisonCloud", true)
-		cloud:SetNWFloat("ArcanaPoisonCloudEnd", CurTime() + duration)
-		cloud:SetNWFloat("ArcanaPoisonCloudRadius", radius)
+		net.Start("Arcana_PoisonCloud", true)
+		net.WriteEntity(cloud)
+		net.WriteFloat(duration)
+		net.WriteFloat(radius)
+		net.Broadcast()
 
 		Arcane:SendAttachBandVFX(cloud, Color(110, 200, 110, 255), radius * 0.9, duration, {
 			{ radius = radius * 0.9, height = 6,  spin = { p = 0.2, y = 0.4, r = 0.1 }, lineWidth = 2 },
@@ -178,60 +179,70 @@ Arcane:RegisterSpell({
 	end
 })
 
+if SERVER then
+	util.AddNetworkString("Arcana_PoisonCloud")
+end
 
 if CLIENT then
-	-- Client-only soft green smoke for poison clouds, handled entirely in this file
-	local activeEmitters = setmetatable({}, { __mode = "k" })
-	local nextScanAt = 0
 
+	local activeEmitters = {}
+	net.Receive("Arcana_PoisonCloud", function()
+		local cloud = net.ReadEntity()
+		if not IsValid(cloud) then return end
+
+		activeEmitters[cloud] = {
+			duration = net.ReadFloat(),
+			radius = net.ReadFloat(),
+		}
+	end)
+
+	-- Client-only soft green smoke for poison clouds, handled entirely in this file
+	local nextScanAt = 0
 	hook.Add("Think", "Arcana_PoisonCloud_ClientFX", function()
 		local now = CurTime()
 		if now < nextScanAt then return end
-		nextScanAt = now + 0.05
 
-		-- Cleanup first
-		for ent, em in pairs(activeEmitters) do
-			if (not IsValid(ent)) or ent:GetNWFloat("ArcanaPoisonCloudEnd", 0) <= now or (not ent:GetNWBool("ArcanaPoisonCloud", false)) then
-				if em and em.Finish then em:Finish() end
-				activeEmitters[ent] = nil
-			end
-		end
+		nextScanAt = now + 0.1
 
 		-- Discover/emit
-		for _, ent in ipairs(ents.GetAll()) do
-			if IsValid(ent) and ent:GetNWBool("ArcanaPoisonCloud", false) then
-				local endT = ent:GetNWFloat("ArcanaPoisonCloudEnd", 0)
-				if endT > now then
-					local rad = ent:GetNWFloat("ArcanaPoisonCloudRadius", 200)
-					local em = activeEmitters[ent]
-					if not em then
-						em = ParticleEmitter(ent:GetPos(), false)
-						activeEmitters[ent] = em
-					end
-					if em then
-						em:SetPos(ent:GetPos())
-						for i = 1, 3 do
-							local rr = rad * math.sqrt(math.Rand(0, 1))
-							local a = math.Rand(0, math.pi * 2)
-							local off = Vector(math.cos(a) * rr, math.sin(a) * rr, math.Rand(0, 10))
-							local p = em:Add("particle/particle_smokegrenade", ent:GetPos() + off)
-							if p then
-								local life = math.Rand(1.4, 2.4)
-								p:SetDieTime(life)
-								p:SetStartAlpha(0)
-								p:SetEndAlpha(140)
-								local sz = math.Rand(18, 30)
-								p:SetStartSize(sz)
-								p:SetEndSize(sz * math.Rand(3.4, 4.6))
-								p:SetRoll(math.Rand(0, 360))
-								p:SetRollDelta(math.Rand(-0.5, 0.5))
-								p:SetColor(110, 200, 110)
-								p:SetAirResistance(70)
-								p:SetGravity(Vector(0, 0, math.Rand(22, 38)))
-								p:SetVelocity(VectorRand():GetNormalized() * math.Rand(10, 32))
-								p:SetCollide(false)
-							end
-						end
+		for ent, emitter_data in pairs(activeEmitters) do
+			if not IsValid(ent) or emitter_data.duration <= now then
+				if emitter_data.emitter and emitter_data.emitter.Finish then emitter_data.emitter:Finish() end
+				activeEmitters[ent] = nil
+				continue
+			end
+
+			if emitter_data.duration > now then
+				local rad = emitter_data.radius
+				local em = emitter_data.emitter
+				if not em then
+					em = ParticleEmitter(ent:GetPos(), false)
+					emitter_data.emitter = em
+				end
+
+				if not em then continue end
+
+				em:SetPos(ent:GetPos())
+				for i = 1, 3 do
+					local rr = rad * math.sqrt(math.Rand(0, 1))
+					local a = math.Rand(0, math.pi * 2)
+					local off = Vector(math.cos(a) * rr, math.sin(a) * rr, math.Rand(0, 10))
+					local p = em:Add("particle/particle_smokegrenade", ent:GetPos() + off)
+					if p then
+						local life = math.Rand(1.4, 2.4)
+						p:SetDieTime(life)
+						p:SetStartAlpha(0)
+						p:SetEndAlpha(140)
+						local sz = math.Rand(18, 30)
+						p:SetStartSize(sz)
+						p:SetEndSize(sz * math.Rand(3.4, 4.6))
+						p:SetRoll(math.Rand(0, 360))
+						p:SetRollDelta(math.Rand(-0.5, 0.5))
+						p:SetColor(110, 200, 110)
+						p:SetAirResistance(70)
+						p:SetGravity(Vector(0, 0, math.Rand(22, 38)))
+						p:SetVelocity(VectorRand():GetNormalized() * math.Rand(10, 32))
+						p:SetCollide(false)
 					end
 				end
 			end
