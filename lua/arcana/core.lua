@@ -107,7 +107,10 @@ if SERVER then
 		MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), prefix .. ": " .. tostring(err) .. "\n")
 	end
 
+	local ensured = false
 	local function ensureDatabase()
+		if ensured then return ensured end
+
 		if _G.co and _G.db then
 			-- if we have postgres use it
 			_G.co(function()
@@ -123,10 +126,14 @@ if SERVER then
 				)]])
 			end)
 
-			return true
+			ensured = true
+			return ensured
 		else
 			-- fallback to sqlite
-			if sql.TableExists("arcane_players") then return true end
+			if sql.TableExists("arcane_players") then
+				ensured = true
+				return ensured
+			end
 
 			local ok = sql.Query([[CREATE TABLE IF NOT EXISTS arcane_players (
 				steamid	TEXT PRIMARY KEY,
@@ -141,10 +148,12 @@ if SERVER then
 
 			if ok == false then
 				dbLogError("CREATE TABLE arcane_players failed")
-				return false
+				ensured = false
+				return ensured
 			end
 
-			return true
+			ensured = true
+			return ensured
 		end
 	end
 
