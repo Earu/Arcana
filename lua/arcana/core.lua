@@ -1146,6 +1146,13 @@ if SERVER then
 	local function SpawnMapEntities()
 		local altar = SpawnAltar()
 		SpawnPortalToAltar(altar)
+
+		if _G.aowl and _G.aowl.GotoLocations then
+			local aliases = { "altar", "magic", "arcane", "arcana" }
+			for _, alias in ipairs(aliases) do
+				_G.aowl.GotoLocations[alias] = altar:WorldSpaceCenter() + altar:GetForward() * 200
+			end
+		end
 	end
 
 	hook.Add("InitPostEntity", "Arcane_SpawnAltar", SpawnMapEntities)
