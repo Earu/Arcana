@@ -51,6 +51,13 @@ Arcane:RegisterSpell({
 				thunder:SetPos(tr.HitPos)
 				thunder:Spawn()
 
+				if thunder.CPPISetOwner then
+					local owner = IsValid(caster) and caster or ply
+					if IsValid(owner) then
+						thunder:CPPISetOwner(owner)
+					end
+				end
+
 				SafeRemoveEntityDelayed(thunder, 60 * 5)
 			end,
 		})
