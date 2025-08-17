@@ -5,7 +5,7 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.UTILITY,
 	level_required = 5,
 	knowledge_cost = 1,
-	cooldown = 60 * 60, -- 1 hour
+	cooldown = 60 * 10, -- 10 minutes
 	cost_type = Arcane.COST_TYPES.COINS,
 	cost_amount = 100, -- cost is in the ritual requirements itself
 	cast_time = 10,
