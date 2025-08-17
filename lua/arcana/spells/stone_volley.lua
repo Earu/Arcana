@@ -24,6 +24,7 @@ Arcane:RegisterSpell({
 			local pebble = ents.Create("prop_physics")
 			if not IsValid(pebble) then continue end
 			pebble:SetModel("models/props_junk/rock001a.mdl")
+			pebble:SetMaterial("models/props_wasteland/rockcliff02b")
 			pebble:SetPos(start + VectorRand() * 10 + Vector(0,0,8))
 			pebble:Spawn()
 
