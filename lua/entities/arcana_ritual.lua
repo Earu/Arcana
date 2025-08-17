@@ -199,7 +199,7 @@ if SERVER then
 		local tr = util.TraceLine({
 			start = start,
 			endpos = start - Vector(0, 0, 256),
-			mask = MASK_SOLID_BRUSHONLY,
+			mask = MASK_SOLID,
 			filter = self,
 		})
 
@@ -319,7 +319,7 @@ if CLIENT then
 			local tr = util.TraceLine({
 				start = self:GetPos() + Vector(0, 0, 100),
 				endpos = self:GetPos() - Vector(0, 0, 256),
-				mask = MASK_SOLID_BRUSHONLY,
+				mask = MASK_SOLID,
 				filter = self,
 			})
 			self._circle.position = tr.HitPos + Vector(0, 0, 2)
