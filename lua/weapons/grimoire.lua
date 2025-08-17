@@ -445,7 +445,7 @@ if CLIENT then
 	end
 
 	-- Thin gold deco frame with clipped corners + center diamond accents
-	local function Arcana_DrawDecoFrame(x, y, w, h, col, corner)
+	local function Arcana_DrawDecoFrame(x, y, w, h, col, corner, drawAccents)
 		local c = math.max(8, corner or 12)
 		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
 		-- Outer rectangle with cut corners
@@ -458,15 +458,17 @@ if CLIENT then
 		surface.DrawLine(x + w - c, y, x + w, y + c)
 		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
 		surface.DrawLine(x + c, y + h, x, y + h - c)
-		-- Small center diamond accents mid-top and mid-bottom
-		local mx = x + w * 0.5
-		local dy = 6
-		surface.DisableClipping(true)
-		surface.DrawLine(mx - dy, y, mx, y - dy)
-		surface.DrawLine(mx, y - dy, mx + dy, y)
-		surface.DrawLine(mx - dy, y + h, mx, y + h + dy)
-		surface.DrawLine(mx, y + h + dy, mx + dy, y + h)
-		surface.DisableClipping(false)
+		-- Small center diamond accents mid-top and mid-bottom (optional)
+		if drawAccents ~= false then
+			local mx = x + w * 0.5
+			local dy = 6
+			surface.DisableClipping(true)
+			surface.DrawLine(mx - dy, y, mx, y - dy)
+			surface.DrawLine(mx, y - dy, mx + dy, y)
+			surface.DrawLine(mx - dy, y + h, mx, y + h + dy)
+			surface.DrawLine(mx, y + h + dy, mx + dy, y + h)
+			surface.DisableClipping(false)
+		end
 	end
 
 	-- Filled panel that matches the clipped-corner frame geometry
@@ -843,7 +845,7 @@ if CLIENT then
 				surface.SetDrawColor(xpFill)
 				surface.DrawRect(barX + innerPad, barY + innerPad, fillW, barH - innerPad * 2)
 				-- XP label centered over the bar
-				local xpLabel = tostring(xpInto) .. " / " .. tostring(neededForNext)
+				local xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext)
 				surface.SetFont("Arcana_Ancient")
 				local lx = select(1, surface.GetTextSize(xpLabel))
 				draw.SimpleText(xpLabel, "Arcana_Ancient", barX + barW - lx, barY - 4, textBright)
@@ -1163,6 +1165,52 @@ if CLIENT then
 				draw.SimpleText(sub, "Arcana_Ancient", 12, 34, textDim)
 			end
 
+			-- Cast button on the right side of the row
+			local castBtn = vgui.Create("DButton", row)
+			castBtn:SetText("Cast")
+			castBtn:SetFont("Arcana_Ancient")
+			castBtn:SetTall(28)
+			castBtn:SetWide(72)
+			castBtn:SetCursor("hand")
+			castBtn.DoClick = function()
+				-- Request server to cast this spell
+				net.Start("Arcane_ConsoleCastSpell")
+				net.WriteString(item.id)
+				net.SendToServer()
+			end
+			castBtn.Paint = function(pnl, w, h)
+				local disabled = not pnl:IsEnabled()
+				local bg = disabled and Color(40, 32, 24, 200) or Color(50, 40, 28, 220)
+				local col = disabled and textDim or paleGold
+				local border = gold
+				if not disabled and pnl:IsHovered() then
+					bg = cardHover
+					col = textBright
+					border = textBright
+				end
+
+				surface.DisableClipping(true)
+				Arcana_FillDecoPanel(0, 0, w, h, bg, 6)
+				Arcana_DrawDecoFrame(0, 0, w, h, border, 6, false)
+				surface.DisableClipping(false)
+
+				pnl:SetTextColor(col)
+			end
+
+			-- Reflect cooldown state in button text/enabled
+			castBtn.Think = function(pnl)
+				local data = Arcane and Arcane:GetPlayerData(owner) or nil
+				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
+				if cd and cd > CurTime() then
+					local remaining = math.max(0, math.ceil(cd - CurTime()))
+					if pnl:IsEnabled() then pnl:SetEnabled(false) end
+					pnl:SetText(tostring(remaining) .. "s")
+				else
+					if not pnl:IsEnabled() then pnl:SetEnabled(true) end
+					pnl:SetText("Cast")
+				end
+			end
+
 			-- Position the info icon next to the spell name
 			row.PerformLayout = function(pnl, w, h)
 				if IsValid(infoIcon) then
@@ -1170,6 +1218,10 @@ if CLIENT then
 					surface.SetFont("Arcana_AncientLarge")
 					local nameW, nameH = surface.GetTextSize(sp.name)
 					infoIcon:SetPos(16 + nameW, 8 + (nameH - 20) / 2)
+				end
+				if IsValid(castBtn) then
+					local btnW, btnH = castBtn:GetWide(), castBtn:GetTall()
+					castBtn:SetPos(w - btnW - 12, (h - btnH) * 0.5)
 				end
 			end
 		end
