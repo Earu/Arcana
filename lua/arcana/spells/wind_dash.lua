@@ -58,8 +58,11 @@ Arcane:RegisterSpell({
 		local forceVector = aimDir * DASH_FORCE + Vector(0, 0, UPWARD_LIFT)
 
 		-- Clear current velocity and apply the dash force
-		local currentVel = caster:GetVelocity()
-		caster:SetVelocity(-currentVel + forceVector)
+		local phys = caster:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:AddVelocity(forceVector)
+		end
+
 		caster:SetGroundEntity(NULL)
 
 		-- Grant temporary fall damage immunity
