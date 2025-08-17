@@ -56,13 +56,8 @@ Arcane:RegisterSpell({
 
 		-- Calculate propulsion force with slight upward component for better mobility
 		local forceVector = aimDir * DASH_FORCE + Vector(0, 0, UPWARD_LIFT)
-
-		-- Clear current velocity and apply the dash force
-		local phys = caster:GetPhysicsObject()
-		if IsValid(phys) then
-			phys:AddVelocity(forceVector)
-		end
-
+		local curVel = caster:GetVelocity()
+		caster:SetVelocity(curVel + forceVector)
 		caster:SetGroundEntity(NULL)
 
 		-- Grant temporary fall damage immunity
