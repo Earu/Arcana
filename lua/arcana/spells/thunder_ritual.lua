@@ -23,7 +23,7 @@ Arcane:RegisterSpell({
 
 		ent:SetPos(pos)
 		ent:SetAngles(Angle(0, caster:EyeAngles().y, 0))
-		ent:SetColor(Color(255, 0, 0))
+		ent:SetColor(Color(170, 200, 255, 255))
 		ent:Spawn()
 		ent:Activate()
 
@@ -37,7 +37,7 @@ Arcane:RegisterSpell({
 			lifetime = 300,
 			coin_cost = 1000,
 			items = {
-				lightning = 20,
+				battery = 10,
 			},
 			on_activate = function(selfEnt, ply)
 				local tr = util.TraceLine({
