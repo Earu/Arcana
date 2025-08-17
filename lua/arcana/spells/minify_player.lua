@@ -1,7 +1,7 @@
 local function minify_bandvfx(target)
 	local r = math.max(target:OBBMaxs():Unpack()) * 0.5
 	Arcane:SendAttachBandVFX(target, Color(150, 220, 255, 255), 30, .5, {
-		{ radius = r * 0.9, height = 10, spin = {p = 0, y = 35, r = 0}, lineWidth = 2 },
+		{ radius = r * 0.9, height = 5, spin = {p = 0, y = 35, r = 0}, lineWidth = 2 },
 	})
 end
 
@@ -10,7 +10,7 @@ Arcane:RegisterSpell({
 	name = "Minify Player",
 	description = "Minifies the target player of the spell momentarily, or yourself if no player is in your crosshair!",
 	category = Arcane.CATEGORIES.COMBAT,
-	level_required = 2,
+	level_required = 4,
 	knowledge_cost = 1,
 	cooldown = 10.0,
 	cost_type = Arcane.COST_TYPES.COINS,
