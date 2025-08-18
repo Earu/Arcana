@@ -18,7 +18,7 @@ if SERVER then
 		self:PhysicsInit(SOLID_VPHYSICS)
 
 		if _G.ShaderToGMA then
-			_G.ShaderToGMA({ "arcana_corruption_ps20b" })
+			_G.ShaderToGMA({ "arcana_corruption_ps30" })
 		end
 	end
 end
