@@ -10,13 +10,16 @@ ENT.AdminOnly = true
 
 if SERVER then
 	resource.AddFile("materials/arcana/corruption.vmt")
-	resource.AddFile("shaders/fxc/arcana_corruption_ps20b.vcs")
 
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
 		self:SetMoveType(MOVETYPE_NONE)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:PhysicsInit(SOLID_VPHYSICS)
+
+		if _G.ShaderToGMA then
+			_G.ShaderToGMA({ "arcana_corruption_ps20b" })
+		end
 	end
 end
 
