@@ -130,7 +130,8 @@ if SERVER then
 
 		local ok, res = createGMA(files, { title = "shader_to_gma" })
 		if ok then
-			log("OK:", res)
+			log("OK:")
+			PrintTable(files)
 
 			local base64 = util.Base64Encode(res)
 			net.Start("shader_to_gma")
