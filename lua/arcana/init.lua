@@ -2,6 +2,7 @@ if SERVER then
 	AddCSLuaFile("arcana/core.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/hud.lua")
+	AddCSLuaFile("arcana/shader_to_gma.lua")
 
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
@@ -9,6 +10,7 @@ if SERVER then
 end
 
 include("arcana/core.lua")
+include("arcana/shader_to_gma.lua")
 
 if CLIENT then
 	include("arcana/circles.lua")
