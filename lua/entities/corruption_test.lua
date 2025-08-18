@@ -125,7 +125,7 @@ if CLIENT then
 	end
 
 	function ENT:Initialize()
-		self.ShaderMat = create_shader_mat("corruption" .. self:EntIndex(), {
+		self.ShaderMat = create_shader_mat("arcana_corruption" .. self:EntIndex(), {
 			-- pixshader/vertexshader must end with _ps30/_vs30/_ps20b
 			["$pixshader"] = "arcana_corruption_ps30",
 			["$basetexture"] = "_rt_FullFrameFB",
