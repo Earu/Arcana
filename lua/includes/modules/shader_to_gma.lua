@@ -1,5 +1,7 @@
+AddCSLuaFile()
+
 local function log(...)
-	MsgC(Color(0, 200, 255), "[ShaderToGMA] ", color_white, table.concat({ ... }, " "), "\n")
+	Msg("[ShaderToGMA] ") print(...)
 end
 
 if SERVER then
@@ -112,35 +114,42 @@ if SERVER then
 
 	util.AddNetworkString("shader_to_gma")
 
-	function ShaderToGMA(shaderNames)
-		if not istable(shaderNames) or #shaderNames == 0 then
-			error("No shader names provided")
+	local shaderFiles = {}
+	function resource.AddShader(shaderName)
+		local path = "shaders/fxc/" .. shaderName .. ".vcs"
+		if not file.Exists(path, "GAME") then
+			error("Missing shader file:", path)
 		end
 
-		local files = {}
-		for _, shaderName in ipairs(shaderNames) do
-			local path = "shaders/fxc/" .. shaderName .. ".vcs"
-			if not file.Exists(path, "GAME") then
-				log("Missing shader file:", path)
-				continue
-			end
+		table.insert(shaderFiles, path)
+	end
 
-			table.insert(files, path)
-		end
+	local justSpawned = {}
+	hook.Add("PlayerInitialSpawn", "shader_to_gma", function(ply)
+		justSpawned[ply] = true
+	end)
 
-		local ok, res = createGMA(files, { title = "shader_to_gma" })
+	local function sendGMA(ply)
+		local ok, res = createGMA(shaderFiles, { title = "shader_to_gma" })
 		if ok then
 			log("OK:")
-			PrintTable(files)
+			PrintTable(shaderFiles)
 
 			local base64 = util.Base64Encode(res)
 			net.Start("shader_to_gma")
 			net.WriteString(base64)
-			net.Broadcast()
+			net.Send(ply)
 		else
 			log("Failed:", res or "unknown error")
 		end
 	end
+
+	hook.Add("SetupMove", "shader_to_gma", function(ply, _, ucmd)
+		if justSpawned[ply] and not ucmd:IsForced() then
+			justSpawned[ply] = nil
+			sendGMA(ply)
+		end
+	end)
 end
 
 if CLIENT then
