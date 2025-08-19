@@ -115,13 +115,18 @@ if SERVER then
 	util.AddNetworkString("shader_to_gma")
 
 	local shaderFiles = {}
+	local gmaData
 	function resource.AddShader(shaderName)
 		local path = "shaders/fxc/" .. shaderName .. ".vcs"
 		if not file.Exists(path, "GAME") then
 			error("Missing shader file:", path)
 		end
 
-		table.insert(shaderFiles, path)
+		shaderFiles[shaderName] = path
+		local ok, res = createGMA(table.ClearKeys(shaderFiles), { title = "shader_to_gma" })
+		if ok then
+			gmaData = res
+		end
 	end
 
 	local justSpawned = {}
@@ -130,12 +135,8 @@ if SERVER then
 	end)
 
 	local function sendGMA(ply)
-		local ok, res = createGMA(shaderFiles, { title = "shader_to_gma" })
-		if ok then
-			log("OK:")
-			PrintTable(shaderFiles)
-
-			local base64 = util.Base64Encode(res)
+		if gmaData then
+			local base64 = util.Base64Encode(gmaData)
 			net.Start("shader_to_gma")
 			net.WriteString(base64)
 			net.Send(ply)
