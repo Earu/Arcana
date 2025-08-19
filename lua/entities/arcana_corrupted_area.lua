@@ -22,6 +22,14 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_NONE)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:PhysicsInit(SOLID_VPHYSICS)
+		self:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:Wake()
+			phys:EnableMotion(false)
+			phys:EnableCollisions(false)
+		end
 
 		if not self:GetRadius() or self:GetRadius() <= 0 then
 			self:SetRadius(500)
@@ -173,7 +181,7 @@ if CLIENT then
 
 	function ENT:PrepareCorruptGlyphs()
 		self._glyphParticles = {}
-		self._glyphSpawnRate = 36
+		self._glyphSpawnRate = 10
 		self._glyphMaxParticles = 150
 		self._glyphSpawnAccumulator = 0
 		-- Seed some initial glyphs so the area looks active right away
@@ -190,7 +198,7 @@ if CLIENT then
 		local baseX = math.cos(ang) * r
 		local baseY = math.sin(ang) * r
 		-- Compute travel so glyph reaches top of the corruption sphere
-		local targetWorldHeight = math.sqrt(math.max(0, radius * radius - (baseX * baseX + baseY * baseY))) * 2
+		local targetWorldHeight = math.sqrt(math.max(0, radius * radius - (baseX * baseX + baseY * baseY))) * 0.5
 		local travel = math.max(0, targetWorldHeight / GLYPH_SCALE)
 		local lifeSeconds = math.Rand(3.0, 7.0)
 		local speed = travel / lifeSeconds
@@ -265,11 +273,14 @@ if CLIENT then
 
 		self:PrepareCorruptGlyphs()
 		updateRenderBounds(self)
+		self._lastUpdate = CurTime()
 	end
 
 	function ENT:Think()
-		-- Spawn/update evil glyph particles
-		local dt = FrameTime() > 0 and FrameTime() or 0.05
+		-- Spawn/update evil glyph particles (use CurTime delta for stable speed)
+		local now = CurTime()
+		local dt = math.Clamp(now - (self._lastUpdate or now), 0, 0.2)
+		self._lastUpdate = now
 		self._glyphSpawnAccumulator = (self._glyphSpawnAccumulator or 0) + (self._glyphSpawnRate or 24) * dt
 		local toSpawn = math.floor(self._glyphSpawnAccumulator)
 		self._glyphSpawnAccumulator = self._glyphSpawnAccumulator - toSpawn
@@ -281,7 +292,6 @@ if CLIENT then
 		end
 
 		if self._glyphParticles and #self._glyphParticles > 0 then
-			local now = CurTime()
 			local write = 1
 
 			for read = 1, #self._glyphParticles do
