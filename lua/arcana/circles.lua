@@ -57,13 +57,36 @@ local Ring = {}
 Ring.__index = Ring
 
 -- Ancient Greek symbols/runes for type 2 rings
-local GREEK_RUNES = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"}
+local GREEK_RUNES = {
+	"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο",
+	"Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ",
+	"η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ",
+	"χ", "ψ", "ω"
+}
 
 -- Ancient Greek magical phrases and words for circular text
-local GREEK_PHRASES = {"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας", "αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ", "αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα", "θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις", "κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα", "φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια", "αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος", "ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"}
+local GREEK_PHRASES = {
+	"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας",
+	"αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ",
+	"αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα",
+	"θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις",
+	"κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα",
+	"φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια",
+	"αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",
+	"ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"
+}
 
 -- Arabic mystical phrases and words for circular text
-local ARABIC_PHRASES = {"بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم", "لاإلهإلاالله محمدرسولالله لاإلهإلاالله محمدرسولالله لاإلهإلاالله", "الله نور السماوات والأرض الله نور السماوات والأرض الله نور", "سبحان الله وبحمده سبحان الله العظيم سبحان الله وبحمده سبحان الله", "أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله", "الحمدلله رب العالمين الحمدلله رب العالمين الحمدلله رب العالمين", "قل هو الله أحد الله الصمد قل هو الله أحد الله الصمد قل هو الله", "وما توفيقي إلا بالله عليه توكلت وإليه أنيب وما توفيقي إلا بالله"}
+local ARABIC_PHRASES = {
+	"بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم",
+	"لاإلهإلاالله محمدرسولالله لاإلهإلاالله محمدرسولالله لاإلهإلاالله",
+	"الله نور السماوات والأرض الله نور السماوات والأرض الله نور",
+	"سبحان الله وبحمده سبحان الله العظيم سبحان الله وبحمده سبحان الله",
+	"أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله",
+	"الحمدلله رب العالمين الحمدلله رب العالمين الحمدلله رب العالمين",
+	"قل هو الله أحد الله الصمد قل هو الله أحد الله الصمد قل هو الله",
+	"وما توفيقي إلا بالله عليه توكلت وإليه أنيب وما توفيقي إلا بالله"
+}
 
 -- Combined phrases array for random selection
 local ALL_MYSTICAL_PHRASES = {}
@@ -452,7 +475,7 @@ function Ring:BuildRingRT()
 		end
 
 		-- Render geometry for this ring variant once
-		render_PushRenderTarget(entry.tex)
+		render_PushRenderTarget(entry.tex, 0, 0, entry.size, entry.size)
 		render_Clear(0, 0, 0, 0, true, true)
 		cam_Start2D()
 		surface_SetDrawColor(255, 255, 255, 255)
@@ -530,7 +553,7 @@ local function GetGlyphMaterial(fontName, char)
 	})
 
 	-- Render the glyph (white) onto its RT
-	render_PushRenderTarget(tex)
+	render_PushRenderTarget(tex, 0, 0, w, h)
 	render_Clear(0, 0, 0, 0, true, true)
 	cam_Start2D()
 	surface_SetFont(fontName or "DermaDefault")
@@ -575,7 +598,7 @@ function Ring:BuildBandRTAndMesh()
 		})
 
 		self:RT_PrecacheCircularTextGlyphs()
-		render_PushRenderTarget(tex)
+		render_PushRenderTarget(tex, 0, 0, texW, texH)
 		render_Clear(0, 0, 0, 0, true, true)
 		cam_Start2D()
 		surface_SetDrawColor(255, 255, 255, 255)
@@ -1018,7 +1041,8 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 end
 
 function MagicCircle:GenerateRings()
-	self.rings = {}
+	self.rings = self.rings or {}
+
 	-- Calculate number of rings based on intensity
 	local ringCount = math_max(4, math_min(self.intensity + math_random(1, 3), 8))
 
@@ -1333,7 +1357,7 @@ hook.Add("Think", "MagicCircleManager_Update", function()
 	MagicCircleManager:Update()
 end)
 
-hook.Add("PostDrawOpaqueRenderables", "MagicCircleManager_Draw", function()
+hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function()
 	MagicCircleManager:Draw()
 end)
 
