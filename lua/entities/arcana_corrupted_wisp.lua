@@ -33,17 +33,57 @@ if SERVER then
 		self:SetRenderMode(RENDERMODE_TRANSCOLOR)
 		self:SetModelScale(1.1, 0)
 		self:SetMoveType(MOVETYPE_FLY)
-		self:SetSolid(SOLID_NONE)
-		self:PhysicsInit(SOLID_NONE)
+		-- Make it hittable but not obstructive
+		self:SetSolid(SOLID_BBOX)
+		self:PhysicsInit(SOLID_BBOX)
+		self:SetCollisionBounds(Vector(-8, -8, -8), Vector(8, 8, 8))
 		self:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 		self:DrawShadow(false)
 		self:SetRadius(200)
+		-- Health
+		self:SetMaxHealth(10)
+		self:SetHealth(10)
 		self._lastThink = CurTime()
 		self._nextLaser = CurTime() + 1.0
 		self._lastTargetCheck = 0
 		-- area binding (center/radius) provided by spawner
 		self._areaCenter = self._areaCenter or self:GetPos()
 		self._areaRadius = self._areaRadius or 300
+	end
+
+	function ENT:OnTakeDamage(dmginfo)
+		local cur = self:Health()
+		local new = math.max(0, cur - (dmginfo:GetDamage() or 0))
+		self:SetHealth(new)
+		-- brief hit feedback: small tesla burst
+		local tes = ents.Create("point_tesla")
+		if IsValid(tes) then
+			tes:SetPos(self:GetPos())
+			tes:SetKeyValue("m_SoundName", "DoSpark")
+			tes:SetKeyValue("texture", "sprites/physbeam.vmt")
+			tes:SetKeyValue("m_Color", "120 80 220")
+			tes:SetKeyValue("m_flRadius", "80")
+			tes:SetKeyValue("beamcount_min", "2")
+			tes:SetKeyValue("beamcount_max", "4")
+			tes:SetKeyValue("thick_min", "1")
+			tes:SetKeyValue("thick_max", "3")
+			tes:SetKeyValue("lifetime_min", "0.03")
+			tes:SetKeyValue("lifetime_max", "0.07")
+			tes:SetKeyValue("interval_min", "0.02")
+			tes:SetKeyValue("interval_max", "0.04")
+			tes:Spawn()
+			tes:Activate()
+			tes:Fire("DoSpark", "", 0)
+			tes:Fire("Kill", "", 0.15)
+		end
+		if new <= 0 and not self._arcanaDead then
+			self._arcanaDead = true
+			-- death flash
+			local ed = EffectData()
+			ed:SetOrigin(self:GetPos())
+			util.Effect("cball_explode", ed, true, true)
+			self:Remove()
+		end
 	end
 
 	local function isValidEnemy(ply)
