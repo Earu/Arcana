@@ -41,6 +41,9 @@ if SERVER then
 		self._lastThink = CurTime()
 		self._nextLaser = CurTime() + 1.0
 		self._lastTargetCheck = 0
+		-- area binding (center/radius) provided by spawner
+		self._areaCenter = self._areaCenter or self:GetPos()
+		self._areaRadius = self._areaRadius or 300
 	end
 
 	local function isValidEnemy(ply)
@@ -63,10 +66,34 @@ if SERVER then
 			end
 		end
 
-		self._target = nearest
+		-- Only accept target inside area bounds
+		if IsValid(nearest) then
+			local center = self._areaCenter or self:GetPos()
+			local r = self._areaRadius or 300
+			if nearest:GetPos():DistToSqr(center) <= r * r then
+				self._target = nearest
+			else
+				self._target = nil
+			end
+		else
+			self._target = nil
+		end
 	end
 
 	function ENT:_Chase(dt)
+		local center = self._areaCenter or self:GetPos()
+		local r = self._areaRadius or 300
+		local myPos = self:GetPos()
+		-- If outside bounds, steer back in
+		if myPos:DistToSqr(center) > r * r then
+			local dir = (center - myPos)
+			local dist = dir:Length()
+			if dist > 1 then dir:Mul(1 / dist) end
+			self:SetPos(myPos + dir * (CHASE_SPEED * 1.2) * dt)
+			self:SetAngles(dir:Angle())
+			return
+		end
+
 		if not IsValid(self._target) then return end
 		local targetPos = self._target:EyePos()
 		local desired = targetPos + Vector(0, 0, 20 + math.sin(CurTime() * 100) * 20)
@@ -75,12 +102,10 @@ if SERVER then
 		if dist < 2000 then
 			local speed = CHASE_SPEED
 			if dist > 100 then
-				-- Chase normally when far away
 				dir:Mul(1 / dist)
 				self:SetPos(self:GetPos() + dir * speed * dt)
 				self:SetAngles(dir:Angle())
 			else
-				-- Circle around target when close
 				local right = dir:Cross(Vector(0,0,1)):GetNormalized()
 				self:SetPos(self:GetPos() + right * speed * dt)
 				self:SetAngles((-right):Angle())
@@ -90,6 +115,11 @@ if SERVER then
 
 	function ENT:_FireLaser()
 		if not IsValid(self._target) then return end
+		-- Do not fire if target is outside the area
+		local center = self._areaCenter or self:GetPos()
+		local r = self._areaRadius or 300
+		if self._target:GetPos():DistToSqr(center) > r * r then return end
+
 		local myPos = self:GetPos()
 		local shootPos = myPos + self:GetForward() * 6
 		local aimPos = self._target:EyePos()
