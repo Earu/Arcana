@@ -34,6 +34,100 @@ if SERVER then
 		if not self:GetRadius() or self:GetRadius() <= 0 then
 			self:SetRadius(500)
 		end
+
+		-- Wisp spawn control
+		self._wisps = {}
+		self._maxWisps = 3
+		self._spawnInterval = 8
+		self._nextWispSpawn = CurTime() + 3
+		-- Idle timeout (despawn when no players for a while)
+		self._lastPlayerPresence = CurTime()
+		self._despawnGrace = 15
+	end
+
+	local function playerInRange(center, radius)
+		radius = radius or 0
+		local r2 = radius * radius
+		for _, ply in ipairs(player.GetAll()) do
+			if IsValid(ply) and ply:Alive() and ply:GetPos():DistToSqr(center) <= r2 then
+				return true
+			end
+		end
+		return false
+	end
+
+	function ENT:_SpawnWisp()
+		local center = self:GetPos()
+		local radius = self:GetRadius() or 500
+		local ent = ents.Create("arcana_corrupted_wisp")
+		if not IsValid(ent) then return end
+		local ang = math.Rand(0, math.pi * 2)
+		local r = math.Rand(math.max(12, radius * 0.15), math.max(24, radius * 0.55))
+		local pos = center + Vector(math.cos(ang) * r, math.sin(ang) * r, math.Rand(24, 80))
+		ent:SetPos(pos)
+		ent:Spawn()
+		ent:Activate()
+		-- Bind the wisp to this area
+		ent._areaCenter = Vector(center)
+		ent._areaRadius = radius
+
+		self._wisps[#self._wisps + 1] = ent
+		ent:CallOnRemove("Arcana_WispRemoved" .. ent:EntIndex(), function()
+			for i = #self._wisps, 1, -1 do
+				if not IsValid(self._wisps[i]) then table.remove(self._wisps, i) end
+			end
+		end)
+	end
+
+	function ENT:Think()
+		local now = CurTime()
+		local center = self:GetPos()
+		local radius = self:GetRadius() or 500
+		-- Update wisps' bounds and cleanup
+		for i = #self._wisps, 1, -1 do
+			local w = self._wisps[i]
+			if not IsValid(w) then
+				table.remove(self._wisps, i)
+			else
+				w._areaCenter = Vector(center)
+				w._areaRadius = radius
+			end
+		end
+
+		local hasPlayer = playerInRange(center, radius)
+		if hasPlayer then
+			self._lastPlayerPresence = now
+		end
+
+		-- Spawn logic: if player present and below cap, spawn on interval
+		if hasPlayer and now >= (self._nextWispSpawn or 0) then
+			if (#self._wisps) < (self._maxWisps or 3) then
+				self:_SpawnWisp()
+			end
+			self._nextWispSpawn = now + (self._spawnInterval or 8)
+		end
+
+		-- Despawn wisps if area idle for too long
+		if (now - (self._lastPlayerPresence or now)) > (self._despawnGrace or 15) then
+			for i = #self._wisps, 1, -1 do
+				local w = self._wisps[i]
+				if IsValid(w) then w:Remove() end
+				table.remove(self._wisps, i)
+			end
+			-- back off spawn timer to avoid immediate respawn on next presence
+			self._nextWispSpawn = now + (self._spawnInterval or 8)
+		end
+
+		self:NextThink(now + 0.5)
+		return true
+	end
+
+	function ENT:OnRemove()
+		if self._wisps then
+			for _, w in ipairs(self._wisps) do
+				if IsValid(w) then w:Remove() end
+			end
+		end
 	end
 end
 
