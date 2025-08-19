@@ -12,10 +12,16 @@ require("shader_to_gma")
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "Radius")
+	self:NetworkVar("Float", 1, "Intensity")
 end
 
 if SERVER then
 	resource.AddShader("arcana_corruption_ps30")
+
+	local function smoothstep(edge0, edge1, x)
+		x = math.Clamp((x - edge0) / math.max(1e-6, edge1 - edge0), 0, 1)
+		return x * x * (3 - 2 * x)
+	end
 
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
@@ -43,6 +49,30 @@ if SERVER then
 		-- Idle timeout (despawn when no players for a while)
 		self._lastPlayerPresence = CurTime()
 		self._despawnGrace = 15
+		-- Intensity defaults
+		if not self:GetIntensity() or self:GetIntensity() < 0 then self:SetIntensity(1) end
+		self._lastIntensity = -1
+	end
+
+	local function applyIntensityServer(self)
+		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		-- Wisps only from 1.2→2: at 1.2 => 1 max, at 2 => 6 max (linear)
+		local sw = math.Clamp((k - 1.2) / 0.8, 0, 1)
+		if sw <= 0 then
+			self._maxWisps = 0
+			self._spawnInterval = 8
+		else
+			self._maxWisps = math.floor(1 + 5 * sw)
+			self._spawnInterval = math.max(2, 10 - 8 * sw)
+		end
+		-- If intensity becomes extremely low, trim excess wisps gradually
+		if self._maxWisps < #self._wisps then
+			for i = #self._wisps, self._maxWisps + 1, -1 do
+				local w = self._wisps[i]
+				if IsValid(w) then w:Remove() end
+				table.remove(self._wisps, i)
+			end
+		end
 	end
 
 	local function playerInRange(center, radius)
@@ -83,6 +113,12 @@ if SERVER then
 		local now = CurTime()
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
+		-- Apply intensity changes live
+		local curI = self:GetIntensity() or 1
+		if curI ~= (self._lastIntensity or -1) then
+			applyIntensityServer(self)
+			self._lastIntensity = curI
+		end
 		-- Update wisps' bounds and cleanup
 		for i = #self._wisps, 1, -1 do
 			local w = self._wisps[i]
@@ -101,7 +137,7 @@ if SERVER then
 
 		-- Spawn logic: if player present and below cap, spawn on interval
 		if hasPlayer and now >= (self._nextWispSpawn or 0) then
-			if (#self._wisps) < (self._maxWisps or 3) then
+			if (#self._wisps) < (self._maxWisps or 3) and (self._maxWisps or 0) > 0 then
 				self:_SpawnWisp()
 			end
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
@@ -138,6 +174,11 @@ if CLIENT then
 		["$alpha"] = "0",
 		["$translucent"] = "1"
 	})
+
+	local function smoothstep(edge0, edge1, x)
+		x = math.Clamp((x - edge0) / math.max(1e-6, edge1 - edge0), 0, 1)
+		return x * x * (3 - 2 * x)
+	end
 
 	-- Subtle darkening overlay for corrupted area
 	local DARKEN_MAT = CreateMaterial("arcana_corruption_darken", "UnlitGeneric", {
@@ -198,6 +239,19 @@ if CLIENT then
 		return CreateMaterial(name, "screenspace_general", key_values)
 	end
 
+	-- server applier above; client has applyIntensityClient below
+
+	local function applyIntensityClient(self)
+		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		-- Particles: very slow from 0.7→2, max at 2
+		local sp = math.Clamp(k * 0.5, 0, 1)
+		local sr = sp * sp * sp * sp -- quartic for very slow onset
+		self._glyphSpawnRate = math.floor(20 * sr)
+		self._glyphMaxParticles = math.floor(20 + 120 * sr)
+		-- Overlay darken can follow a softer factor so it appears earlier
+		self._intensityScale = sp
+	end
+
 	local function drawCorruption(self)
 		if not IsValid(self) then return end
 
@@ -205,6 +259,8 @@ if CLIENT then
 		local player_pos = LocalPlayer():GetPos()
 		local distance = player_pos:Distance(world_pos)
 		local radius = math.max(1, self:GetRadius() or 500)
+		local tscale = self._intensityScale or 0.5
+		local shaderIntensity = math.Clamp(self:GetIntensity() or 1, 0, 2)
 
 		-- Update framebuffer for post-processing
 		render.UpdateScreenEffectTexture()
@@ -212,8 +268,7 @@ if CLIENT then
 
 		-- Tunables with subtle flicker/jitter
 		local t = CurTime()
-		local intensity = 1.6
-		self.ShaderMat:SetFloat("$c0_y", intensity)
+		self.ShaderMat:SetFloat("$c0_y", shaderIntensity)
 		self.ShaderMat:SetFloat("$c1_x", 0.5 + 0.02 * math.sin(t * 1.9))
 		self.ShaderMat:SetFloat("$c1_y", 0.5 + 0.02 * math.cos(t * 2.3))
 		self.ShaderMat:SetFloat("$c0_z", 1.7)
@@ -221,7 +276,11 @@ if CLIENT then
 
 		local function drawDarkOverlay()
 			render.SetMaterial(DARKEN_MAT)
+			if tscale <= 0 then return end
+			local old = render.GetBlend()
+			render.SetBlend(math.Clamp(tscale, 0, 1))
 			render.DrawScreenQuad()
+			render.SetBlend(old)
 		end
 
 		if distance < radius then
@@ -279,8 +338,12 @@ if CLIENT then
 		self._glyphMaxParticles = 150
 		self._glyphSpawnAccumulator = 0
 		-- Seed some initial glyphs so the area looks active right away
-		for i = 1, math.min(1, self._glyphMaxParticles or 1) do
-			self:_SpawnCorruptGlyph()
+		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		local sp = math.Clamp((k - 0.7) / 1.3, 0, 1)
+		if sp > 0.15 then
+			for i = 1, math.min(1, self._glyphMaxParticles or 1) do
+				self:_SpawnCorruptGlyph()
+			end
 		end
 	end
 
@@ -368,6 +431,8 @@ if CLIENT then
 		self:PrepareCorruptGlyphs()
 		updateRenderBounds(self)
 		self._lastUpdate = CurTime()
+		self._lastIntensity = -1
+		applyIntensityClient(self)
 	end
 
 	function ENT:Think()
@@ -375,6 +440,12 @@ if CLIENT then
 		local now = CurTime()
 		local dt = math.Clamp(now - (self._lastUpdate or now), 0, 0.2)
 		self._lastUpdate = now
+		-- Intensity changes live
+		local curI = self:GetIntensity() or 1
+		if curI ~= (self._lastIntensity or -1) then
+			applyIntensityClient(self)
+			self._lastIntensity = curI
+		end
 		self._glyphSpawnAccumulator = (self._glyphSpawnAccumulator or 0) + (self._glyphSpawnRate or 24) * dt
 		local toSpawn = math.floor(self._glyphSpawnAccumulator)
 		self._glyphSpawnAccumulator = self._glyphSpawnAccumulator - toSpawn
@@ -400,7 +471,7 @@ if CLIENT then
 						p.tpEnd = nil
 					end
 					if (not p.tpEnd) and p.nextTp and now >= p.nextTp then
-						local max = p.tpMax or math.max(16, (self:GetRadius() or 100) * 0.25)
+						local max = p.tpMax or math.max(16, radius * 0.25)
 						p.tpx = math.Rand(-max, max)
 						p.tpy = math.Rand(-max, max)
 						p.tpEnd = now + (p.tpDur or math.Rand(0.05, 0.12))
