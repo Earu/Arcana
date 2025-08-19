@@ -57,34 +57,13 @@ local Ring = {}
 Ring.__index = Ring
 
 -- Ancient Greek symbols/runes for type 2 rings
-local GREEK_RUNES = {
-	"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ",
-	"Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ",
-	"λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"}
+local GREEK_RUNES = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"}
 
 -- Ancient Greek magical phrases and words for circular text
-local GREEK_PHRASES = {
-	"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας",
-	"αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ",
-	"αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα",
-	"θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις",
-	"κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα",
-	"φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια",
-	"αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",
-	"ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"
-}
+local GREEK_PHRASES = {"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας", "αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ", "αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα", "θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις", "κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα", "φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια", "αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος", "ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"}
 
 -- Arabic mystical phrases and words for circular text
-local ARABIC_PHRASES = {
-	"بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم",
-	"لاإلهإلاالله محمدرسولالله لاإلهإلاالله محمدرسولالله لاإلهإلاالله",
-	"الله نور السماوات والأرض الله نور السماوات والأرض الله نور",
-	"سبحان الله وبحمده سبحان الله العظيم سبحان الله وبحمده سبحان الله",
-	"أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله",
-	"الحمدلله رب العالمين الحمدلله رب العالمين الحمدلله رب العالمين",
-	"قل هو الله أحد الله الصمد قل هو الله أحد الله الصمد قل هو الله",
-	"وما توفيقي إلا بالله عليه توكلت وإليه أنيب وما توفيقي إلا بالله"
-}
+local ARABIC_PHRASES = {"بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم بسمالله الرحمن الرحيم", "لاإلهإلاالله محمدرسولالله لاإلهإلاالله محمدرسولالله لاإلهإلاالله", "الله نور السماوات والأرض الله نور السماوات والأرض الله نور", "سبحان الله وبحمده سبحان الله العظيم سبحان الله وبحمده سبحان الله", "أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله أستغفرالله", "الحمدلله رب العالمين الحمدلله رب العالمين الحمدلله رب العالمين", "قل هو الله أحد الله الصمد قل هو الله أحد الله الصمد قل هو الله", "وما توفيقي إلا بالله عليه توكلت وإليه أنيب وما توفيقي إلا بالله"}
 
 -- Combined phrases array for random selection
 local ALL_MYSTICAL_PHRASES = {}
@@ -123,15 +102,12 @@ local BAND_RT_CACHE = {}
 local BAND_MESH_CACHE = {}
 
 -- Default ring ejection sound candidates (short, energetic)
-local MAGIC_EJECT_SOUNDS = {
-	"ambient/energy/zap1.wav",
-	"ambient/energy/zap2.wav",
-	"ambient/energy/zap3.wav",
-}
+local MAGIC_EJECT_SOUNDS = {"ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav",}
 
 -- Quantize a numeric value to limit the number of RT variants produced
 local function quantize(value, step)
 	step = step or 1
+
 	return math_floor((value or 0) / step + 0.5) * step
 end
 
@@ -150,11 +126,7 @@ local function ringRTKey(r)
 	local phraseId = (util_CRC and util_CRC(phrase)) or tostring(phrase)
 	local inner = quantize(r.innerTextRadius or (radius - 5), 1)
 	local outer = quantize(r.outerTextRadius or radius, 1)
-
-	local key = string.format(
-		"t%d_s%d_r%d_lw%.1f_f%s_p%s_in%d_out%d",
-		ringType, sizeBucket, radiusBucket, lineWidthBucket, fontName, tostring(phraseId), inner, outer
-	)
+	local key = string.format("t%d_s%d_r%d_lw%.1f_f%s_p%s_in%d_out%d", ringType, sizeBucket, radiusBucket, lineWidthBucket, fontName, tostring(phraseId), inner, outer)
 
 	return key, sizeBucket, radiusBucket
 end
@@ -176,6 +148,7 @@ local function bandRTKey(r)
 	local phrase = r.mysticalPhrase or ""
 	local phraseId = (util_CRC and util_CRC(phrase)) or tostring(phrase)
 	local key = string.format("w%d_h%d_px%d_f%s_p%s", wBucket, hBucket, pxPerUnitBucket, fontName, tostring(phraseId))
+
 	return key, wBucket, hBucket
 end
 
@@ -264,8 +237,6 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	return ring
 end
 
-
-
 -- Cache text processing to avoid repeated UTF-8 operations
 function Ring:CacheTextProcessing()
 	if not self.mysticalPhrase then return nil end
@@ -306,6 +277,7 @@ function Ring:Update(deltaTime)
 		local from = self.scaleFrom or 1
 		local to = self.scaleTarget or 1
 		self.currentScale = from + (to - from) * t
+
 		if t >= 1 then
 			self.scaleDuration = 0
 			self.currentScale = to
@@ -315,16 +287,19 @@ function Ring:Update(deltaTime)
 	-- Breakdown motion (for non-band rings)
 	if self.breaking and not self.removed then
 		local tNow = CurTime()
+
 		-- Wait for per-ring eject delay to spread out
 		if not self.ejectStarted then
 			if (tNow - (self.breakStart or 0)) >= (self.breakDelay or 0) then
 				self.ejectStarted = true
+
 				if not self.ejectSoundPlayed then
 					local pitch = 115 + math_random(-8, 12)
-					sound.Play(MAGIC_EJECT_SOUNDS[math_random(1, #MAGIC_EJECT_SOUNDS)], self._lastDrawCenter or Vector(0,0,0), 70, pitch, 0.6)
+					sound.Play(MAGIC_EJECT_SOUNDS[math_random(1, #MAGIC_EJECT_SOUNDS)], self._lastDrawCenter or Vector(0, 0, 0), 70, pitch, 0.6)
 					self.ejectSoundPlayed = true
 				end
 			end
+
 			return
 		end
 
@@ -333,11 +308,13 @@ function Ring:Update(deltaTime)
 		local dir = self.ejectDirXY or Vector(1, 0, 0)
 		-- Normalize in-plane dir
 		local len = math.sqrt(dir.x * dir.x + dir.y * dir.y)
+
 		if len > 0 then
 			dir = Vector(dir.x / len, dir.y / len, 0)
 		else
 			dir = Vector(1, 0, 0)
 		end
+
 		self.breakVelocity.x = (self.breakVelocity.x or 0) + dir.x * accel * deltaTime
 		self.breakVelocity.y = (self.breakVelocity.y or 0) + dir.y * accel * deltaTime
 		self.breakVelocity.z = (self.breakVelocity.z or 0) + (math_random() * 18 - 9) * deltaTime
@@ -350,6 +327,7 @@ function Ring:Update(deltaTime)
 		-- removal when far enough
 		local dist2 = (self.breakOffset.x or 0) ^ 2 + (self.breakOffset.y or 0) ^ 2 + (self.breakOffset.z or 0) ^ 2
 		local threshold = (self.breakRemoveDistance or (self.radius * 3))
+
 		if dist2 >= (threshold * threshold) then
 			self.removed = true
 		end
@@ -358,6 +336,7 @@ end
 
 function Ring:GetCurrentOpacity(baseOpacity, time)
 	local pulse = math_sin(time * self.pulseSpeed + self.pulseOffset) * 0.3 + 0.7
+
 	return baseOpacity * self.opacity * pulse
 end
 
@@ -365,6 +344,7 @@ function Ring:Draw(centerPos, angles, color, time)
 	local ringPos = centerPos + angles:Up() * self.height
 	-- remember last center for delayed ejection sounds
 	self._lastDrawCenter = centerPos
+
 	-- Apply breakdown offset in local ring plane (non-band rings)
 	if self.breaking and not self.removed and self.type ~= RING_TYPES.BAND_RING then
 		local off = self.breakOffset or Vector(0, 0, 0)
@@ -374,6 +354,7 @@ function Ring:Draw(centerPos, angles, color, time)
 		local u = oriented:Up()
 		ringPos = ringPos + f * (off.x or 0) + r * (off.y or 0) + u * (off.z or 0)
 	end
+
 	local currentOpacity = self:GetCurrentOpacity(color.a, time)
 	local ringColor = self.color or Color(color.r, color.g, color.b, currentOpacity)
 	ringColor.a = currentOpacity
@@ -432,6 +413,7 @@ function Ring:BuildRingRT()
 		local rtName = "arcana_ring_rt_" .. key
 		local tex = GetRenderTarget(rtName, size, size, true)
 		local matName = "arcana_ring_mat_" .. key
+
 		local mat = CreateMaterial(matName, "UnlitGeneric", {
 			["$basetexture"] = tex:GetName(),
 			["$translucent"] = 1,
@@ -450,6 +432,7 @@ function Ring:BuildRingRT()
 			radiusBucket = radiusBucket,
 			built = false,
 		}
+
 		RING_RT_CACHE[key] = entry
 	end
 
@@ -473,7 +456,6 @@ function Ring:BuildRingRT()
 		render_Clear(0, 0, 0, 0, true, true)
 		cam_Start2D()
 		surface_SetDrawColor(255, 255, 255, 255)
-
 		-- Build using a canonical unit-to-pixel mapping so all rings sharing
 		-- this cache key produce identical RT contents
 		local oldUnitToPx = self.unitToPx
@@ -482,10 +464,11 @@ function Ring:BuildRingRT()
 		self.rtSize = entry.size
 		self.rtRadiusPx = entry.rtRadiusPx
 		self.unitToPx = entry.rtRadiusPx / math_max(1, entry.radiusBucket)
-
 		local passes = getRTBuildPasses()
+
 		for _pass = 1, passes do
 			surface_SetDrawColor(255, 255, 255, 255)
+
 			if self.type == RING_TYPES.PATTERN_LINES then
 				self:RT_DrawPatternLines2D()
 				self:RT_DrawCircularText2D()
@@ -550,13 +533,15 @@ local function GetGlyphMaterial(fontName, char)
 	render_PushRenderTarget(tex)
 	render_Clear(0, 0, 0, 0, true, true)
 	cam_Start2D()
-		surface_SetFont(fontName or "DermaDefault")
-		surface_SetTextColor(255, 255, 255, 255)
-		local passes = getRTBuildPasses()
-		for _pass = 1, passes do
-			surface_SetTextPos(1, 1)
-			surface_DrawText(char)
-		end
+	surface_SetFont(fontName or "DermaDefault")
+	surface_SetTextColor(255, 255, 255, 255)
+	local passes = getRTBuildPasses()
+
+	for _pass = 1, passes do
+		surface_SetTextPos(1, 1)
+		surface_DrawText(char)
+	end
+
 	cam_End2D()
 	render_PopRenderTarget()
 
@@ -579,6 +564,7 @@ function Ring:BuildBandRTAndMesh()
 		local rtName = "arcana_band_rt_" .. rtKey
 		local tex = GetRenderTarget(rtName, texW, texH, true)
 		local matName = "arcana_band_mat_" .. rtKey
+
 		local mat = CreateMaterial(matName, "UnlitGeneric", {
 			["$basetexture"] = tex:GetName(),
 			["$translucent"] = 1,
@@ -589,24 +575,29 @@ function Ring:BuildBandRTAndMesh()
 		})
 
 		self:RT_PrecacheCircularTextGlyphs()
-
 		render_PushRenderTarget(tex)
 		render_Clear(0, 0, 0, 0, true, true)
 		cam_Start2D()
 		surface_SetDrawColor(255, 255, 255, 255)
-
 		local textData = self.cachedTextData
+
 		if textData and textData.chars and textData.charCount > 0 then
 			local fontName = self.textFont or "MagicCircle_Medium"
 			surface_SetFont(fontName)
 			local sampleChar = textData.chars[1]
 			local cw, ch = surface_GetTextSize(sampleChar)
-			if cw <= 0 then cw = 16 end
-			if ch <= 0 then ch = 32 end
+
+			if cw <= 0 then
+				cw = 16
+			end
+
+			if ch <= 0 then
+				ch = 32
+			end
 
 			local scale = math_max(0.25, math_min(2.5, (texH * 0.7) / ch))
-
 			local passes = getRTBuildPasses()
+
 			for _pass = 1, passes do
 				do
 					local lineThickness = math_max(1, math_floor(texH * 0.06))
@@ -622,6 +613,7 @@ function Ring:BuildBandRTAndMesh()
 
 				local x = 0
 				local idx = 1
+
 				while x < texW + cw * scale do
 					local char = textData.chars[((idx - 1) % textData.charCount) + 1]
 					local gm, gw, gh = GetGlyphMaterial(fontName, char)
@@ -639,7 +631,13 @@ function Ring:BuildBandRTAndMesh()
 		cam_End2D()
 		render_PopRenderTarget()
 
-		rtEntry = { tex = tex, mat = mat, w = texW, h = texH }
+		rtEntry = {
+			tex = tex,
+			mat = mat,
+			w = texW,
+			h = texH
+		}
+
 		BAND_RT_CACHE[rtKey] = rtEntry
 	end
 
@@ -647,7 +645,6 @@ function Ring:BuildBandRTAndMesh()
 	self.bandMat = rtEntry.mat
 	self.bandRTW = rtEntry.w
 	self.bandRTH = rtEntry.h
-
 	-- Shared mesh for the cylindrical strip
 	local height = math_max(1, self.bandHeight or (self.radius * 0.15))
 	local radiusBucket = quantize(self.radius or 1, 1)
@@ -660,32 +657,85 @@ function Ring:BuildBandRTAndMesh()
 		local vertices = {}
 		local radius = math_max(1, radiusBucket)
 		local halfH = heightBucket * 0.5
+
 		for i = 0, segments do
 			local t = i / segments
 			local ang = t * math_pi * 2
 			local cx = math_cos(ang) * radius
 			local cy = math_sin(ang) * radius
-			table_insert(vertices, { pos = Vector(cx, cy, -halfH), u = t, v = 1, normal = Vector(cx, cy, 0):GetNormalized() })
-			table_insert(vertices, { pos = Vector(cx, cy,  halfH), u = t, v = 0, normal = Vector(cx, cy, 0):GetNormalized() })
+
+			table_insert(vertices, {
+				pos = Vector(cx, cy, -halfH),
+				u = t,
+				v = 1,
+				normal = Vector(cx, cy, 0):GetNormalized()
+			})
+
+			table_insert(vertices, {
+				pos = Vector(cx, cy, halfH),
+				u = t,
+				v = 0,
+				normal = Vector(cx, cy, 0):GetNormalized()
+			})
 		end
 
 		local meshBuilder = Mesh()
+
 		meshBuilder:BuildFromTriangles((function()
 			local tris = {}
+
 			for i = 0, segments - 1 do
 				local i0 = i * 2 + 1
 				local i1 = i0 + 1
 				local i2 = i0 + 2
 				local i3 = i0 + 3
-				table_insert(tris, { pos = vertices[i0].pos, u = vertices[i0].u, v = vertices[i0].v, normal = vertices[i0].normal })
-				table_insert(tris, { pos = vertices[i2].pos, u = vertices[i2].u, v = vertices[i2].v, normal = vertices[i2].normal })
-				table_insert(tris, { pos = vertices[i1].pos, u = vertices[i1].u, v = vertices[i1].v, normal = vertices[i1].normal })
-				table_insert(tris, { pos = vertices[i2].pos, u = vertices[i2].u, v = vertices[i2].v, normal = vertices[i2].normal })
-				table_insert(tris, { pos = vertices[i3].pos, u = vertices[i3].u, v = vertices[i3].v, normal = vertices[i3].normal })
-				table_insert(tris, { pos = vertices[i1].pos, u = vertices[i1].u, v = vertices[i1].v, normal = vertices[i1].normal })
+
+				table_insert(tris, {
+					pos = vertices[i0].pos,
+					u = vertices[i0].u,
+					v = vertices[i0].v,
+					normal = vertices[i0].normal
+				})
+
+				table_insert(tris, {
+					pos = vertices[i2].pos,
+					u = vertices[i2].u,
+					v = vertices[i2].v,
+					normal = vertices[i2].normal
+				})
+
+				table_insert(tris, {
+					pos = vertices[i1].pos,
+					u = vertices[i1].u,
+					v = vertices[i1].v,
+					normal = vertices[i1].normal
+				})
+
+				table_insert(tris, {
+					pos = vertices[i2].pos,
+					u = vertices[i2].u,
+					v = vertices[i2].v,
+					normal = vertices[i2].normal
+				})
+
+				table_insert(tris, {
+					pos = vertices[i3].pos,
+					u = vertices[i3].u,
+					v = vertices[i3].v,
+					normal = vertices[i3].normal
+				})
+
+				table_insert(tris, {
+					pos = vertices[i1].pos,
+					u = vertices[i1].u,
+					v = vertices[i1].v,
+					normal = vertices[i1].normal
+				})
 			end
+
 			return tris
 		end)())
+
 		meshEntry = meshBuilder
 		BAND_MESH_CACHE[meshKey] = meshEntry
 	end
@@ -704,7 +754,9 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	-- Apply uniform scaling for band ring (animated)
 	local s = self.currentScale or 1
 	m:Scale(Vector(s, s, s))
-	m:SetTranslation(centerPos)
+	-- Nudge along local Up to reduce co-planar depth fighting between multiple bands
+	local bias = self.zBias or 0
+	m:SetTranslation(centerPos + oriented:Up() * bias)
 	cam_PushModelMatrix(m)
 
 	-- Apply color/alpha to the material so the band adopts ring color
@@ -929,7 +981,6 @@ function Ring:RT_DrawStarRing2D()
 	end
 end
 
-
 -- MagicCircle class implementation
 function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	local circle = setmetatable({}, MagicCircle)
@@ -945,10 +996,10 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.startTime = CurTime()
 	circle.duration = 0
 	circle.isActive = true
-		-- Fade-out state
-		circle.isFading = false
-		circle.fadeStart = 0
-		circle.fadeDuration = 0.3
+	-- Fade-out state
+	circle.isFading = false
+	circle.fadeStart = 0
+	circle.fadeDuration = 0.3
 	-- Evolving-cast state
 	circle.isEvolving = false
 	circle.evolveStart = 0
@@ -1034,6 +1085,7 @@ function MagicCircle:Update(deltaTime)
 	-- Cull rings removed by breakdown
 	for i = #self.rings, 1, -1 do
 		local r = self.rings[i]
+
 		if r and r.removed then
 			table_remove(self.rings, i)
 		end
@@ -1041,8 +1093,8 @@ function MagicCircle:Update(deltaTime)
 
 	-- Check if animation should end (skip while breaking)
 	if self.isAnimated and not self.isBreaking and (CurTime() - self.startTime) > self.duration and not self.isFading then
-			self:StartFadeOut(self.fadeDuration)
-		end
+		self:StartFadeOut(self.fadeDuration)
+	end
 
 	-- Update evolving behavior
 	if self.isEvolving then
@@ -1084,9 +1136,11 @@ function MagicCircle:Update(deltaTime)
 
 			ring.height = ring.height + (target - ring.height) * math.min(1, deltaTime * 6)
 		end
+
 		-- Handle fade-out completion
 		if self.isFading then
 			local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
+
 			if t >= 1 then
 				self:FinalizeDeactivate()
 				self.isActive = false
@@ -1095,15 +1149,17 @@ function MagicCircle:Update(deltaTime)
 	end
 end
 
-	function MagicCircle:Draw()
+function MagicCircle:Draw()
 	if not self.isActive then return end
 	render.SetColorMaterial()
 	local currentTime = CurTime()
-		-- Apply fade alpha if fading
-		local fadeMul = 1
+	-- Apply fade alpha if fading
+	local fadeMul = 1
+
 	if self.isFading then
-			fadeMul = math_max(0, 1 - (currentTime - self.fadeStart) / math_max(0.01, self.fadeDuration))
-		end
+		fadeMul = math_max(0, 1 - (currentTime - self.fadeStart) / math_max(0.01, self.fadeDuration))
+	end
+
 	-- Draw all rings
 	local count = #self.rings
 	local maxToDraw = self.isEvolving and math.max(self.baseVisible, self.lastVisible) or count
@@ -1111,10 +1167,11 @@ end
 	for i = 1, math.min(count, maxToDraw) do
 		local ring = self.rings[i]
 		local baseCol = self.color or Color(255, 255, 255, 255)
-			local a = math_floor((baseCol.a or 255) * fadeMul)
-			if a > 0 then
-				ring:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
-			end
+		local a = math_floor((baseCol.a or 255) * fadeMul)
+
+		if a > 0 then
+			ring:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
+		end
 	end
 end
 
@@ -1133,8 +1190,10 @@ function MagicCircle:StartBreakdown(duration)
 	local d = math_max(0.1, tonumber(duration) or 0.6)
 	local num = #self.rings
 	local idx = 0
+
 	for _, r in ipairs(self.rings) do
 		idx = idx + 1
+
 		if r and r.type ~= RING_TYPES.BAND_RING then
 			r.breaking = true
 			r.breakStart = CurTime()
@@ -1152,9 +1211,11 @@ function MagicCircle:StartBreakdown(duration)
 			-- sound cue will play when ejection actually starts in Update
 		end
 	end
+
 	-- Optional: schedule final cleanup if all rings gone
 	timer.Simple(d + 0.2, function()
 		if not self.isActive then return end
+
 		if #self.rings <= 0 then
 			-- No fade here; breakdown fully removes rings already
 			self.isActive = false
@@ -1184,28 +1245,28 @@ function MagicCircle:IsActive()
 end
 
 function MagicCircle:Destroy()
-		-- Trigger a quick fade-out instead of instant disappearance
-		self:StartFadeOut(self.fadeDuration)
+	-- Trigger a quick fade-out instead of instant disappearance
+	self:StartFadeOut(self.fadeDuration)
 end
 
-	function MagicCircle:StartFadeOut(duration)
-		if self.isFading then return end
-		self.isFading = true
-		self.fadeStart = CurTime()
-		self.fadeDuration = math_max(0.05, duration or 0.3)
-	end
+function MagicCircle:StartFadeOut(duration)
+	if self.isFading then return end
+	self.isFading = true
+	self.fadeStart = CurTime()
+	self.fadeDuration = math_max(0.05, duration or 0.3)
+end
 
-	function MagicCircle:FinalizeDeactivate()
-		-- Drop heavy per-ring references to encourage GC; shared cache persists
-		if self.rings then
-			for _, r in ipairs(self.rings) do
-				if r then
-					r.rt = nil
-					r.rtMat = nil
-				end
+function MagicCircle:FinalizeDeactivate()
+	-- Drop heavy per-ring references to encourage GC; shared cache persists
+	if self.rings then
+		for _, r in ipairs(self.rings) do
+			if r then
+				r.rt = nil
+				r.rtMat = nil
 			end
 		end
 	end
+end
 
 function MagicCircle:GetRingCount()
 	return #self.rings
@@ -1366,10 +1427,10 @@ function BandCircle.new(pos, ang, color, size)
 	bc.isAnimated = false
 	bc.startTime = CurTime()
 	bc.duration = 0
-		-- Fade-out state
-		bc.isFading = false
-		bc.fadeStart = 0
-		bc.fadeDuration = 0.3
+	-- Fade-out state
+	bc.isFading = false
+	bc.fadeStart = 0
+	bc.fadeDuration = 0.3
 
 	return bc
 end
@@ -1395,12 +1456,14 @@ end
 function BandCircle:SetScale(scale, duration)
 	scale = tonumber(scale) or 1
 	duration = tonumber(duration) or 0
+
 	for _, r in ipairs(self.rings) do
 		if r and r.type == RING_TYPES.BAND_RING then
 			r.scaleFrom = r.currentScale or 1
 			r.scaleTarget = scale
 			r.scaleStart = CurTime()
 			r.scaleDuration = math_max(0, duration)
+
 			if duration <= 0 then
 				r.currentScale = scale
 				r.scaleDuration = 0
@@ -1414,33 +1477,45 @@ function BandCircle:Update(dt)
 		r:Update(dt)
 	end
 
-		if self.isAnimated and (CurTime() - self.startTime) > (self.duration or 0) and not self.isFading then
-			self:StartFadeOut(self.fadeDuration)
-		end
+	if self.isAnimated and (CurTime() - self.startTime) > (self.duration or 0) and not self.isFading then
+		self:StartFadeOut(self.fadeDuration)
+	end
 
-		if self.isFading then
-			local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
-			if t >= 1 then
-				self.isActive = false
-			end
+	if self.isFading then
+		local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
+
+		if t >= 1 then
+			self.isActive = false
 		end
+	end
 end
 
-	function BandCircle:Draw()
+function BandCircle:Draw()
 	if not self.isActive then return end
 	render.SetColorMaterial()
 	local t = CurTime()
-		local fadeMul = 1
-		if self.isFading then
-			fadeMul = math_max(0, 1 - (t - self.fadeStart) / math_max(0.01, self.fadeDuration))
-		end
+	local fadeMul = 1
 
-	for _, r in ipairs(self.rings) do
-			local baseCol = self.color or Color(255, 255, 255, 255)
-			local a = math_floor((baseCol.a or 255) * fadeMul)
-			if a > 0 then
-				r:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), t)
-			end
+	if self.isFading then
+		fadeMul = math_max(0, 1 - (t - self.fadeStart) / math_max(0.01, self.fadeDuration))
+	end
+
+	-- Stable back-to-front ordering by radius for translucent blending
+	local ordered = {}
+
+	for i = 1, #self.rings do
+		ordered[i] = self.rings[i]
+	end
+
+	table_sort(ordered, function(a, b) return (a.radius or 0) > (b.radius or 0) end)
+
+	for _, r in ipairs(ordered) do
+		local baseCol = self.color or Color(255, 255, 255, 255)
+		local a = math_floor((baseCol.a or 255) * fadeMul)
+
+		if a > 0 then
+			r:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), t)
+		end
 	end
 end
 
@@ -1448,16 +1523,16 @@ function BandCircle:IsActive()
 	return self.isActive
 end
 
-	function BandCircle:Remove()
-		self:StartFadeOut(self.fadeDuration)
-	end
+function BandCircle:Remove()
+	self:StartFadeOut(self.fadeDuration)
+end
 
-	function BandCircle:StartFadeOut(duration)
-		if self.isFading then return end
-		self.isFading = true
-		self.fadeStart = CurTime()
-		self.fadeDuration = math_max(0.05, duration or 0.3)
-	end
+function BandCircle:StartFadeOut(duration)
+	if self.isFading then return end
+	self.isFading = true
+	self.fadeStart = CurTime()
+	self.fadeDuration = math_max(0.05, duration or 0.3)
+end
 
 function BandCircle:SetAnimated(duration)
 	self.isAnimated = true
