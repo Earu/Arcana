@@ -46,6 +46,8 @@ if SERVER then
 		self._lastThink = CurTime()
 		self._nextLaser = CurTime() + 1.0
 		self._lastTargetCheck = 0
+		-- ambient sound schedule
+		self._nextAmbient = CurTime() + math.Rand(2.0, 6.0)
 		-- area binding (center/radius) provided by spawner
 		self._areaCenter = self._areaCenter or self:GetPos()
 		self._areaRadius = self._areaRadius or 300
@@ -232,6 +234,13 @@ if SERVER then
 		if now >= (self._nextLaser or 0) then
 			self:_FireLaser()
 			self._nextLaser = now + LASER_INTERVAL
+		end
+
+		-- Periodic ambient whispers/hollow sounds when players are nearby
+		if now >= (self._nextAmbient or 0) then
+			local snd = "ambient/hallow0" .. math.random(4, 8) .. ".wav"
+			self:EmitSound(snd, 60, math.random(95, 105), math.random(0.6, 1.4))
+			self._nextAmbient = now + math.Rand(2.0, 4.0)
 		end
 
 		self:NextThink(now + 0.02)
