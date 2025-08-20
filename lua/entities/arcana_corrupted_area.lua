@@ -18,11 +18,6 @@ end
 if SERVER then
 	resource.AddShader("arcana_corruption_ps30")
 
-	local function smoothstep(edge0, edge1, x)
-		x = math.Clamp((x - edge0) / math.max(1e-6, edge1 - edge0), 0, 1)
-		return x * x * (3 - 2 * x)
-	end
-
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
 		self:SetMoveType(MOVETYPE_NONE)
@@ -178,6 +173,11 @@ if CLIENT then
 	local function smoothstep(edge0, edge1, x)
 		x = math.Clamp((x - edge0) / math.max(1e-6, edge1 - edge0), 0, 1)
 		return x * x * (3 - 2 * x)
+	end
+
+	local function lerpColor(t, r1, g1, b1, r2, g2, b2)
+		local function lerp(a, b, t2) return a + (b - a) * t2 end
+		return math.floor(lerp(r1, r2, t)), math.floor(lerp(g1, g2, t)), math.floor(lerp(b1, b2, t))
 	end
 
 	-- Subtle darkening overlay for corrupted area
@@ -538,27 +538,23 @@ if CLIENT then
 
 				cam.Start3D2D(worldPos, ang, GLYPH_SCALE)
 					local txt = p.char or "*"
-					-- Stroke for contrast
-					surface.SetTextColor(0, 0, 0, math.floor(alpha * 0.9))
-					surface.SetTextPos(-19 + jx, -math.floor(p.h or 0) - 1 + jy)
-					surface.DrawText(txt)
-					surface.SetTextPos(-17 + jx, -math.floor(p.h or 0) - 1 + jy)
-					surface.DrawText(txt)
-					surface.SetTextPos(-19 + jx, -math.floor(p.h or 0) + 1 + jy)
-					surface.DrawText(txt)
-					surface.SetTextPos(-17 + jx, -math.floor(p.h or 0) + 1 + jy)
-					surface.DrawText(txt)
-					-- Inner bright text (with jitter)
-					surface.SetTextColor(240, 210, 255, alpha)
+					-- Color based on entity intensity: white -> purple -> deep blue
+					local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+					local t01 = k * 0.5 -- map [0..2] to [0..1]
+					local cr, cg, cb
+					if t01 <= 0.5 then
+						local tt = smoothstep(0.0, 0.5, t01)
+						-- White -> Near-Blue Purple (almost blue)
+						cr, cg, cb = lerpColor(tt, 255, 255, 255, 80, 100, 255)
+					else
+						local tt = smoothstep(0.5, 1.0, t01)
+						-- Near-Blue Purple -> Deep Blue
+						cr, cg, cb = lerpColor(tt, 80, 100, 255, 34, 0, 255)
+					end
+					surface.SetTextColor(cr, cg, cb, alpha)
 					surface.SetTextPos(-18 + jx, -math.floor(p.h or 0) + jy)
 					surface.DrawText(txt)
-					-- Chromatic glitch: magenta/green slight offsets (also jittered)
-					surface.SetTextColor(220, 60, 240, math.floor(alpha * 0.75))
-					surface.SetTextPos(-16 + jx * 0.8, -math.floor(p.h or 0) + 1 + jy * 0.8)
-					surface.DrawText(txt)
-					surface.SetTextColor(80, 255, 140, math.floor(alpha * 0.6))
-					surface.SetTextPos(-20 + jx * 0.6, -math.floor(p.h or 0) - 1 + jy * 0.6)
-					surface.DrawText(txt)
+
 				cam.End3D2D()
 			end
 		end
