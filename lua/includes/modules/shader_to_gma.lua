@@ -118,8 +118,8 @@ if SERVER then
 	local gmaData
 	function resource.AddShader(shaderName)
 		local path = "shaders/fxc/" .. shaderName .. ".vcs"
-		if not file.Exists(path, "GAME") then
-			error("Missing shader file:", path)
+		if not file.Exists(path, "MOD") then
+			error("Missing shader file: " .. path)
 		end
 
 		shaderFiles[shaderName] = path
