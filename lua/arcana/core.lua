@@ -360,6 +360,7 @@ if SERVER then
 	util.AddNetworkString("Arcane_PlayCastGesture")
 	util.AddNetworkString("Arcane_SpellFailed")
 	util.AddNetworkString("Arcana_AttachBandVFX")
+	util.AddNetworkString("Arcana_ClearBandVFX")
 	util.AddNetworkString("Arcana_AttachParticles")
 	util.AddNetworkString("Arcane_ConsoleCastSpell")
 	util.AddNetworkString("Arcane_ErrorNotification")
@@ -620,7 +621,7 @@ end
 
 -- Public helper: Attach BandCircle VFX to an entity (server-side entry)
 if SERVER then
-	function Arcane:SendAttachBandVFX(ent, color, size, duration, bandConfigs)
+	function Arcane:SendAttachBandVFX(ent, color, size, duration, bandConfigs, tag)
 		if not IsValid(ent) then return end
 		net.Start("Arcana_AttachBandVFX", true)
 			net.WriteEntity(ent)
@@ -638,6 +639,15 @@ if SERVER then
 				net.WriteFloat((c.spin and c.spin.r) or 0)
 				net.WriteFloat(c.lineWidth or 2)
 			end
+			net.WriteString(tostring(tag or ""))
+		net.Broadcast()
+	end
+
+	function Arcane:ClearBandVFX(ent, tag)
+		if not IsValid(ent) then return end
+		net.Start("Arcana_ClearBandVFX", true)
+			net.WriteEntity(ent)
+			net.WriteString(tostring(tag or ""))
 		net.Broadcast()
 	end
 end
@@ -1043,6 +1053,9 @@ if CLIENT then
 		ply:AnimRestartGesture(slot, gesture, true)
 	end)
 
+	-- Track active BandCircle VFX by entity and optional tag for early clearing
+	local activeBandVFX = {}
+
 	-- Client-only: receive BandCircle VFX attachments
 	net.Receive("Arcana_AttachBandVFX", function()
 		local ent = net.ReadEntity()
@@ -1064,6 +1077,9 @@ if CLIENT then
 			bc:AddBand(radius, height, { p = sp, y = sy, r = sr }, lw)
 		end
 
+		-- Read optional tag after band list
+		local tag = net.ReadString() or ""
+
 		-- Follow entity for duration
 		local hookName = "BandCircleFollow_" .. tostring(bc)
 		hook.Add("Think", hookName, function()
@@ -1075,6 +1091,29 @@ if CLIENT then
 			bc.position = ent:WorldSpaceCenter()
 			bc.angles = ent:GetAngles()
 		end)
+
+		-- Store by entity and tag for later clearing
+		activeBandVFX[ent] = activeBandVFX[ent] or {}
+		local key = tag ~= "" and tag or "__untagged__"
+		activeBandVFX[ent][key] = activeBandVFX[ent][key] or {}
+		table.insert(activeBandVFX[ent][key], bc)
+	end)
+
+	-- Clear previously attached band VFX by tag
+	net.Receive("Arcana_ClearBandVFX", function()
+		local ent = net.ReadEntity()
+		local tag = net.ReadString() or ""
+		if not IsValid(ent) then return end
+		local key = tag ~= "" and tag or "__untagged__"
+		if activeBandVFX[ent] and activeBandVFX[ent][key] then
+			for _, bc in ipairs(activeBandVFX[ent][key]) do
+				if bc and bc.Remove then bc:Remove() end
+			end
+			activeBandVFX[ent][key] = nil
+			if next(activeBandVFX[ent]) == nil then
+				activeBandVFX[ent] = nil
+			end
+		end
 	end)
 end
 
