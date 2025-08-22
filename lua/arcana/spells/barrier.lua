@@ -1,6 +1,6 @@
 -- Arcane Barrier: A timed shield that absorbs incoming damage up to a cap
 
-local BARRIER_COLOR = Color(150, 170, 255, 255)
+local BARRIER_COLOR = Color(142, 120, 225)
 
 -- Internal helpers
 local function clearBarrier(ply)
