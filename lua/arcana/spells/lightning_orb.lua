@@ -46,7 +46,16 @@ Arcane:RegisterSpell({
 
 		-- Brief casting VFX on the caster
 		Arcane:SendAttachBandVFX(caster, Color(170, 210, 255, 255), 26, 0.8, {
-			{ radius = 20, height = 6, spin = {p = 0, y = 45, r = 0}, lineWidth = 2 },
+			{
+				radius = 20,
+				height = 6,
+				spin = {
+					p = 0,
+					y = 45,
+					r = 0
+				},
+				lineWidth = 2
+			},
 		})
 
 		caster:EmitSound("ambient/energy/zap" .. math.random(1, 9) .. ".wav", 75, math.random(110, 130))
@@ -54,5 +63,3 @@ Arcane:RegisterSpell({
 		return true
 	end
 })
-
-

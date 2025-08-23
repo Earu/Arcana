@@ -1,4 +1,3 @@
--- Single-file Arcana Fireball entity (merged server/client)
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Fireball"

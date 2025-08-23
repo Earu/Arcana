@@ -1,11 +1,9 @@
--- Single-file Arcana Lightning Orb entity (server/client)
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Lightning Orb"
 ENT.Author = "Arcana"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
-
 -- Tunables
 ENT.OrbSpeed = 300
 ENT.OrbRadius = 300
@@ -52,14 +50,16 @@ if SERVER then
 			spr:SetParent(parent)
 			spr:Spawn()
 			spr:Activate()
+
 			parent:CallOnRemove(name or ("ArcanaLightningOrb_" .. model), function(_, s)
-				if IsValid(s) then s:Remove() end
+				if IsValid(s) then
+					s:Remove()
+				end
 			end, spr)
 		end
 
 		addSprite(self, "sprites/physbeam.vmt", Color(180, 220, 255), 0.5, "ArcanaLO_S1")
 		addSprite(self, "sprites/light_glow02_add.vmt", Color(150, 200, 255), 0.8, "ArcanaLO_S2")
-
 		self.Created = CurTime()
 		self._nextTick = CurTime() + (self.OrbTickInterval or 0.25)
 
@@ -102,6 +102,7 @@ if SERVER then
 		if self._detonated then return end
 		if ent == self:GetSpellOwner() then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
+
 		if isSolidNonTrigger(ent) then
 			self:Detonate()
 		end
@@ -143,8 +144,10 @@ if SERVER then
 			isValidTarget = isValidTarget and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
 			isValidTarget = isValidTarget and (not ent:IsPlayer() or ent:Alive())
 			isValidTarget = isValidTarget and (not ent:IsNPC() or ent:Health() > 0)
+
 			if isValidTarget then
 				local tpos = ent:WorldSpaceCenter()
+
 				local tr = util.TraceHull({
 					start = center,
 					endpos = tpos,
@@ -154,11 +157,14 @@ if SERVER then
 					filter = function(hit)
 						if hit == self or hit == owner then return false end
 						if IsValid(hit) and hit:GetParent() == self then return false end
+
 						return true
 					end
 				})
+
 				local clearLOS = (not tr.Hit) or (tr.Entity == ent) or (tr.Fraction >= 0.98)
 				local veryClose = ent:NearestPoint(center):DistToSqr(center) <= (radius * 0.25) ^ 2
+
 				if clearLOS or veryClose then
 					table.insert(targets, ent)
 				end
@@ -177,6 +183,7 @@ if SERVER then
 			dmg:SetAttacker(IsValid(owner) and owner or self)
 			dmg:SetInflictor(self)
 			dmg:SetDamagePosition(tpos)
+
 			if tgt.ForceTakeDamageInfo then
 				tgt:ForceTakeDamageInfo(dmg)
 			else
@@ -194,6 +201,7 @@ if SERVER then
 		end
 
 		self:NextThink(now)
+
 		return true
 	end
 
@@ -203,7 +211,6 @@ if SERVER then
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
 		util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 55)
-
 		local ed = EffectData()
 		ed:SetOrigin(pos)
 		util.Effect("cball_explode", ed, true, true)
@@ -302,5 +309,3 @@ if CLIENT then
 		end
 	end
 end
-
-
