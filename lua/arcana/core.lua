@@ -447,6 +447,12 @@ function Arcane:StartCasting(ply, spellId)
 	local spell = self.RegisteredSpells[spellId]
 	local castTime = math.max(0.1, spell.cast_time or 0)
 
+	local pdata = self:GetPlayerData(ply)
+	if pdata then
+		pdata.casting_until = CurTime() + castTime
+		pdata.casting_spell = spellId
+	end
+
 	-- Decide gesture and broadcast to clients to play locally
 	if SERVER then
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
@@ -470,9 +476,22 @@ function Arcane:StartCasting(ply, spellId)
 		-- Schedule execution after cast time
 		timer.Simple(castTime, function()
 			if not IsValid(ply) then return end
+			-- Clear casting lock before final validation and execution
+			local d = self:GetPlayerData(ply)
+			if d then
+				d.casting_until = nil
+				d.casting_spell = nil
+			end
 			-- Re-check basic conditions before executing
 			local ok = select(1, self:CanCastSpell(ply, spellId))
-			if not ok then return end
+			if not ok then
+				net.Start("Arcane_SpellFailed", true)
+				net.WriteEntity(ply)
+				net.WriteFloat(castTime)
+				net.Broadcast()
+
+				return
+			end
 			-- Recompute circle context at actual cast moment so it follows the player
 			local ctxPos = ply:GetPos() + Vector(0, 0, 2)
 			local ctxAng = Angle(0, 180, 180)
@@ -704,6 +723,10 @@ function Arcane:CanCastSpell(ply, spellId)
 	local spell = self.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
 	local data = self:GetPlayerData(ply)
+	-- Block re-casting while a previous cast is still winding up
+	if data.casting_until and data.casting_until > CurTime() then
+		return false, "Already casting"
+	end
 	-- Check if spell is unlocked
 	if not data.unlocked_spells[spellId] then return false, "Spell not unlocked" end
 	-- Check level requirement
