@@ -320,12 +320,11 @@ if CLIENT then
 					self._ambient:Play()
 					self._ambient:SetSoundLevel(65)
 					self._ambient:SetDSP(111)
-
 					local timerName = "Arcana_AmbientLoop" .. self:EntIndex()
+
 					timer.Create(timerName, 200, 0, function()
 						if not self._ambient then return end
 						if not IsValid(self) then return end
-
 						self._ambient:Stop()
 						self._ambient:Play()
 						self._ambient:SetSoundLevel(65)
@@ -528,7 +527,6 @@ if CLIENT then
 		local scroll = vgui.Create("DScrollPanel", listPanel)
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
-
 		local vbar = scroll:GetVBar()
 		vbar:SetWide(8)
 
@@ -567,7 +565,6 @@ if CLIENT then
 				row:Dock(TOP)
 				row:SetTall(60)
 				row:DockMargin(0, 0, 0, 8)
-
 				-- Create info icon for spell description tooltip
 				local infoIcon = vgui.Create("DPanel", row)
 				infoIcon:SetSize(20, 20)
@@ -582,6 +579,7 @@ if CLIENT then
 					surface.SetDrawColor(paleGold)
 					-- Draw circle outline by drawing lines in a circle pattern
 					local segments = 16
+
 					for i = 0, segments - 1 do
 						local angle1 = (i / segments) * math.pi * 2
 						local angle2 = ((i + 1) / segments) * math.pi * 2
@@ -591,6 +589,7 @@ if CLIENT then
 						local y2 = cy + math.sin(angle2) * radius
 						surface.DrawLine(x1, y1, x2, y2)
 					end
+
 					draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 
@@ -603,7 +602,6 @@ if CLIENT then
 
 				local function createTooltip()
 					if IsValid(infoIcon.tooltip) then return end
-
 					local tooltip = vgui.Create("DLabel")
 					tooltip:SetSize(300, 60)
 					tooltip:SetWrap(true)
@@ -623,14 +621,16 @@ if CLIENT then
 
 					infoIcon.tooltip = tooltip
 					updateTooltipPos(tooltip)
-
 					-- Update position if mouse moves
 					local hookName = "ArcanaTooltipPos_" .. tostring(tooltip)
+
 					hook.Add("Think", hookName, function()
 						if not IsValid(tooltip) then
 							hook.Remove("Think", hookName)
+
 							return
 						end
+
 						updateTooltipPos(tooltip)
 					end)
 				end

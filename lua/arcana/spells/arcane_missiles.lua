@@ -1,5 +1,4 @@
 -- Arcane Missiles: Launch three homing projectiles that prefer the target closest to the caster's aim
-
 Arcane:RegisterSpell({
 	id = "arcane_missiles",
 	name = "Arcane Missiles",
@@ -16,21 +15,20 @@ Arcane:RegisterSpell({
 	has_target = true,
 	is_projectile = true,
 	cast_anim = "forward",
-
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-
 		local origin = (ctx and ctx.circlePos) or caster:GetShootPos()
 		local aim = caster:GetAimVector()
-
 		-- Select target once: closest to center of screen (aim direction)
 		local best, bestDot, maxRange = nil, -1, 1600
+
 		for _, ent in ipairs(ents.FindInSphere(origin + aim * (maxRange * 0.6), maxRange)) do
 			if not IsValid(ent) or ent == caster then continue end
 			if not (ent:IsPlayer() or ent:IsNPC()) then continue end
 			if ent:Health() <= 0 then continue end
 			local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
 			local d = dir:Dot(aim)
+
 			if d > bestDot then
 				bestDot, best = d, ent
 			end
@@ -45,16 +43,23 @@ Arcane:RegisterSpell({
 				ent:SetAngles(aim:Angle())
 				ent:Spawn()
 				ent:SetOwner(caster)
-				if ent.SetSpellOwner then ent:SetSpellOwner(caster) end
-				if ent.CPPISetOwner then ent:CPPISetOwner(caster) end
-				if IsValid(best) and ent.SetHomingTarget then ent:SetHomingTarget(best) end
+
+				if ent.SetSpellOwner then
+					ent:SetSpellOwner(caster)
+				end
+
+				if ent.CPPISetOwner then
+					ent:CPPISetOwner(caster)
+				end
+
+				if IsValid(best) and ent.SetHomingTarget then
+					ent:SetHomingTarget(best)
+				end
 			end)
 		end
 
 		sound.Play("weapons/physcannon/energy_sing_flyby1.wav", origin, 70, 160)
+
 		return true
 	end
 })
-
-
-

@@ -22,57 +22,29 @@ local function registerRitual(id, name, description, is_night)
 		end)
 	end
 
-	Arcane:RegisterSpell({
+	Arcane:RegisterRitualSpell({
 		id = id,
 		name = name,
 		description = description,
 		category = Arcane.CATEGORIES.UTILITY,
 		level_required = 10,
 		knowledge_cost = 4,
-		cooldown = 60 * 20, -- 20 minutes
+		cooldown = 60 * 20,
 		cost_type = Arcane.COST_TYPES.COINS,
-		cost_amount = 100, -- cost is in the ritual requirements itself
+		cost_amount = 100,
 		cast_time = 1.5,
-		has_target = false,
 		cast_anim = "becon",
-		can_cast = function(caster)
-			if not IsValid(caster) then return false, "Invalid caster" end
-
-			return true
-		end,
-		cast = function(caster)
-			if CLIENT then return true end
-			local pos = caster:GetEyeTrace().HitPos
-			local ent = ents.Create("arcana_ritual")
-			if not IsValid(ent) then return false end
-
-			ent:SetPos(pos)
-			ent:SetAngles(Angle(0, caster:EyeAngles().y, 0))
-			ent:SetColor(is_night and Color(180, 160, 255) or Color(222, 198, 120))
-			ent:Spawn()
-			ent:Activate()
-
-			if ent.CPPISetOwner then
-				ent:CPPISetOwner(caster)
-			end
-
-			ent:Configure({
-				id = is_night and "ritual_of_night" or "ritual_of_day",
-				owner = caster,
-				lifetime = 300,
-				coin_cost = 2000,
-				items = {
-					battery = 1,
-					radioactive = 1,
-					waterbottle = 1,
-				},
-				on_activate = function(selfEnt)
-					setTime(is_night and 0 or 12)
-					sound.Play("ambient/levels/canals/windchime2.wav", selfEnt:GetPos(), 70, 105, 0.6)
-				end,
-			})
-
-			return true
+		ritual_color = is_night and Color(180, 160, 255) or Color(222, 198, 120),
+		ritual_lifetime = 300,
+		ritual_coin_cost = 2000,
+		ritual_items = {
+			battery = 1,
+			radioactive = 1,
+			waterbottle = 1,
+		},
+		on_activate = function(selfEnt)
+			setTime(is_night and 0 or 12)
+			sound.Play("ambient/levels/canals/windchime2.wav", selfEnt:GetPos(), 70, 105, 0.6)
 		end,
 	})
 end

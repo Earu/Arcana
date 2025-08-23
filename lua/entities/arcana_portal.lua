@@ -1,11 +1,9 @@
 AddCSLuaFile()
-
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Arcana Portal"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
-
 ENT.DefaultRadius = 64
 
 function ENT:SetupDataTables()
@@ -47,6 +45,7 @@ if SERVER then
 		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
 		ent:Spawn()
 		ent:Activate()
+
 		return ent
 	end
 
@@ -56,6 +55,7 @@ if SERVER then
 		local up = portal:GetUp()
 		local entPos = ent:WorldSpaceCenter()
 		local vertical = up:Dot(entPos - portalPos)
+
 		return vertical >= -8 and vertical <= 128
 	end
 
@@ -65,6 +65,7 @@ if SERVER then
 		if ent:IsNPC() then return true end
 		if ent:GetMoveType() == MOVETYPE_VPHYSICS then return true end
 		if ent:GetClass() == "arcana_portal" then return false end
+
 		return false
 	end
 
@@ -85,12 +86,15 @@ if SERVER then
 	function ENT:Think()
 		local radius = math.max(16, self:GetRadius())
 		local center = self:GetPos()
+
 		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
 			if shouldTeleportEntity(ent) and isAbovePortal(ent, self) then
 				self:TryTeleport(ent)
 			end
 		end
+
 		self:NextThink(CurTime() + 0.1)
+
 		return true
 	end
 
@@ -99,8 +103,8 @@ if SERVER then
 	function ENT:_PlayTeleportVFX(ent)
 		if not IsValid(self) or not IsValid(ent) then return end
 		net.Start("Arcana_Portal_Teleported")
-			net.WriteEntity(self)
-			net.WriteEntity(ent)
+		net.WriteEntity(self)
+		net.WriteEntity(ent)
 		net.Broadcast()
 	end
 
@@ -108,12 +112,10 @@ if SERVER then
 		if not shouldTeleportEntity(ent) then return end
 		if not isAbovePortal(ent, self) then return end
 		if ent == self or ent:GetClass() == "arcana_portal" then return end
-
 		local now = CurTime()
 		if ent._arcanaNextTeleport and now < ent._arcanaNextTeleport then return end
 		local nextOk = self._nextEligible[ent] or 0
 		if now < nextOk then return end
-
 		local dest = self:GetDestination() or self:GetPos()
 		local destAng = self:GetDestinationAngles() or Angle(0, 0, 0)
 		local exitPos = dest + Vector(0, 0, 4)
@@ -131,6 +133,7 @@ if SERVER then
 		else
 			if ent.GetPhysicsObject then
 				local phys = ent:GetPhysicsObject()
+
 				if IsValid(phys) then
 					local vel = phys:GetVelocity()
 					ent:SetPos(exitPos)
@@ -144,6 +147,7 @@ if SERVER then
 				ent:SetPos(exitPos)
 				ent:SetAngles(destAng)
 			end
+
 			sound.Play(TELEPORT_SOUND, exitPos, 70, 105)
 		end
 
@@ -162,19 +166,20 @@ if CLIENT then
 	end
 
 	function ENT:OnRemove()
-		if self._circle and self._circle.Destroy then self._circle:Destroy() end
+		if self._circle and self._circle.Destroy then
+			self._circle:Destroy()
+		end
+
 		self._circle = nil
 	end
 
 	local function ensureCircle(self)
 		if not MagicCircle or not MagicCircle.new then return end
 		if self._circle and self._circle.IsActive and self._circle:IsActive() then return end
-
 		local pos = self:GetPos() + self:GetUp() * 2
 		local ang = self:GetAngles()
 		ang:RotateAroundAxis(ang:Forward(), 180)
 		local size = math.max(24, self:GetRadius())
-
 		self._circle = MagicCircle.new(pos, ang, circleColor, 3, size, 2.0)
 		MagicCircleManager:Add(self._circle)
 	end
@@ -182,6 +187,7 @@ if CLIENT then
 	function ENT:Think()
 		ensureCircle(self)
 		self:NextThink(CurTime() + 0.2)
+
 		return true
 	end
 
@@ -189,7 +195,6 @@ if CLIENT then
 		local portal = net.ReadEntity()
 		local ent = net.ReadEntity()
 		if not IsValid(portal) then return end
-
 		local baseAng = portal:GetAngles()
 		local flatAng = Angle(baseAng)
 		flatAng:RotateAroundAxis(flatAng:Up(), 90)

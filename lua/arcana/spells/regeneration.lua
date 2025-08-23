@@ -12,10 +12,8 @@ Arcane:RegisterSpell({
 	range = 0,
 	icon = "icon16/heart.png",
 	cast_anim = "becon",
-
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-
 		local duration = 20
 		local perTick = 5
 		local id = "Arcana_Regeneration_" .. caster:SteamID64()
@@ -25,6 +23,7 @@ Arcane:RegisterSpell({
 			if not IsValid(caster) then return end
 			local new = math.min(caster:GetMaxHealth(), caster:Health() + perTick)
 			caster:SetHealth(new)
+
 			if CurTime() >= endTime or not IsValid(caster) then
 				timer.Remove(id)
 			end
@@ -32,8 +31,18 @@ Arcane:RegisterSpell({
 
 		-- Subtle VFX band
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
+
 		Arcane:SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
-			{ radius = r * 0.9, height = 3, spin = {p = 0, y = 35, r = 0}, lineWidth = 2 },
+			{
+				radius = r * 0.9,
+				height = 3,
+				spin = {
+					p = 0,
+					y = 35,
+					r = 0
+				},
+				lineWidth = 2
+			},
 		})
 
 		return true

@@ -1,12 +1,12 @@
 local function resolveStrikeGround(ply)
 	local tr = ply:GetEyeTrace()
+
 	return tr.HitPos, tr.HitNormal
 end
 
 local function spawnTeslaBurst(pos)
 	local tesla = ents.Create("point_tesla")
 	if not IsValid(tesla) then return end
-
 	tesla:SetPos(pos)
 	tesla:SetKeyValue("targetname", "arcana_lightning")
 	tesla:SetKeyValue("m_SoundName", "DoSpark")
@@ -34,10 +34,8 @@ local function impactVFX(pos, normal)
 	ed:SetOrigin(pos)
 	util.Effect("cball_explode", ed, true, true)
 	util.Effect("ManhackSparks", ed, true, true)
-
 	util.Decal("Scorch", pos + normal * 8, pos - normal * 8)
 	util.ScreenShake(pos, 6, 90, 0.35, 600)
-
 	sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, 95, 100)
 end
 
@@ -45,28 +43,27 @@ end
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
 	local baseDamage = 60
-
 	util.BlastDamage(attacker, attacker, hitPos, radius, baseDamage)
-
 	-- Chain to up to 3 nearby living targets
 	local candidates = {}
+
 	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do
 		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
 			table.insert(candidates, ent)
 		end
 	end
-	table.sort(candidates, function(a, b)
-		return a:GetPos():DistToSqr(hitPos) < b:GetPos():DistToSqr(hitPos)
-	end)
 
+	table.sort(candidates, function(a, b) return a:GetPos():DistToSqr(hitPos) < b:GetPos():DistToSqr(hitPos) end)
 	local maxChains = 3
+
 	for i = 1, math.min(maxChains, #candidates) do
 		local tgt = candidates[i]
 		local tpos = tgt:WorldSpaceCenter()
+
 		timer.Simple(0.03 * i, function()
 			if not IsValid(tgt) then return end
-
 			local tesla = spawnTeslaBurst(tpos)
+
 			if IsValid(tesla) and tesla.CPPISetOwner then
 				tesla:CPPISetOwner(attacker)
 			end
@@ -96,26 +93,36 @@ Arcane:RegisterSpell({
 	range = 1500,
 	icon = "icon16/weather_lightning.png",
 	has_target = true,
-
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-
 		local targetPos = resolveStrikeGround(caster)
 
 		-- Perform 1 strong strike and 2 lighter offset strikes for style
 		local strikes = {
-			{ delay = 0.00, offset = Vector(0, 0, 0), power = 1.0 },
-			{ delay = 0.10, offset = Vector(math.Rand(-60, 60), math.Rand(-60, 60), 0), power = 0.5 },
-			{ delay = 0.18, offset = Vector(math.Rand(-60, 60), math.Rand(-60, 60), 0), power = 0.5 },
+			{
+				delay = 0.00,
+				offset = Vector(0, 0, 0),
+				power = 1.0
+			},
+			{
+				delay = 0.10,
+				offset = Vector(math.Rand(-60, 60), math.Rand(-60, 60), 0),
+				power = 0.5
+			},
+			{
+				delay = 0.18,
+				offset = Vector(math.Rand(-60, 60), math.Rand(-60, 60), 0),
+				power = 0.5
+			},
 		}
 
 		for _, s in ipairs(strikes) do
 			timer.Simple(s.delay, function()
 				if not IsValid(caster) then return end
-
 				-- Tesla burst at impact, plus supporting effects
 				local normal = Vector(0, 0, 1)
 				local tesla = spawnTeslaBurst(targetPos + s.offset)
+
 				if IsValid(tesla) and tesla.CPPISetOwner then
 					tesla:CPPISetOwner(caster)
 				end
@@ -140,27 +147,31 @@ if CLIENT then
 	hook.Add("Arcane_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "lightning_strike" then return end
 		if not MagicCircle then return end
-
 		local color = Color(170, 200, 255, 255)
 		local pos = resolveStrikeGround(caster, 1500) or (caster:GetPos() + Vector(0, 0, 2))
 		local ang = Angle(0, 0, 0)
 		local size = 26
 		local intensity = 4
-
 		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
 		if not circle then return end
-		if circle.StartEvolving then circle:StartEvolving(castTime, true) end
+
+		if circle.StartEvolving then
+			circle:StartEvolving(castTime, true)
+		end
 
 		-- Follow the ground position under the caster's aim until cast ends
 		local hookName = "Arcana_LS_CircleFollow_" .. tostring(circle)
 		local endTime = CurTime() + castTime + 0.05
+
 		hook.Add("Think", hookName, function()
 			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
 				hook.Remove("Think", hookName)
+
 				return
 			end
 
 			local gpos = resolveStrikeGround(caster, 1500)
+
 			if gpos then
 				circle.position = gpos + Vector(0, 0, 0.5)
 				circle.angles = Angle(0, 0, 0)

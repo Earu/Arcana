@@ -2,7 +2,6 @@ if SERVER then
 	AddCSLuaFile("arcana/core.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/hud.lua")
-
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
 	resource.AddFile("sound/arcana/arcane_3.ogg")
@@ -18,8 +17,12 @@ end
 -- Load all spells from arcana/spells/*.lua so each spell can live in its own file
 do
 	local files = file.Find("arcana/spells/*.lua", "LUA")
+
 	for _, fname in ipairs(files) do
-		if SERVER then AddCSLuaFile("arcana/spells/" .. fname) end
+		if SERVER then
+			AddCSLuaFile("arcana/spells/" .. fname)
+		end
+
 		include("arcana/spells/" .. fname)
 	end
 end
@@ -41,9 +44,10 @@ end)
 
 if SERVER then
 	-- Starter spell for new players
-	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function( wep, ply)
+	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function(wep, ply)
 		if wep:GetClass() == "grimoire" and IsValid(ply) then
 			local data = Arcane:GetPlayerData(ply)
+
 			if data and not data.unlocked_spells["fireball"] then
 				Arcane:UnlockSpell(ply, "fireball", true)
 			end
