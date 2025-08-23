@@ -73,8 +73,7 @@ function ENT:Think()
 						dmg:SetDamageType(DMG_BLAST)
 						dmg:SetAttacker(self.CPPIGetOwner and IsValid(self.CPPIGetOwner()) and self.CPPIGetOwner() or self)
 						dmg:SetInflictor(self)
-						local takeDamage = ent.ForceTakeDamageInfo or ent.TakeDamageInfo
-						takeDamage(ent, dmg)
+						ent:TakeDamageInfo(dmg)
 					end
 				end
 			end
