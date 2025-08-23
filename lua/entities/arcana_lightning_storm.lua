@@ -26,8 +26,8 @@ function ENT:Initialize()
 		self:SetNWInt("Radius", 2000) -- Increased radius for larger cloud area
 		self:SetNWInt("CloudHeight", 400) -- Height of the cloud
 		self:SetNWInt("Damage", 1000) -- Damage per lightning strike
-		self:SetNWFloat("MinStrikeInterval", 8) -- Minimum time between strikes
-		self:SetNWFloat("MaxStrikeInterval", 20) -- Maximum time between strikes
+		self:SetNWFloat("MinStrikeInterval", 2) -- Minimum time between strikes
+		self:SetNWFloat("MaxStrikeInterval", 8) -- Maximum time between strikes
 		self:SetNWFloat("DarknessIntensity", 0.25) -- How dark it gets under the cloud (0-1)
 		-- Start the lightning strikes with random interval
 		self:SetNextStrikeTime()

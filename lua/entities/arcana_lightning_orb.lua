@@ -176,19 +176,12 @@ if SERVER then
 		end
 
 		for _, tgt in ipairs(targets) do
-			local tpos = tgt:WorldSpaceCenter()
 			local dmg = DamageInfo()
 			dmg:SetDamage(self.OrbTickDamage or 12)
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
 			dmg:SetAttacker(IsValid(owner) and owner or self)
 			dmg:SetInflictor(self)
-			dmg:SetDamagePosition(tpos)
-
-			if tgt.ForceTakeDamageInfo then
-				tgt:ForceTakeDamageInfo(dmg)
-			else
-				tgt:TakeDamageInfo(dmg)
-			end
+			tgt:TakeDamageInfo(dmg)
 		end
 	end
 
