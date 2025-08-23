@@ -1,5 +1,4 @@
 AddCSLuaFile()
-
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Corrupted Wisp"
@@ -8,10 +7,7 @@ ENT.Spawnable = false
 ENT.AdminOnly = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 
-local GLYPHS = {
-	"Γ", "Δ", "Θ", "Λ", "Ξ", "Π", "Σ", "Φ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ",
-	"η", "θ", "ι", "κ", "λ", "μ", "ξ", "π", "φ", "ψ", "ω"
-}
+local GLYPHS = {"Γ", "Δ", "Θ", "Λ", "Ξ", "Π", "Σ", "Φ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ξ", "π", "φ", "ψ", "ω"}
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "LaserTime")
@@ -59,6 +55,7 @@ if SERVER then
 		self:SetHealth(new)
 		-- brief hit feedback: small tesla burst
 		local tes = ents.Create("point_tesla")
+
 		if IsValid(tes) then
 			tes:SetPos(self:GetPos())
 			tes:SetKeyValue("m_SoundName", "DoSpark")
@@ -78,6 +75,7 @@ if SERVER then
 			tes:Fire("DoSpark", "", 0)
 			tes:Fire("Kill", "", 0.15)
 		end
+
 		if new <= 0 and not self._arcanaDead then
 			self._arcanaDead = true
 			-- death flash
@@ -102,6 +100,7 @@ if SERVER then
 		for _, ply in ipairs(player.GetAll()) do
 			if isValidEnemy(ply) then
 				local d2 = myPos:DistToSqr(ply:GetPos())
+
 				if d2 < nd2 then
 					nearest, nd2 = ply, d2
 				end
@@ -112,6 +111,7 @@ if SERVER then
 		if IsValid(nearest) then
 			local center = self._areaCenter or self:GetPos()
 			local r = self._areaRadius or 300
+
 			if nearest:GetPos():DistToSqr(center) <= r * r then
 				self._target = nearest
 			else
@@ -126,13 +126,19 @@ if SERVER then
 		local center = self._areaCenter or self:GetPos()
 		local r = self._areaRadius or 300
 		local myPos = self:GetPos()
+
 		-- If outside bounds, steer back in
 		if myPos:DistToSqr(center) > r * r then
 			local dir = (center - myPos)
 			local dist = dir:Length()
-			if dist > 1 then dir:Mul(1 / dist) end
+
+			if dist > 1 then
+				dir:Mul(1 / dist)
+			end
+
 			self:SetPos(myPos + dir * (CHASE_SPEED * 1.2) * dt)
 			self:SetAngles(dir:Angle())
+
 			return
 		end
 
@@ -141,14 +147,16 @@ if SERVER then
 		local desired = targetPos + Vector(0, 0, 20 + math.sin(CurTime() * 100) * 20)
 		local dir = (desired - self:GetPos())
 		local dist = dir:Length()
+
 		if dist < 2000 then
 			local speed = CHASE_SPEED
+
 			if dist > 100 then
 				dir:Mul(1 / dist)
 				self:SetPos(self:GetPos() + dir * speed * dt)
 				self:SetAngles(dir:Angle())
 			else
-				local right = dir:Cross(Vector(0,0,1)):GetNormalized()
+				local right = dir:Cross(Vector(0, 0, 1)):GetNormalized()
 				self:SetPos(self:GetPos() + right * speed * dt)
 				self:SetAngles((-right):Angle())
 			end
@@ -161,19 +169,19 @@ if SERVER then
 		local center = self._areaCenter or self:GetPos()
 		local r = self._areaRadius or 300
 		if self._target:GetPos():DistToSqr(center) > r * r then return end
-
 		local myPos = self:GetPos()
 		local shootPos = myPos + self:GetForward() * 6
 		local aimPos = self._target:EyePos()
+
 		local tr = util.TraceLine({
 			start = shootPos,
 			endpos = aimPos,
-			filter = { self },
+			filter = {self},
 			mask = MASK_SHOT
 		})
+
 		local hitPos = tr.HitPos or aimPos
 		if shootPos:DistToSqr(hitPos) > LASER_RANGE * LASER_RANGE then return end
-
 		self:SetLaserStart(shootPos)
 		self:SetLaserEnd(hitPos)
 		self:SetLaserTime(CurTime())
@@ -185,7 +193,6 @@ if SERVER then
 			dmg:SetAttacker(self)
 			dmg:SetInflictor(self)
 			--dmg:SetDamagePosition(hitPos)
-
 			local takeDamageInfo = tr.Entity.ForceTakeDamageInfo or tr.Entity.TakeDamageInfo
 			takeDamageInfo(tr.Entity, dmg)
 		end
@@ -227,7 +234,6 @@ if SERVER then
 		local now = CurTime()
 		local dt = math.Clamp(now - (self._lastThink or now), 0, 0.2)
 		self._lastThink = now
-
 		self:_PickTarget()
 		self:_Chase(dt)
 
@@ -244,15 +250,26 @@ if SERVER then
 		end
 
 		self:NextThink(now + 0.02)
+
 		return true
 	end
 end
 
 if CLIENT then
 	local SPRITE_MAT = Material("sprites/light_glow02_add")
+
 	-- remove cable beam usage; we'll render a sprite chain instead
-	local COL_PURPLE = { r = 110, g = 60, b = 190 }
-	local COL_DEEPBLUE = { r = 30, g = 50, b = 120 }
+	local COL_PURPLE = {
+		r = 110,
+		g = 60,
+		b = 190
+	}
+
+	local COL_DEEPBLUE = {
+		r = 30,
+		g = 50,
+		b = 120
+	}
 
 	surface.CreateFont("Arcana_WispGlyph", {
 		font = "Arial",
@@ -296,7 +313,6 @@ if CLIENT then
 		self:DrawModel()
 		render.SetLightingMode(0)
 		render.SuppressEngineLighting(false)
-
 		-- Core glow sprites layered over the sphere
 		render.SetMaterial(SPRITE_MAT)
 		local t = CurTime()
@@ -304,51 +320,50 @@ if CLIENT then
 		local baseSize = 64 + 40 * pulse
 		render.DrawSprite(self:GetPos(), baseSize * 1.4, baseSize * 1.4, Color(COL_DEEPBLUE.r, COL_DEEPBLUE.g, COL_DEEPBLUE.b, 235))
 		render.DrawSprite(self:GetPos(), baseSize * 0.9, baseSize * 0.9, Color(COL_DEEPBLUE.r, COL_DEEPBLUE.g, COL_DEEPBLUE.b, 190))
-
 		local ply = LocalPlayer()
 		local ang = Angle(0, 0, 0)
+
 		if IsValid(ply) then
 			ang = (ply:GetPos() - self:GetPos()):Angle()
 		end
+
 		ang:RotateAroundAxis(ang:Right(), -90)
 		ang:RotateAroundAxis(ang:Up(), 90)
-
 		local jx = (self._jxAmp or 3) * math.sin(t * (self._jxW or 12) + (self._jxP or 0))
 		local jy = (self._jyAmp or 3) * math.cos(t * (self._jyW or 14) + (self._jyP or 0))
-
 		cam.IgnoreZ(true)
 		cam.Start3D2D(self:GetPos(), ang, 0.12)
-			surface.SetFont("Arcana_WispGlyph")
-			local txt = self._glyphChar or "*"
-			local tw, th = surface.GetTextSize(txt)
-			local cx = -tw * 0.5
-			local cy = -th * 0.5
-			-- Stroke around center
-			surface.SetTextColor(0, 0, 0, 230)
-			surface.SetTextPos(cx - 1 + jx, cy - 1 + jy)
-			surface.DrawText(txt)
-			surface.SetTextPos(cx + 1 + jx, cy - 1 + jy)
-			surface.DrawText(txt)
-			surface.SetTextPos(cx - 1 + jx, cy + 1 + jy)
-			surface.DrawText(txt)
-			surface.SetTextPos(cx + 1 + jx, cy + 1 + jy)
-			surface.DrawText(txt)
-			-- Bright core
-			surface.SetTextColor(220, 190, 255, 255)
-			surface.SetTextPos(cx + jx, cy + jy)
-			surface.DrawText(txt)
-			-- Chromatic offsets
-			surface.SetTextColor(COL_PURPLE.r, COL_PURPLE.g, COL_PURPLE.b, 170)
-			surface.SetTextPos(cx + 2 + jx * 0.8, cy + 2 + jy * 0.8)
-			surface.DrawText(txt)
-			surface.SetTextColor(80, 140, 255, 160)
-			surface.SetTextPos(cx - 2 + jx * 0.6, cy - 2 + jy * 0.6)
-			surface.DrawText(txt)
+		surface.SetFont("Arcana_WispGlyph")
+		local txt = self._glyphChar or "*"
+		local tw, th = surface.GetTextSize(txt)
+		local cx = -tw * 0.5
+		local cy = -th * 0.5
+		-- Stroke around center
+		surface.SetTextColor(0, 0, 0, 230)
+		surface.SetTextPos(cx - 1 + jx, cy - 1 + jy)
+		surface.DrawText(txt)
+		surface.SetTextPos(cx + 1 + jx, cy - 1 + jy)
+		surface.DrawText(txt)
+		surface.SetTextPos(cx - 1 + jx, cy + 1 + jy)
+		surface.DrawText(txt)
+		surface.SetTextPos(cx + 1 + jx, cy + 1 + jy)
+		surface.DrawText(txt)
+		-- Bright core
+		surface.SetTextColor(220, 190, 255, 255)
+		surface.SetTextPos(cx + jx, cy + jy)
+		surface.DrawText(txt)
+		-- Chromatic offsets
+		surface.SetTextColor(COL_PURPLE.r, COL_PURPLE.g, COL_PURPLE.b, 170)
+		surface.SetTextPos(cx + 2 + jx * 0.8, cy + 2 + jy * 0.8)
+		surface.DrawText(txt)
+		surface.SetTextColor(80, 140, 255, 160)
+		surface.SetTextPos(cx - 2 + jx * 0.6, cy - 2 + jy * 0.6)
+		surface.DrawText(txt)
 		cam.End3D2D()
 		cam.IgnoreZ(false)
-
 		-- Dynamic light
 		local d = DynamicLight(self:EntIndex())
+
 		if d then
 			d.pos = self:GetPos()
 			d.r = 120
@@ -366,9 +381,11 @@ if CLIENT then
 		local toSpawn = math.floor(self._miniAccum)
 		self._miniAccum = self._miniAccum - toSpawn
 		self._miniGlyphs = self._miniGlyphs or {}
+
 		for i = 1, math.min(toSpawn, math.max(0, (self._miniMax or 18) - #self._miniGlyphs)) do
 			ang = math.Rand(0, math.pi * 2)
 			local r = math.Rand(10, 24)
+
 			local entry = {
 				char = pickGlyph(),
 				born = t,
@@ -380,6 +397,7 @@ if CLIENT then
 				rot = math.Rand(0, 360),
 				rotW = math.Rand(-60, 60)
 			}
+
 			self._miniGlyphs[#self._miniGlyphs + 1] = entry
 		end
 
@@ -387,27 +405,32 @@ if CLIENT then
 			for idx = #self._miniGlyphs, 1, -1 do
 				local g = self._miniGlyphs[idx]
 				local age = t - (g.born or t)
+
 				if age >= (g.life or 1) then
 					table.remove(self._miniGlyphs, idx)
 				else
 					local fade = 1 - (age / math.max(0.001, g.life or 1))
 					local pos = self:GetPos() + Vector(g.x or 0, g.y or 0, (g.z or 0) + (g.speed or 20) * age)
 					local tang = Angle(0, 0, 0)
-					if IsValid(ply) then tang = (ply:GetPos() - pos):Angle() end
+
+					if IsValid(ply) then
+						tang = (ply:GetPos() - pos):Angle()
+					end
+
 					tang:RotateAroundAxis(tang:Right(), -90)
 					tang:RotateAroundAxis(tang:Up(), 90)
 					cam.Start3D2D(pos, tang, 0.045)
-						surface.SetFont("Arcana_WispGlyphSmall")
-						txt = g.char or "*"
-						tw, th = surface.GetTextSize(txt)
-						cx = -tw * 0.5
-						cy = -th * 0.5
-						surface.SetTextColor(0, 0, 0, math.floor(160 * fade))
-						surface.SetTextPos(cx + 1, cy + 1)
-						surface.DrawText(txt)
-						surface.SetTextColor(60, 80, 150, math.floor(200 * fade))
-						surface.SetTextPos(cx, cy)
-						surface.DrawText(txt)
+					surface.SetFont("Arcana_WispGlyphSmall")
+					txt = g.char or "*"
+					tw, th = surface.GetTextSize(txt)
+					cx = -tw * 0.5
+					cy = -th * 0.5
+					surface.SetTextColor(0, 0, 0, math.floor(160 * fade))
+					surface.SetTextPos(cx + 1, cy + 1)
+					surface.DrawText(txt)
+					surface.SetTextColor(60, 80, 150, math.floor(200 * fade))
+					surface.SetTextPos(cx, cy)
+					surface.DrawText(txt)
 					cam.End3D2D()
 				end
 			end

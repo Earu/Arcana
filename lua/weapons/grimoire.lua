@@ -458,6 +458,7 @@ if CLIENT then
 		surface.DrawLine(x + w - c, y, x + w, y + c)
 		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
 		surface.DrawLine(x + c, y + h, x, y + h - c)
+
 		-- Small center diamond accents mid-top and mid-bottom (optional)
 		if drawAccents ~= false then
 			local mx = x + w * 0.5
@@ -1036,7 +1037,6 @@ if CLIENT then
 		local listScroll = vgui.Create("DScrollPanel", middle)
 		listScroll:Dock(FILL)
 		listScroll:DockMargin(12, 36, 12, 12)
-
 		local vbar = listScroll:GetVBar()
 		vbar:SetWide(8)
 
@@ -1076,7 +1076,6 @@ if CLIENT then
 			row:SetText("")
 			row.SpellId = item.id
 			row:Droppable("arcana_spell")
-
 			-- Create info icon for spell description tooltip
 			local infoIcon = vgui.Create("DPanel", row)
 			infoIcon:SetSize(20, 20)
@@ -1091,6 +1090,7 @@ if CLIENT then
 				surface.SetDrawColor(paleGold)
 				-- Draw circle outline by drawing lines in a circle pattern
 				local segments = 16
+
 				for i = 0, segments - 1 do
 					local angle1 = (i / segments) * math.pi * 2
 					local angle2 = ((i + 1) / segments) * math.pi * 2
@@ -1100,13 +1100,13 @@ if CLIENT then
 					local y2 = cy + math.sin(angle2) * radius
 					surface.DrawLine(x1, y1, x2, y2)
 				end
+
 				draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
 			-- Tooltip functionality
 			infoIcon.OnCursorEntered = function()
 				if IsValid(infoIcon.tooltip) then return end
-
 				local tooltip = vgui.Create("DLabel")
 				tooltip:SetSize(300, 60)
 				tooltip:SetWrap(true)
@@ -1139,8 +1139,10 @@ if CLIENT then
 				hook.Add("Think", "ArcanaTooltipPos_" .. tostring(tooltip), function()
 					if not IsValid(tooltip) then
 						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
+
 						return
 					end
+
 					updateTooltipPos()
 				end)
 			end
@@ -1172,17 +1174,20 @@ if CLIENT then
 			castBtn:SetTall(28)
 			castBtn:SetWide(72)
 			castBtn:SetCursor("hand")
+
 			castBtn.DoClick = function()
 				-- Request server to cast this spell
 				net.Start("Arcane_ConsoleCastSpell")
 				net.WriteString(item.id)
 				net.SendToServer()
 			end
+
 			castBtn.Paint = function(pnl, w, h)
 				local disabled = not pnl:IsEnabled()
 				local bg = disabled and Color(40, 32, 24, 200) or Color(50, 40, 28, 220)
 				local col = disabled and textDim or paleGold
 				local border = gold
+
 				if not disabled and pnl:IsHovered() then
 					bg = cardHover
 					col = textBright
@@ -1193,7 +1198,6 @@ if CLIENT then
 				Arcana_FillDecoPanel(0, 0, w, h, bg, 6)
 				Arcana_DrawDecoFrame(0, 0, w, h, border, 6, false)
 				surface.DisableClipping(false)
-
 				pnl:SetTextColor(col)
 			end
 
@@ -1201,12 +1205,20 @@ if CLIENT then
 			castBtn.Think = function(pnl)
 				local data = Arcane and Arcane:GetPlayerData(owner) or nil
 				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
+
 				if cd and cd > CurTime() then
 					local remaining = math.max(0, math.ceil(cd - CurTime()))
-					if pnl:IsEnabled() then pnl:SetEnabled(false) end
+
+					if pnl:IsEnabled() then
+						pnl:SetEnabled(false)
+					end
+
 					pnl:SetText(tostring(remaining) .. "s")
 				else
-					if not pnl:IsEnabled() then pnl:SetEnabled(true) end
+					if not pnl:IsEnabled() then
+						pnl:SetEnabled(true)
+					end
+
 					pnl:SetText("Cast")
 				end
 			end
@@ -1219,6 +1231,7 @@ if CLIENT then
 					local nameW, nameH = surface.GetTextSize(sp.name)
 					infoIcon:SetPos(16 + nameW, 8 + (nameH - 20) / 2)
 				end
+
 				if IsValid(castBtn) then
 					local btnW, btnH = castBtn:GetWide(), castBtn:GetTall()
 					castBtn:SetPos(w - btnW - 12, (h - btnH) * 0.5)

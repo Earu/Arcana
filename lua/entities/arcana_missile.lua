@@ -1,11 +1,9 @@
 ENT.Type = "anim"
 ENT.Base = "base_anim"
-
 ENT.PrintName = "Arcane Missile"
 ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
-
 -- Tunables
 ENT.MissileSpeed = 600
 ENT.MissileDamage = 22
@@ -33,8 +31,8 @@ if SERVER then
 		self.Created = CurTime()
 		self:SetTrigger(true)
 		self:EmitSound("weapons/physcannon/energy_sing_flyby1.wav", 65, 180)
-
 		local phys = self:GetPhysicsObject()
+
 		if IsValid(phys) then
 			phys:SetMass(1)
 			phys:Wake()
@@ -42,20 +40,41 @@ if SERVER then
 		end
 
 		Arcane:SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
-			{ radius = 10, height = 3, spin = {p = 0, y = 80 * 3, r = 60 * 3}, lineWidth = 2 },
-			{ radius = 10, height = 3, spin = {p = 60 * 3, y = -45 * 3, r = 0}, lineWidth = 2 },
+			{
+				radius = 10,
+				height = 3,
+				spin = {
+					p = 0,
+					y = 80 * 3,
+					r = 60 * 3
+				},
+				lineWidth = 2
+			},
+			{
+				radius = 10,
+				height = 3,
+				spin = {
+					p = 60 * 3,
+					y = -45 * 3,
+					r = 0
+				},
+				lineWidth = 2
+			},
 		})
 	end
 
 	function ENT:Think()
 		if (CurTime() - (self.Created or 0)) > (self.MaxLifetime or 5) then
 			self:Remove()
+
 			return
 		end
 
 		local phys = self:GetPhysicsObject()
+
 		if IsValid(phys) then
 			local target = self:GetHomingTarget()
+
 			if IsValid(target) then
 				local desiredDir = (target:WorldSpaceCenter() - self:GetPos()):GetNormalized()
 				local curDir = phys:GetVelocity():GetNormalized()
@@ -68,6 +87,7 @@ if SERVER then
 		end
 
 		self:NextThink(CurTime())
+
 		return true
 	end
 
@@ -104,8 +124,8 @@ if CLIENT then
 		render.SetLightingMode(2)
 		self:DrawModel()
 		render.SetLightingMode(0)
-
 		local dlight = DynamicLight(self:EntIndex())
+
 		if dlight then
 			dlight.pos = self:GetPos()
 			dlight.r = ARCANE_COLOR.r

@@ -13,11 +13,10 @@ Arcane:RegisterSpell({
 	icon = "icon16/fire.png",
 	is_projectile = true,
 	has_target = true,
-
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-
 		local startPos
+
 		if ctx and ctx.circlePos then
 			startPos = ctx.circlePos + caster:GetForward() * 5
 		else
@@ -29,19 +28,44 @@ Arcane:RegisterSpell({
 		ent:SetPos(startPos)
 		ent:Spawn()
 		ent:SetOwner(caster)
-		if ent.SetSpellOwner then ent:SetSpellOwner(caster) end
-		if ent.CPPISetOwner then ent:CPPISetOwner(caster) end
 
-		if ent.LaunchTowards then ent:LaunchTowards(caster:GetAimVector()) end
+		if ent.SetSpellOwner then
+			ent:SetSpellOwner(caster)
+		end
+
+		if ent.CPPISetOwner then
+			ent:CPPISetOwner(caster)
+		end
+
+		if ent.LaunchTowards then
+			ent:LaunchTowards(caster:GetAimVector())
+		end
 
 		Arcane:SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {
-			{ radius = 15, height = 4, spin = {p = 0, y = 80 * 50, r = 60 * 50}, lineWidth = 2 },
-			{ radius = 13, height = 3, spin = {p = 60 * 50, y = -45 * 50, r = 0}, lineWidth = 2 },
+			{
+				radius = 15,
+				height = 4,
+				spin = {
+					p = 0,
+					y = 80 * 50,
+					r = 60 * 50
+				},
+				lineWidth = 2
+			},
+			{
+				radius = 13,
+				height = 3,
+				spin = {
+					p = 60 * 50,
+					y = -45 * 50,
+					r = 0
+				},
+				lineWidth = 2
+			},
 		})
 
 		caster:EmitSound("weapons/gauss/fire1.wav", 70, 90)
+
 		return true
 	end
 })
-
-

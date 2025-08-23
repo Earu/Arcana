@@ -5,7 +5,6 @@ ENT.PrintName = "Corruption Test"
 ENT.Category = "Arcana"
 ENT.Spawnable = true
 ENT.AdminOnly = true
-
 require("shader_to_gma")
 
 if SERVER then
@@ -22,6 +21,7 @@ end
 if CLIENT then
 	-- Configuration
 	local WORLD_RADIUS = 500 -- Pollution sphere radius in world units
+
 	local INVISIBLE_MAT = CreateMaterial("arcana_corruption_stencil", "UnlitGeneric", {
 		["$basetexture"] = "color/white",
 		["$alpha"] = "0",
@@ -33,11 +33,9 @@ if CLIENT then
 		local world_pos = self:GetPos()
 		local player_pos = LocalPlayer():GetPos()
 		local distance = player_pos:Distance(world_pos)
-
 		-- Update framebuffer for post-processing
 		render.UpdateScreenEffectTexture()
 		self.ShaderMat:SetFloat("$c0_x", CurTime())
-
 		-- Set corruption intensity
 		local intensity = 1.2
 		self.ShaderMat:SetFloat("$c0_y", intensity)
@@ -64,10 +62,8 @@ if CLIENT then
 			render.SetStencilPassOperation(STENCIL_REPLACE)
 			render.SetStencilFailOperation(STENCIL_KEEP)
 			render.SetStencilZFailOperation(STENCIL_KEEP)
-
 			-- Draw invisible sphere to stencil buffer
 			render.SetMaterial(INVISIBLE_MAT)
-
 			-- Draw sphere at entity position
 			local matrix = Matrix()
 			matrix:SetTranslation(world_pos)
@@ -75,7 +71,6 @@ if CLIENT then
 			cam.PushModelMatrix(matrix)
 			render.DrawSphere(Vector(0, 0, 0), 1, 16, 16) -- Unit sphere (scaled by matrix)
 			cam.PopModelMatrix()
-
 			-- Step 3: Set stencil to only draw where sphere was rendered
 			render.SetStencilCompareFunction(STENCIL_EQUAL)
 			render.SetStencilPassOperation(STENCIL_KEEP)
@@ -115,6 +110,7 @@ if CLIENT then
 
 	local function create_shader_mat(name, opts)
 		local key_values = util.KeyValuesToTable(shader_mat, false, true)
+
 		if opts then
 			for k, v in pairs(opts) do
 				key_values[k] = v

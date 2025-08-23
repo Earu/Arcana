@@ -1,5 +1,4 @@
 -- Flame Wave: A sweeping cone of fire that ignites and damages enemies
-
 Arcane:RegisterSpell({
 	id = "flame_wave",
 	name = "Flame Wave",
@@ -15,10 +14,8 @@ Arcane:RegisterSpell({
 	icon = "icon16/fire.png",
 	has_target = false,
 	cast_anim = "forward",
-
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-
 		local origin = (ctx and ctx.circlePos) or caster:GetShootPos()
 		local forward = caster:GetAimVector()
 		local cosHalfAngle = math.cos(math.rad(45))
@@ -33,7 +30,6 @@ Arcane:RegisterSpell({
 			if dist > maxRange then continue end
 			local dir = toTarget:GetNormalized()
 			if dir:Dot(forward) < cosHalfAngle then continue end
-
 			-- Scale damage by angle tightness and distance within the cone
 			local angleFactor = math.Clamp((dir:Dot(forward) - cosHalfAngle) / (1 - cosHalfAngle), 0, 1)
 			local distanceFactor = 1 - math.Clamp(dist / maxRange, 0, 1) * 0.4 -- 1 near, 0.6 far
@@ -47,11 +43,18 @@ Arcane:RegisterSpell({
 				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetDamagePosition(ent:WorldSpaceCenter())
 				ent:TakeDamageInfo(dmg)
-				if ent.Ignite then ent:Ignite(igniteTime, 0) end
+
+				if ent.Ignite then
+					ent:Ignite(igniteTime, 0)
+				end
+
 				-- Knockback for characters
-				if ent.SetVelocity then ent:SetVelocity(forward * 220) end
+				if ent.SetVelocity then
+					ent:SetVelocity(forward * 220)
+				end
 			else
 				local phys = ent:GetPhysicsObject()
+
 				if IsValid(phys) then
 					phys:ApplyForceCenter(forward * (700 * phys:GetMass()))
 				end
@@ -61,9 +64,6 @@ Arcane:RegisterSpell({
 		return true
 	end
 })
-
-
-
 
 if CLIENT then
 	-- Client visuals for Flame Wave. Runs when casting begins; schedules the wave marker at completion.
@@ -75,6 +75,7 @@ if CLIENT then
 			if not IsValid(caster) then return end
 			local origin
 			local forward = caster:GetAimVector()
+
 			if forwardLike then
 				local maxs = caster:OBBMaxs()
 				origin = caster:GetPos() + caster:GetForward() * maxs.x * 1.5 + caster:GetUp() * maxs.z / 2
@@ -96,23 +97,28 @@ if CLIENT then
 				local fx = EffectData()
 				fx:SetOrigin(p)
 				util.Effect("cball_explode", fx, true, true)
+
 				local tr = util.TraceLine({
 					start = p + Vector(0, 0, 32),
 					endpos = p - Vector(0, 0, 96),
 					filter = caster
 				})
+
 				if tr.Hit then
 					util.Decal("Scorch", tr.HitPos + tr.HitNormal * 4, tr.HitPos - tr.HitNormal * 8)
 				end
 			end
 
 			local right = forward:Angle():Right()
+
 			local function spawnWaveMarker(side)
 				local life, steps = 0.6, 18
 				local emitter = ParticleEmitter(origin)
 				local jitterSeed = math.Rand(0, 1000)
+
 				for i = 1, steps do
 					local frac = i / steps
+
 					timer.Simple(frac * life, function()
 						if not emitter then return end
 						local dist = maxRange * frac
@@ -124,6 +130,7 @@ if CLIENT then
 						-- Embers (match fireball style)
 						for j = 1, 3 do
 							local p = emitter:Add("effects/yellowflare", ppos + VectorRand() * 2)
+
 							if p then
 								p:SetVelocity(-forward * (60 + math.random(0, 40)) + VectorRand() * 20)
 								p:SetDieTime(0.4 + math.Rand(0.1, 0.3))
@@ -145,6 +152,7 @@ if CLIENT then
 						for j = 1, 2 do
 							local mat = (math.random() < 0.5) and "effects/fire_cloud1" or "effects/fire_cloud2"
 							local p = emitter.Add and emitter:Add(mat, ppos)
+
 							if p then
 								p:SetVelocity(-forward * (40 + math.random(0, 30)) + VectorRand() * 10)
 								p:SetDieTime(0.6 + math.Rand(0.2, 0.5))
@@ -164,6 +172,7 @@ if CLIENT then
 
 						-- Heat shimmer
 						local hw = emitter:Add("sprites/heatwave", ppos)
+
 						if hw then
 							hw:SetVelocity(VectorRand() * 10)
 							hw:SetDieTime(0.25)
@@ -177,11 +186,16 @@ if CLIENT then
 						end
 					end)
 				end
+
 				timer.Simple(life + 0.6, function()
-					if emitter then emitter:Finish() end
+					if emitter then
+						emitter:Finish()
+					end
+
 					emitter = nil
 				end)
 			end
+
 			spawnWaveMarker(0)
 			spawnWaveMarker(1)
 			spawnWaveMarker(-1)
@@ -190,4 +204,3 @@ if CLIENT then
 		timer.Simple(math.max(0.01, castTime or 0.7), spawnWaveVisuals)
 	end)
 end
-

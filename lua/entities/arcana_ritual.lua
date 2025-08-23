@@ -39,8 +39,8 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-
 		local phys = self:GetPhysicsObject()
+
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableGravity(false)
@@ -51,20 +51,18 @@ if SERVER then
 		self._owner = self._owner or nil
 		self._startedAt = CurTime()
 		self:SetExpireAt(self._startedAt + (self._lifetime or 300))
-
 		self._hoverBaseZ = 28
 		self._hoverAmp = 6
 		self._hoverSpeed = 2
-
 		self:StartMotionController()
 		self:NextThink(CurTime() + 0.2)
 
 		timer.Simple(0.1, function()
 			if not IsValid(self) then return end
-
 			self:StartMotionController()
 			self:SetPos(self:GetPos() + Vector(0, 0, 50))
 			phys = self:GetPhysicsObject()
+
 			if IsValid(phys) then
 				phys:Wake()
 				phys:EnableGravity(false)
@@ -75,7 +73,6 @@ if SERVER then
 	function ENT:Use(ply)
 		if self._hasActivated then return end
 		if not IsValid(ply) or not ply:IsPlayer() then return end
-
 		-- Check requirements against the player who pressed use
 		local coinsOk = true
 
@@ -192,10 +189,9 @@ if SERVER then
 
 	function ENT:PhysicsSimulate(phys, dt)
 		if not IsValid(phys) then return end
-
 		phys:Wake()
-
 		local start = self:GetPos() + Vector(0, 0, 100)
+
 		local tr = util.TraceLine({
 			start = start,
 			endpos = start - Vector(0, 0, 256),
@@ -204,6 +200,7 @@ if SERVER then
 		})
 
 		local floatPos = tr.HitPos + Vector(0, 0, 50 + 5 * math.sin(CurTime()))
+
 		local shadowParams = {
 			secondstoarrive = 0.2,
 			pos = floatPos,
@@ -283,6 +280,7 @@ if CLIENT then
 		-- Animate the client-side bands scale so they pulse on activation
 		if ent._bands then
 			local bandDuration = math.max(0.1, (duration or 2.0) - 1)
+
 			timer.Simple(bandDuration, function()
 				if IsValid(ent) and ent._bands then
 					ent._bands:SetScale(10, bandDuration)
@@ -300,8 +298,13 @@ if CLIENT then
 	end
 
 	function ENT:OnRemove()
-		if self._circle then self._circle:Destroy() end
-		if self._bands then self._bands:Remove() end
+		if self._circle then
+			self._circle:Destroy()
+		end
+
+		if self._bands then
+			self._bands:Remove()
+		end
 	end
 
 	function ENT:DrawTranslucent()
@@ -322,6 +325,7 @@ if CLIENT then
 				mask = MASK_SOLID,
 				filter = self,
 			})
+
 			self._circle.position = tr.HitPos + Vector(0, 0, 2)
 			self._circle.angles = Angle(0, 180, 180)
 		end
@@ -332,11 +336,10 @@ if CLIENT then
 			local t = CurTime()
 			local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
 			local size = 200 + 60 * pulse
-
 			render.SetMaterial(self._glowMat)
 			render.DrawSprite(pos, size, size, Color(color.r, color.g, color.b, 230))
-
 			local dl = DynamicLight(self:EntIndex())
+
 			if dl then
 				dl.pos = pos
 				dl.r = color.r
@@ -355,13 +358,29 @@ if CLIENT then
 			local pos = self:WorldSpaceCenter()
 			local ang = self:GetAngles()
 			self._bands = BandCircle.Create(pos, ang, baseColor, 80, 0)
+
 			if self._bands then
 				self._bands.position = pos
 				self._bands.angles = ang
+
 				-- Bands config mirrors previous server call
-				self._bands:AddBand(20, 5, { p = 20, y = 60, r = 10 }, 2)
-				self._bands:AddBand(32, 4, { p = -30, y = -40, r = 0 }, 2)
-				self._bands:AddBand(26, 6, { p = -10, y = -20, r = 60 }, 2)
+				self._bands:AddBand(20, 5, {
+					p = 20,
+					y = 60,
+					r = 10
+				}, 2)
+
+				self._bands:AddBand(32, 4, {
+					p = -30,
+					y = -40,
+					r = 0
+				}, 2)
+
+				self._bands:AddBand(26, 6, {
+					p = -10,
+					y = -20,
+					r = 60
+				}, 2)
 			end
 		end
 
@@ -378,13 +397,29 @@ if CLIENT then
 			local pos = self:WorldSpaceCenter()
 			local ang = self:GetAngles()
 			self._bands = BandCircle.Create(pos, ang, baseColor, 80, 0)
+
 			if self._bands then
 				self._bands.position = pos
 				self._bands.angles = ang
+
 				-- Bands config mirrors previous server call
-				self._bands:AddBand(20, 5, { p = 20, y = 60, r = 10 }, 2)
-				self._bands:AddBand(32, 4, { p = -30, y = -40, r = 0 }, 2)
-				self._bands:AddBand(26, 6, { p = -10, y = -20, r = 60 }, 2)
+				self._bands:AddBand(20, 5, {
+					p = 20,
+					y = 60,
+					r = 10
+				}, 2)
+
+				self._bands:AddBand(32, 4, {
+					p = -30,
+					y = -40,
+					r = 0
+				}, 2)
+
+				self._bands:AddBand(26, 6, {
+					p = -10,
+					y = -20,
+					r = 60
+				}, 2)
 			end
 		end
 
@@ -397,13 +432,10 @@ if CLIENT then
 
 		local data = ritualState[self]
 		if not data then return end
-
 		local pos = self:WorldSpaceCenter() + Vector(0, 0, 24)
 		local ang = LocalPlayer():EyeAngles()
-
 		ang:RotateAroundAxis(ang:Right(), 90)
 		ang:RotateAroundAxis(ang:Up(), -90)
-
 		cam.Start3D2D(pos, ang, 0.06)
 		surface.SetDrawColor(decoPanel)
 		surface.DrawRect(-180, -90, 360, 180)
