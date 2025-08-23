@@ -1180,6 +1180,8 @@ if CLIENT then
 				net.Start("Arcane_ConsoleCastSpell")
 				net.WriteString(item.id)
 				net.SendToServer()
+
+				frame:Close()
 			end
 
 			castBtn.Paint = function(pnl, w, h)
