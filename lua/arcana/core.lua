@@ -108,6 +108,9 @@ if SERVER then
 	end
 
 	local ensured = false
+	-- Per-player gating to prevent saving until a successful initial DB load
+	Arcane.SaveBlockedBySteamID = Arcane.SaveBlockedBySteamID or {}
+	Arcane.RetryStateBySteamID = Arcane.RetryStateBySteamID or {}
 
 	local function ensureDatabase()
 		if ensured then return ensured end
@@ -227,37 +230,88 @@ if SERVER then
 
 	function Arcane:SavePlayerDataToSQL(ply, data)
 		if not ensureDatabase() then return end
+
+		local sid = IsValid(ply) and ply:SteamID64() or nil
+		if sid and SaveBlockedBySteamID[sid] then return end
+
 		local steamid = sql.SQLStr(ply:SteamID64(), true)
-		local xp = tonumber(data.xp) or 0
-		local level = tonumber(data.level) or 1
-		local kp = tonumber(data.knowledge_points) or 0
-		local unlocked = sql.SQLStr(serializeUnlockedSpells(data.unlocked_spells))
-		local quick = sql.SQLStr(serializeQuickslots(data.quickspell_slots))
-		local selected = tonumber(data.selected_quickslot) or 1
+		local incoming_xp = tonumber(data.xp) or 0
+		local incoming_level = tonumber(data.level) or 1
+		local incoming_kp = tonumber(data.knowledge_points) or 0
+		local incoming_unlocked_map = data.unlocked_spells or {}
+		local incoming_quickslots = data.quickspell_slots or {nil, nil, nil, nil, nil, nil, nil, nil}
+		local incoming_selected = tonumber(data.selected_quickslot) or 1
 		local lastsave = tonumber(data.last_save) or os.time()
+
+		-- Merge strategy to prevent data loss if an earlier load failed:
+		-- - xp/level/knowledge_points: take max(existing, incoming)
+		-- - unlocked_spells: union
+		-- - quickslots: prefer incoming when set, otherwise keep existing
+		-- - selected_quickslot: prefer incoming if valid
+		local function mergeWithExistingRow(row)
+			if not istable(row) then
+				return incoming_xp, incoming_level, incoming_kp, incoming_unlocked_map, incoming_quickslots, incoming_selected
+			end
+
+			local existing_xp = tonumber(row.xp) or 0
+			local existing_level = tonumber(row.level) or 1
+			local existing_kp = tonumber(row.knowledge_points) or 0
+			local existing_unlocked = deserializeUnlockedSpells(row.unlocked_spells)
+			local existing_quick = deserializeQuickslots(row.quickspell_slots)
+			local existing_selected = tonumber(row.selected_quickslot) or 1
+
+			local merged_xp = math.max(existing_xp, incoming_xp)
+			local merged_level = math.max(existing_level, incoming_level)
+			local merged_kp = math.max(existing_kp, incoming_kp)
+
+			local merged_unlocked = {}
+			for id, v in pairs(existing_unlocked or {}) do if v then merged_unlocked[id] = true end end
+			for id, v in pairs(incoming_unlocked_map or {}) do if v then merged_unlocked[id] = true end end
+
+			local merged_quick = {nil, nil, nil, nil, nil, nil, nil, nil}
+			for i = 1, 8 do
+				merged_quick[i] = incoming_quickslots and incoming_quickslots[i] or nil
+				if not merged_quick[i] or merged_quick[i] == "" then
+					merged_quick[i] = existing_quick and existing_quick[i] or nil
+				end
+			end
+
+			local merged_selected = (incoming_selected >= 1 and incoming_selected <= 8) and incoming_selected or existing_selected
+
+			return merged_xp, merged_level, merged_kp, merged_unlocked, merged_quick, merged_selected
+		end
 
 		if _G.co and _G.db then
 			-- if we have postgres use it
 			_G.co(function()
-				local query = "UPDATE arcane_players SET xp = $2, level = $3, knowledge_points = $4, unlocked_spells = $5, quickspell_slots = $6, selected_quickslot = $7, last_save = $8 WHERE steamid = $1"
-				local rows, err = _G.db.Query(query, steamid, xp, level, kp, unlocked, quick, selected, lastsave)
-
-				if not rows or rows == 0 then
-					if isstring(err) then
-						dbLogError("SavePlayerDataToSQL failed")
-
-						return
-					end
-
-					local insertQuery = "INSERT INTO arcane_players(steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES($1, $2, $3, $4, $5, $6, $7, $8)"
-					_G.db.Query(insertQuery, steamid, xp, level, kp, unlocked, quick, selected, lastsave)
-				end
+				-- Read existing row to merge conservatively
+				local existing = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
+				local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(existing) and existing[1] or nil)
+				local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
+				local quick = sql.SQLStr(serializeQuickslots(mquick))
+				local upsert = [[
+					INSERT INTO arcane_players(steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save)
+					VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+					ON CONFLICT (steamid) DO UPDATE SET
+						xp = EXCLUDED.xp,
+						level = EXCLUDED.level,
+						knowledge_points = EXCLUDED.knowledge_points,
+						unlocked_spells = EXCLUDED.unlocked_spells,
+						quickspell_slots = EXCLUDED.quickspell_slots,
+						selected_quickslot = EXCLUDED.selected_quickslot,
+						last_save = EXCLUDED.last_save
+				]]
+				_G.db.Query(upsert, steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
 			end)
 
 			return
 		else
 			-- fallback to sqlite
-			local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, xp, level, kp, unlocked, quick, selected, lastsave)
+			local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+			local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
+			local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
+			local quick = sql.SQLStr(serializeQuickslots(mquick))
+			local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
 			local ok = sql.Query(q)
 
 			if ok == false then
@@ -268,6 +322,10 @@ if SERVER then
 
 	function Arcane:LoadPlayerDataFromSQL(ply, callback)
 		if not ensureDatabase() then return nil end
+		if not IsValid(ply) then return end
+
+		local rawSid = ply:SteamID64()
+		Arcane.SaveBlockedBySteamID[rawSid] = true
 
 		local function processData(row)
 			local data = CreateDefaultPlayerData()
@@ -278,19 +336,44 @@ if SERVER then
 			data.quickspell_slots = deserializeQuickslots(row.quickspell_slots)
 			data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
 			data.last_save = tonumber(row.last_save) or data.last_save
+			Arcane.SaveBlockedBySteamID[rawSid] = nil
+			Arcane.RetryStateBySteamID[rawSid] = nil
 			callback(true, data)
 		end
 
-		local steamid = sql.SQLStr(ply:SteamID64(), true)
+		local steamid = sql.SQLStr(rawSid, true)
+
+		local function scheduleRetry()
+			local state = Arcane.RetryStateBySteamID[rawSid] or {delay = 1}
+			Arcane.RetryStateBySteamID[rawSid] = state
+
+			local tname = "Arcana_RetryLoad_" .. tostring(rawSid)
+			timer.Remove(tname)
+			timer.Create(tname, state.delay, 1, function()
+				if not IsValid(ply) then return end
+				state.delay = math.min((state.delay or 1) * 2, 60)
+				Arcane:LoadPlayerDataFromSQL(ply, callback)
+			end)
+		end
 
 		if _G.co and _G.db then
 			-- if we have postgres use it
 			_G.co(function()
 				local rows = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
+				if rows == false or rows == nil then
+					scheduleRetry()
+					return
+				end
 
-				if not (istable(rows) and #rows > 0) then
-					callback(false)
+				if istable(rows) and #rows < 1 then
+					-- No existing row: treat as success with defaults and allow saving
+					Arcane.SaveBlockedBySteamID[rawSid] = nil
+					Arcane.RetryStateBySteamID[rawSid] = nil
 
+					local defaults = CreateDefaultPlayerData()
+					callback(true, defaults)
+
+					Arcane:SavePlayerDataToSQL(ply, defaults)
 					return
 				end
 
@@ -299,17 +382,20 @@ if SERVER then
 		else
 			-- fallback to sqlite
 			rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
-
 			if rows == false then
 				dbLogError("LoadPlayerDataFromSQL failed")
-				callback(false)
-
+				scheduleRetry()
 				return
 			end
 
 			if not rows or not rows[1] then
-				callback(false)
+				Arcane.SaveBlockedBySteamID[rawSid] = nil
+				Arcane.RetryStateBySteamID[rawSid] = nil
 
+				local defaults = CreateDefaultPlayerData()
+				callback(true, defaults)
+
+				Arcane:SavePlayerDataToSQL(ply, defaults)
 				return
 			end
 
@@ -346,6 +432,10 @@ end
 
 function Arcane:SavePlayerData(ply)
 	if not IsValid(ply) then return end
+
+	local sid = ply:SteamID64()
+	if SaveBlockedBySteamID[sid] then return end
+
 	local data = self:GetPlayerData(ply)
 	data.last_save = os.time()
 
@@ -360,13 +450,7 @@ function Arcane:LoadPlayerData(ply, callback)
 
 	if SERVER then
 		self:LoadPlayerDataFromSQL(ply, function(loaded, data)
-			if loaded then
-				self.PlayerData[steamid] = data
-			else
-				self.PlayerData[steamid] = CreateDefaultPlayerData()
-				self:SavePlayerDataToSQL(ply, self.PlayerData[steamid])
-			end
-
+			self.PlayerData[steamid] = data
 			callback()
 		end)
 	else
@@ -1280,6 +1364,12 @@ if SERVER then
 	end)
 
 	hook.Add("PlayerDisconnected", "Arcane_PlayerLeave", function(ply)
+		local sid = IsValid(ply) and ply:SteamID64() or nil
+		if sid then
+			timer.Remove("Arcana_RetryLoad_" .. tostring(sid))
+			RetryStateBySteamID[sid] = nil
+			-- Leave SaveBlockedBySteamID as-is; SavePlayerData will respect it and no-op
+		end
 		Arcane:SavePlayerData(ply)
 	end)
 
