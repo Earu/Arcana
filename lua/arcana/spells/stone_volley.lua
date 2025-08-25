@@ -48,5 +48,8 @@ Arcane:RegisterSpell({
 		caster:EmitSound("physics/concrete/concrete_impact_hard" .. math.random(1, 3) .. ".wav", 70, 100)
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"stones",
+	}
 })

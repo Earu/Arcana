@@ -54,5 +54,9 @@ Arcane:RegisterSpell({
 		else
 			return false
 		end
-	end
+	end,
+	trigger_phrase_aliases = {
+		"minify",
+		"shrink",
+	}
 })

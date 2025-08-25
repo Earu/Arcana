@@ -210,7 +210,12 @@ Arcane:RegisterSpell({
 		caster:EmitSound("npc/antlion/idle2.wav", 65, 120, 0.6)
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"poison",
+		"fart", -- because thats funny
+		"fart cloud",
+	}
 })
 
 if SERVER then

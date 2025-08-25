@@ -46,5 +46,9 @@ Arcane:RegisterSpell({
 		})
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"regen",
+		"regenerate",
+	}
 })

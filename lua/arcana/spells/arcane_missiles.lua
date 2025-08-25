@@ -61,5 +61,9 @@ Arcane:RegisterSpell({
 		sound.Play("weapons/physcannon/energy_sing_flyby1.wav", origin, 70, 160)
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"missiles",
+		"missile",
+	}
 })
