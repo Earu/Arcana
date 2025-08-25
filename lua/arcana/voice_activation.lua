@@ -73,14 +73,14 @@ hook.Add("PlayerStartVoice", "Arcana_VoiceActivation", function(ply)
 	if not SPEECH then return end
 	if ply ~= LocalPlayer() then return end
 
-	SPEECH:resume()
+	SPEECH:reco_state("active")
 end)
 
 hook.Add("PlayerEndVoice", "Arcana_VoiceActivation", function(ply)
 	if not SPEECH then return end
 	if ply ~= LocalPlayer() then return end
 
-	SPEECH:pause()
+	SPEECH:reco_state("inactive")
 end)
 
 local function holdingGrimoire()
