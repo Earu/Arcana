@@ -205,4 +205,8 @@ Arcane:RegisterSpell({
 
 		return true
 	end,
+	trigger_phrase_aliases = {
+		"barrier",
+		"shield",
+	}
 })

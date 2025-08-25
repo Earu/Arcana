@@ -615,6 +615,16 @@ function Arcane:RegisterSpell(spellData)
 	}
 
 	self.RegisteredSpells[spell.id] = spell
+	if CLIENT and Arcane.AddTriggerPhrase then
+		Arcane:AddTriggerPhrase(spell.name, spell.id)
+
+		if istable(spellData.trigger_phrase_aliases) then
+			for _, phrase in ipairs(spellData.trigger_phrase_aliases) do
+				Arcane:AddTriggerPhrase(phrase, spell.id)
+			end
+		end
+	end
+
 	self:Print("Registered spell '" .. spell.name .. "' (ID: " .. spell.id .. "')\n")
 
 	return true

@@ -139,7 +139,10 @@ Arcane:RegisterSpell({
 		end
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"lightning",
+	}
 })
 
 if CLIENT then

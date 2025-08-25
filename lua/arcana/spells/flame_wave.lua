@@ -62,7 +62,11 @@ Arcane:RegisterSpell({
 		end
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"flame",
+		"flames",
+	}
 })
 
 if CLIENT then

@@ -93,7 +93,10 @@ Arcane:RegisterSpell({
 		caster:EmitSound("weapons/physcannon/superphys_launch1.wav", 80, 120)
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"spear",
+	}
 })
 
 if CLIENT then

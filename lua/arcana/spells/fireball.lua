@@ -67,5 +67,8 @@ Arcane:RegisterSpell({
 		caster:EmitSound("weapons/gauss/fire1.wav", 70, 90)
 
 		return true
-	end
+	end,
+	trigger_phrase_aliases = {
+		"fire",
+	}
 })
