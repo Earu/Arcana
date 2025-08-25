@@ -4,6 +4,7 @@ if not util.IsBinaryModuleInstalled("speech") then return end
 
 require("speech")
 
+local SPEECH
 local BASE_GRAMMAR = [[
 <grammar langid="409">
   <rule name="arcana_spells" toplevel="active">
@@ -18,7 +19,26 @@ local BASE_GRAMMAR = [[
 
 local triggerPhrases = {}
 local function normalize(phrase)
-	return string.lower(string.gsub(phrase, "%s+", ""))
+	-- Robust normalization for voice command phrases
+	if phrase == nil then return "" end
+
+	-- Ensure string and lowercase
+	phrase = tostring(phrase)
+	phrase = string.lower(phrase)
+
+	-- Replace common separators with spaces
+	phrase = phrase:gsub("[-_/]+", " ")
+
+	-- Remove all punctuation except spaces and alphanumerics
+	phrase = phrase:gsub("[^%a%d%s]", " ")
+
+	-- Collapse multiple whitespace to a single space
+	phrase = phrase:gsub("%s+", " ")
+
+	-- Trim leading/trailing spaces
+	phrase = phrase:gsub("^%s+", ""):gsub("%s+$", "")
+
+	return phrase
 end
 
 local function buildGrammar()
@@ -35,18 +55,18 @@ local function buildGrammar()
 	if SPEECH:grammar("arcana_spells.xml") then
 		SPEECH:grammar_state("enabled")
 		SPEECH:rule_state(nil, "active")
-		Arcane:Print("Added", #triggerPhrases, "trigger phrases to voice activation")
+		Arcane:Print("Added", table.Count(triggerPhrases), "trigger phrases to voice activation")
 	end
 end
 
 function Arcane:AddTriggerPhrase(phrase, spell_id)
 	triggerPhrases[normalize(phrase)] = spell_id
-	buildGrammar()
+	timer.Create("Arcana_VoiceActivation_BuildGrammar", 1, 1, buildGrammar)
 end
 
 function Arcane:RemoveTriggerPhrase(phrase)
 	triggerPhrases[normalize(phrase)] = nil
-	buildGrammar()
+	timer.Create("Arcana_VoiceActivation_BuildGrammar", 1, 1, buildGrammar)
 end
 
 hook.Add("PlayerStartVoice", "Arcana_VoiceActivation", function(ply)
@@ -75,7 +95,6 @@ end
 
 hook.Add("Think", "Arcana_VoiceActivation", function()
 	if not SPEECH then return end
-	if not holdingGrimoire() then return end
 
 	local num, events, err = SPEECH:events(10)
 	if num == nil then
@@ -84,6 +103,7 @@ hook.Add("Think", "Arcana_VoiceActivation", function()
 	end
 
 	if num == 0 then return end
+	if not holdingGrimoire() then return end
 
 	for _, event in pairs(events) do
 		local spell_id = event.text and triggerPhrases[event.text]
