@@ -232,7 +232,7 @@ if SERVER then
 		if not ensureDatabase() then return end
 
 		local sid = IsValid(ply) and ply:SteamID64() or nil
-		if sid and SaveBlockedBySteamID[sid] then return end
+		if sid and Arcane.SaveBlockedBySteamID[sid] then return end
 
 		local steamid = sql.SQLStr(ply:SteamID64(), true)
 		local incoming_xp = tonumber(data.xp) or 0
@@ -434,7 +434,7 @@ function Arcane:SavePlayerData(ply)
 	if not IsValid(ply) then return end
 
 	local sid = ply:SteamID64()
-	if SaveBlockedBySteamID[sid] then return end
+	if Arcane.SaveBlockedBySteamID[sid] then return end
 
 	local data = self:GetPlayerData(ply)
 	data.last_save = os.time()
@@ -1367,7 +1367,7 @@ if SERVER then
 		local sid = IsValid(ply) and ply:SteamID64() or nil
 		if sid then
 			timer.Remove("Arcana_RetryLoad_" .. tostring(sid))
-			RetryStateBySteamID[sid] = nil
+			Arcane.RetryStateBySteamID[sid] = nil
 			-- Leave SaveBlockedBySteamID as-is; SavePlayerData will respect it and no-op
 		end
 		Arcane:SavePlayerData(ply)
