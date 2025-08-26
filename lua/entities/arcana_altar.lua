@@ -450,6 +450,8 @@ if CLIENT then
 		frame:Center()
 		frame:SetTitle("")
 		frame:MakePopup()
+		-- Track tooltip panels for cleanup on close/remove
+		frame._arcanaTooltips = {}
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
@@ -510,6 +512,19 @@ if CLIENT then
 				surface.DrawLine(w - pad, pad, pad, h - pad)
 			end
 		end
+
+		-- Ensure tooltips are cleaned on close/remove
+		frame.OnClose = function()
+			if frame._arcanaTooltips then
+				for pnl, _ in pairs(frame._arcanaTooltips) do
+					if IsValid(pnl) then pnl:Remove() end
+					hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(pnl))
+				end
+				frame._arcanaTooltips = {}
+			end
+		end
+
+		frame.OnRemove = frame.OnClose
 
 		local content = vgui.Create("DPanel", frame)
 		content:Dock(FILL)
@@ -620,6 +635,8 @@ if CLIENT then
 					end
 
 					infoIcon.tooltip = tooltip
+					-- Register for cleanup
+					frame._arcanaTooltips[tooltip] = true
 					updateTooltipPos(tooltip)
 					-- Update position if mouse moves
 					local hookName = "ArcanaTooltipPos_" .. tostring(tooltip)
@@ -637,8 +654,10 @@ if CLIENT then
 
 				local function destroyTooltip()
 					if IsValid(infoIcon.tooltip) then
-						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(infoIcon.tooltip))
-						infoIcon.tooltip:Remove()
+						local t = infoIcon.tooltip
+						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(t))
+						t:Remove()
+						frame._arcanaTooltips[t] = nil
 						infoIcon.tooltip = nil
 					end
 				end

@@ -803,6 +803,9 @@ if CLIENT then
 		frame:ShowCloseButton(true)
 		frame:MakePopup()
 
+		-- Track tooltip panels for cleanup on close/remove
+		frame._arcanaTooltips = {}
+
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
 			Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8, 255)
@@ -887,7 +890,18 @@ if CLIENT then
 
 		frame.OnClose = function()
 			self.MenuOpen = false
+			-- Cleanup any leftover tooltips and Think hooks
+			if frame._arcanaTooltips then
+				for pnl, _ in pairs(frame._arcanaTooltips) do
+					if IsValid(pnl) then pnl:Remove() end
+					hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(pnl))
+				end
+				frame._arcanaTooltips = {}
+			end
 		end
+
+		-- Ensure cleanup if removed without calling OnClose
+		frame.OnRemove = frame.OnClose
 
 		-- Modern split layout: left quickslots, right learned spells list (drag to assign)
 		local content = vgui.Create("DPanel", frame)
@@ -1125,6 +1139,8 @@ if CLIENT then
 				end
 
 				infoIcon.tooltip = tooltip
+				-- Register for cleanup on frame close
+				frame._arcanaTooltips[tooltip] = true
 
 				-- Position tooltip near cursor
 				local function updateTooltipPos()
@@ -1148,9 +1164,11 @@ if CLIENT then
 			end
 
 			infoIcon.OnCursorExited = function()
-				if IsValid(infoIcon.tooltip) then
-					hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(infoIcon.tooltip))
-					infoIcon.tooltip:Remove()
+				local t = infoIcon.tooltip
+				if IsValid(t) then
+					hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(t))
+					t:Remove()
+					frame._arcanaTooltips[t] = nil
 					infoIcon.tooltip = nil
 				end
 			end
