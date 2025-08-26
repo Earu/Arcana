@@ -6,7 +6,7 @@ require("speech")
 
 local SPEECH
 local BASE_GRAMMAR = [[
-<grammar langid="409">
+<grammar>
   <rule name="arcana_spells" toplevel="active">
     <o>...</o>
     <list>
@@ -17,9 +17,29 @@ local BASE_GRAMMAR = [[
 </grammar>
 ]]
 
+local function tryCreateSpeechWithLanguage(name, excludedIds)
+	excludedIds = excludedIds or {}
+	local recognizers = speech.recognizers()
+	for _, recognizer in pairs(recognizers) do
+		if excludedIds[recognizer.id] then continue end
+
+		if recognizer.name:lower():match(name:lower():PatternSafe()) then
+			local s = speech.create(recognizer.id)
+			if s then
+				return s
+			else
+				excludedIds[recognizer.id] = true
+				return tryCreateSpeechWithLanguage(name, excludedIds)
+			end
+		end
+	end
+
+	-- latest fallback
+	return speech.create(recognizers[1].id)
+end
+
 local triggerPhrases = {}
 local function normalize(phrase)
-	-- Robust normalization for voice command phrases
 	if phrase == nil then return "" end
 
 	-- Ensure string and lowercase
@@ -50,7 +70,12 @@ local function buildGrammar()
 	local grammar = BASE_GRAMMAR:format(table.concat(xmlPhrases, "\n"))
 	file.Write("arcana_spells.xml", grammar)
 
-	SPEECH = speech.create("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Recognizers\\Tokens\\MS-1033-80-DESK")
+	SPEECH = tryCreateSpeechWithLanguage("English")
+	if not SPEECH then
+		chat.AddText(Color(255, 0, 0), "[Arcana] You have installed the speech module for voice spell activation, but your machine does not have any english language pack installed. Voice detection quality will be poor or not working at all. You can install language and speech packs from the Windows Settings.")
+		return
+	end
+
 	SPEECH:interest(38)
 	if SPEECH:grammar("arcana_spells.xml") then
 		SPEECH:grammar_state("enabled")

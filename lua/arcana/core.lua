@@ -5,8 +5,7 @@ local Arcane = _G.Arcane or {}
 _G.Arcane = Arcane
 
 function Arcane:Print(...)
-	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), ...)
-	MsgN()
+	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), table.concat({...}, " "), "\n")
 end
 
 -- Client-side stub for autocomplete and help so players see the command
