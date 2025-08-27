@@ -32,8 +32,9 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		local phys = self:GetPhysicsObject()
+		self:SetColor(Color(80, 180, 255))
 
+		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableMotion(false)
@@ -158,6 +159,11 @@ if CLIENT then
 		local scr = render.GetScreenEffectTexture()
 		self.ShaderMat:SetTexture("$basetexture", scr)
 
+		local curColor = self:GetColor()
+		self.ShaderMat:SetFloat("$c0_z", curColor.r / 255)
+		self.ShaderMat:SetFloat("$c0_w", curColor.g / 255)
+		self.ShaderMat:SetFloat("$c1_x", curColor.b / 255)
+
 		render.OverrideDepthEnable(true, true) -- no Z write
 
 		for i = 1, PASSES do
@@ -186,9 +192,9 @@ if CLIENT then
 		if dl then
 			local center = getCorePos(self)
 			dl.pos = center
-			dl.r = 80
-			dl.g = 180
-			dl.b = 255
+			dl.r = curColor.r
+			dl.g = curColor.g
+			dl.b = curColor.b
 			dl.brightness = 6
 			dl.Decay = 100
 			dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
