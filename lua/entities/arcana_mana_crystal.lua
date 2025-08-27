@@ -16,8 +16,27 @@ function ENT:SetupDataTables()
 
 	if SERVER then
 		self:SetAbsorbRadius(520)
-		self:SetCrystalScale(0.35)
 		self:SetStoredMana(0)
+	end
+
+	-- Apply model scaling whenever CrystalScale changes (both realms)
+	self:NetworkVarNotify("CrystalScale", function(ent, name, old, new)
+		if ent._ApplyScale then
+			ent:_ApplyScale(new)
+		end
+	end)
+end
+
+-- Shared scale application helper so clients render the correct size
+function ENT:_ApplyScale(scale)
+	-- Ensure sane defaults even if called before Initialize
+	self._minScale = self._minScale or 0.35
+	self._maxScale = self._maxScale or 2.2
+	local s = math.Clamp(tonumber(scale) or 1, self._minScale, self._maxScale)
+	self:SetModelScale(s, 0)
+	-- adjust absorb radius with size subtly
+	if self.SetAbsorbRadius then
+		self:SetAbsorbRadius(520 * (0.6 + (s - self._minScale) / (self._maxScale - self._minScale + 0.0001) * 0.8))
 	end
 end
 
@@ -27,12 +46,12 @@ if SERVER then
 
 	function ENT:Initialize()
 		self:SetModel("models/props_abandoned/crystals/crystal_damaged/crystal_cluster_huge_damaged_a.mdl")
-		self:SetMaterial("models/mspropp/light_blue001")
+		self:SetMaterial("materials/models/props_abandoned/crystals/crystal_damaged/crystal_damaged_huge_yellow.vmt")
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		self:SetColor(Color(80, 180, 255))
+		self:SetColor(Color(255, 0, 255))
 
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
@@ -46,18 +65,6 @@ if SERVER then
 		self._maxScale = 2.2
 		self._minScale = 0.35
 		self:_ApplyScale(self:GetCrystalScale())
-	end
-
-	function ENT:_ApplyScale(scale)
-		local s = math.Clamp(tonumber(scale) or 1, self._minScale, self._maxScale)
-		self:SetModelScale(s, 0)
-		-- adjust absorb radius with size subtly
-		self:SetAbsorbRadius(520 * (0.6 + (s - self._minScale) / (self._maxScale - self._minScale + 0.0001) * 0.8))
-	end
-
-	function ENT:SetCrystalScale(scale)
-		self:SetDTFloat(1, scale)
-		self:_ApplyScale(scale)
 	end
 
 	function ENT:AddCrystalGrowth(points)
@@ -108,6 +115,11 @@ end
 
 if CLIENT then
 	function ENT:Initialize()
+		-- Ensure client has consistent scale constants and apply current scale
+		self._maxScale = 2.2
+		self._minScale = 0.35
+		self:_ApplyScale(self:GetCrystalScale())
+
 		self.ShaderMat = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
@@ -172,7 +184,7 @@ if CLIENT then
 			-- reduce opacity per pass
 			self.ShaderMat:SetFloat("$c1_y", perPassOpacity)
 			-- animate grain if you added it
-			--	SHADER_MAT:SetFloat("$c2_x", CurTime())
+			-- SHADER_MAT:SetFloat("$c2_x", CurTime())
 			-- facet/bounce can be adjusted live too
 			-- SHADER_MAT:SetFloat("$c3_x", 1.2)
 			-- SHADER_MAT:SetFloat("$c3_y", 12)
