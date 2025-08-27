@@ -1,7 +1,3 @@
-// Environmental Pollution Post-Processing Shader
-// Creates realistic pollution effects that integrate with the world
-// Features: world darkening, desaturation, atmospheric particles, subtle corruption
-
 sampler BASETEXTURE : register(s0); // Framebuffer (world rendering)
 sampler TEXTURE1 : register(s1);	// Noise texture for pollution patterns
 
