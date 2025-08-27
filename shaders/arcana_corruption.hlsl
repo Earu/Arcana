@@ -14,6 +14,14 @@ struct PS_INPUT
 	float2 uv : TEXCOORD0;
 };
 
+// Robust smoothstep to ensure consistent behavior across vendors
+float smoothstep(float edge0, float edge1, float x)
+{
+	float denom = max(edge1 - edge0, 1e-5);
+	float t = saturate((x - edge0) / denom);
+	return t * t * (3.0 - 2.0 * t);
+}
+
 // Simple noise function
 float noise(float2 p)
 {
@@ -72,7 +80,9 @@ float4 main(PS_INPUT frag) : COLOR
 
 	// Blend between the two based on distance to entity
 	float pollution_falloff = lerp(screen_falloff, world_falloff, blend_factor);
-	pollution_falloff = pow(abs(pollution_falloff), 1.5); // More dramatic falloff
+	// Stable alternative to pow(x, 1.5): x * sqrt(x), guarded for negatives
+	pollution_falloff = abs(pollution_falloff);
+	pollution_falloff = pollution_falloff * sqrt(pollution_falloff); // More dramatic falloff
 
 	// Generate subtle noise for pollution variation
 	float2 noise_uv = frag.uv * 8.0 + time * 0.1;
@@ -96,7 +106,7 @@ float4 main(PS_INPUT frag) : COLOR
 	// Create magical energy patterns
 	float2 magic_uv = frag.uv * 6.0 + time * 0.3;
 	float magic_pattern = smoothNoise(magic_uv);
-	magic_pattern = pow(magic_pattern, 2.0); // Sharper magical energy
+	magic_pattern = magic_pattern * magic_pattern; // Sharper magical energy
 
 	// Mix corruption colors based on magical patterns
 	float3 magical_mix = lerp(shadow_tint, corruption_tint, magic_pattern);
@@ -115,31 +125,34 @@ float4 main(PS_INPUT frag) : COLOR
 	float swirl_angle = time * 0.8 + swirl_distance * 8.0;
 	float swirl_strength = final_pollution_strength * 0.006;
 
-	magical_distortion_uv.x += sin(swirl_angle) * swirl_strength;
-	magical_distortion_uv.y += cos(swirl_angle) * swirl_strength;
+	float s_val, c_val;
+	sincos(swirl_angle, s_val, c_val);
+	magical_distortion_uv.x += s_val * swirl_strength;
+	magical_distortion_uv.y += c_val * swirl_strength;
 
 	// Add ripple distortion for mystical energy waves
 	float ripple_pattern = sin(swirl_distance * 20.0 - time * 4.0) * 0.002;
 	magical_distortion_uv += ripple_pattern * final_pollution_strength;
 
 	// Re-sample with magical distortion
-	if (final_pollution_strength > 0.1) {
-		tinted_color = tex2D(BASETEXTURE, magical_distortion_uv).xyz;
+	float distort_mask = saturate((final_pollution_strength - 0.1) / 0.9);
+	float2 clamped_uv = saturate(magical_distortion_uv);
+	float3 distorted_sample = tex2D(BASETEXTURE, clamped_uv).xyz;
 
-		// Re-apply corruption effects to distorted sample
-		tinted_color *= (1.0 - darkening_strength * final_pollution_strength);
-		float magical_luminance = getLuminance(tinted_color);
-		tinted_color = lerp(tinted_color, float3(magical_luminance, magical_luminance, magical_luminance),
-							desaturation_amount * final_pollution_strength);
-		tinted_color = lerp(tinted_color, tinted_color * magical_mix, final_pollution_strength * 0.5);
-	}
+	// Re-apply corruption effects to distorted sample
+	float3 distorted_tinted = distorted_sample * (1.0 - darkening_strength * final_pollution_strength);
+	float magical_luminance = getLuminance(distorted_tinted);
+	distorted_tinted = lerp(distorted_tinted, float3(magical_luminance, magical_luminance, magical_luminance),
+						 desaturation_amount * final_pollution_strength);
+	distorted_tinted = lerp(distorted_tinted, distorted_tinted * magical_mix, final_pollution_strength * 0.5);
+	tinted_color = lerp(tinted_color, distorted_tinted, distort_mask);
 
 	// Add magical energy highlights - glowing veins of corruption
 	float2 vein_uv1 = frag.uv * 8.0 + time * 0.4;
 	float2 vein_uv2 = frag.uv * 12.0 - time * 0.3;
 
 	float magical_veins = smoothNoise(vein_uv1) * smoothNoise(vein_uv2);
-	magical_veins = pow(magical_veins, 3.0); // Sharp, vein-like patterns
+	magical_veins = (magical_veins * magical_veins) * magical_veins; // Sharp, vein-like patterns
 
 	// Add glowing purple/pink energy veins
 	float3 energy_color = float3(0.8, 0.3, 1.0); // Bright magical purple
@@ -147,7 +160,7 @@ float4 main(PS_INPUT frag) : COLOR
 	tinted_color += energy_color * vein_intensity * 0.3;
 
 	// Blend between original and polluted based on overall intensity
-	float3 final_color = lerp(world_color, tinted_color, pollution_intensity);
+	float3 final_color = saturate(lerp(world_color, tinted_color, pollution_intensity));
 
 	return float4(final_color, 1.0);
 }
