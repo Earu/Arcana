@@ -944,6 +944,14 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		if spell.on_success then
 			spell.on_success(ply, has_target, data)
 		end
+
+		-- Report magic usage location for mana crystals
+		if SERVER and Arcane.ManaCrystals and Arcane.ManaCrystals.ReportMagicUse then
+			local ctxPos = (context and context.circlePos) or (IsValid(ply) and (ply:GetPos() + Vector(0, 0, 2))) or nil
+			if ctxPos then
+				Arcane.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, context)
+			end
+		end
 	else
 		if spell.on_failure then
 			spell.on_failure(ply, has_target, data)

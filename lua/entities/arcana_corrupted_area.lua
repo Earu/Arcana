@@ -31,7 +31,7 @@ if SERVER then
 		end
 
 		if not self:GetRadius() or self:GetRadius() <= 0 then
-			self:SetRadius(500)
+			self:SetRadius(900)
 		end
 
 		-- Wisp spawn control

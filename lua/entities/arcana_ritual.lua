@@ -122,6 +122,13 @@ if SERVER then
 		net.WriteFloat(evolveDur)
 		net.Broadcast()
 
+		-- Report magic use at ritual activation
+		if Arcane and Arcane.ManaCrystals and Arcane.ManaCrystals.ReportMagicUse then
+			local pos = self:GetPos()
+			local rid = self.GetRitualId and self:GetRitualId() or "ritual"
+			Arcane.ManaCrystals:ReportMagicUse(ply, pos, rid, {isRitual = true})
+		end
+
 		timer.Simple(evolveDur + 0.1, function()
 			if IsValid(self) then
 				-- Callback
