@@ -120,7 +120,7 @@ if SERVER then
 end
 
 if CLIENT then
-	local MAX_RENDER_DIST = 4000 * 4000
+	local MAX_RENDER_DIST = 2000 * 2000
 	function ENT:Initialize()
 		-- Ensure client has consistent scale constants and apply current scale
 		self._maxScale = 2.2
