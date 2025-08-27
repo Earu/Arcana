@@ -92,6 +92,7 @@ if SERVER then
 		local ent = ents.Create("arcana_mana_crystal")
 		if not IsValid(ent) then return nil end
 		ent:SetPos(pos + (normal or vector_up) * 4)
+		ent:SetAngles(Angle(0, math.random(0, 359), 0))
 		ent:Spawn()
 		ent:Activate()
 		-- Start small
