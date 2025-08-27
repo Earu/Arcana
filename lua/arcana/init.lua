@@ -3,6 +3,8 @@ if SERVER then
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/hud.lua")
 	AddCSLuaFile("arcana/voice_activation.lua")
+	-- Manager is server-driven; still safe to send to clients if needed later
+	AddCSLuaFile("arcana/mana_crystals.lua")
 
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
@@ -10,6 +12,9 @@ if SERVER then
 end
 
 include("arcana/core.lua")
+if SERVER then
+	include("arcana/mana_crystals.lua")
+end
 
 if CLIENT then
 	include("arcana/circles.lua")
