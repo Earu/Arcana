@@ -225,46 +225,6 @@ if CLIENT then
 
 	-- 3D2D scale used for glyph drawing (world units per 1/scale of 2D units)
 	local GLYPH_SCALE = 0.06
-	-- Screenspace material template
-	local shader_mat = [==[
-		screenspace_general
-		{
-			$pixshader ""
-			$vertexshader ""
-
-			$basetexture ""
-			$texture1    ""
-			$texture2    ""
-			$texture3    ""
-
-			// Mandatory, don't touch
-			$ignorez            1
-			$vertexcolor        1
-			$vertextransform    1
-			"<dx90"
-			{
-				$no_draw 1
-			}
-
-			$copyalpha                 0
-			$alpha_blend_color_overlay 0
-			$alpha_blend               1
-			$linearwrite               1
-			$linearread_basetexture    1
-		}
-	]==]
-
-	local function create_shader_mat(name, opts)
-		local key_values = util.KeyValuesToTable(shader_mat, false, true)
-
-		if opts then
-			for k, v in pairs(opts) do
-				key_values[k] = v
-			end
-		end
-
-		return CreateMaterial(name, "screenspace_general", key_values)
-	end
 
 	-- server applier above; client has applyIntensityClient below
 	local function applyIntensityClient(self)
@@ -425,7 +385,7 @@ if CLIENT then
 	end
 
 	function ENT:Initialize()
-		self.ShaderMat = create_shader_mat("arcana_corruption_" .. self:EntIndex(), {
+		self.ShaderMat = CreateShaderMaterial("arcana_corruption_" .. self:EntIndex(), {
 			["$pixshader"] = "arcana_corruption_ps30",
 			["$basetexture"] = "_rt_FullFrameFB",
 			["$c0_x"] = 0,
