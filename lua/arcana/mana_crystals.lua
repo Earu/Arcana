@@ -6,19 +6,19 @@ if SERVER then
 
 	-- Configuration
 	M.Config = M.Config or {
-		hotspotJoinRadius = 300,    -- distance to merge reports into an existing hotspot
+		hotspotJoinRadius = 2000,    -- distance to merge reports into an existing hotspot
 		hotspotDecayPerSecond = 6,  -- how fast hotspot intensity decays
 		hotspotSpawnThreshold = 40, -- intensity required to attempt a spawn
 		hotspotTrimBelow = 4,       -- remove hotspots below this intensity
 
-		crystalSearchRadius = 500,  -- try to find/grow an existing crystal within this distance
+		crystalSearchRadius = 2000,  -- try to find/grow an existing crystal within this distance
 		crystalGrowthPerCast = 6,   -- growth points added per cast nearby
 		crystalMaxScale = 2.2,      -- maximum model scale
 		crystalMinScale = 0.35,     -- starting model scale
 		crystalMaxPerArea = 2,      -- limit new spawns if too many are near
-		areaLimitRadius = 800,      -- radius to count nearby crystals for the area limit
+		areaLimitRadius = 2000,      -- radius to count nearby crystals for the area limit
 		-- Environment grouping and regen
-		regionRadius = 900,          -- radius to group crystals into an environment cell
+		regionRadius = 2000,          -- radius to group crystals into an environment cell
 		regionRegenPerSecond = 80,   -- how much mana the environment regenerates per region per sec
 		corruptionRampPerSecond = 0.08, -- how fast corruption intensity increases while overdraw persists
 	}
