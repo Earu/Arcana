@@ -117,6 +117,74 @@ if SERVER then
 	function ENT:IsFull()
 		return (self:GetStoredMana() or 0) >= self:GetMaxMana() - 0.001
 	end
+
+	-- Allow players to dismantle a crystal by holding the Use key near it.
+	-- Dismantle duration scales with crystal size to keep it fair.
+	function ENT:ComputeDismantleDuration()
+		local minDur, maxDur = 2.0, 6.0
+		local minScale = self._minScale or 0.35
+		local maxScale = self._maxScale or 2.2
+		local s = math.Clamp(self:GetCrystalScale() or 1, minScale, maxScale)
+		local t = (s - minScale) / math.max(0.0001, maxScale - minScale)
+		return minDur + (maxDur - minDur) * t
+	end
+
+	local DISMANTLE_MAX_DIST = 128 * 128
+
+	function ENT:_CancelDismantle()
+		self._dismantler = nil
+		self._dismantleEnd = nil
+		self._dismantleStarted = nil
+		self._nextProgressBeep = nil
+	end
+
+	function ENT:_FinishDismantle(ply)
+		self:_CancelDismantle()
+		local ed = EffectData()
+		ed:SetOrigin(self:GetPos())
+		util.Effect("GlassImpact", ed, true, true)
+		self:EmitSound("physics/glass/glass_largesheet_break1.wav", 70, 100)
+		self:Remove()
+	end
+
+	function ENT:Use(activator)
+		if not IsValid(activator) or not activator:IsPlayer() then return end
+		if IsValid(self._dismantler) and self._dismantler ~= activator then return end
+		local now = CurTime()
+		self._dismantler = activator
+		self._dismantleStarted = now
+		self._dismantleEnd = now + self:ComputeDismantleDuration()
+		self._nextProgressBeep = now
+		if activator.ChatPrint then
+			activator:ChatPrint("Hold E to dismantle the crystal")
+		end
+	end
+
+	function ENT:Think()
+		if self._dismantleEnd then
+			local ply = self._dismantler
+			if not IsValid(ply) or not ply:Alive() then
+				self:_CancelDismantle()
+				return
+			end
+			local dist2 = ply:GetPos():DistToSqr(self:GetPos())
+			if dist2 > DISMANTLE_MAX_DIST or not ply:KeyDown(IN_USE) then
+				self:_CancelDismantle()
+				return
+			end
+			local now = CurTime()
+			if now >= self._dismantleEnd then
+				self:_FinishDismantle(ply)
+				return
+			end
+			if now >= (self._nextProgressBeep or 0) then
+				self:EmitSound("buttons/button16.wav", 55, 120)
+				self._nextProgressBeep = now + 0.4
+			end
+			self:NextThink(CurTime() + 0.05)
+			return true
+		end
+	end
 end
 
 if CLIENT then
