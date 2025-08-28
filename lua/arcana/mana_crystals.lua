@@ -17,6 +17,7 @@ if SERVER then
 		crystalMinScale = 0.35,     -- starting model scale
 		crystalMaxPerArea = 2,      -- limit new spawns if too many are near
 		areaLimitRadius = 2000,      -- radius to count nearby crystals for the area limit
+		hotspotSpawnCooldown = 10,   -- minimum seconds between spawns per hotspot
 		-- Environment grouping and regen
 		regionRadius = 2000,          -- radius to group crystals into an environment cell
 		regionRegenPerSecond = 80,   -- how much mana the environment regenerates per region per sec
@@ -108,16 +109,17 @@ if SERVER then
 	function M:ReportMagicUse(ply, pos, spellId, context)
 		if not isvector(pos) then return end
 		local cfg = self.Config
+		local now = CurTime()
 		-- Merge into an existing hotspot or create new
 		local h = findNearestHotspot(pos, cfg.hotspotJoinRadius)
 		if not h then
-			h = {pos = pos, value = 0, touched = CurTime()}
+			h = {pos = pos, value = 0, touched = now}
 			table.insert(self.hotspots, h)
 		end
 
 		-- Increase intensity and timestamp
 		h.value = (h.value or 0) + cfg.crystalGrowthPerCast
-		h.touched = CurTime()
+		h.touched = now
 
 		-- First, try to grow an existing crystal nearby
 		local crystal = findCrystalNear(h.pos, cfg.crystalSearchRadius)
@@ -126,8 +128,10 @@ if SERVER then
 			return
 		end
 
-		-- Otherwise, consider spawning if hotspot is strong and area is not saturated
-		if (h.value or 0) >= cfg.hotspotSpawnThreshold and countCrystalsNear(h.pos, cfg.areaLimitRadius) < cfg.crystalMaxPerArea then
+		-- Otherwise, consider spawning if hotspot is strong, area is not saturated, and cooldown passed
+		if (h.value or 0) >= cfg.hotspotSpawnThreshold
+			and countCrystalsNear(h.pos, cfg.areaLimitRadius) < cfg.crystalMaxPerArea
+			and ((h.lastSpawn or 0) + (cfg.hotspotSpawnCooldown or 0) <= now) then
 			local groundPos, nrm = groundAt(h.pos)
 			local ent = spawnCrystalAt(groundPos, nrm)
 			if IsValid(ent) and ent.AddCrystalGrowth then
@@ -135,6 +139,7 @@ if SERVER then
 			end
 			-- Reduce hotspot to avoid immediately spawning again
 			h.value = math.max(0, (h.value or 0) - cfg.hotspotSpawnThreshold * 0.75)
+			h.lastSpawn = now
 		end
 	end
 
