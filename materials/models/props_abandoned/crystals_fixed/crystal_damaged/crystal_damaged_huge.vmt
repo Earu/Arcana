@@ -1,0 +1,30 @@
+VertexLitGeneric
+{
+	// Levels: Input (71, 156) Output (61, 255)
+
+	$basetexture "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge"
+	$surfaceprop Glass
+
+	$envmap "env_cubemap"
+
+	$selfillum 1
+	$selfillumtint "[1 1 1]"
+
+	$color2 "[1 1 1]"
+
+	Proxies
+	{
+		Sine
+		{
+			resultVar "$selfillumtint"
+			sinemin 1
+			sinemax 2
+			sineperiod 2.50
+		}
+		Equals
+		{
+			srcVar1 "$color2"
+			resultVar "$envmaptint"
+		}
+	}
+}
