@@ -69,14 +69,19 @@ if SERVER then
 	resource.AddShader("arcana_crystal_surface_vs30")
 	resource.AddShader("arcana_crystal_surface_ps30")
 
+	resource.AddFile("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_a.mdl")
+	resource.AddFile("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_b.mdl")
+	resource.AddFile("materials/models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge_multi.vmt")
+	resource.AddFile("materials/models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge.vmt")
+
 	function ENT:Initialize()
-		self:SetModel("models/props_abandoned/crystals/crystal_damaged/crystal_cluster_huge_damaged_a.mdl")
-		self:SetMaterial("models/props_abandoned/crystals/crystal_damaged/crystal_damaged_huge_yellow.vmt")
+		self:SetModel("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_" .. (math.random() > 0.5 and "a" or "b") .. ".mdl")
+		self:SetMaterial("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge.vmt")
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		self:SetColor(Color(255, 0, 255))
+		self:SetColor(Color(123, 0, 255))
 
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
