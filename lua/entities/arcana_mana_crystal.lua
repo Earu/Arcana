@@ -98,6 +98,94 @@ if SERVER then
 		self:_ApplyScale(self:GetCrystalScale())
 	end
 
+	-- Spawn a shard entity with optional amount and outward impulse
+	local function SpawnShard(self, amount, dir)
+		local ent = ents.Create("arcana_crystal_shard")
+		if not IsValid(ent) then return end
+
+		local center = self:WorldSpaceCenter()
+		local normal = (dir and dir:GetNormalized()) or VectorRand():GetNormalized()
+		local spawnPos = center + normal * math.Rand(8, 20)
+		ent:SetPos(spawnPos)
+		ent:SetAngles(AngleRand())
+		ent:SetColor(self:GetColor())
+		ent:Spawn()
+		ent:Activate()
+		ent:SetShardAmount(amount or 1)
+
+		local phys = ent:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:Wake()
+			phys:SetVelocity((normal + VectorRand() * 0.2):GetNormalized() * math.Rand(300, 600))
+			phys:AddAngleVelocity(VectorRand() * 120)
+		end
+
+		constraint.NoCollide(ent, self, 0, 0)
+	end
+
+	function ENT:DropShards(count, amountPerShard, dir)
+		count = math.Clamp(math.floor(tonumber(count) or 1), 1, 12)
+		amountPerShard = math.Clamp(math.floor(tonumber(amountPerShard) or 1), 1, 10)
+		for i = 1, count do
+			SpawnShard(self, amountPerShard, dir)
+		end
+		self:EmitSound("physics/glass/glass_impact_bullet4.wav", 60, 130)
+	end
+
+	function ENT:_Shatter()
+		-- burst of shards, glass effect, remove
+		local count = math.random(8, 16)
+		for i = 1, count do
+			local dir = Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(0.1, 1))
+			SpawnShard(self, 1, dir)
+		end
+		local ed = EffectData()
+		ed:SetOrigin(self:WorldSpaceCenter())
+		util.Effect("GlassImpact", ed, true, true)
+		self:EmitSound("physics/glass/glass_largesheet_break1.wav", 70, 100)
+		self:Remove()
+	end
+
+	function ENT:OnTakeDamage(dmginfo)
+		local dmg = math.max(0, dmginfo and dmginfo:GetDamage() or 0)
+		if dmg <= 0 then return end
+
+		-- Compute ejection direction away from the attacker side (fallbacks to hit pos/force)
+		local dir
+		local attacker = dmginfo and dmginfo.GetAttacker and dmginfo:GetAttacker() or nil
+		if IsValid(attacker) then
+			local apos = attacker.WorldSpaceCenter and attacker:WorldSpaceCenter() or attacker:GetPos()
+			dir = (self:WorldSpaceCenter() - apos)
+		elseif dmginfo and dmginfo.GetDamagePosition then
+			local hpos = dmginfo:GetDamagePosition()
+			if isvector(hpos) then
+				dir = (self:WorldSpaceCenter() - hpos)
+			end
+		end
+
+		if not dir or dir:IsZero() then
+			dir = (dmginfo and dmginfo.GetDamageForce and dmginfo:GetDamageForce()) or VectorRand()
+		end
+
+		-- Chance to drop shards scales with damage
+		local chance = math.Clamp(0.15 + (dmg * 0.01), 0.15, 0.9)
+		if math.Rand(0, 1) <= chance then
+			local num = math.Clamp(math.floor(1 + dmg / 35), 1, 6)
+			self:DropShards(num, 1, dir)
+		end
+
+		-- Reduce size based on damage
+		local s = math.max(self._minScale or 0.35, tonumber(self:GetCrystalScale()) or 1)
+		local delta = 0.02 + dmg * 0.002
+		local newS = math.max(self._minScale or 0.35, s - delta)
+		self:SetCrystalScale(newS)
+
+		-- Shatter if at minimum scale
+		if newS <= (self._minScale or 0.35) + 0.0001 then
+			self:_Shatter()
+		end
+	end
+
 	function ENT:AddCrystalGrowth(points)
 		self._growth = math.max(0, (self._growth or 0) + (tonumber(points) or 0))
 		local frac = math.Clamp(self._growth / 300, 0, 1)
@@ -120,76 +208,7 @@ if SERVER then
 		return add
 	end
 
-	function ENT:IsFull()
-		return (self:GetStoredMana() or 0) >= self:GetMaxMana() - 0.001
-	end
-
-	-- Allow players to dismantle a crystal by holding the Use key near it.
-	-- Dismantle duration scales with crystal size to keep it fair.
-	function ENT:ComputeDismantleDuration()
-		local minDur, maxDur = 2.0, 6.0
-		local minScale = self._minScale or 0.35
-		local maxScale = self._maxScale or 2.2
-		local s = math.Clamp(self:GetCrystalScale() or 1, minScale, maxScale)
-		local t = (s - minScale) / math.max(0.0001, maxScale - minScale)
-		return minDur + (maxDur - minDur) * t
-	end
-
-	local DISMANTLE_MAX_DIST = 128 * 128
-
-	function ENT:_CancelDismantle()
-		self._dismantler = nil
-		self._dismantleEnd = nil
-		self._dismantleStarted = nil
-		self._nextProgressBeep = nil
-	end
-
-	function ENT:_FinishDismantle(ply)
-		self:_CancelDismantle()
-		local ed = EffectData()
-		ed:SetOrigin(self:GetPos())
-		util.Effect("GlassImpact", ed, true, true)
-		self:EmitSound("physics/glass/glass_largesheet_break1.wav", 70, 100)
-		self:Remove()
-	end
-
-	function ENT:Use(activator)
-		if not IsValid(activator) or not activator:IsPlayer() then return end
-		if IsValid(self._dismantler) and self._dismantler ~= activator then return end
-		local now = CurTime()
-		self._dismantler = activator
-		self._dismantleStarted = now
-		self._dismantleEnd = now + self:ComputeDismantleDuration()
-		self._nextProgressBeep = now
-		if activator.ChatPrint then
-			activator:ChatPrint("Hold E to dismantle the crystal")
-		end
-	end
-
 	function ENT:Think()
-		if self._dismantleEnd then
-			local ply = self._dismantler
-			if not IsValid(ply) or not ply:Alive() then
-				self:_CancelDismantle()
-				return
-			end
-			local dist2 = ply:GetPos():DistToSqr(self:GetPos())
-			if dist2 > DISMANTLE_MAX_DIST or not ply:KeyDown(IN_USE) then
-				self:_CancelDismantle()
-				return
-			end
-			local now = CurTime()
-			if now >= self._dismantleEnd then
-				self:_FinishDismantle(ply)
-				return
-			end
-			if now >= (self._nextProgressBeep or 0) then
-				self:EmitSound("buttons/button16.wav", 55, 120)
-				self._nextProgressBeep = now + 0.4
-			end
-			self:NextThink(CurTime() + 0.05)
-			return true
-		end
 	end
 end
 
