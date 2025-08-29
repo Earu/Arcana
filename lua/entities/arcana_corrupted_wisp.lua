@@ -6,6 +6,8 @@ ENT.Category = "Arcana"
 ENT.Spawnable = false
 ENT.AdminOnly = false
 ENT.RenderGroup = RENDERGROUP_BOTH
+ENT.PhysgunDisabled = true
+ENT.ms_notouch = true
 
 local GLYPHS = {"Γ", "Δ", "Θ", "Λ", "Ξ", "Π", "Σ", "Φ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ξ", "π", "φ", "ψ", "ω"}
 
