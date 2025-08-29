@@ -27,7 +27,7 @@ if SERVER then
 		end
 
 		self._amount = self._amount or 1
-		SafeRemoveEntityDelayed(self, 120)
+		SafeRemoveEntityDelayed(self, 40)
 
 		-- Subtle looping hum (softer)
 		self._hum = CreateSound(self, "ambient/levels/citadel/field_loop3.wav")

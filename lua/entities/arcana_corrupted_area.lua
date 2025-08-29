@@ -16,6 +16,10 @@ end
 if SERVER then
 	resource.AddShader("arcana_corruption_ps30")
 
+	function ENT:UpdateTransmitState()
+		return TRANSMIT_ALWAYS
+	end
+
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
 		self:SetMoveType(MOVETYPE_NONE)
