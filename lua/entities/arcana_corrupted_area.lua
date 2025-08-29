@@ -6,6 +6,8 @@ ENT.Category = "Arcana"
 ENT.Spawnable = false
 ENT.AdminOnly = false
 ENT.RenderGroup = RENDERGROUP_BOTH
+ENT.PhysgunDisabled = true
+ENT.ms_notouch = true
 require("shader_to_gma")
 
 function ENT:SetupDataTables()
