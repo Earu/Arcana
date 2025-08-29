@@ -24,6 +24,9 @@ function ENT:SetupDataTables()
 		if ent._ApplyScale then
 			ent:_ApplyScale(new)
 		end
+		if ent._OnScaleChanged then
+			ent:_OnScaleChanged(new)
+		end
 	end)
 end
 
@@ -39,6 +42,30 @@ function ENT:_ApplyScale(scale)
 	-- adjust absorb radius with size subtly
 	if self.SetAbsorbRadius then
 		self:SetAbsorbRadius(520 * (0.6 + (s - self._minScale) / (self._maxScale - self._minScale + 0.0001) * 0.8))
+	end
+end
+
+-- Health scales with crystal size. Server-only state is fine; health is ephemeral.
+function ENT:GetMaxHealthFromScale()
+	local minScale = self._minScale or 0.35
+	local maxScale = self._maxScale or 2.2
+	local s = math.Clamp(self:GetCrystalScale() or 1, minScale, maxScale)
+	local t = (s - minScale) / math.max(0.0001, maxScale - minScale)
+	local minHP = 150
+	local maxHP = 800
+	return minHP + (maxHP - minHP) * t
+end
+
+function ENT:_OnScaleChanged(_)
+	if SERVER then
+		local newMax = math.floor(self:GetMaxHealthFromScale())
+		self._maxHealth = newMax
+		-- Do not heal on growth; just clamp if current exceeds new max
+		if self._health then
+			self._health = math.min(self._health, newMax)
+		else
+			self._health = newMax
+		end
 	end
 end
 
@@ -83,7 +110,7 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		self:SetColor(Color(123, 0, 255))
+		self:SetColor(Color(255, 0, 123))
 
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
@@ -96,14 +123,16 @@ if SERVER then
 		self._maxScale = 2.2
 		self._minScale = 0.35
 		self:_ApplyScale(self:GetCrystalScale())
+		-- Initialize health based on current scale
+		self:_OnScaleChanged(self:GetCrystalScale())
 	end
 
 	-- Spawn a shard entity with optional amount and outward impulse
-	local function SpawnShard(self, amount, dir)
+	local function SpawnShard(self, amount, dir, crystalPos)
 		local ent = ents.Create("arcana_crystal_shard")
 		if not IsValid(ent) then return end
 
-		local center = self:WorldSpaceCenter()
+		local center = crystalPos or self:WorldSpaceCenter()
 		local normal = (dir and dir:GetNormalized()) or VectorRand():GetNormalized()
 		local spawnPos = center + normal * math.Rand(8, 20)
 		ent:SetPos(spawnPos)
@@ -123,11 +152,11 @@ if SERVER then
 		constraint.NoCollide(ent, self, 0, 0)
 	end
 
-	function ENT:DropShards(count, amountPerShard, dir)
+	function ENT:DropShards(count, amountPerShard, dir, crystalPos)
 		count = math.Clamp(math.floor(tonumber(count) or 1), 1, 12)
 		amountPerShard = math.Clamp(math.floor(tonumber(amountPerShard) or 1), 1, 10)
 		for i = 1, count do
-			SpawnShard(self, amountPerShard, dir)
+			SpawnShard(self, amountPerShard, dir, crystalPos)
 		end
 		self:EmitSound("physics/glass/glass_impact_bullet4.wav", 60, 130)
 	end
@@ -147,41 +176,33 @@ if SERVER then
 	end
 
 	function ENT:OnTakeDamage(dmginfo)
-		local dmg = math.max(0, dmginfo and dmginfo:GetDamage() or 0)
+		local dmg = math.max(0, dmginfo:GetDamage())
 		if dmg <= 0 then return end
 
-		-- Compute ejection direction away from the attacker side (fallbacks to hit pos/force)
+		-- Compute ejection direction
 		local dir
-		local attacker = dmginfo and dmginfo.GetAttacker and dmginfo:GetAttacker() or nil
+		local attacker = dmginfo:GetAttacker()
+		local crystalPos = self:WorldSpaceCenter()
 		if IsValid(attacker) then
-			local apos = attacker.WorldSpaceCenter and attacker:WorldSpaceCenter() or attacker:GetPos()
-			dir = (self:WorldSpaceCenter() - apos)
-		elseif dmginfo and dmginfo.GetDamagePosition then
-			local hpos = dmginfo:GetDamagePosition()
-			if isvector(hpos) then
-				dir = (self:WorldSpaceCenter() - hpos)
-			end
+			local tr = attacker:GetEyeTrace()
+			crystalPos = tr.Entity == self and tr.HitPos or crystalPos
+			dir = -(crystalPos - attacker:WorldSpaceCenter())
 		end
 
 		if not dir or dir:IsZero() then
-			dir = (dmginfo and dmginfo.GetDamageForce and dmginfo:GetDamageForce()) or VectorRand()
+			dir = dmginfo:GetDamageForce()
 		end
 
 		-- Chance to drop shards scales with damage
 		local chance = math.Clamp(0.15 + (dmg * 0.01), 0.15, 0.9)
 		if math.Rand(0, 1) <= chance then
 			local num = math.Clamp(math.floor(1 + dmg / 35), 1, 6)
-			self:DropShards(num, 1, dir)
+			self:DropShards(num, 1, dir, crystalPos)
 		end
 
-		-- Reduce size based on damage
-		local s = math.max(self._minScale or 0.35, tonumber(self:GetCrystalScale()) or 1)
-		local delta = 0.02 + dmg * 0.002
-		local newS = math.max(self._minScale or 0.35, s - delta)
-		self:SetCrystalScale(newS)
-
-		-- Shatter if at minimum scale
-		if newS <= (self._minScale or 0.35) + 0.0001 then
+		-- Apply health damage and shatter at zero
+		self._health = math.max(0, math.floor((self._health or self:GetMaxHealthFromScale()) - dmg))
+		if self._health <= 0 then
 			self:_Shatter()
 		end
 	end
@@ -383,8 +404,7 @@ if CLIENT then
 
 		local dl = DynamicLight(self:EntIndex())
 		if dl then
-			local center = getCorePos(self)
-			dl.pos = center
+			dl.pos = self:GetPos() + Vector(0, 0, 10)
 			dl.r = curColor.r
 			dl.g = curColor.g
 			dl.b = curColor.b
