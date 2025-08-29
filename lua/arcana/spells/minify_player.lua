@@ -17,7 +17,7 @@ end
 
 Arcane:RegisterSpell({
 	id = "minify_player",
-	name = "Minify Player",
+	name = "Minify",
 	description = "Minifies the target player of the spell momentarily, or yourself if no player is in your crosshair!",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 4,
@@ -56,7 +56,6 @@ Arcane:RegisterSpell({
 		end
 	end,
 	trigger_phrase_aliases = {
-		"minify",
 		"shrink",
 	}
 })
