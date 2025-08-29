@@ -33,7 +33,9 @@ function ENT:_ApplyScale(scale)
 	self._minScale = self._minScale or 0.35
 	self._maxScale = self._maxScale or 2.2
 	local s = math.Clamp(tonumber(scale) or 1, self._minScale, self._maxScale)
-	self:SetModelScale(s, 0)
+	self:SetModelScale(s)
+	self:Activate()
+
 	-- adjust absorb radius with size subtly
 	if self.SetAbsorbRadius then
 		self:SetAbsorbRadius(520 * (0.6 + (s - self._minScale) / (self._maxScale - self._minScale + 0.0001) * 0.8))
@@ -89,7 +91,6 @@ if SERVER then
 			phys:EnableMotion(false)
 		end
 
-		self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 		self:DrawShadow(true)
 		self._growth = 0
 		self._maxScale = 2.2
