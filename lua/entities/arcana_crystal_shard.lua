@@ -61,7 +61,7 @@ if SERVER then
 
 		local amount = self:GetShardAmount()
 		ply:GiveItem("mana_crystal_shard", amount)
-		self:EmitSound("items/smallmedkit1.wav", 60, 135)
+		self:EmitSound("physics/glass/glass_cup_break1.wav", 70, math.random(190, 210), 0.75)
 
 		local ed = EffectData()
 		ed:SetOrigin(self:WorldSpaceCenter())
@@ -78,7 +78,7 @@ if SERVER then
 
 	function ENT:PhysicsCollide(data, phys)
 		if data.Speed > 60 then
-			self:EmitSound("physics/glass/glass_impact_soft1.wav", 55, 140)
+			self:EmitSound("physics/glass/glass_cup_break2.wav", 70, math.random(190, 210), 0.75)
 		end
 
 		if IsValid(phys) and data.Speed > 150 then
