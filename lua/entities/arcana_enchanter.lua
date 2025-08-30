@@ -5,6 +5,7 @@ ENT.PrintName = "Enchanter"
 ENT.Category = "Arcana"
 ENT.Spawnable = true
 ENT.AdminSpawnable = true
+ENT.AdminOnly = true
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.UseCooldown = 0.75
 ENT.HintDistance = 140
