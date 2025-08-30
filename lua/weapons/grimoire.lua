@@ -795,7 +795,7 @@ if CLIENT then
 		self.MenuOpen = true
 		-- Create the menu frame
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(820, 560)
+		frame:SetSize(980, 600)
 		frame:Center()
 		frame:SetTitle("")
 		frame:SetVisible(true)
@@ -814,7 +814,7 @@ if CLIENT then
 		frame.Paint = function(pnl, w, h)
 			-- Full solid fallback to avoid any missing textures from default skin
 			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
-			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
+			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14, false)
 			-- Title
 			local titleText = string.upper("Grimoire")
 			surface.SetFont("Arcana_DecoTitle")
@@ -913,17 +913,17 @@ if CLIENT then
 		local left = vgui.Create("DPanel", content)
 		left:Dock(LEFT)
 		left:SetWide(440)
-		left:DockMargin(0, 0, 8, 0)
+		left:DockMargin(0, 0, 4, 0)
 		left._hoverSlot = nil
 
 		left.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
+			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12, false)
 			draw.SimpleText(string.upper("Quick Access"), "Arcana_Ancient", 14, 10, paleGold)
 			-- Center the wheel within the left panel using a content box (account for title area)
-			local titlePadTop = 36
+			local titlePadTop = 32
 			local padSide = 16
-			local padBottom = 18
+			local padBottom = 12
 			local contentW = w - padSide * 2
 			local contentH = h - titlePadTop - padBottom
 			local cx = padSide + contentW * 0.5
@@ -1044,20 +1044,20 @@ if CLIENT then
 
 		middle.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
+			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12, false)
 			draw.SimpleText(string.upper("Learned Spells"), "Arcana_Ancient", 14, 10, paleGold)
 		end
 
 		local listScroll = vgui.Create("DScrollPanel", middle)
 		listScroll:Dock(FILL)
-		listScroll:DockMargin(12, 36, 12, 12)
+		listScroll:DockMargin(12, 28, 12, 12)
 		local vbar = listScroll:GetVBar()
 		vbar:SetWide(8)
 
 		vbar.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
 			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8, false)
 			surface.DisableClipping(false)
 		end
 
@@ -1086,7 +1086,7 @@ if CLIENT then
 			local row = vgui.Create("DButton", listScroll)
 			row:Dock(TOP)
 			row:SetTall(56)
-			row:DockMargin(0, 0, 0, 6)
+			row:DockMargin(0, 0, 8, 6)
 			row:SetText("")
 			row.SpellId = item.id
 			row:Droppable("arcana_spell")
@@ -1176,13 +1176,13 @@ if CLIENT then
 			row.Paint = function(pnl, w, h)
 				local hovered = pnl:IsHovered()
 				Arcana_FillDecoPanel(2, 2, w - 4, h - 4, hovered and cardHover or cardIdle, 8)
-				Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
+				Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8, false)
 				draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, textBright)
 				-- Subline: cost only
 				local ca = tonumber(sp.cost_amount or 0) or 0
 				local ct = tostring(sp.cost_type or "")
 				local sub = string.format("Cost %s %s", string.Comma(ca), ct)
-				draw.SimpleText(sub, "Arcana_Ancient", 12, 34, textDim)
+				draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, textDim)
 			end
 
 			-- Cast button on the right side of the row
