@@ -171,6 +171,14 @@ if CLIENT then
 	net.Receive("shader_to_gma", function()
 		local base64 = net.ReadString()
 		local data = util.Base64Decode(base64)
+
+		-- clear old gma files
+		local files = file.Find("data/shader_to_gma_*.gma", "MOD")
+		for _, f in ipairs(files) do
+			file.Delete(f)
+		end
+
+		-- create new gma file
 		local fileName = "shader_to_gma_" .. os.time() .. ".gma"
 		file.Write(fileName, data)
 		local ok, err = game.MountGMA("data/" .. fileName)
@@ -181,8 +189,6 @@ if CLIENT then
 			log("Mounted GMA")
 			PrintTable(err)
 		end
-
-		file.Delete(fileName)
 	end)
 
 	local shader_mat = [==[
