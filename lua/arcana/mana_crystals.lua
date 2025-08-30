@@ -13,6 +13,7 @@ if SERVER then
 
 		crystalSearchRadius = 2000,  -- try to find/grow an existing crystal within this distance
 		crystalGrowthPerCast = 6,   -- growth points added per cast nearby
+		crystalSpawnInitialGrowth = 6, -- initial growth given to freshly spawned crystals
 		crystalMaxScale = 2.2,      -- maximum model scale
 		crystalMinScale = 0.35,     -- starting model scale
 		crystalMaxPerArea = 2,      -- limit new spawns if too many are near
@@ -135,7 +136,9 @@ if SERVER then
 			local groundPos, nrm = groundAt(h.pos)
 			local ent = spawnCrystalAt(groundPos, nrm)
 			if IsValid(ent) and ent.AddCrystalGrowth then
-				ent:AddCrystalGrowth(h.value)
+				-- New crystals should start small; only seed with a minimal growth amount
+				local seedGrowth = cfg.crystalSpawnInitialGrowth or cfg.crystalGrowthPerCast or 0
+				ent:AddCrystalGrowth(seedGrowth)
 			end
 			-- Reduce hotspot to avoid immediately spawning again
 			h.value = math.max(0, (h.value or 0) - cfg.hotspotSpawnThreshold * 0.75)
