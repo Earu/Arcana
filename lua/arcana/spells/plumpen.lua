@@ -43,7 +43,7 @@ hook.Add("InitPostEntity", "arcana_plumpen_player", function()
 			if not target.GetFatness then return false end
 			if not SERVER then return true end
 
-			target:SetFatness(me:GetFatness() + 100)
+			target:SetFatness(target:GetFatness() + 100)
 			target:EmitSound("player/suit_sprint.wav", 70, 90)
 			bandvfx(target)
 
