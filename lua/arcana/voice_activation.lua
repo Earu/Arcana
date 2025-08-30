@@ -94,24 +94,6 @@ function Arcane:RemoveTriggerPhrase(phrase)
 	timer.Create("Arcana_VoiceActivation_BuildGrammar", 1, 1, buildGrammar)
 end
 
-hook.Add("PlayerStartVoice", "Arcana_VoiceActivation", function(ply)
-	if not SPEECH then return end
-	if ply ~= LocalPlayer() then return end
-
-	SPEECH:pause()
-	SPEECH:reco_state("active")
-	SPEECH:resume()
-end)
-
-hook.Add("PlayerEndVoice", "Arcana_VoiceActivation", function(ply)
-	if not SPEECH then return end
-	if ply ~= LocalPlayer() then return end
-
-	SPEECH:pause()
-	SPEECH:reco_state("inactive")
-	SPEECH:resume()
-end)
-
 local function holdingGrimoire()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return false end
@@ -133,6 +115,7 @@ hook.Add("Think", "Arcana_VoiceActivation", function()
 
 	if num == 0 then return end
 	if not holdingGrimoire() then return end
+	if not LocalPlayer():IsSpeaking() then return end
 
 	for _, event in pairs(events) do
 		local spell_id = event.text and triggerPhrases[event.text]
