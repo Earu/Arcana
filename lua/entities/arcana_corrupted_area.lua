@@ -8,7 +8,6 @@ ENT.AdminOnly = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.PhysgunDisabled = true
 ENT.ms_notouch = true
-require("shader_to_gma")
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "Radius")
@@ -16,8 +15,6 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
-	resource.AddShader("arcana_corruption_ps20b")
-
 	function ENT:UpdateTransmitState()
 		return TRANSMIT_ALWAYS
 	end
@@ -212,15 +209,6 @@ if CLIENT then
 
 		return math.floor(lerp(r1, r2, t)), math.floor(lerp(g1, g2, t)), math.floor(lerp(b1, b2, t))
 	end
-
-	-- Subtle darkening overlay for corrupted area
-	local DARKEN_MAT = CreateMaterial("arcana_corruption_darken", "UnlitGeneric", {
-		["$basetexture"] = "color/black",
-		["$alpha"] = "0.18",
-		["$additive"] = "0",
-		["$translucent"] = "1"
-	})
-
 	-- Dedicated font for corrupted glyphs (avoid dependency on circles.lua fonts)
 	surface.CreateFont("Arcana_CorruptGlyph", {
 		font = "Arial",
@@ -250,35 +238,20 @@ if CLIENT then
 		local player_pos = LocalPlayer():GetPos()
 		local distance = player_pos:Distance(world_pos)
 		local radius = math.max(1, self:GetRadius() or 500)
-		local tscale = self._intensityScale or 0.5
-		local shaderIntensity = math.Clamp(self:GetIntensity() or 1, 0, 2)
-		-- Update framebuffer for post-processing
-		render.UpdateScreenEffectTexture()
-		-- Bind the current screen effect texture explicitly each frame
-		self.ShaderMat:SetTexture("$basetexture", render.GetScreenEffectTexture())
-		self.ShaderMat:SetFloat("$c0_x", CurTime())
-		-- Tunables with subtle flicker/jitter
-		local t = CurTime()
-		self.ShaderMat:SetFloat("$c0_y", shaderIntensity)
-		self.ShaderMat:SetFloat("$c1_x", 0.5 + 0.02 * math.sin(t * 1.9))
-		self.ShaderMat:SetFloat("$c1_y", 0.5 + 0.02 * math.cos(t * 2.3))
-		self.ShaderMat:SetFloat("$c0_z", 1.7)
-		self.ShaderMat:SetFloat("$c0_w", 0) -- World-space mode
+		-- intensity still drives overlay/glyphs, but no custom shader needed
 
-		local function drawDarkOverlay()
-			render.SetMaterial(DARKEN_MAT)
-			if tscale <= 0 then return end
-			local old = render.GetBlend()
-			render.SetBlend(math.Clamp(tscale, 0, 1))
-			render.DrawScreenQuad()
-			render.SetBlend(old)
-		end
+
+		-- Compute post-process values from intensity: colour 1→0, contrast 1→2
+		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		local t = k * 0.5
+		local cm = {
+			["$pp_colour_contrast"] = 1 + t,
+			["$pp_colour_colour"] = 1 - t,
+		}
 
 		if distance < radius then
-			-- Inside corruption volume: full-screen pass + darken overlay
-			render.SetMaterial(self.ShaderMat)
-			render.DrawScreenQuad()
-			drawDarkOverlay()
+			-- Inside corruption volume: apply post-processing + darken overlay
+			DrawColorModify(cm)
 		else
 			-- Outside: mask with a 3D sphere in the stencil buffer
 			render.SetStencilEnable(true)
@@ -300,10 +273,8 @@ if CLIENT then
 			cam.PopModelMatrix()
 			render.SetStencilCompareFunction(STENCIL_EQUAL)
 			render.SetStencilPassOperation(STENCIL_KEEP)
-			render.SetMaterial(self.ShaderMat)
-			render.DrawScreenQuad()
-			-- Darken within the mask as well
-			drawDarkOverlay()
+			-- Apply post-processing within stencil
+			DrawColorModify(cm)
 			render.SetStencilEnable(false)
 		end
 	end
@@ -393,24 +364,6 @@ if CLIENT then
 	end
 
 	function ENT:Initialize()
-		self.ShaderMat = CreateShaderMaterial("arcana_corruption_" .. self:EntIndex(), {
-			["$pixshader"] = "arcana_corruption_ps20b",
-			["$c0_x"] = 0,
-			["$c0_y"] = 0.8,
-			["$c0_z"] = 0.4,
-			["$c0_w"] = 0.0,
-			["$c1_x"] = 0.5,
-			["$c1_y"] = 0.5,
-			["$c1_z"] = 0.4,
-			["$c1_w"] = 0.6,
-		})
-
-		-- Hook to draw corruption screenspace effect
-		hook.Add("PostDrawOpaqueRenderables", self, function(_, _, _, sky3d)
-			if sky3d then return end
-			drawCorruption(self)
-		end)
-
 		self:PrepareCorruptGlyphs()
 		updateRenderBounds(self)
 		self._lastUpdate = CurTime()
@@ -554,6 +507,8 @@ if CLIENT then
 			end
 		end
 		--cam.IgnoreZ(false)
+
+		drawCorruption(self)
 	end
 
 	function ENT:Draw()
