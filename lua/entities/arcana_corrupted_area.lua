@@ -254,6 +254,8 @@ if CLIENT then
 		local shaderIntensity = math.Clamp(self:GetIntensity() or 1, 0, 2)
 		-- Update framebuffer for post-processing
 		render.UpdateScreenEffectTexture()
+		-- Bind the current screen effect texture explicitly each frame
+		self.ShaderMat:SetTexture("$basetexture", render.GetScreenEffectTexture())
 		self.ShaderMat:SetFloat("$c0_x", CurTime())
 		-- Tunables with subtle flicker/jitter
 		local t = CurTime()
@@ -393,7 +395,6 @@ if CLIENT then
 	function ENT:Initialize()
 		self.ShaderMat = CreateShaderMaterial("arcana_corruption_" .. self:EntIndex(), {
 			["$pixshader"] = "arcana_corruption_ps20b",
-			["$basetexture"] = "_rt_FullFrameFB",
 			["$c0_x"] = 0,
 			["$c0_y"] = 0.8,
 			["$c0_z"] = 0.4,
