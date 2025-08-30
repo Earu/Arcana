@@ -485,22 +485,7 @@ if CLIENT then
 
 				cam.Start3D2D(worldPos, ang, GLYPH_SCALE)
 				local txt = p.char or "*"
-				-- Color based on entity intensity: white -> purple -> deep blue
-				local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
-				local t01 = k * 0.5 -- map [0..2] to [0..1]
-				local cr, cg, cb
-
-				if t01 <= 0.5 then
-					local tt = smoothstep(0.0, 0.5, t01)
-					-- White -> Near-Blue Purple (almost blue)
-					cr, cg, cb = lerpColor(tt, 255, 255, 255, 80, 100, 255)
-				else
-					local tt = smoothstep(0.5, 1.0, t01)
-					-- Near-Blue Purple -> Deep Blue
-					cr, cg, cb = lerpColor(tt, 80, 100, 255, 34, 0, 255)
-				end
-
-				surface.SetTextColor(cr, cg, cb, alpha)
+				surface.SetTextColor(180, 180, 180, alpha)
 				surface.SetTextPos(-18 + jx, -math.floor(p.h or 0) + jy)
 				surface.DrawText(txt)
 				cam.End3D2D()

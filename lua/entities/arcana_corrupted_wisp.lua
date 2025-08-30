@@ -27,7 +27,7 @@ if SERVER then
 	function ENT:Initialize()
 		self:SetModel("models/hunter/misc/sphere025x025.mdl")
 		self:SetMaterial("models/shiny")
-		self:SetColor(Color(60, 80, 150, 10))
+		self:SetColor(Color(150, 150, 150, 10))
 		self:SetRenderMode(RENDERMODE_TRANSCOLOR)
 		self:SetModelScale(1.1, 0)
 		self:SetMoveType(MOVETYPE_FLY)
@@ -358,9 +358,9 @@ if CLIENT then
 
 		if d then
 			d.pos = self:GetPos()
-			d.r = 120
-			d.g = 80
-			d.b = 220
+			d.r = 150
+			d.g = 150
+			d.b = 150
 			d.brightness = 3
 			d.Decay = 800
 			d.Size = 220
