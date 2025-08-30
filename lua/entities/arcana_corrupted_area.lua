@@ -196,19 +196,14 @@ if CLIENT then
 		["$translucent"] = "1"
 	})
 
-	local function smoothstep(edge0, edge1, x)
-		x = math.Clamp((x - edge0) / math.max(1e-6, edge1 - edge0), 0, 1)
+	-- Subtle darkening overlay for corrupted area
+	local DARKEN_MAT = CreateMaterial("arcana_corruption_darken", "UnlitGeneric", {
+		["$basetexture"] = "color/black",
+		["$alpha"] = "0.18",
+		["$additive"] = "0",
+		["$translucent"] = "1"
+	})
 
-		return x * x * (3 - 2 * x)
-	end
-
-	local function lerpColor(t, r1, g1, b1, r2, g2, b2)
-		local function lerp(a, b, t2)
-			return a + (b - a) * t2
-		end
-
-		return math.floor(lerp(r1, r2, t)), math.floor(lerp(g1, g2, t)), math.floor(lerp(b1, b2, t))
-	end
 	-- Dedicated font for corrupted glyphs (avoid dependency on circles.lua fonts)
 	surface.CreateFont("Arcana_CorruptGlyph", {
 		font = "Arial",
@@ -238,20 +233,39 @@ if CLIENT then
 		local player_pos = LocalPlayer():GetPos()
 		local distance = player_pos:Distance(world_pos)
 		local radius = math.max(1, self:GetRadius() or 500)
-		-- intensity still drives overlay/glyphs, but no custom shader needed
 
-
-		-- Compute post-process values from intensity: colour 1→0, contrast 1→2
+		-- Remap intensity k in [0.5..2.0] -> s in [0..1], ensure visibility <0.9
 		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
-		local t = k * 0.5
+		local s0 = math.Clamp((k - 0.5) / 1.5, 0, 1)
+		local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
+		local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
+		-- Compute post-process values from s: moderate contrast, clear desaturation, slight darken
 		local cm = {
-			["$pp_colour_contrast"] = 1 + t,
-			["$pp_colour_colour"] = 1 - t,
+			["$pp_colour_addr"] = 0,
+			["$pp_colour_addg"] = 0,
+			["$pp_colour_addb"] = 0,
+			["$pp_colour_brightness"] = -0.04 * s,
+			["$pp_colour_contrast"] = 1 + 1.0 * s,
+			["$pp_colour_colour"] = math.max(0, 1 - 1.1 * s),
+			["$pp_colour_mulr"] = 0,
+			["$pp_colour_mulg"] = 0,
+			["$pp_colour_mulb"] = 0,
 		}
+
+		local function drawDarkOverlay(strength)
+			if strength <= 0 then return end
+			render.SetMaterial(DARKEN_MAT)
+			local old = render.GetBlend()
+			-- Darken scales with intensity (more visible at low s)
+			render.SetBlend(math.Clamp(0.18 * (strength ^ 0.8), 0, 0.26))
+			render.DrawScreenQuad()
+			render.SetBlend(old)
+		end
 
 		if distance < radius then
 			-- Inside corruption volume: apply post-processing + darken overlay
 			DrawColorModify(cm)
+			drawDarkOverlay(s)
 		else
 			-- Outside: mask with a 3D sphere in the stencil buffer
 			render.SetStencilEnable(true)
@@ -275,6 +289,7 @@ if CLIENT then
 			render.SetStencilPassOperation(STENCIL_KEEP)
 			-- Apply post-processing within stencil
 			DrawColorModify(cm)
+			drawDarkOverlay(s)
 			render.SetStencilEnable(false)
 		end
 	end
