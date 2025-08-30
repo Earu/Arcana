@@ -20,6 +20,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_Enchanter_Deposit")
 	util.AddNetworkString("Arcana_Enchanter_Withdraw")
 	util.AddNetworkString("Arcana_Enchanter_Apply")
+	util.AddNetworkString("Arcana_Enchanter_ApplyBatch")
 
 	function ENT:Initialize()
 		self:SetModel("models/props_lab/reciever01b.mdl")
@@ -154,6 +155,77 @@ if SERVER then
 		end
 		ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
 	end)
+
+	-- Batch apply: aggregate costs, deduct once, then apply all
+	net.Receive("Arcana_Enchanter_ApplyBatch", function(_, ply)
+		local ent = net.ReadEntity()
+		local list = net.ReadTable() or {}
+		if not IsValid(ent) or ent:GetClass() ~= "arcana_enchanter" then return end
+		local cls = ent:GetContainedClass()
+		if not cls or cls == "" then return end
+		if not istable(list) or #list == 0 then return end
+		-- Collect enchantments
+		local enchs = {}
+		for _, id in ipairs(list) do
+			local e = Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[id]
+			if e then table.insert(enchs, {id = id, ench = e}) end
+		end
+		if #enchs == 0 then return end
+		-- Optional applicability check (use a single dummy)
+		local dummy = ents.Create(cls)
+		if IsValid(dummy) then dummy:Remove() end
+		for _, it in ipairs(enchs) do
+			if it.ench.can_apply then
+				local ok, reason = pcall(it.ench.can_apply, ply, dummy)
+				if not ok or reason == false then
+					if Arcane and Arcane.SendErrorNotification then
+						Arcane:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. tostring(reason or "invalid"))
+					end
+					return
+				end
+			end
+		end
+		-- Aggregate costs
+		local sumCoins = 0
+		local itemTotals = {}
+		for _, it in ipairs(enchs) do
+			sumCoins = sumCoins + (tonumber(it.ench.cost_coins or 0) or 0)
+			for _, it2 in ipairs(it.ench.cost_items or {}) do
+				local name = tostring(it2.name or "")
+				local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+				if name ~= "" then
+					itemTotals[name] = (itemTotals[name] or 0) + amt
+				end
+			end
+		end
+		-- Affordability check
+		local coins = (ply.GetCoins and ply:GetCoins()) or 0
+		if coins < sumCoins then
+			if Arcane and Arcane.SendErrorNotification then
+				Arcane:SendErrorNotification(ply, "Insufficient coins")
+			end
+			return
+		end
+		for name, amt in pairs(itemTotals) do
+			local have = (ply.GetItemCount and ply:GetItemCount(name)) or 0
+			if have < amt then
+				if Arcane and Arcane.SendErrorNotification then
+					Arcane:SendErrorNotification(ply, "Missing item: " .. tostring(name))
+				end
+				return
+			end
+		end
+		-- Deduct
+		if sumCoins > 0 and ply.TakeCoins then ply:TakeCoins(sumCoins) end
+		for name, amt in pairs(itemTotals) do
+			if ply.TakeItem then ply:TakeItem(name, amt) end
+		end
+		-- Apply all
+		for _, it in ipairs(enchs) do
+			Arcane:ApplyEnchantmentToWeapon(ply, cls, it.id)
+		end
+		ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
+	end)
 end
 
 if CLIENT then
@@ -186,7 +258,22 @@ if CLIENT then
 	local decoPanel = Color(32, 24, 18, 235)
 	local gold = Color(198, 160, 74, 255)
 	local textBright = Color(236, 230, 220, 255)
-	local textDim = Color(180, 170, 150, 255)
+	local paleGold = Color(222, 198, 120, 255)
+
+	-- Blur helper (same as grimoire menu)
+	local blurMat = Material("pp/blurscreen")
+	local function Arcana_DrawBlurRect(x, y, w, h, layers, density)
+		surface.SetMaterial(blurMat)
+		surface.SetDrawColor(255, 255, 255)
+		render.SetScissorRect(x, y, x + w, y + h, true)
+		for i = 1, (layers or 4) do
+			blurMat:SetFloat("$blur", (i / (layers or 4)) * (density or 8))
+			blurMat:Recompute()
+			render.UpdateScreenEffectTexture()
+			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		end
+		render.SetScissorRect(0, 0, 0, 0, false)
+	end
 
 	-- UI-only glyph helpers to enrich the circle visuals (standalone from circles.lua)
 	local GREEK_PHRASES = {
@@ -322,6 +409,11 @@ if CLIENT then
 		frame:Center()
 		frame:SetTitle("")
 		frame:MakePopup()
+		-- Screen-space blur behind frame (like grimoire)
+		hook.Add("HUDPaint", frame, function()
+			local x, y = frame:LocalToScreen(0, 0)
+			Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
+		end)
 		-- Style close button like the rest of the UI
 		if IsValid(frame.btnClose) then
 			local close = frame.btnClose
@@ -343,7 +435,7 @@ if CLIENT then
 		frame.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
 			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
-			draw.SimpleText("ENCHANTER", "Arcana_AncientLarge", 18, 10, textBright)
+			draw.SimpleText(string.upper("Enchanter"), "Arcana_AncientLarge", 18, 10, paleGold)
 		end
 
 		if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
@@ -351,8 +443,78 @@ if CLIENT then
 
 		local content = vgui.Create("DPanel", frame)
 		content:Dock(FILL)
-		content:DockMargin(12, 34, 12, 12)
+		content:DockMargin(12, 12, 12, 12)
 		content.Paint = nil
+
+		-- Selected enchantments (ids) available to all child builders
+		local selected = {}
+
+		-- Selection totals (for progress bars)
+		local needCoins, needShards = 0, 0
+		local function computeTotals()
+			needCoins, needShards = 0, 0
+			for id, on in pairs(selected) do
+				if on then
+					local e = Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[id]
+					if e then
+						needCoins = needCoins + (tonumber(e.cost_coins or 0) or 0)
+						for _, it in ipairs(e.cost_items or {}) do
+							local name = tostring(it.name or "")
+							local amt = math.max(1, math.floor(tonumber(it.amount or 1) or 1))
+							if name == "mana_crystal_shard" then
+								needShards = needShards + amt
+							end
+						end
+					end
+				end
+			end
+		end
+
+		-- Top bars panel
+		local topBars = vgui.Create("DPanel", content)
+		topBars:Dock(TOP)
+		topBars:SetTall(84)
+		topBars:DockMargin(0, 0, 0, 8)
+		topBars.Paint = function(pnl, w, h)
+			Arcana_FillDecoPanel(4, 0, w - 8, h, decoPanel, 12)
+			Arcana_DrawDecoFrame(4, 0, w - 8, h, gold, 12)
+			-- Gather player amounts
+			local haveCoins = (IsValid(ply) and ply.GetCoins and ply:GetCoins()) or 0
+			local haveShards = (IsValid(ply) and ply.GetItemCount and ply:GetItemCount("mana_crystal_shard")) or 0
+			-- Draw helper
+			local function drawBar(x, y, bw, bh, label, have, need, fillCol)
+				local innerPad = 8
+				-- Label
+				draw.SimpleText(label, "Arcana_Ancient", x + innerPad, y + 4, textBright)
+				-- Bar geometry
+				local labelH = draw.GetFontHeight("Arcana_Ancient") + 2
+				local barY = y + labelH
+				local barH = math.max(10, bh - labelH - 8)
+				local barW = bw - innerPad * 2
+				-- Bar frame + background
+				surface.SetDrawColor(46, 36, 26, 235)
+				surface.DrawRect(x + innerPad, barY, barW, barH)
+				-- Fill
+				local needSafe = math.max(1, math.floor(need))
+				local haveClamped = math.min(have, needSafe)
+				local frac = math.Clamp(haveClamped / needSafe, 0, 1)
+				surface.SetDrawColor(fillCol)
+				surface.DrawRect(x + innerPad + 2, barY + 2, math.floor((barW - 4) * frac), barH - 4)
+				surface.SetDrawColor(gold)
+				surface.DrawOutlinedRect(x + innerPad, barY, barW, barH)
+				-- Text right-aligned
+				local txt = string.format("%s / %s", string.Comma(haveClamped), string.Comma(needSafe))
+				surface.SetFont("Arcana_AncientSmall")
+				local tw = select(1, surface.GetTextSize(txt))
+				draw.SimpleText(txt, "Arcana_AncientSmall", x + bw - innerPad - tw, barY - 15, textBright)
+			end
+
+			local pad = 2
+			local bw = w - pad * 2
+			local eachH = math.floor((h - pad * 3) * 0.5)
+			drawBar(pad, pad, bw, eachH, "Coins", haveCoins, needCoins, Color(210, 182, 100, 220))
+			drawBar(pad, pad * 2 + eachH, bw, eachH, "Crystal Shards", haveShards, needShards, Color(255, 110, 180, 220))
+		end
 
 		-- Left: Engraved circle with weapon model/name + controls
 		local left = vgui.Create("DPanel", content)
@@ -432,12 +594,21 @@ if CLIENT then
 		controls:Dock(BOTTOM)
 		controls:SetTall(70)
 		controls.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(8, h - 60, w - 16, 52, Color(46, 36, 26, 235), 10)
-			Arcana_DrawDecoFrame(8, h - 60, w - 16, 52, gold, 10)
+			-- background intentionally empty (parent frame provides style)
 		end
 
 		-- Forward declaration for preview setter used below
 		local setPreviewForClass
+		-- Selected enchantments (ids) available to all child builders
+		-- (declared above)
+
+		local function hasSelection()
+			for _, v in pairs(selected) do if v then return true end end
+			return false
+		end
+
+		-- Forward declare enchant button so earlier references are safe
+		local enchantBtn
 
 		-- One toggle button: Deposit / Withdraw
 		local toggleBtn = vgui.Create("DButton", controls)
@@ -469,11 +640,61 @@ if CLIENT then
 				net.SendToServer()
 			end
 			surface.PlaySound("buttons/button6.wav")
+			-- After deposit/withdraw, recalc totals and refresh buttons
 			timer.Simple(0.05, function()
 				if IsValid(machine) then
-					setPreviewForClass(machine:GetContainedClass() or "")
+					computeTotals()
+					topBars:InvalidateLayout(true)
+				end
+				if IsValid(enchantBtn) and IsValid(machine) then
+					enchantBtn:SetEnabled((machine:GetContainedClass() or "") ~= "" and hasSelection())
 				end
 			end)
+		end
+
+		-- Enchant Selected button
+		enchantBtn = vgui.Create("DButton", controls)
+		enchantBtn:SetSize(220, 36)
+		enchantBtn:SetPos(250, 16)
+		enchantBtn:SetText("")
+
+		local function refreshButtons()
+			local cls = IsValid(machine) and machine:GetContainedClass() or ""
+			enchantBtn:SetEnabled((cls ~= "") and hasSelection())
+		end
+
+		enchantBtn.Paint = function(pnl, w, h)
+			local enabled = pnl:IsEnabled()
+			local hovered = enabled and pnl:IsHovered()
+			local bg = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+			Arcana_FillDecoPanel(0, 0, w, h, bg, 8)
+			local frameCol = enabled and gold or Color(140, 120, 90, 255)
+			Arcana_DrawDecoFrame(0, 0, w, h, frameCol, 8)
+			draw.SimpleText("Enchant", "Arcana_AncientLarge", w * 0.5, h * 0.5, enabled and textBright or Color(200, 190, 170, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+
+		enchantBtn.DoClick = function()
+			if not enchantBtn:IsEnabled() then surface.PlaySound("buttons/button8.wav") return end
+			local ids = {}
+			for id, on in pairs(selected) do if on then table.insert(ids, id) end end
+			net.Start("Arcana_Enchanter_ApplyBatch")
+			net.WriteEntity(machine)
+			net.WriteTable(ids)
+			net.SendToServer()
+			surface.PlaySound("buttons/button14.wav")
+		end
+
+		-- Make buttons fill the parent width with consistent padding
+		controls.PerformLayout = function(pnl, w, h)
+			local pad = 20
+			local gap = 10
+			local top = 16
+			local bw = math.max(80, math.floor(w - pad * 2 - gap))
+			bw = math.floor(bw * 0.5)
+			toggleBtn:SetSize(bw, 36)
+			toggleBtn:SetPos(pad, top)
+			enchantBtn:SetSize(bw, 36)
+			enchantBtn:SetPos(pad + bw + gap, top)
 		end
 
 		-- Helper to derive model and name from weapon class
@@ -514,12 +735,18 @@ if CLIENT then
 
 		-- Initialize preview and keep it updated
 		setPreviewForClass(IsValid(machine) and machine:GetContainedClass() or "")
+		computeTotals()
+		topBars:InvalidateLayout(true)
+		refreshButtons()
 		frame.Think = function()
 			if not IsValid(machine) then frame:Close() return end
 			local cls = machine:GetContainedClass() or ""
 			if (modelPanel._cls or "") ~= cls then
 				modelPanel._cls = cls
 				setPreviewForClass(cls)
+				computeTotals()
+				topBars:InvalidateLayout(true)
+				refreshButtons()
 			end
 		end
 
@@ -529,7 +756,7 @@ if CLIENT then
 		right.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
 			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
-			draw.SimpleText("Enchantments", "Arcana_Ancient", 14, 10, textBright)
+			draw.SimpleText(string.upper("Enchantments"), "Arcana_Ancient", 14, 10, paleGold)
 		end
 
 		local scroll = vgui.Create("DScrollPanel", right)
@@ -548,52 +775,115 @@ if CLIENT then
 
 		local function rebuild()
 			scroll:Clear()
-			local cls = IsValid(machine) and machine:GetContainedClass() or ""
 			for enchId, ench in pairs(getEnchantmentsList()) do
-				local row = vgui.Create("DPanel", scroll)
+				local row = vgui.Create("DButton", scroll)
 				row:Dock(TOP)
-				row:SetTall(60)
+				row:SetTall(64)
 				row:DockMargin(0, 0, 0, 8)
+				row:SetText("")
+				row._id = enchId
+				row._selected = selected[enchId] and true or false
 				row.Paint = function(pnl, w, h)
-					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, Color(46, 36, 26, 235), 8)
-					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
-					draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 12, 8, textBright)
-					draw.SimpleText(ench.description or "", "Arcana_AncientSmall", 12, 34, textDim)
+					local bg = pnl._selected and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
+					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, pnl._selected and textBright or gold, 8)
+					draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, textBright)
+				end
+				row.DoClick = function(pnl)
+					pnl._selected = not pnl._selected
+					selected[enchId] = pnl._selected or nil
+					computeTotals()
+					topBars:InvalidateLayout(true)
+					topBars:InvalidateParent(true)
+					refreshButtons()
+					pnl:InvalidateLayout(true)
 				end
 
-				local apply = vgui.Create("DButton", row)
-				apply:Dock(RIGHT)
-				apply:DockMargin(6, 10, 10, 10)
-				apply:SetWide(120)
-				apply:SetText("")
-				apply.Paint = function(pnl, w, h)
-					local hovered = pnl:IsHovered()
-					local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
-					Arcana_FillDecoPanel(0, 0, w, h, bgCol, 8)
-					Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
-					draw.SimpleText("Apply", "Arcana_AncientLarge", w * 0.5, h * 0.5, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				-- Info tooltip icon
+				local infoIcon = vgui.Create("DPanel", row)
+				infoIcon:SetSize(20, 20)
+				infoIcon:SetCursor("hand")
+				infoIcon.Paint = function(pnl, w, h)
+					surface.SetDrawColor(gold)
+					local cx, cy, r = w * 0.5, h * 0.5, 8
+					local seg = 16
+					for i = 0, seg - 1 do
+						local a1 = (i / seg) * math.pi * 2
+						local a2 = ((i + 1) / seg) * math.pi * 2
+						surface.DrawLine(cx + math.cos(a1) * r, cy + math.sin(a1) * r, cx + math.cos(a2) * r, cy + math.sin(a2) * r)
+					end
+					draw.SimpleText("i", "Arcana_Ancient", cx, cy, gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
-				function apply:DoClick()
-					if cls == "" then surface.PlaySound("buttons/button8.wav") return end
-					net.Start("Arcana_Enchanter_Apply")
-					net.WriteEntity(machine)
-					net.WriteString(enchId)
-					net.SendToServer()
-					surface.PlaySound("buttons/button14.wav")
+				-- Tooltip behavior
+				infoIcon.OnCursorEntered = function()
+					if IsValid(infoIcon.tooltip) then return end
+					local tooltip = vgui.Create("DLabel")
+					tooltip:SetSize(320, 64)
+					tooltip:SetWrap(true)
+					tooltip:SetText(ench.description or "No description available")
+					tooltip:SetFont("Arcana_AncientSmall")
+					tooltip:SetTextColor(textBright)
+					tooltip:SetDrawOnTop(true)
+					tooltip:SetMouseInputEnabled(false)
+					tooltip:SetKeyboardInputEnabled(false)
+					tooltip.Paint = function(pnl, w, h)
+						surface.DisableClipping(true)
+						Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
+						Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
+						surface.DisableClipping(false)
+					end
+					infoIcon.tooltip = tooltip
+					local function updateTooltipPos()
+						if not IsValid(tooltip) then return end
+						local x, y = gui.MousePos()
+						tooltip:SetPos(x + 15, y - 30)
+					end
+					updateTooltipPos()
+					hook.Add("Think", "ArcanaTooltipPos_" .. tostring(tooltip), function()
+						if not IsValid(tooltip) then hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip)) return end
+						updateTooltipPos()
+					end)
 				end
-				-- Cost chips
-				local cost = vgui.Create("DLabel", row)
-				cost:Dock(RIGHT)
-				cost:DockMargin(6, 18, 6, 18)
-				cost:SetWide(160)
-				cost:SetFont("Arcana_AncientSmall")
-				cost:SetTextColor(textDim)
-				local items = {}
-				if ench.cost_coins and ench.cost_coins > 0 then table.insert(items, tostring(ench.cost_coins) .. "c") end
-				for _, it in ipairs(ench.cost_items or {}) do
-					table.insert(items, string.format("%dx %s", it.amount or 1, it.name or "item"))
+				infoIcon.OnCursorExited = function()
+					local t = infoIcon.tooltip
+					if IsValid(t) then
+						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(t))
+						t:Remove()
+						infoIcon.tooltip = nil
+					end
 				end
-				cost:SetText(table.concat(items, "  •  "))
+				-- Plain cost text under the name
+				local costLbl = vgui.Create("DLabel", row)
+				costLbl:SetFont("Arcana_AncientSmall")
+				costLbl:SetTextColor(Color(180, 170, 150, 255))
+				local parts = {}
+				local coinAmt = tonumber(ench.cost_coins or 0) or 0
+				if coinAmt > 0 then parts[#parts + 1] = ("x" .. string.Comma(coinAmt) .. " coins") end
+				for _, it2 in ipairs(ench.cost_items or {}) do
+					local name = tostring(it2.name or "item")
+					local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+					local pretty = name
+					if _G.msitems and _G.msitems.GetInventoryInfo then
+						local info = _G.msitems.GetInventoryInfo(name)
+						if info and info.name then pretty = string.lower(info.name) end
+					elseif name == "mana_crystal_shard" then
+						pretty = "crystal shards"
+					end
+					parts[#parts + 1] = (string.Comma(amt) .. " " .. pretty)
+				end
+				costLbl:SetText(table.concat(parts, " | "))
+				costLbl:SizeToContents()
+
+				row.PerformLayout = function(pnl, w, h)
+					-- Position info icon right after the enchant name
+					surface.SetFont("Arcana_AncientLarge")
+					local nameW = select(1, surface.GetTextSize(ench.name or enchId))
+					local nameX = 36
+					infoIcon:SetPos(nameX + nameW + 8, 10)
+					-- Costs under the name
+					costLbl:SetPos(nameX, h - 24)
+				end
+
 			end
 		end
 
