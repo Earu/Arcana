@@ -103,6 +103,8 @@ if SERVER then
 		ent:SetPos(pos)
 		ent:Spawn()
 		ent:Activate()
+		ent:SetRadius(radius * 2)
+
 		-- Bind the wisp to this area
 		ent._areaCenter = Vector(center)
 		ent._areaRadius = radius
