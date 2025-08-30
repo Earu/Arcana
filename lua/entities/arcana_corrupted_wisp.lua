@@ -62,7 +62,7 @@ if SERVER then
 			tes:SetPos(self:GetPos())
 			tes:SetKeyValue("m_SoundName", "DoSpark")
 			tes:SetKeyValue("texture", "sprites/physbeam.vmt")
-			tes:SetKeyValue("m_Color", "120 80 220")
+			tes:SetKeyValue("m_Color", "180 180 180")
 			tes:SetKeyValue("m_flRadius", "80")
 			tes:SetKeyValue("beamcount_min", "2")
 			tes:SetKeyValue("beamcount_max", "4")
@@ -206,7 +206,7 @@ if SERVER then
 			tes:SetPos(pos)
 			tes:SetKeyValue("m_SoundName", "DoSpark")
 			tes:SetKeyValue("texture", "sprites/physbeam.vmt")
-			tes:SetKeyValue("m_Color", "120 80 220")
+			tes:SetKeyValue("m_Color", "180 180 180")
 			tes:SetKeyValue("m_flRadius", tostring(radius or 120))
 			tes:SetKeyValue("beamcount_min", "3")
 			tes:SetKeyValue("beamcount_max", "5")
@@ -260,18 +260,8 @@ end
 if CLIENT then
 	local SPRITE_MAT = Material("sprites/light_glow02_add")
 
-	-- remove cable beam usage; we'll render a sprite chain instead
-	local COL_PURPLE = {
-		r = 110,
-		g = 60,
-		b = 190
-	}
-
-	local COL_DEEPBLUE = {
-		r = 30,
-		g = 50,
-		b = 120
-	}
+	local COL_PURPLE = Color(180, 180, 180)
+	local COL_DEEPBLUE = Color(97, 97, 97)
 
 	surface.CreateFont("Arcana_WispGlyph", {
 		font = "Arial",
@@ -351,14 +341,14 @@ if CLIENT then
 		surface.SetTextPos(cx + 1 + jx, cy + 1 + jy)
 		surface.DrawText(txt)
 		-- Bright core
-		surface.SetTextColor(220, 190, 255, 255)
+		surface.SetTextColor(255, 255, 255)
 		surface.SetTextPos(cx + jx, cy + jy)
 		surface.DrawText(txt)
 		-- Chromatic offsets
 		surface.SetTextColor(COL_PURPLE.r, COL_PURPLE.g, COL_PURPLE.b, 170)
 		surface.SetTextPos(cx + 2 + jx * 0.8, cy + 2 + jy * 0.8)
 		surface.DrawText(txt)
-		surface.SetTextColor(80, 140, 255, 160)
+		surface.SetTextColor(255, 255, 255, 160)
 		surface.SetTextPos(cx - 2 + jx * 0.6, cy - 2 + jy * 0.6)
 		surface.DrawText(txt)
 		cam.End3D2D()
@@ -427,10 +417,7 @@ if CLIENT then
 					tw, th = surface.GetTextSize(txt)
 					cx = -tw * 0.5
 					cy = -th * 0.5
-					surface.SetTextColor(0, 0, 0, math.floor(160 * fade))
-					surface.SetTextPos(cx + 1, cy + 1)
-					surface.DrawText(txt)
-					surface.SetTextColor(60, 80, 150, math.floor(200 * fade))
+					surface.SetTextColor(139, 139, 139, math.floor(200 * fade))
 					surface.SetTextPos(cx, cy)
 					surface.DrawText(txt)
 					cam.End3D2D()
