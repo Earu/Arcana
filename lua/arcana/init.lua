@@ -25,13 +25,24 @@ end
 -- Load all spells from arcana/spells/*.lua so each spell can live in its own file
 do
 	local files = file.Find("arcana/spells/*.lua", "LUA")
-
 	for _, fname in ipairs(files) do
 		if SERVER then
 			AddCSLuaFile("arcana/spells/" .. fname)
 		end
 
 		include("arcana/spells/" .. fname)
+	end
+end
+
+-- Load all enchantments from arcana/enchantments/*.lua so each enchantment can live in its own file
+do
+	local files = file.Find("arcana/enchantments/*.lua", "LUA")
+	for _, fname in ipairs(files) do
+		if SERVER then
+			AddCSLuaFile("arcana/enchantments/" .. fname)
+		end
+
+		include("arcana/enchantments/" .. fname)
 	end
 end
 
