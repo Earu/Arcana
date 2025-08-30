@@ -64,6 +64,8 @@ Arcane.Config = {
 -- Storage for registered spells
 Arcane.RegisteredSpells = Arcane.RegisteredSpells or {}
 Arcane.PlayerData = Arcane.PlayerData or {}
+-- Storage for registered weapon enchantments
+Arcane.RegisteredEnchantments = Arcane.RegisteredEnchantments or {}
 
 -- Spell cost types
 Arcane.COST_TYPES = {
@@ -81,6 +83,123 @@ Arcane.CATEGORIES = {
 	DIVINATION = "divination",
 	ENCHANTMENT = "enchantment"
 }
+
+-- Enchantment API
+function Arcane:RegisterEnchantment(def)
+	if not istable(def) then
+		ErrorNoHalt("RegisterEnchantment requires a table definition\n")
+		return false
+	end
+
+	local id = tostring(def.id or "")
+	local name = def.name or id
+	if id == "" then
+		ErrorNoHalt("RegisterEnchantment missing id\n")
+		return false
+	end
+
+	-- defaults
+	local ench = {
+		id = id,
+		name = name,
+		description = def.description or "Mystic modification to a weapon",
+		icon = def.icon or "icon16/wand.png",
+		-- Requirements/costs
+		cost_coins = tonumber(def.cost_coins or 0) or 0,
+		cost_items = istable(def.cost_items) and def.cost_items or { -- array of {name="mana_crystal_shard", amount=5}
+			{name = "mana_crystal_shard", amount = 1}
+		},
+		-- Applicability: return true if weapon can accept this enchantment
+		can_apply = def.can_apply, -- function(ply, wep)
+		-- Apply/remove: attach runtime behavior (e.g., hooks) to the weapon
+		apply = def.apply,   -- function(ply, wep, state)
+		remove = def.remove, -- function(ply, wep, state)
+		-- Optional: maximum stacks or config
+		max_stacks = tonumber(def.max_stacks or 1) or 1,
+	}
+
+	Arcane.RegisteredEnchantments[id] = ench
+	Arcane:Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
+	return true
+end
+
+function Arcane:GetEnchantments()
+	return Arcane.RegisteredEnchantments or {}
+end
+
+local function ensurePlayerEnchTable(ply)
+	local sid = IsValid(ply) and ply:SteamID64() or nil
+	Arcane.EnchantStateBySteamID = Arcane.EnchantStateBySteamID or {}
+	if not sid then return {} end
+	Arcane.EnchantStateBySteamID[sid] = Arcane.EnchantStateBySteamID[sid] or {}
+	return Arcane.EnchantStateBySteamID[sid]
+end
+
+function Arcane:GetWeaponEnchantments(ply, wepClass)
+	if not IsValid(ply) or not wepClass then return {} end
+	local ench = ensurePlayerEnchTable(ply)
+	ench[wepClass] = ench[wepClass] or {}
+	return ench[wepClass]
+end
+
+function Arcane:HasEnchantment(ply, wepClass, enchId)
+	local list = self:GetWeaponEnchantments(ply, wepClass)
+	return list[enchId] ~= nil
+end
+
+-- Apply and persist an enchantment to a weapon class for a player
+function Arcane:ApplyEnchantmentToWeapon(ply, wepClass, enchId)
+	if not IsValid(ply) then return false, "Invalid player" end
+	local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+	if not ench then return false, "Unknown enchantment" end
+
+	local list = self:GetWeaponEnchantments(ply, wepClass)
+	if list[enchId] then return false, "Already enchanted" end
+
+	list[enchId] = {stacks = 1, applied_at = os.time()}
+
+	-- If player currently holds that weapon, run apply hook now
+	local wep = ply:GetActiveWeapon()
+	if IsValid(wep) and wep:GetClass() == wepClass and ench.apply then
+		local ok, err = pcall(ench.apply, ply, wep, list[enchId])
+		if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
+	end
+
+	return true
+end
+
+function Arcane:RemoveEnchantmentFromWeapon(ply, wepClass, enchId)
+	if not IsValid(ply) then return false, "Invalid player" end
+	local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+	local list = self:GetWeaponEnchantments(ply, wepClass)
+	if not list[enchId] then return false, "Not applied" end
+
+	-- If player currently holds that weapon, call remove first
+	local wep = ply:GetActiveWeapon()
+	if IsValid(wep) and wep:GetClass() == wepClass and ench and ench.remove then
+		local ok, err = pcall(ench.remove, ply, wep, list[enchId])
+		if not ok then ErrorNoHalt("Enchantment remove error: " .. tostring(err) .. "\n") end
+	end
+
+	list[enchId] = nil
+	return true
+end
+
+-- Runtime: ensure enchantments re-apply when switching to an enchanted weapon
+if SERVER then
+	hook.Add("PlayerSwitchWeapon", "Arcana_ReapplyEnchantmentsOnSwitch", function(ply, oldWep, newWep)
+		if not IsValid(ply) or not IsValid(newWep) then return end
+		local wepClass = newWep:GetClass()
+		local list = Arcane:GetWeaponEnchantments(ply, wepClass)
+		for enchId, state in pairs(list) do
+			local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+			if ench and ench.apply then
+				local ok, err = pcall(ench.apply, ply, newWep, state)
+				if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
+			end
+		end
+	end)
+end
 
 -- Player data structure
 local function CreateDefaultPlayerData()
