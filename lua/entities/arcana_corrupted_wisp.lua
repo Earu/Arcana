@@ -145,16 +145,10 @@ if SERVER then
 		end
 
 		if not IsValid(self._target) then
-			local tr = util.TraceLine({
-				start = myPos,
-				endpos = myPos + Vector(0, 0, -10000),
-				filter = self,
-			})
-
-			local desired = tr.HitPos + Vector(0, 0, 20 + math.sin(CurTime() * 100) * 20)
+			local desired = myPos + Vector(0, 0, 20 + math.sin(CurTime() * 100) * 20)
 			local dir = (desired - self:GetPos())
 			local dist = dir:Length()
-			if dist > 10 then
+			if dist > 1 then
 				dir:Mul(1 / dist)
 				self:SetPos(self:GetPos() + dir * CHASE_SPEED * dt)
 				self:SetAngles(dir:Angle())
