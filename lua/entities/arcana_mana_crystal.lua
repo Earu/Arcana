@@ -185,7 +185,7 @@ if SERVER then
 		local dir
 		local attacker = dmginfo:GetAttacker()
 		local crystalPos = self:WorldSpaceCenter()
-		if IsValid(attacker) then
+		if IsValid(attacker) and attacker:IsPlayer() then
 			local tr = attacker:GetEyeTrace()
 			crystalPos = tr.Entity == self and tr.HitPos or crystalPos
 			dir = -(crystalPos - attacker:WorldSpaceCenter())
