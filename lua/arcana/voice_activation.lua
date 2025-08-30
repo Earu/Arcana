@@ -8,11 +8,11 @@ local SPEECH
 local BASE_GRAMMAR = [[
 <grammar>
   <rule name="arcana_spells" toplevel="active">
-    <o>...</o>
-    <list>
+	<o>...</o>
+	<list>
 		%s
-    </list>
-    <o>...</o>
+	</list>
+	<o>...</o>
   </rule>
 </grammar>
 ]]
@@ -80,6 +80,7 @@ local function buildGrammar()
 	if SPEECH:grammar("arcana_spells.xml") then
 		SPEECH:grammar_state("enabled")
 		SPEECH:rule_state(nil, "active")
+		SPEECH:resume()
 		Arcane:Print("Added", table.Count(triggerPhrases), "trigger phrases to voice activation")
 	end
 end
@@ -104,6 +105,23 @@ local function holdingGrimoire()
 	return wep:GetClass() == "grimoire"
 end
 
+local isSpeaking = false
+hook.Add("PlayerStartVoice", "Arcana_VoiceActivation", function(ply)
+	if not SPEECH then return end
+	if ply ~= LocalPlayer() then return end
+
+	isSpeaking = true
+end)
+
+hook.Add("PlayerEndVoice", "Arcana_VoiceActivation", function(ply)
+	if not SPEECH then return end
+	if ply ~= LocalPlayer() then return end
+
+	timer.Create("Arcana_VoiceActivation_StopSpeaking", 1, 2, function()
+		isSpeaking = false
+	end)
+end)
+
 hook.Add("Think", "Arcana_VoiceActivation", function()
 	if not SPEECH then return end
 
@@ -115,7 +133,7 @@ hook.Add("Think", "Arcana_VoiceActivation", function()
 
 	if num == 0 then return end
 	if not holdingGrimoire() then return end
-	if not LocalPlayer():IsSpeaking() then return end
+	if not isSpeaking then return end
 
 	for _, event in pairs(events) do
 		local spell_id = event.text and triggerPhrases[event.text]
