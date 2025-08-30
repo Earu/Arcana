@@ -16,7 +16,7 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
-	resource.AddShader("arcana_corruption_ps30")
+	resource.AddShader("arcana_corruption_ps20b")
 
 	function ENT:UpdateTransmitState()
 		return TRANSMIT_ALWAYS
