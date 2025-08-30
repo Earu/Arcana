@@ -133,6 +133,15 @@ if SERVER then
 
 		shaderFiles[shaderName] = path
 
+		-- clean up possible broken shader references
+		for existingShaderName, existingShaderPath in pairs(shaderFiles) do
+			if existingShaderName == shaderName then continue end
+
+			if not file.Exists(existingShaderPath, "MOD") then
+				shaderFiles[existingShaderName] = nil
+			end
+		end
+
 		local ok, res = createGMA(table.ClearKeys(shaderFiles), {
 			title = "shader_to_gma"
 		})
