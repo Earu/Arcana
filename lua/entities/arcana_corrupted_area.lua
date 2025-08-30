@@ -392,7 +392,7 @@ if CLIENT then
 
 	function ENT:Initialize()
 		self.ShaderMat = CreateShaderMaterial("arcana_corruption_" .. self:EntIndex(), {
-			["$pixshader"] = "arcana_corruption_ps30",
+			["$pixshader"] = "arcana_corruption_ps20b",
 			["$basetexture"] = "_rt_FullFrameFB",
 			["$c0_x"] = 0,
 			["$c0_y"] = 0.8,
