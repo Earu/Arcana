@@ -49,6 +49,13 @@ if SERVER then
 		-- area binding (center/radius) provided by spawner
 		self._areaCenter = self._areaCenter or self:GetPos()
 		self._areaRadius = self._areaRadius or 300
+
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:SetMass(0.1)
+			phys:EnableGravity(false)
+			phys:Wake()
+		end
 	end
 
 	function ENT:OnTakeDamage(dmginfo)
@@ -145,7 +152,13 @@ if SERVER then
 		end
 
 		if not IsValid(self._target) then
-			local desired = myPos + Vector(0, 0, 20 + math.sin(CurTime() * 100) * 20)
+			local tr = util.TraceLine({
+				start = myPos,
+				endpos = myPos + Vector(0, 0, -10000),
+				filter = self,
+			})
+
+			local desired = tr.HitPos + Vector(0, 0, 50)
 			local dir = (desired - self:GetPos())
 			local dist = dir:Length()
 			if dist > 1 then
