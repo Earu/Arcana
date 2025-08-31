@@ -76,9 +76,8 @@ end
 
 local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
-	local hookId = string.format("Arcana_Ench_ThunderRounds_%d_%d", wep:EntIndex(), ply:EntIndex())
 
-	hook.Add("EntityFireBullets", hookId, function(ent, data)
+	hook.Add("EntityFireBullets", wep, function(_, ent, data)
 		if not IsValid(ent) or not ent:IsPlayer() then return end
 		if ent ~= ply then return end
 
@@ -106,14 +105,10 @@ local function attachHook(ply, wep, state)
 			applyLightningDamage(attacker, hitPos, normal)
 		end
 	end)
-
-	state._hookId = hookId
 end
 
 local function detachHook(ply, wep, state)
-	if not state or not state._hookId then return end
-	hook.Remove("EntityFireBullets", state._hookId)
-	state._hookId = nil
+	hook.Remove("EntityFireBullets", wep)
 end
 
 Arcane:RegisterEnchantment({
