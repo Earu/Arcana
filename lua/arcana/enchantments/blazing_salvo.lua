@@ -2,7 +2,7 @@ local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
 	state._hookId = string.format("Arcana_Ench_BlazingSalvo_%d_%d", wep:EntIndex(), ply:EntIndex())
-	hook.Add("EntityFireBullets", hookId, function(ent, data)
+	hook.Add("EntityFireBullets", state._hookId, function(ent, data)
 		if not IsValid(ent) or not ent:IsPlayer() then return end
 
 		local active = ent:GetActiveWeapon()
