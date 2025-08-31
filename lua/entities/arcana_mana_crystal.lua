@@ -274,7 +274,6 @@ if CLIENT then
 		-- Particle FX state
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
 		self._fxNextAbsorb = 0
-		self._fxNextZap = 0
 	end
 
 	function ENT:OnRemove()
@@ -322,20 +321,6 @@ if CLIENT then
 		end
 	end
 
-	function ENT:_SpawnFullZap()
-		local center = getCorePos(self)
-		local bmin, bmax = self:OBBMins(), self:OBBMaxs()
-		local localPos = Vector(math.Rand(bmin.x, bmax.x), math.Rand(bmin.y, bmax.y), math.Rand(bmin.z, bmax.z))
-		local worldPos = self:LocalToWorld(localPos)
-		local ed = EffectData()
-		ed:SetOrigin(worldPos)
-		ed:SetNormal((worldPos - center):GetNormalized())
-		ed:SetMagnitude(2)
-		ed:SetScale(1)
-		ed:SetRadius(64)
-		util.Effect("ElectricSpark", ed, true, true)
-	end
-
 	function ENT:Think()
 		if self._fxEmitter then
 			self._fxEmitter:SetPos(self:GetPos())
@@ -344,16 +329,9 @@ if CLIENT then
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
 
 		local now = CurTime()
-		if not self:IsFull() then
-			if now >= (self._fxNextAbsorb or 0) then
-				self:_SpawnAbsorbParticles()
-				self._fxNextAbsorb = now + 0.06
-			end
-		else
-			if now >= (self._fxNextZap or 0) then
-				self:_SpawnFullZap()
-				self._fxNextZap = now + math.Rand(0.2, 0.5)
-			end
+		if not self:IsFull() and now >= (self._fxNextAbsorb or 0) then
+			self:_SpawnAbsorbParticles()
+			self._fxNextAbsorb = now + 0.06
 		end
 
 		self:SetNextClientThink(CurTime())
@@ -363,6 +341,23 @@ if CLIENT then
 	function ENT:Draw()
 		self:DrawModel()
 
+		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+
+		local curColor = self:GetColor()
+		local dl = DynamicLight(self:EntIndex())
+		if dl then
+			dl.pos = self:GetPos() + Vector(0, 0, 50)
+			dl.r = curColor.r
+			dl.g = curColor.g
+			dl.b = curColor.b
+			dl.brightness = 6
+			dl.Decay = 100
+			dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
+			dl.DieTime = CurTime() + 0.1
+		end
+	end
+
+	function ENT:DrawTranslucent()
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
 
 		-- draw only the refractive passes (skip solid base draw to avoid overbright)
@@ -376,9 +371,9 @@ if CLIENT then
 		self.ShaderMat:SetTexture("$basetexture", scr)
 
 		local curColor = self:GetColor()
-		self.ShaderMat:SetFloat("$c0_z", curColor.r / 255)
-		self.ShaderMat:SetFloat("$c0_w", curColor.g / 255)
-		self.ShaderMat:SetFloat("$c1_x", curColor.b / 255)
+		self.ShaderMat:SetFloat("$c0_z", curColor.r / 255 * 3)
+		self.ShaderMat:SetFloat("$c0_w", curColor.g / 255 * 3)
+		self.ShaderMat:SetFloat("$c1_x", curColor.b / 255 * 3)
 
 		render.OverrideDepthEnable(true, true) -- no Z write
 
@@ -396,27 +391,14 @@ if CLIENT then
 			-- SHADER_MAT:SetFloat("$c3_w", 4)
 
 			render.MaterialOverride(self.ShaderMat)
+			render.SetLightingMode(2)
 			self:DrawModel()
+			render.SetLightingMode(0)
 			render.MaterialOverride()
 			-- capture the result to feed into next pass
 			render.CopyRenderTargetToTexture(scr)
 		end
 
 		render.OverrideDepthEnable(false, false)
-
-		local dl = DynamicLight(self:EntIndex())
-		if dl then
-			dl.pos = self:GetPos() + Vector(0, 0, 10)
-			dl.r = curColor.r
-			dl.g = curColor.g
-			dl.b = curColor.b
-			dl.brightness = 6
-			dl.Decay = 100
-			dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
-			dl.DieTime = CurTime() + 0.1
-		end
-	end
-
-	function ENT:DrawTranslucent()
 	end
 end
