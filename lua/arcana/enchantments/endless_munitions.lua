@@ -3,7 +3,8 @@ local function attachInfiniteAmmo(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
 	-- Continuously top off the weapon clips while this weapon is active
-	hook.Add("Think", wep, function()
+	state._hookId = string.format("Arcana_Ench_InfiniteAmmo_%d_%d", wep:EntIndex(), ply:EntIndex())
+	hook.Add("Think", state._hookId, function()
 		if not IsValid(ply) then return end
 		local active = ply:GetActiveWeapon()
 		if not IsValid(active) or active ~= wep then return end
@@ -45,7 +46,9 @@ end
 local function detachInfiniteAmmo(ply, wep, state)
 	if not SERVER then return end
 
-	hook.Remove("Think", wep)
+	if not state or not state._hookId then return end
+	hook.Remove("Think", state._hookId)
+	state._hookId = nil
 end
 
 Arcane:RegisterEnchantment({
