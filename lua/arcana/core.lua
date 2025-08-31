@@ -1016,7 +1016,7 @@ if SERVER then
 
 	-- Attach rotating BandCircle rings to a weapon, one per enchantment, rotating around the longest axis
 	function Arcane:UpdateWeaponEnchantmentVFX(ply, wep, clearOnly)
-		if not IsValid(ply) or not IsValid(wep) then return end
+		--[[if not IsValid(ply) or not IsValid(wep) then return end
 		-- Clear any previous VFX for this weapon
 		self:ClearBandVFX(wep, "ArcanaWeaponEnchants")
 		if clearOnly then return end
@@ -1070,7 +1070,7 @@ if SERVER then
 
 		-- Attach for a long duration; the follow hook will keep it aligned
 		local overallSize = math.max(12, baseRadius + count * 4)
-		self:SendAttachBandVFX(wep, color, overallSize, 3600, bandConfigs, "ArcanaWeaponEnchants")
+		self:SendAttachBandVFX(wep, color, overallSize, 3600, bandConfigs, "ArcanaWeaponEnchants")]]
 	end
 end
 
