@@ -2,14 +2,13 @@ local function attachInfiniteAmmo(ply, wep, state)
 	if not SERVER then return end
 	if not IsValid(ply) or not IsValid(wep) then return end
 
-	local cls = wep:GetClass()
-	local hookId = string.format("Arcana_Ench_InfiniteAmmo_%s_%d", tostring(cls), ply:EntIndex())
+	local hookId = string.format("Arcana_Ench_InfiniteAmmo_%d_%d", wep:EntIndex(), ply:EntIndex())
 
 	-- Continuously top off the weapon clips while this weapon is active
 	hook.Add("Think", hookId, function()
 		if not IsValid(ply) then return end
 		local active = ply:GetActiveWeapon()
-		if not IsValid(active) or active:GetClass() ~= cls then return end
+		if not IsValid(active) or active ~= wep then return end
 
 		-- Resolve max primary clip size
 		local maxClip1 = -1
