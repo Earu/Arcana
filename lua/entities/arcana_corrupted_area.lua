@@ -198,14 +198,6 @@ if CLIENT then
 		["$translucent"] = "1"
 	})
 
-	-- Subtle darkening overlay for corrupted area
-	local DARKEN_MAT = CreateMaterial("arcana_corruption_darken", "UnlitGeneric", {
-		["$basetexture"] = "color/black",
-		["$alpha"] = "0.18",
-		["$additive"] = "0",
-		["$translucent"] = "1"
-	})
-
 	-- Dedicated font for corrupted glyphs (avoid dependency on circles.lua fonts)
 	surface.CreateFont("Arcana_CorruptGlyph", {
 		font = "Arial",
@@ -231,6 +223,7 @@ if CLIENT then
 
 	local function drawCorruption(self)
 		if not IsValid(self) then return end
+
 		local world_pos = self:GetPos()
 		local player_pos = LocalPlayer():GetPos()
 		local distance = player_pos:Distance(world_pos)
@@ -238,6 +231,8 @@ if CLIENT then
 
 		-- Remap intensity k in [0.5..2.0] -> s in [0..1], ensure visibility <0.9
 		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		if k < 0.5 then return end
+
 		local s0 = math.Clamp((k - 0.5) / 1.5, 0, 1)
 		local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
 		local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
@@ -254,20 +249,10 @@ if CLIENT then
 			["$pp_colour_mulb"] = 0,
 		}
 
-		local function drawDarkOverlay(strength)
-			if strength <= 0 then return end
-			render.SetMaterial(DARKEN_MAT)
-			local old = render.GetBlend()
-			-- Darken scales with intensity (more visible at low s)
-			render.SetBlend(math.Clamp(0.18 * (strength ^ 0.8), 0, 0.26))
-			render.DrawScreenQuad()
-			render.SetBlend(old)
-		end
-
 		if distance < radius then
 			-- Inside corruption volume: apply post-processing + darken overlay
 			DrawColorModify(cm)
-			drawDarkOverlay(s)
+			--drawDarkOverlay(s)
 		else
 			-- Outside: mask with a 3D sphere in the stencil buffer
 			render.SetStencilEnable(true)
@@ -291,7 +276,7 @@ if CLIENT then
 			render.SetStencilPassOperation(STENCIL_KEEP)
 			-- Apply post-processing within stencil
 			DrawColorModify(cm)
-			drawDarkOverlay(s)
+			--drawDarkOverlay(s)
 			render.SetStencilEnable(false)
 		end
 	end
@@ -463,7 +448,6 @@ if CLIENT then
 		surface.SetFont("Arcana_CorruptGlyph")
 		local baseTop = self:GetPos() - OFFSET
 
-		--cam.IgnoreZ(true)
 		for _, p in ipairs(self._glyphParticles) do
 			local now = CurTime()
 			local lifeFrac = 1
@@ -508,12 +492,9 @@ if CLIENT then
 				cam.End3D2D()
 			end
 		end
-		--cam.IgnoreZ(false)
-
-		drawCorruption(self)
 	end
 
 	function ENT:Draw()
-		--self:DrawModel()
+		drawCorruption(self)
 	end
 end
