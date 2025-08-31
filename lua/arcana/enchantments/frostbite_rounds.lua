@@ -76,7 +76,8 @@ end
 local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
-	hook.Add("EntityFireBullets", wep, function(_, ent, data)
+	state._hookId = string.format("Arcana_Ench_FrostbiteRounds_%d_%d", wep:EntIndex(), ply:EntIndex())
+	hook.Add("EntityFireBullets", state._hookId, function(ent, data)
 		if not IsValid(ent) or not ent:IsPlayer() then return end
 
 		local active = ent:GetActiveWeapon()
@@ -102,7 +103,9 @@ local function attachHook(ply, wep, state)
 end
 
 local function detachHook(ply, wep, state)
-	hook.Remove("EntityFireBullets", wep)
+	if not state or not state._hookId then return end
+	hook.Remove("EntityFireBullets", state._hookId)
+	state._hookId = nil
 end
 
 Arcane:RegisterEnchantment({

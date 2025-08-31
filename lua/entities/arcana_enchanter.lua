@@ -388,6 +388,15 @@ if SERVER then
 
 		ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
 	end)
+
+	-- Prevent players from picking up or physgunning weapons stored in the enchanter
+	hook.Add("PlayerCanPickupWeapon", "Arcana_BlockPickupStoredWeapon", function(ply, wep)
+		if IsValid(wep) and wep.ArcanaStored then return false end
+	end)
+
+	hook.Add("PhysgunPickup", "Arcana_BlockPhysgunStoredWeapon", function(ply, ent)
+		if IsValid(ent) and ent:IsWeapon() and ent.ArcanaStored then return false end
+	end)
 end
 
 if CLIENT then
