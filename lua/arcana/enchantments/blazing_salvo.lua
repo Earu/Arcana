@@ -3,7 +3,6 @@ local function attachHook(ply, wep, state)
 
 	hook.Add("EntityFireBullets", wep, function(_, ent, data)
 		if not IsValid(ent) or not ent:IsPlayer() then return end
-		if ent ~= ply then return end
 
 		local active = ent:GetActiveWeapon()
 		if not IsValid(active) or active ~= wep then return end
