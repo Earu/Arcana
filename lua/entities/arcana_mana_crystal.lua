@@ -391,9 +391,7 @@ if CLIENT then
 			-- SHADER_MAT:SetFloat("$c3_w", 4)
 
 			render.MaterialOverride(self.ShaderMat)
-			render.SetLightingMode(2)
 			self:DrawModel()
-			render.SetLightingMode(0)
 			render.MaterialOverride()
 			-- capture the result to feed into next pass
 			render.CopyRenderTargetToTexture(scr)
