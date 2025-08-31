@@ -76,15 +76,14 @@ end
 
 local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
-	local cls = wep:GetClass()
-	local hookId = string.format("Arcana_Ench_ThunderRounds_%s_%d", tostring(cls), ply:EntIndex())
+	local hookId = string.format("Arcana_Ench_ThunderRounds_%d_%d", wep:EntIndex(), ply:EntIndex())
 
 	hook.Add("EntityFireBullets", hookId, function(ent, data)
 		if not IsValid(ent) or not ent:IsPlayer() then return end
 		if ent ~= ply then return end
 
 		local active = ent:GetActiveWeapon()
-		if not IsValid(active) or active:GetClass() ~= cls then return end
+		if not IsValid(active) or active ~= wep then return end
 
 		-- Wrap any existing bullet callback to inject our lightning AoE on hit
 		local existingCallback = data.Callback

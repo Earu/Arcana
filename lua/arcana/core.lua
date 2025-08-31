@@ -127,99 +127,86 @@ function Arcane:GetEnchantments()
 	return Arcane.RegisteredEnchantments or {}
 end
 
-local function ensurePlayerEnchTable(ply)
-	local sid = IsValid(ply) and ply:SteamID64() or nil
-	Arcane.EnchantStateBySteamID = Arcane.EnchantStateBySteamID or {}
-	if not sid then return {} end
-	Arcane.EnchantStateBySteamID[sid] = Arcane.EnchantStateBySteamID[sid] or {}
-	return Arcane.EnchantStateBySteamID[sid]
+-- Store enchantments on weapon entities directly
+local function ensureEntityEnchantTable(wep)
+	if not IsValid(wep) then return {} end
+
+	wep.ArcanaEnchantments = wep.ArcanaEnchantments or {}
+	return wep.ArcanaEnchantments
 end
 
-function Arcane:GetWeaponEnchantments(ply, wepClass)
-	if not IsValid(ply) or not wepClass then return {} end
-	local ench = ensurePlayerEnchTable(ply)
-	ench[wepClass] = ench[wepClass] or {}
-	return ench[wepClass]
+function Arcane:GetEntityEnchantments(wep)
+	if not IsValid(wep) then return {} end
+	return ensureEntityEnchantTable(wep)
 end
 
-function Arcane:HasEnchantment(ply, wepClass, enchId)
-	local list = self:GetWeaponEnchantments(ply, wepClass)
+function Arcane:HasEntityEnchantment(wep, enchId)
+	local list = self:GetEntityEnchantments(wep)
 	return list[enchId] ~= nil
 end
 
--- Apply and persist an enchantment to a weapon class for a player
-function Arcane:ApplyEnchantmentToWeapon(ply, wepClass, enchId)
+local function syncWeaponEnchantNW(wep)
+	if not IsValid(wep) then return end
+	local list = ensureEntityEnchantTable(wep)
+	local ids = {}
+	for id, v in pairs(list) do if v then ids[#ids + 1] = id end end
+	local json = util.TableToJSON(ids) or "[]"
+	if wep.SetNWString then
+		wep:SetNWString("Arcana_EnchantIds", json)
+	end
+end
+
+-- Apply/remove on a specific weapon entity instance
+function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
 	if not IsValid(ply) then return false, "Invalid player" end
+	if not IsValid(wep) then return false, "Invalid weapon" end
+
 	local ench = (Arcane.RegisteredEnchantments or {})[enchId]
 	if not ench then return false, "Unknown enchantment" end
 
-	local list = self:GetWeaponEnchantments(ply, wepClass)
+	local list = ensureEntityEnchantTable(wep)
 	if list[enchId] then return false, "Already enchanted" end
 
-	list[enchId] = {stacks = 1, applied_at = os.time()}
+	local count = 0
+	for _ in pairs(list) do count = count + 1 end
+	if count >= 3 then return false, "Max enchantments reached" end
 
-	-- If player currently holds that weapon, run apply hook now
-	local wep = ply:GetActiveWeapon()
-	if IsValid(wep) and wep:GetClass() == wepClass and ench.apply then
+	list[enchId] = { stacks = 1, applied_at = os.time() }
+	syncWeaponEnchantNW(wep)
+
+	if ench.apply then
 		local ok, err = pcall(ench.apply, ply, wep, list[enchId])
 		if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
 	end
 
-	-- If player currently holds that weapon, refresh VFX to reflect ring count
-	local active = ply:GetActiveWeapon()
-	if IsValid(active) and active:GetClass() == wepClass and self.UpdateWeaponEnchantmentVFX then
-		self:UpdateWeaponEnchantmentVFX(ply, active)
+	if self.UpdateWeaponEnchantmentVFX then
+		self:UpdateWeaponEnchantmentVFX(ply, wep)
 	end
 
 	return true
 end
 
-function Arcane:RemoveEnchantmentFromWeapon(ply, wepClass, enchId)
+function Arcane:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
 	if not IsValid(ply) then return false, "Invalid player" end
+	if not IsValid(wep) then return false, "Invalid weapon" end
+
 	local ench = (Arcane.RegisteredEnchantments or {})[enchId]
-	local list = self:GetWeaponEnchantments(ply, wepClass)
+	local list = ensureEntityEnchantTable(wep)
 	if not list[enchId] then return false, "Not applied" end
 
-	-- If player currently holds that weapon, call remove first
-	local wep = ply:GetActiveWeapon()
-	if IsValid(wep) and wep:GetClass() == wepClass and ench and ench.remove then
+	if ench and ench.remove then
 		local ok, err = pcall(ench.remove, ply, wep, list[enchId])
 		if not ok then ErrorNoHalt("Enchantment remove error: " .. tostring(err) .. "\n") end
 	end
 
 	list[enchId] = nil
+	syncWeaponEnchantNW(wep)
 
-	-- If player currently holds that weapon, refresh VFX to reflect new ring count
-	local active = ply:GetActiveWeapon()
-	if IsValid(active) and active:GetClass() == wepClass and self.UpdateWeaponEnchantmentVFX then
-		self:UpdateWeaponEnchantmentVFX(ply, active)
+	if self.UpdateWeaponEnchantmentVFX then
+		self:UpdateWeaponEnchantmentVFX(ply, wep)
 	end
 
 	return true
-end
-
--- Runtime: ensure enchantments re-apply when switching to an enchanted weapon
-if SERVER then
-	hook.Add("PlayerSwitchWeapon", "Arcana_ReapplyEnchantmentsOnSwitch", function(ply, oldWep, newWep)
-		if not IsValid(ply) or not IsValid(newWep) then return end
-		local wepClass = newWep:GetClass()
-		local list = Arcane:GetWeaponEnchantments(ply, wepClass)
-		for enchId, state in pairs(list) do
-			local ench = (Arcane.RegisteredEnchantments or {})[enchId]
-			if ench and ench.apply then
-				local ok, err = pcall(ench.apply, ply, newWep, state)
-				if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
-			end
-		end
-
-		-- Refresh weapon enchantment VFX when switching
-		if Arcane and Arcane.UpdateWeaponEnchantmentVFX then
-			if IsValid(oldWep) then
-				Arcane:UpdateWeaponEnchantmentVFX(ply, oldWep, true)
-			end
-			Arcane:UpdateWeaponEnchantmentVFX(ply, newWep)
-		end
-	end)
 end
 
 -- Player data structure
@@ -1636,19 +1623,27 @@ if SERVER then
 
 	hook.Add("InitPostEntity", "Arcane_SpawnAltar", SpawnMapEntities)
 	hook.Add("PostCleanupMap", "Arcane_SpawnAltar", SpawnMapEntities)
+end
 
-	-- Console Commands for Testing
-	concommand.Add("arcane_give_xp", function(ply, cmd, args)
-		if not IsValid(ply) then return end
-		local amount = tonumber(args[1]) or 100
-		Arcane:GiveXP(ply, amount, "Admin Command")
-	end)
+-- Public helper to sync a weapon's applied enchantment IDs to clients via NWString
+function Arcane:SyncWeaponEnchantNW(wep)
+	return syncWeaponEnchantNW(wep)
+end
 
-	concommand.Add("arcane_reset", function(ply, cmd, args)
-		if not IsValid(ply) then return end
-		Arcane.PlayerData[ply:SteamID64()] = CreateDefaultPlayerData()
-		Arcane:SavePlayerData(ply)
-		Arcane:SyncPlayerData(ply)
+-- Cleanup: when a weapon entity is removed, ensure all enchantments detach their hooks
+if SERVER then
+	hook.Add("EntityRemoved", "Arcana_CleanupWeaponEnchantments", function(ent)
+		if not ent or not ent.ArcanaEnchantments then return end
+		local list = ent.ArcanaEnchantments
+		local owner = (ent.GetOwner and ent:GetOwner()) or nil
+		for enchId, state in pairs(list) do
+			local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+			if ench and ench.remove then
+				local ok, err = pcall(ench.remove, (IsValid(owner) and owner) or game.GetWorld(), ent, state)
+				if not ok then ErrorNoHalt("Enchantment remove error on entity removal: " .. tostring(err) .. "\n") end
+			end
+		end
+		ent.ArcanaEnchantments = nil
 	end)
 end
 
