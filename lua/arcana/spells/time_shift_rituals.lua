@@ -1,4 +1,4 @@
-local function registerRitual(id, name, description, is_night)
+local function registerRitual(id, name, description, time, custom_color)
 	if not _G.tod then return end -- dont register if tod is not loaded
 
 	local function setTime(val)
@@ -34,7 +34,7 @@ local function registerRitual(id, name, description, is_night)
 		cost_amount = 100,
 		cast_time = 1.5,
 		cast_anim = "becon",
-		ritual_color = is_night and Color(180, 160, 255) or Color(222, 198, 120),
+		ritual_color = custom_color,
 		ritual_lifetime = 300,
 		ritual_coin_cost = 2000,
 		ritual_items = {
@@ -43,7 +43,7 @@ local function registerRitual(id, name, description, is_night)
 			waterbottle = 1,
 		},
 		on_activate = function(selfEnt)
-			setTime(is_night and 0 or 12)
+			setTime(time)
 			sound.Play("ambient/levels/canals/windchime2.wav", selfEnt:GetPos(), 70, 105, 0.6)
 		end,
 	})
@@ -51,6 +51,8 @@ end
 
 -- let tod load first
 hook.Add("InitPostEntity", "arcana_time_shift_rituals", function()
-	registerRitual("ritual_of_night", "Ritual: Night", "A ritual that calls to the goddess of the night to summon a night sky.", true)
-	registerRitual("ritual_of_day", "Ritual: Day", "A ritual that calls to the god of the day to summon a bright sky.", false)
+	registerRitual("ritual_of_night", "Ritual: Night", "A ritual that calls to the goddess of the night to summon a night sky.", 0, Color(180, 160, 255))
+	registerRitual("ritual_of_day", "Ritual: Day", "A ritual that calls to the god of the day to summon a bright sky.", 12, Color(222, 198, 120))
+	registerRitual("ritual_of_daybreak", "Ritual: Daybreak", "A ritual that ushers in the first light of dawn.", 3, Color(255, 210, 130))
+	registerRitual("ritual_of_sunset", "Ritual: Sunset", "A ritual that calls the last light before nightfall.", 23, Color(255, 120, 90))
 end)
