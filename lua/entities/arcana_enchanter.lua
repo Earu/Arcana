@@ -150,8 +150,20 @@ if SERVER then
 			wep:SetAngles(Angle(0, ply:EyeAngles().y, 0))
 			wep:SetOwner(ply)
 
+			-- Remove any pre-existing weapon of the same class from the player's inventory
+			if cls and cls ~= "" and ply.HasWeapon and ply:HasWeapon(cls) then
+				ply:StripWeapon(cls)
+			end
+
 			if ply.PickupWeapon then
 				ply:PickupWeapon(wep)
+			end
+
+			-- Force switch to this weapon
+			if cls and cls ~= "" then
+				timer.Simple(0, function()
+					if IsValid(ply) then ply:SelectWeapon(cls) end
+				end)
 			end
 
 			ent:SetContainedWeapon(NULL)
@@ -165,9 +177,19 @@ if SERVER then
 		if cls and cls ~= "" then
 			ent:SetContainedClass("")
 
+			-- Remove any pre-existing weapon of the same class first
+			if ply.HasWeapon and ply:HasWeapon(cls) then
+				ply:StripWeapon(cls)
+			end
+
 			if ply.Give then
 				ply:Give(cls)
 			end
+
+			-- Force switch to this weapon after giving
+			timer.Simple(0, function()
+				if IsValid(ply) then ply:SelectWeapon(cls) end
+			end)
 
 			ent:EmitSound("items/smallmedkit1.wav", 70, 115)
 		end
