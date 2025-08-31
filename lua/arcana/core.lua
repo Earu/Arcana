@@ -165,6 +165,12 @@ function Arcane:ApplyEnchantmentToWeapon(ply, wepClass, enchId)
 		if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
 	end
 
+	-- If player currently holds that weapon, refresh VFX to reflect ring count
+	local active = ply:GetActiveWeapon()
+	if IsValid(active) and active:GetClass() == wepClass and self.UpdateWeaponEnchantmentVFX then
+		self:UpdateWeaponEnchantmentVFX(ply, active)
+	end
+
 	return true
 end
 
@@ -182,6 +188,13 @@ function Arcane:RemoveEnchantmentFromWeapon(ply, wepClass, enchId)
 	end
 
 	list[enchId] = nil
+
+	-- If player currently holds that weapon, refresh VFX to reflect new ring count
+	local active = ply:GetActiveWeapon()
+	if IsValid(active) and active:GetClass() == wepClass and self.UpdateWeaponEnchantmentVFX then
+		self:UpdateWeaponEnchantmentVFX(ply, active)
+	end
+
 	return true
 end
 
@@ -197,6 +210,14 @@ if SERVER then
 				local ok, err = pcall(ench.apply, ply, newWep, state)
 				if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
 			end
+		end
+
+		-- Refresh weapon enchantment VFX when switching
+		if Arcane and Arcane.UpdateWeaponEnchantmentVFX then
+			if IsValid(oldWep) then
+				Arcane:UpdateWeaponEnchantmentVFX(ply, oldWep, true)
+			end
+			Arcane:UpdateWeaponEnchantmentVFX(ply, newWep)
 		end
 	end)
 end
@@ -991,6 +1012,65 @@ if SERVER then
 		net.WriteEntity(ent)
 		net.WriteString(tostring(tag or ""))
 		net.Broadcast()
+	end
+
+	-- Attach rotating BandCircle rings to a weapon, one per enchantment, rotating around the longest axis
+	function Arcane:UpdateWeaponEnchantmentVFX(ply, wep, clearOnly)
+		if not IsValid(ply) or not IsValid(wep) then return end
+		-- Clear any previous VFX for this weapon
+		self:ClearBandVFX(wep, "ArcanaWeaponEnchants")
+		if clearOnly then return end
+
+		-- Count applied enchantments for this weapon class
+		local list = self:GetWeaponEnchantments(ply, wep:GetClass())
+		local count = 0
+		for _ in pairs(list) do count = count + 1 end
+		if count <= 0 then return end
+
+		-- Determine weapon's longest axis using its OBB
+		local mins, maxs = wep:OBBMins(), wep:OBBMaxs()
+		local size = maxs - mins
+		local lenX, lenY, lenZ = math.abs(size.x), math.abs(size.y), math.abs(size.z)
+		local axis = "x"
+		if lenY >= lenX and lenY >= lenZ then
+			axis = "y"
+		elseif lenZ >= lenX and lenZ >= lenY then
+			axis = "z"
+		end
+
+		-- Use player's physgun color (weapon color) for the bands
+		local color = ply.GetWeaponColor and ply:GetWeaponColor():ToColor() or Color(120, 200, 255, 255)
+
+		-- Build band configurations
+		local bandConfigs = {}
+		local smallest = math.max(4, math.min(lenX, math.min(lenY, lenZ)))
+		local baseRadius = smallest * 0.6
+		local spinSpeed = 90 * 50 -- baseline spin around chosen axis
+
+		for i = 1, count do
+			local r = baseRadius + (i - 1) * 4
+			local spin = { p = 0, y = 0, r = 0 }
+			-- Alternate spin direction for visual variety
+			local dir = (i % 2 == 0) and 1 or -1
+			if axis == "x" then
+				spin.p = dir * spinSpeed
+			elseif axis == "y" then
+				spin.y = dir * spinSpeed
+			else
+				spin.r = dir * spinSpeed
+			end
+
+			bandConfigs[#bandConfigs + 1] = {
+				radius = r,
+				height = 2,
+				spin = spin,
+				lineWidth = 2,
+			}
+		end
+
+		-- Attach for a long duration; the follow hook will keep it aligned
+		local overallSize = math.max(12, baseRadius + count * 4)
+		self:SendAttachBandVFX(wep, color, overallSize, 3600, bandConfigs, "ArcanaWeaponEnchants")
 	end
 end
 
