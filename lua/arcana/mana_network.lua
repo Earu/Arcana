@@ -10,15 +10,17 @@ if SERVER then
 		-- Graph/linking
 		gridCell = 600,           -- spatial bucket size for neighbor discovery
 		defaultLinkRange = 500,   -- default link range when a node doesn't specify
+
 		-- Transfer
-		consumerBaseIntake = 30,  -- base mana per second a consumer can intake from the network
-		stageThroughputBonus = 0.25, -- each stabilizer/purifier stage increases throughput by 25%
-		maxStages = 3,            -- three rounds of each to reach full purity/stability
+		consumerBaseIntake = 30,        -- base mana per second a consumer can intake from the network
+		perProcessorThroughputBonus = 0.25, -- each stabilizer/purifier increases throughput by 25%
+
 		-- Quality
 		rawPurity = 0.30,
 		rawStability = 0.30,
-		perStagePurity = 0.25,
-		perStageStability = 0.25,
+		perProcessorPurity = 0.25,     -- amount added to purity by each purifier
+		perProcessorStability = 0.25,  -- amount added to stability by each stabilizer
+
 		-- Enchant costs
 		manaPerEnchant = 50,
 	}
@@ -226,11 +228,15 @@ if SERVER then
 			local nProd = #comp.producers
 			if nProd <= 0 then continue end
 
-			local nStab = math.min(cfg.maxStages, #comp.stabilizers)
-			local nPur = math.min(cfg.maxStages, #comp.purifiers)
-			local purity = math.Clamp(cfg.rawPurity + nPur * cfg.perStagePurity, 0, 1)
-			local stability = math.Clamp(cfg.rawStability + nStab * cfg.perStageStability, 0, 1)
-			local throughputMul = 1 + (nPur + nStab) * cfg.stageThroughputBonus
+			local nStab = #comp.stabilizers
+			local nPur = #comp.purifiers
+
+			-- Quality saturates at 1.0 naturally; no artificial cap
+			local purity = math.Clamp(cfg.rawPurity + nPur * (cfg.perProcessorPurity or 0), 0, 1)
+			local stability = math.Clamp(cfg.rawStability + nStab * (cfg.perProcessorStability or 0), 0, 1)
+
+			-- Throughput scales with every processor present (no cap)
+			local throughputMul = 1 + (nPur + nStab) * (cfg.perProcessorThroughputBonus or 0)
 
 			-- Determine consumer's base intake
 			local baseIntake = cnode.intake and cnode.intake > 0 and cnode.intake or cfg.consumerBaseIntake
