@@ -91,12 +91,23 @@ if SERVER then
 	end
 
 	local function spawnCrystalAt(pos, normal)
+		if not util.IsInWorld(pos) then return nil end
+
 		local ent = ents.Create("arcana_mana_crystal")
 		if not IsValid(ent) then return nil end
+
 		ent:SetPos(pos + (normal or vector_up) * 4)
 		ent:SetAngles(Angle(0, math.random(0, 359), 0))
 		ent:Spawn()
 		ent:Activate()
+		ent:AddEffects(EF_ITEM_BLINK)
+		ent:DropToFloor()
+
+		timer.Simple(0.5, function()
+			ent:RemoveEffects(EF_ITEM_BLINK)
+			ent:DropToFloor()
+		end)
+
 		-- Start small
 		if ent.SetCrystalScale then
 			ent:SetCrystalScale(M.Config.crystalMinScale)
@@ -159,6 +170,8 @@ if SERVER then
 	local function ensureCorruptedArea(key, center)
 		local region = M.regions[key]
 		if region and IsValid(region.corruptEnt) then return region.corruptEnt end
+		if not util.IsInWorld(center) then return nil end
+
 		-- Spawn at low intensity at the region center
 		local ent = ents.Create("arcana_corrupted_area")
 		if not IsValid(ent) then return nil end
