@@ -26,9 +26,9 @@ hook.Add("InitPostEntity", "arcana_plumpen_player", function()
 		category = Arcane.CATEGORIES.COMBAT,
 		level_required = 4,
 		knowledge_cost = 1,
-		cooldown = 10.0,
+		cooldown = 60 * 15, -- 15 minutes
 		cost_type = Arcane.COST_TYPES.COINS,
-		cost_amount = 500,
+		cost_amount = 10000,
 		cast_time = 3.0,
 		range = 1200,
 		icon = "icon16/zoom_in.png",
