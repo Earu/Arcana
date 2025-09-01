@@ -245,7 +245,7 @@ if CLIENT then
 
 		-- Fade-in setup
 		self._spawnFadeStart = SysTime()
-		self._spawnFadeDur = 0.5
+		self._spawnFadeDur = 1
 		self._origColor = self:GetColor() or Color(255, 255, 255)
 		-- We avoid changing entity alpha; we handle fade in our draw passes
 
