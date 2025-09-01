@@ -104,6 +104,8 @@ if SERVER then
 		ent:DropToFloor()
 
 		timer.Simple(0.5, function()
+			if not IsValid(ent) then return end
+
 			ent:RemoveEffects(EF_ITEM_BLINK)
 			ent:DropToFloor()
 		end)
