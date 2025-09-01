@@ -42,8 +42,9 @@ local function attachIgniteHook(ply, wep, state)
 		if not isMeleeHoldType(wep) then return end
 
 		-- Filter out bullet/projectile damage: prefer club/slash or generic close-range
+		-- some weird knives use DMG_NEVERGIB
 		local dtype = dmginfo:GetDamageType()
-		local isMelee = bit.band(dtype, DMG_CLUB) ~= 0 or bit.band(dtype, DMG_SLASH) ~= 0 or bit.band(dtype, DMG_BURN) ~= 0
+		local isMelee = bit.band(dtype, DMG_CLUB) ~= 0 or bit.band(dtype, DMG_SLASH) ~= 0 or bit.band(dtype, DMG_BURN) ~= 0 or bit.band(dtype, DMG_NEVERGIB) ~= 0
 		if not isMelee then return end
 
 		igniteTarget(attacker, victim)
