@@ -268,8 +268,7 @@ if SERVER then
 		end
 
 		-- Mana requirement and success chance based on purity/stability
-		local manaNet = Arcane and Arcane.ManaNetwork
-		local manaCost = manaNet and manaNet:GetManaCostPerEnchant() or 50
+		local manaCost = (ent.GetManaCostPerEnchant and ent:GetManaCostPerEnchant()) or 50
 		if (ent._manaBuffer or 0) < manaCost then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, "Insufficient refined mana")
@@ -288,8 +287,8 @@ if SERVER then
 
 		takeEnchantmentCost(ply, ench)
 
-		-- Success roll
-		local chance = manaNet and manaNet:GetEnchantSuccessChance(ent._purity or 0, ent._stability or 0) or 0.5
+		-- Success roll (computed in enchanter)
+		local chance = (ent.ComputeSuccessChance and ent:ComputeSuccessChance(ent._purity or 0, ent._stability or 0)) or 0.5
 		if math.Rand(0, 1) > chance then
 			-- Failure consumes half mana cost
 			ent._manaBuffer = math.max(0, (ent._manaBuffer or 0) - manaCost * 0.5)
@@ -428,8 +427,7 @@ if SERVER then
 		end
 
 		-- Compute required mana and chance per attempt (fixed chance for the batch)
-		local manaNet = Arcane and Arcane.ManaNetwork
-		local manaPer = manaNet and manaNet:GetManaCostPerEnchant() or 50
+		local manaPer = (ent.GetManaCostPerEnchant and ent:GetManaCostPerEnchant()) or 50
 		local totalMana = manaPer * #enchs
 		if (ent._manaBuffer or 0) < totalMana then
 			if Arcane and Arcane.SendErrorNotification then
@@ -446,7 +444,7 @@ if SERVER then
 			if ply.TakeItem then ply:TakeItem(name, amt) end
 		end
 
-		local chance = manaNet and manaNet:GetEnchantSuccessChance(ent._purity or 0, ent._stability or 0) or 0.5
+		local chance = (ent.ComputeSuccessChance and ent:ComputeSuccessChance(ent._purity or 0, ent._stability or 0)) or 0.5
 		local successes = 0
 		for _, it in ipairs(enchs) do
 			if (ent._manaBuffer or 0) < manaPer then break end
@@ -916,18 +914,20 @@ if CLIENT then
 		-- Compact success indicator at top-left above the circle
 		local successBadge = vgui.Create("DPanel", left)
 		successBadge:SetSize(110, 50)
-		successBadge:SetPos(12, 8)
+		successBadge:SetPos(12, 12)
 		successBadge.Paint = function(pnl, w, h)
 			if not IsValid(machine) then return end
 			local purity = machine:GetNWFloat("Arcana_ManaPurity", 0)
 			local stability = machine:GetNWFloat("Arcana_ManaStability", 0)
-			local chance = 0.5
-			if Arcane and Arcane.ManaNetwork and Arcane.ManaNetwork.GetEnchantSuccessChance then
-				chance = Arcane.ManaNetwork:GetEnchantSuccessChance(purity, stability)
-			end
+
+			-- Pair-based success (same as server): base 25%, +12% per full stage up to 3
+			local chance = machine:ComputeSuccessChance(purity, stability)
+			chance = math.Clamp(chance, 0.05, 0.995)
+
 			-- Badge background
 			Arcana_FillDecoPanel(0, 0, w, h, Color(46, 36, 26, 235), 8)
 			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+
 			-- Left: small ring arc gauge
 			local cx, cy = 20, h * 0.5
 			local r = 12
@@ -943,6 +943,7 @@ if CLIENT then
 				if i > 0 then surface.DrawLine(px, py, x, y) end
 				px, py = x, y
 			end
+
 			-- Right: percentage text
 			local pct = math.floor(frac * 100 + 0.5)
 			draw.SimpleText("SUCCESS", "Arcana_AncientSmall", 40, 6, paleGold)
@@ -1377,6 +1378,24 @@ end
 
 function ENT:GetManaQuality()
 	return math.Clamp(self._purity or 0, 0, 1), math.Clamp(self._stability or 0, 0, 1)
+end
+
+function ENT:GetManaCostPerEnchant()
+	-- Centralized mana cost per enchant; can be tuned or made dynamic later
+	return 50
+end
+
+function ENT:ComputeSuccessChance(purity, stability)
+	purity = math.Clamp(tonumber(purity) or 0, 0, 1)
+	stability = math.Clamp(tonumber(stability) or 0, 0, 1)
+	local raw = 0.30
+	local per = 0.25
+	local maxStages = 3
+	local minQual = math.min(purity, stability)
+	local stages = math.floor(math.max(0, (minQual - raw + 1e-6) / per))
+	stages = math.Clamp(stages, 0, maxStages)
+	local chance = 0.25 + 0.12 * stages
+	return math.Clamp(chance, 0.05, 0.995)
 end
 
 if SERVER then

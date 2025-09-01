@@ -261,22 +261,12 @@ if SERVER then
 		end
 	end)
 
-	-- Helper exposed to other systems
-	function MN:GetEnchantSuccessChance(purity, stability)
-		purity = math.Clamp(tonumber(purity) or 0, 0, 1)
-		stability = math.Clamp(tonumber(stability) or 0, 0, 1)
-		-- Weight both equally; baseline 40%, max near 100%
-		local chance = 0.40 + 0.30 * purity + 0.30 * stability
-		return math.Clamp(chance, 0.05, 0.995)
-	end
-
-	function MN:GetManaCostPerEnchant()
-		return self.Config.manaPerEnchant or 50
-	end
 end
 
 if CLIENT then
 	local flows = {}
+	local glyphParticles = {}
+
 	-- Glyph stream config
 	local GLYPH_PHRASES = {
 		"αβραξασθεοσγνωσιςφωςζωηαληθειακοσμοςψυχηπνευμα",
@@ -287,6 +277,7 @@ if CLIENT then
 		"Ἀτρεΐδαςἄρ'ἵηκεΠοτειδεύς",
 		"ἨριφάειςΤρῶεςἵστετοκλυτόν",
 	}
+
 	local function pickGlyph(idx)
 		local phrase = GLYPH_PHRASES[(idx % #GLYPH_PHRASES) + 1]
 		local len = utf8 and utf8.len and utf8.len(phrase) or #phrase
@@ -301,6 +292,33 @@ if CLIENT then
 		ang:RotateAroundAxis(ang:Right(), -90)
 		ang:RotateAroundAxis(ang:Up(), 90)
 		return ang
+	end
+
+	local function randomPointOnOBBSurface(ent)
+		if not IsValid(ent) then return ent:WorldSpaceCenter() end
+
+		local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+		local axis = math.random(1, 3)
+		local pos = Vector(0, 0, 0)
+		if axis == 1 then
+			pos.x = (math.random(0, 1) == 1) and maxs.x or mins.x
+			pos.y = math.Rand(mins.y, maxs.y)
+			pos.z = math.Rand(mins.z, maxs.z)
+		elseif axis == 2 then
+			pos.y = (math.random(0, 1) == 1) and maxs.y or mins.y
+			pos.x = math.Rand(mins.x, maxs.x)
+			pos.z = math.Rand(mins.z, maxs.z)
+		else
+			pos.z = (math.random(0, 1) == 1) and maxs.z or mins.z
+			pos.x = math.Rand(mins.x, maxs.x)
+			pos.y = math.Rand(mins.y, maxs.y)
+		end
+		return ent:LocalToWorld(pos)
+	end
+
+	local function bezierPoint(a, b, c, t)
+		local u = 1 - t
+		return a * (u * u) + b * (2 * u * t) + c * (t * t)
 	end
 
 	-- Receive flow snapshots
@@ -325,7 +343,47 @@ if CLIENT then
 			local fromEnt = net.ReadEntity()
 			local amt = net.ReadFloat()
 			if IsValid(fromEnt) and amt > 0 then
-				list[#list + 1] = {from = fromEnt, amount = amt, t = now, purity = purity, stability = stability}
+				local rec = {from = fromEnt, amount = amt, t = now, purity = purity, stability = stability}
+				list[#list + 1] = rec
+
+				-- spawn glyph particles for this contribution
+				local fromPos = randomPointOnOBBSurface(fromEnt)
+				local toPos = toEnt:WorldSpaceCenter()
+				local dir = (toPos - fromPos)
+				local dist = dir:Length()
+				if dist > 2 then
+					dir:Normalize()
+
+					local up = Vector(0, 0, 1)
+					local right = dir:Cross(up)
+					if right:LengthSqr() < 0.01 then right = Vector(1, 0, 0) end
+
+					right:Normalize()
+
+					local mid = (fromPos + toPos) * 0.5
+					local curveAmt = math.Clamp(dist * 0.25, 20, 160)
+					local ctrl = mid + right * math.Rand(-curveAmt, curveAmt)
+					local baseColor = fromEnt:GetColor() or Color(255, 255, 255)
+					local density = 2
+					local countGlyphs = math.Clamp(math.floor(amt * 0.15 * density), 5, 80)
+					for gi = 1, countGlyphs do
+						local speed = math.Rand(120, 220) -- slower travel
+						local dur = dist / speed
+						local startDelay = math.Rand(0, 1.0) -- slightly more stagger
+
+						glyphParticles[#glyphParticles + 1] = {
+							startPos = fromPos,
+							ctrlPos = ctrl,
+							endPos = toPos,
+							startTime = now + startDelay,
+							duration = dur,
+							char = pickGlyph(gi + math.floor(now * 13)),
+							baseColor = Color(baseColor.r, baseColor.g, baseColor.b, 255),
+							quality = math.Clamp((purity + stability) * 0.5, 0, 1),
+							size = math.Rand(10, 16)
+						}
+					end
+				end
 			end
 		end
 
@@ -333,71 +391,43 @@ if CLIENT then
 	end)
 
 	local MAX_RENDER_DIST = 2000 * 2000
-	-- Glyph stream draw between producers and consumer; fades within 1 second
+	-- Glyph particles travel independently along curved bezier paths; color fades toward white by quality
 	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function()
 		local eye = EyePos()
-		for toEnt, list in pairs(flows) do
-			if not IsValid(toEnt) then
-				flows[toEnt] = nil
-				continue
-			end
-
-			if eye:DistToSqr(toEnt:GetPos()) > MAX_RENDER_DIST then continue end
-
-			for _, rec in ipairs(list) do
-				local fromEnt = rec.from
-				if not IsValid(fromEnt) then continue end
-				if eye:DistToSqr(fromEnt:GetPos()) > MAX_RENDER_DIST then continue end
-
-				local age = CurTime() - rec.t
-				local life = 1.0
-				if age > life then continue end
-
-				-- Color hint by purity/stability
-				local baseA = 230 * (1 - age / life)
-				local r = Lerp(rec.purity or 0, 120, 30)
-				local g = Lerp(rec.stability or 0, 90, 230)
-				local b = 255
-				local from = fromEnt:WorldSpaceCenter()
-				local to = toEnt:WorldSpaceCenter()
-				local dir = (to - from)
-				local segLen = dir:Length()
-				if segLen < 2 then continue end
-
-				dir:Normalize()
-
-				-- Per-amount density and size
-				local spacing = 32
-				local maxGlyphs = math.min(24, math.max(4, math.floor(segLen / spacing)))
-				local speed = 120 + math.min(180, rec.amount * 2)
-				local size = 10 + math.Clamp(rec.amount * 0.08, 2, 30)
-
-				-- Perpendicular wobble for liveliness
-				local up = Vector(0, 0, 1)
-				local right = dir:Cross(up)
-				if right:LengthSqr() < 0.01 then right = Vector(1, 0, 0) end
-
-				right:Normalize()
-
-				for gi = 0, maxGlyphs - 1 do
-					local phase = (CurTime() * speed + gi * spacing) % segLen
-					local pos = from + dir * phase + right * math.sin((CurTime() * 4 + gi) * 0.6) * 4
+		local now = CurTime()
+		local write = 1
+		for i = 1, #glyphParticles do
+			local p = glyphParticles[i]
+			local startT = p.startTime or 0
+			local endT = startT + (p.duration or 0)
+			local active = (now >= startT and now <= endT)
+			if active then
+				local u = math.Clamp((now - startT) / math.max(0.001, p.duration), 0, 1)
+				local pos = bezierPoint(p.startPos, p.ctrlPos, p.endPos, u)
+				if eye:DistToSqr(pos) <= MAX_RENDER_DIST then
+					-- Color gradient: base producer color to white by quality and progress
+					local mix = math.Clamp(p.quality * u, 0, 1)
+					local br = Lerp(mix, p.baseColor.r, 255)
+					local bg = Lerp(mix, p.baseColor.g, 255)
+					local bb = Lerp(mix, p.baseColor.b, 255)
+					local alpha = math.floor(220 * (1 - 0.15 * u))
 					local ang = billboardAnglesAt(pos)
-					local alpha = math.Clamp(baseA * (0.35 + 0.65 * (phase / segLen)), 10, 255)
 					cam.Start3D2D(pos, ang, 0.08)
 						surface.SetFont("MagicCircle_Medium")
-						local ok = pcall(function() end) -- noop to keep lua happy
-						surface.SetTextColor(r, g, b, alpha)
+						surface.SetTextColor(br, bg, bb, alpha)
 						surface.SetTextPos(0, 0)
-						surface.DrawText(pickGlyph(gi))
+						surface.DrawText(p.char or "*")
 					cam.End3D2D()
 				end
+			end
 
-				-- Subtle glow at destination
-				render.SetMaterial(Material("sprites/light_glow02_add"))
-				render.DrawSprite(to, 6, 6, Color(r, g, b, baseA))
+			if now <= endT + 0.05 then
+				glyphParticles[write] = p
+				write = write + 1
 			end
 		end
+
+		for i = write, #glyphParticles do glyphParticles[i] = nil end
 	end)
 end
 
