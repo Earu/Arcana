@@ -8,7 +8,6 @@ ENT.AdminOnly = false
 ENT.Category = "Arcana"
 ENT.PhysgunDisabled = true
 ENT.ms_notouch = true
-require("shader_to_gma")
 
 if SERVER then
 	function ENT:Initialize()
@@ -47,7 +46,7 @@ if SERVER then
 
 	function ENT:SetShardAmount(n)
 		self._amount = math.max(1, math.floor(tonumber(n) or 1))
-		self:SetModelScale(1 + self._amount * 0.05)
+		self:SetModelScale(1 + self._amount)
 		self:Activate()
 	end
 
