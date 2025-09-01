@@ -37,6 +37,16 @@ if SERVER then
 		end
 
 		self._nextUse = 0
+		-- Mana buffer and quality accumulated from network
+		self._manaBuffer = 0
+		self._purity = 0
+		self._stability = 0
+
+		-- Register into ManaNetwork as a consumer
+		local Arcane = _G.Arcane or {}
+		if Arcane.ManaNetwork and Arcane.ManaNetwork.RegisterConsumer then
+			Arcane.ManaNetwork:RegisterConsumer(self, {range = 700})
+		end
 	end
 
 	function ENT:SpawnFunction(ply, tr, classname)
@@ -253,17 +263,38 @@ if SERVER then
 			return
 		end
 
-		-- Cost
+		-- Mana requirement and success chance based on purity/stability
+		local manaNet = Arcane and Arcane.ManaNetwork
+		local manaCost = manaNet and manaNet:GetManaCostPerEnchant() or 50
+		if (ent._manaBuffer or 0) < manaCost then
+			if Arcane and Arcane.SendErrorNotification then
+				Arcane:SendErrorNotification(ply, "Insufficient refined mana")
+			end
+			return
+		end
+
+		-- Deduct other costs
 		local ok, reason = canAffordEnchantment(ply, ench)
 		if not ok then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, tostring(reason or "Insufficient resources"))
 			end
-
 			return
 		end
 
 		takeEnchantmentCost(ply, ench)
+
+		-- Success roll
+		local chance = manaNet and manaNet:GetEnchantSuccessChance(ent._purity or 0, ent._stability or 0) or 0.5
+		if math.Rand(0, 1) > chance then
+			-- Failure consumes half mana cost
+			ent._manaBuffer = math.max(0, (ent._manaBuffer or 0) - manaCost * 0.5)
+			ent:EmitSound("buttons/button10.wav", 65, 90)
+			return
+		end
+
+		-- Success consumes full mana cost
+		ent._manaBuffer = math.max(0, (ent._manaBuffer or 0) - manaCost)
 		local success, err = Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
 		if not success then
 			if Arcane and Arcane.SendErrorNotification then
@@ -392,23 +423,43 @@ if SERVER then
 			end
 		end
 
-		-- Deduct once
+		-- Compute required mana and chance per attempt (fixed chance for the batch)
+		local manaNet = Arcane and Arcane.ManaNetwork
+		local manaPer = manaNet and manaNet:GetManaCostPerEnchant() or 50
+		local totalMana = manaPer * #enchs
+		if (ent._manaBuffer or 0) < totalMana then
+			if Arcane and Arcane.SendErrorNotification then
+				Arcane:SendErrorNotification(ply, "Insufficient refined mana")
+			end
+			return
+		end
+
+		-- Deduct currency/items up front
 		if sumCoins > 0 and ply.TakeCoins then
 			ply:TakeCoins(sumCoins)
 		end
-
 		for name, amt in pairs(itemTotals) do
-			if ply.TakeItem then
-				ply:TakeItem(name, amt)
+			if ply.TakeItem then ply:TakeItem(name, amt) end
+		end
+
+		local chance = manaNet and manaNet:GetEnchantSuccessChance(ent._purity or 0, ent._stability or 0) or 0.5
+		local successes = 0
+		for _, it in ipairs(enchs) do
+			if (ent._manaBuffer or 0) < manaPer then break end
+			if math.Rand(0, 1) <= chance then
+				Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
+				successes = successes + 1
+				ent._manaBuffer = math.max(0, ent._manaBuffer - manaPer)
+			else
+				ent._manaBuffer = math.max(0, ent._manaBuffer - manaPer * 0.5)
 			end
 		end
 
-		-- Apply sequentially
-		for _, it in ipairs(enchs) do
-			Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
+		if successes > 0 then
+			ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
+		else
+			ent:EmitSound("buttons/button10.wav", 65, 90)
 		end
-
-		ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
 	end)
 
 	-- Prevent players from picking up or physgunning weapons stored in the enchanter
@@ -1275,4 +1326,27 @@ if CLIENT then
 			OpenEnchanterMenu(ent)
 		end
 	end)
+end
+
+-- Server + Client shared: basic accessors for networked visualization later
+function ENT:GetManaBuffer()
+	return self._manaBuffer or 0
+end
+
+function ENT:GetManaQuality()
+	return math.Clamp(self._purity or 0, 0, 1), math.Clamp(self._stability or 0, 0, 1)
+end
+
+if SERVER then
+	-- Called by ManaNetwork to add mana with current quality
+	function ENT:AddMana(amount, purity, stability)
+		amount = tonumber(amount) or 0
+		if amount <= 0 then return 0 end
+		self._manaBuffer = (self._manaBuffer or 0) + amount
+		-- Weighted rolling average towards incoming qualities
+		local w = math.min(1, amount / 100)
+		self._purity = (self._purity or 0) * (1 - w) + (math.Clamp(purity or 0, 0, 1)) * w
+		self._stability = (self._stability or 0) * (1 - w) + (math.Clamp(stability or 0, 0, 1)) * w
+		return amount
+	end
 end

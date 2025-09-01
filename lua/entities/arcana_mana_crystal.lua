@@ -125,8 +125,15 @@ if SERVER then
 		self._maxScale = 2.2
 		self._minScale = 0.35
 		self:_ApplyScale(self:GetCrystalScale())
+
 		-- Initialize health based on current scale
 		self:_OnScaleChanged(self:GetCrystalScale())
+
+		-- Register as producer in ManaNetwork
+		local Arcane = _G.Arcane or {}
+		if Arcane.ManaNetwork and Arcane.ManaNetwork.RegisterProducer then
+			Arcane.ManaNetwork:RegisterProducer(self, {range = self:GetAbsorbRadius() or 520})
+		end
 	end
 
 	-- Spawn a shard entity with optional amount and outward impulse
@@ -229,6 +236,26 @@ if SERVER then
 		end
 
 		return add
+	end
+
+	-- Extract and return the actually removed amount
+	function ENT:TakeStoredMana(amount)
+		amount = tonumber(amount) or 0
+		if amount <= 0 then return 0 end
+		local cur = math.max(0, self:GetStoredMana() or 0)
+		local take = math.min(amount, cur)
+		if take > 0 then
+			self:SetStoredMana(cur - take)
+		end
+		return take
+	end
+
+	-- Register into the ManaNetwork on spawn
+	function ENT:OnRemove()
+		local Arcane = _G.Arcane or {}
+		if Arcane.ManaNetwork and Arcane.ManaNetwork.UnregisterNode then
+			Arcane.ManaNetwork:UnregisterNode(self)
+		end
 	end
 
 	function ENT:Think()
