@@ -103,6 +103,12 @@ if SERVER then
 		ent:AddEffects(EF_ITEM_BLINK)
 		ent:DropToFloor()
 
+		local snd = CreateSound(ent, "ambient/levels/labs/teleport_winddown1.wav")
+		snd:SetDSP(16)
+		snd:SetSoundLevel(80)
+		snd:ChangePitch(math.random(150, 180))
+		snd:Play()
+
 		timer.Simple(0.5, function()
 			if not IsValid(ent) then return end
 
