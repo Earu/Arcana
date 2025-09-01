@@ -359,6 +359,7 @@ if CLIENT then
 
 	function ENT:DrawTranslucent()
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+		if self:IsEffectActive(EF_ITEM_BLINK) then return end
 
 		-- draw only the refractive passes (skip solid base draw to avoid overbright)
 		local PASSES = 4 -- try 3–6
