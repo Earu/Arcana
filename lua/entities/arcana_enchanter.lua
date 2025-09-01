@@ -55,10 +55,13 @@ if SERVER then
 
 	function ENT:SpawnFunction(ply, tr, classname)
 		if not tr or not tr.Hit then return end
+
 		local pos = tr.HitPos + tr.HitNormal * 8
 		local ent = ents.Create(classname or "arcana_enchanter")
 		if not IsValid(ent) then return end
+
 		ent:SetPos(pos)
+
 		local ang = Angle(0, ply:EyeAngles().y, 0)
 		ent:SetAngles(ang)
 		ent:Spawn()
@@ -114,10 +117,13 @@ if SERVER then
 	net.Receive("Arcana_Enchanter_Deposit", function(_, ply)
 		local ent = net.ReadEntity()
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_enchanter" then return end
+
 		local hasCls = tostring(ent:GetContainedClass() or "")
 		if hasCls ~= "" or IsValid(ent:GetContainedWeapon()) then return end -- already holding a weapon
+
 		local wep = ply:GetActiveWeapon()
 		if not IsValid(wep) then return end
+
 		-- Store actual entity reference and class
 		ent:SetContainedClass(wep:GetClass())
 		ent:SetContainedWeapon(wep)
@@ -331,7 +337,6 @@ if SERVER then
 		-- Collect unique enchantments, drop duplicates or ones already present
 		local targetCurrent = Arcane and Arcane.GetEntityEnchantments and Arcane:GetEntityEnchantments(wep) or {}
 		local selected = {}
-
 		for _, id in ipairs(list) do
 			if not targetCurrent[id] then
 				selected[id] = true
@@ -340,14 +345,12 @@ if SERVER then
 
 		-- Enforce cap of 3
 		local count = 0
-
 		for _ in pairs(targetCurrent) do
 			count = count + 1
 		end
 
 		local room = math.max(0, 3 - count)
 		local idsOrdered = {}
-
 		for id, _ in pairs(selected) do
 			idsOrdered[#idsOrdered + 1] = id
 		end
@@ -360,9 +363,9 @@ if SERVER then
 		end
 
 		if #idsOrdered == 0 then return end
+
 		-- Validate applicability and aggregate costs
 		local enchs = {}
-
 		for _, id in ipairs(idsOrdered) do
 			local e = Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[id]
 
@@ -390,7 +393,6 @@ if SERVER then
 
 		local sumCoins = 0
 		local itemTotals = {}
-
 		for _, it in ipairs(enchs) do
 			sumCoins = sumCoins + (tonumber(it.ench.cost_coins or 0) or 0)
 
@@ -405,7 +407,6 @@ if SERVER then
 		end
 
 		local coins = (ply.GetCoins and ply:GetCoins()) or 0
-
 		if coins < sumCoins then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, "Insufficient coins")
