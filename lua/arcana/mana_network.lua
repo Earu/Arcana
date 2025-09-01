@@ -275,8 +275,6 @@ if SERVER then
 	end
 end
 
-return Arcane
-
 if CLIENT then
 	local flows = {}
 	-- Glyph stream config
