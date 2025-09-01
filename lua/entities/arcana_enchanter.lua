@@ -41,6 +41,10 @@ if SERVER then
 		self._manaBuffer = 0
 		self._purity = 0
 		self._stability = 0
+		-- NW for client UI
+		self:SetNWFloat("Arcana_ManaBuffer", 0)
+		self:SetNWFloat("Arcana_ManaPurity", 0)
+		self:SetNWFloat("Arcana_ManaStability", 0)
 
 		-- Register into ManaNetwork as a consumer
 		local Arcane = _G.Arcane or {}
@@ -908,11 +912,49 @@ if CLIENT then
 		nameLabel:SetFont("Arcana_Ancient")
 		nameLabel:SetTextColor(textBright)
 		nameLabel:SetContentAlignment(5)
+
+		-- Compact success indicator at top-left above the circle
+		local successBadge = vgui.Create("DPanel", left)
+		successBadge:SetSize(110, 50)
+		successBadge:SetPos(12, 8)
+		successBadge.Paint = function(pnl, w, h)
+			if not IsValid(machine) then return end
+			local purity = machine:GetNWFloat("Arcana_ManaPurity", 0)
+			local stability = machine:GetNWFloat("Arcana_ManaStability", 0)
+			local chance = 0.5
+			if Arcane and Arcane.ManaNetwork and Arcane.ManaNetwork.GetEnchantSuccessChance then
+				chance = Arcane.ManaNetwork:GetEnchantSuccessChance(purity, stability)
+			end
+			-- Badge background
+			Arcana_FillDecoPanel(0, 0, w, h, Color(46, 36, 26, 235), 8)
+			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			-- Left: small ring arc gauge
+			local cx, cy = 20, h * 0.5
+			local r = 12
+			surface.SetDrawColor(gold)
+			local steps = 22
+			local frac = math.Clamp(chance, 0, 1)
+			local sweep = frac * (math.pi * 1.8)
+			local px, py
+			for i = 0, steps do
+				local a = -math.pi * 0.9 + (i / steps) * sweep
+				local x = cx + math.cos(a) * r
+				local y = cy + math.sin(a) * r
+				if i > 0 then surface.DrawLine(px, py, x, y) end
+				px, py = x, y
+			end
+			-- Right: percentage text
+			local pct = math.floor(frac * 100 + 0.5)
+			draw.SimpleText("SUCCESS", "Arcana_AncientSmall", 40, 6, paleGold)
+			draw.SimpleText(pct .. "%", "Arcana_AncientLarge", 40, h - 8, textBright, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
+		end
+
 		-- Controls area
 		local controls = vgui.Create("DPanel", left)
 		controls:Dock(BOTTOM)
 		controls:SetTall(70)
 		controls.Paint = function(pnl, w, h) end -- background intentionally empty (parent frame provides style)
+
 		-- Forward declaration for preview setter used below
 		local setPreviewForClass
 
@@ -1342,11 +1384,18 @@ if SERVER then
 	function ENT:AddMana(amount, purity, stability)
 		amount = tonumber(amount) or 0
 		if amount <= 0 then return 0 end
+
 		self._manaBuffer = (self._manaBuffer or 0) + amount
+
 		-- Weighted rolling average towards incoming qualities
 		local w = math.min(1, amount / 100)
 		self._purity = (self._purity or 0) * (1 - w) + (math.Clamp(purity or 0, 0, 1)) * w
 		self._stability = (self._stability or 0) * (1 - w) + (math.Clamp(stability or 0, 0, 1)) * w
+
+		-- Sync for client visuals
+		self:SetNWFloat("Arcana_ManaBuffer", self._manaBuffer or 0)
+		self:SetNWFloat("Arcana_ManaPurity", self._purity or 0)
+		self:SetNWFloat("Arcana_ManaStability", self._stability or 0)
 		return amount
 	end
 end
