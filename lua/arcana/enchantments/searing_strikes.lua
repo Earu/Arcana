@@ -63,9 +63,9 @@ Arcane:RegisterEnchantment({
 	name = "Searing Strikes",
 	description = "Melee hits ignite targets for 3 seconds.",
 	icon = "icon16/fire.png",
-	cost_coins = 300,
+	cost_coins = 400,
 	cost_items = {
-		{ name = "mana_crystal_shard", amount = 12 },
+		{ name = "mana_crystal_shard", amount = 20 },
 	},
 	can_apply = function(ply, wep)
 		return IsValid(wep) and isMeleeHoldType(wep)

@@ -66,9 +66,9 @@ Arcane:RegisterEnchantment({
 	name = "Endless Munitions",
 	description = "This weapon never consumes ammo while equipped; clips auto-refill.",
 	icon = "icon16/bullet_black.png",
-	cost_coins = 500,
+	cost_coins = 2000,
 	cost_items = {
-		{ name = "mana_crystal_shard", amount = 20 },
+		{ name = "mana_crystal_shard", amount = 100 },
 	},
 	can_apply = function(ply, wep)
 		if not IsValid(wep) then return false end

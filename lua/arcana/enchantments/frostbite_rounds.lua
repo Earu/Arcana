@@ -123,9 +123,9 @@ Arcane:RegisterEnchantment({
 	name = "Frostbite Rounds",
 	description = "Bullets freeze the struck target with chilling slow and cold VFX.",
 	icon = "icon16/weather_snow.png",
-	cost_coins = 500,
+	cost_coins = 1000,
 	cost_items = {
-		{ name = "mana_crystal_shard", amount = 20 },
+		{ name = "mana_crystal_shard", amount = 50 },
 	},
 	can_apply = function(ply, wep)
 		-- Only firearms that can shoot bullets
