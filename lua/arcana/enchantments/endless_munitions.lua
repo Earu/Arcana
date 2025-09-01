@@ -51,6 +51,16 @@ local function detachInfiniteAmmo(ply, wep, state)
 	state._hookId = nil
 end
 
+local function isMeleeHoldType(wep)
+	if not IsValid(wep) then return false end
+
+	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
+	if not isstring(ht) then return false end
+
+	ht = string.lower(ht)
+	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
+end
+
 Arcane:RegisterEnchantment({
 	id = "infinite_ammo",
 	name = "Endless Munitions",
@@ -68,7 +78,7 @@ Arcane:RegisterEnchantment({
 		if (not maxClip or maxClip <= 0) and wep.Primary and tonumber(wep.Primary.ClipSize) then
 			maxClip = tonumber(wep.Primary.ClipSize) or -1
 		end
-		return usesAmmo or (maxClip and maxClip > 0)
+		return usesAmmo or (maxClip and maxClip > 0) and not isMeleeHoldType(wep)
 	end,
 	apply = attachInfiniteAmmo,
 	remove = detachInfiniteAmmo,

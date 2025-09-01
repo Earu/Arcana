@@ -200,13 +200,15 @@ if SERVER then
 		local ent = net.ReadEntity()
 		local enchId = net.ReadString()
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_enchanter" then return end
+
 		local cls = ent:GetContainedClass()
 		if not cls or cls == "" then return end
+
 		local ench = (Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[enchId]) or nil
 		if not ench then return end
+
 		-- Resolve weapon entity from the machine (the stored instance is the one being enchanted)
 		local wep = ent:GetContainedWeapon()
-
 		if not IsValid(wep) then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, "Deposit a weapon first")
@@ -230,7 +232,6 @@ if SERVER then
 
 		-- Prevent duplicates and enforce cap
 		local current = Arcane and Arcane.GetEntityEnchantments and Arcane:GetEntityEnchantments(wep) or {}
-
 		if current[enchId] then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, "Enchantment already on weapon")
@@ -240,7 +241,6 @@ if SERVER then
 		end
 
 		local count = 0
-
 		for _ in pairs(current) do
 			count = count + 1
 		end
@@ -255,7 +255,6 @@ if SERVER then
 
 		-- Cost
 		local ok, reason = canAffordEnchantment(ply, ench)
-
 		if not ok then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, tostring(reason or "Insufficient resources"))
@@ -266,7 +265,6 @@ if SERVER then
 
 		takeEnchantmentCost(ply, ench)
 		local success, err = Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
-
 		if not success then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, tostring(err or "Failed to apply enchantment"))
@@ -1098,8 +1096,20 @@ if CLIENT then
 					end
 				end
 			end
+			-- Build visible list filtered by can_apply for the deposited weapon (if any)
+			local visible = {}
 			for enchId, ench in pairs(getEnchantmentsList()) do
-				local row = vgui.Create("DButton", scroll)
+				local show = true
+				if IsValid(wepEnt) and not appliedSet[enchId] then
+					if ench and ench.can_apply then
+						local ok, res = pcall(ench.can_apply, ply, wepEnt)
+						show = ok and (res ~= false)
+					end
+				end
+
+				if show then
+					visible[enchId] = true
+					local row = vgui.Create("DButton", scroll)
 				row:Dock(TOP)
 				row:SetTall(64)
 				row:DockMargin(0, 0, 0, 8)
@@ -1240,7 +1250,17 @@ if CLIENT then
 					-- Costs under the name
 					costLbl:SetPos(nameX, h - 24)
 				end
+				end
 			end
+
+			-- Prune any previously selected enchantments that are not visible for this weapon
+			for id, on in pairs(selected) do
+				if on and not visible[id] then
+					selected[id] = nil
+				end
+			end
+			computeTotals()
+			topBars:InvalidateLayout(true)
 		end
 
 		rebuild()

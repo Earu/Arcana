@@ -41,6 +41,16 @@ local function detachHook(ply, wep, state)
 	state._hookId = nil
 end
 
+local function isMeleeHoldType(wep)
+	if not IsValid(wep) then return false end
+
+	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
+	if not isstring(ht) then return false end
+
+	ht = string.lower(ht)
+	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
+end
+
 Arcane:RegisterEnchantment({
 	id = "fireball_on_shoot",
 	name = "Blazing Salvo",
@@ -52,7 +62,7 @@ Arcane:RegisterEnchantment({
 	},
 	can_apply = function(ply, wep)
 		-- only firearms that can shoot bullets
-		return IsValid(wep) and (wep.Primary ~= nil or wep.FireBullets ~= nil)
+		return IsValid(wep) and (wep.Primary ~= nil or wep.FireBullets ~= nil) and not isMeleeHoldType(wep)
 	end,
 	apply = attachHook,
 	remove = detachHook,
