@@ -1388,13 +1388,17 @@ end
 function ENT:ComputeSuccessChance(purity, stability)
 	purity = math.Clamp(tonumber(purity) or 0, 0, 1)
 	stability = math.Clamp(tonumber(stability) or 0, 0, 1)
-	local raw = 0.30
-	local per = 0.25
-	local maxStages = 3
-	local minQual = math.min(purity, stability)
-	local stages = math.floor(math.max(0, (minQual - raw + 1e-6) / per))
-	stages = math.Clamp(stages, 0, maxStages)
-	local chance = 0.25 + 0.12 * stages
+	local base = 0.25
+
+	-- Count current connected stabilizers/purifiers; each pair adds +12%
+	local stab, pur = 0, 0
+	local MN = Arcane and Arcane.ManaNetwork
+	if MN and MN.GetConnectedProcessorCounts then
+		stab, pur = MN:GetConnectedProcessorCounts(self)
+	end
+
+	local couples = math.min(stab, pur)
+	local chance = base + 0.12 * couples
 	return math.Clamp(chance, 0.05, 0.995)
 end
 

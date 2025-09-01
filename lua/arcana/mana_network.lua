@@ -182,6 +182,17 @@ if SERVER then
 		return out
 	end
 
+	-- Public: get counts of connected processors for a given consumer entity
+	function MN:GetConnectedProcessorCounts(consumerEnt)
+		if not IsValid(consumerEnt) then return 0, 0 end
+
+		local node = MN._nodes[consumerEnt]
+		if not node then return 0, 0 end
+
+		local comp = collectComponent(node)
+		return #comp.stabilizers, #comp.purifiers
+	end
+
 	-- Utilities expected on entities
 	local function crystalTake(ent, amt)
 		if ent and ent.TakeStoredMana then
