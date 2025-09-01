@@ -202,38 +202,48 @@ if SERVER then
 		local cfg = MN.Config
 		for i = #MN._consumers, 1, -1 do
 			local cnode = MN._consumers[i]
-			if not cnode or not IsValid(cnode.ent) then table.remove(MN._consumers, i) goto continue end
+			if not cnode or not IsValid(cnode.ent) then
+				table.remove(MN._consumers, i)
+				continue
+			end
+
 			-- Refresh position once in a while (mostly static entities)
 			MN:UpdateNodePosition(cnode.ent)
+
 			-- Discover connected component
 			local comp = collectComponent(cnode)
 			local nProd = #comp.producers
-			if nProd <= 0 then goto continue end
+			if nProd <= 0 then continue end
+
 			local nStab = math.min(cfg.maxStages, #comp.stabilizers)
 			local nPur = math.min(cfg.maxStages, #comp.purifiers)
 			local purity = math.Clamp(cfg.rawPurity + nPur * cfg.perStagePurity, 0, 1)
 			local stability = math.Clamp(cfg.rawStability + nStab * cfg.perStageStability, 0, 1)
 			local throughputMul = 1 + (nPur + nStab) * cfg.stageThroughputBonus
+
 			-- Determine consumer's base intake
 			local baseIntake = cnode.intake and cnode.intake > 0 and cnode.intake or cfg.consumerBaseIntake
 			if cnode.ent.GetManaIntakePerSecond then
 				local ok, v = pcall(cnode.ent.GetManaIntakePerSecond, cnode.ent)
 				if ok and tonumber(v) and v > 0 then baseIntake = v end
 			end
+
 			local intake = baseIntake * throughputMul
+
 			-- Pull evenly from producers
 			local per = intake / nProd
 			local delivered = 0
 			local contributions = {}
 			for _, pnode in ipairs(comp.producers) do
-				if not IsValid(pnode.ent) then goto nextprod end
+				if not IsValid(pnode.ent) then continue end
+
 				local got = crystalTake(pnode.ent, per)
 				if got > 0 then
 					delivered = delivered + got
 					contributions[#contributions + 1] = {from = pnode.ent, amount = got}
 				end
-				::nextprod::
 			end
+
 			if delivered > 0 then
 				consumerAdd(cnode.ent, delivered, purity, stability)
 				-- Broadcast a flow snapshot (throttled by tick at 1s)
@@ -248,7 +258,6 @@ if SERVER then
 				end
 				net.Broadcast()
 			end
-			::continue::
 		end
 	end)
 
@@ -330,17 +339,21 @@ if CLIENT then
 	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function()
 		local eye = EyePos()
 		for toEnt, list in pairs(flows) do
-			if not IsValid(toEnt) then flows[toEnt] = nil goto continue_cons end
-			if eye:DistToSqr(toEnt:GetPos()) > MAX_RENDER_DIST then goto continue_cons end
+			if not IsValid(toEnt) then
+				flows[toEnt] = nil
+				continue
+			end
+
+			if eye:DistToSqr(toEnt:GetPos()) > MAX_RENDER_DIST then continue end
 
 			for _, rec in ipairs(list) do
 				local fromEnt = rec.from
-				if not IsValid(fromEnt) then goto continue_beam end
-				if eye:DistToSqr(fromEnt:GetPos()) > MAX_RENDER_DIST then goto continue_beam end
+				if not IsValid(fromEnt) then continue end
+				if eye:DistToSqr(fromEnt:GetPos()) > MAX_RENDER_DIST then continue end
 
 				local age = CurTime() - rec.t
 				local life = 1.0
-				if age > life then goto continue_beam end
+				if age > life then continue end
 
 				-- Color hint by purity/stability
 				local baseA = 230 * (1 - age / life)
@@ -351,7 +364,7 @@ if CLIENT then
 				local to = toEnt:WorldSpaceCenter()
 				local dir = (to - from)
 				local segLen = dir:Length()
-				if segLen < 2 then goto continue_beam end
+				if segLen < 2 then continue end
 
 				dir:Normalize()
 
@@ -385,11 +398,7 @@ if CLIENT then
 				-- Subtle glow at destination
 				render.SetMaterial(Material("sprites/light_glow02_add"))
 				render.DrawSprite(to, 6, 6, Color(r, g, b, baseA))
-
-				::continue_beam::
 			end
-
-			::continue_cons::
 		end
 	end)
 end
