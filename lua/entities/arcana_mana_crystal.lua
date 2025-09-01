@@ -243,6 +243,12 @@ if CLIENT then
 		self._minScale = 0.35
 		self:_ApplyScale(self:GetCrystalScale())
 
+		-- Fade-in setup
+		self._spawnFadeStart = SysTime()
+		self._spawnFadeDur = 0.5
+		self._origColor = self:GetColor() or Color(255, 255, 255)
+		-- We avoid changing entity alpha; we handle fade in our draw passes
+
 		self.Material = Material(self:GetMaterial())
 		self.ShaderMat = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
@@ -274,6 +280,13 @@ if CLIENT then
 		-- Particle FX state
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
 		self._fxNextAbsorb = 0
+	end
+
+	function ENT:_GetSpawnFadeFrac()
+		if not self._spawnFadeStart then return 1 end
+		local d = self._spawnFadeDur or 0.5
+		if d <= 0 then return 1 end
+		return math.Clamp((SysTime() - self._spawnFadeStart) / d, 0, 1)
 	end
 
 	function ENT:OnRemove()
@@ -322,6 +335,11 @@ if CLIENT then
 	end
 
 	function ENT:Think()
+		-- complete fade tracking once done
+		if self._spawnFadeStart and self:_GetSpawnFadeFrac() >= 1 then
+			self._spawnFadeStart = nil
+		end
+
 		if self._fxEmitter then
 			self._fxEmitter:SetPos(self:GetPos())
 		end
@@ -339,7 +357,10 @@ if CLIENT then
 	end
 
 	function ENT:Draw()
-		self:DrawModel()
+		local fadeFrac = self._GetSpawnFadeFrac and self:_GetSpawnFadeFrac() or 1
+		if fadeFrac >= 1 then
+			self:DrawModel()
+		end
 
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
 
@@ -350,7 +371,7 @@ if CLIENT then
 			dl.r = curColor.r
 			dl.g = curColor.g
 			dl.b = curColor.b
-			dl.brightness = 6
+			dl.brightness = 6 * (self._GetSpawnFadeFrac and self:_GetSpawnFadeFrac() or 1)
 			dl.Decay = 100
 			dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
 			dl.DieTime = CurTime() + 0.1
@@ -359,12 +380,11 @@ if CLIENT then
 
 	function ENT:DrawTranslucent()
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
-		if self:IsEffectActive(EF_ITEM_BLINK) then return end
 
 		-- draw only the refractive passes (skip solid base draw to avoid overbright)
 		local PASSES = 4 -- try 3–6
 		local baseDisp = 0.5 -- your $c0_x base
-		local perPassOpacity = 1 / PASSES
+		local perPassOpacity = (1 / PASSES) * (self._GetSpawnFadeFrac and self:_GetSpawnFadeFrac() or 1)
 
 		-- start from current screen
 		render.UpdateScreenEffectTexture()

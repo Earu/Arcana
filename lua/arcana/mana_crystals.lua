@@ -100,7 +100,6 @@ if SERVER then
 		ent:SetAngles(Angle(0, math.random(0, 359), 0))
 		ent:Spawn()
 		ent:Activate()
-		ent:AddEffects(EF_ITEM_BLINK)
 		ent:DropToFloor()
 
 		local snd = CreateSound(ent, "ambient/levels/labs/teleport_winddown1.wav")
@@ -112,7 +111,6 @@ if SERVER then
 		timer.Simple(0.5, function()
 			if not IsValid(ent) then return end
 
-			ent:RemoveEffects(EF_ITEM_BLINK)
 			ent:DropToFloor()
 		end)
 
