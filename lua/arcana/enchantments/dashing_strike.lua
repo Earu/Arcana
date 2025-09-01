@@ -66,7 +66,7 @@ Arcane:RegisterEnchantment({
 	icon = "icon16/arrow_right.png",
 	cost_coins = 350,
 	cost_items = {
-		{ name = "mana_crystal_shard", amount = 15 },
+		{ name = "mana_crystal_shard", amount = 20 },
 	},
 	can_apply = function(ply, wep)
 		return IsValid(wep) and isMeleeHoldType(wep)

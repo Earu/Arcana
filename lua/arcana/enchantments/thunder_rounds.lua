@@ -128,9 +128,9 @@ Arcane:RegisterEnchantment({
 	name = "Thunder Rounds",
 	description = "Each bullet impact calls a lightning AoE, chaining to nearby foes.",
 	icon = "icon16/weather_lightning.png",
-	cost_coins = 600,
+	cost_coins = 2000,
 	cost_items = {
-		{ name = "mana_crystal_shard", amount = 25 },
+		{ name = "mana_crystal_shard", amount = 80 },
 	},
 	can_apply = function(ply, wep)
 		-- Only firearms that can shoot bullets

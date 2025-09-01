@@ -56,9 +56,9 @@ Arcane:RegisterEnchantment({
 	name = "Blazing Salvo",
 	description = "Fires a fireball every second while shooting this weapon.",
 	icon = "icon16/fire.png",
-	cost_coins = 250,
+	cost_coins = 1000,
 	cost_items = {
-		{ name = "mana_crystal_shard", amount = 10 },
+		{ name = "mana_crystal_shard", amount = 30 },
 	},
 	can_apply = function(ply, wep)
 		-- only firearms that can shoot bullets
