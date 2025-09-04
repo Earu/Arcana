@@ -10,6 +10,11 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.UseCooldown = 0.75
 ENT.HintDistance = 140
 
+-- Success chance tunables
+ENT._baseSuccess = 0
+ENT._purityCoeff = 0.4
+ENT._stabilityCoeff = 0.4
+
 function ENT:SetupDataTables()
 	self:NetworkVar("Entity", 0, "ContainedWeapon") -- weapon entity stored inside machine
 	self:NetworkVar("String", 0, "ContainedClass") -- class name for persistence on client
@@ -29,27 +34,24 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		local phys = self:GetPhysicsObject()
 
+		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableMotion(false)
 		end
 
 		self._nextUse = 0
+
 		-- Mana buffer and quality accumulated from network
 		self._manaBuffer = 0
 		self._purity = 0
 		self._stability = 0
+
 		-- NW for client UI
 		self:SetNWFloat("Arcana_ManaBuffer", 0)
 		self:SetNWFloat("Arcana_ManaPurity", 0)
 		self:SetNWFloat("Arcana_ManaStability", 0)
-
-		-- Success chance tunables
-		self._baseSuccess = 0.25
-		self._purityCoeff = 0.4
-		self._stabilityCoeff = 0.4
 
 		-- Register into ManaNetwork as a consumer
 		local Arcane = _G.Arcane or {}
@@ -545,7 +547,6 @@ if CLIENT then
 	end
 
 	local UI_GLYPH_CACHE = {}
-
 	local function UI_GetGlyphMaterial(fontName, char)
 		local key = (fontName or "") .. ":" .. (char or "")
 		local cached = UI_GLYPH_CACHE[key]
@@ -839,9 +840,11 @@ if CLIENT then
 		left.Paint = function(pnl, w, h)
 			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
 			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
+
 			-- Engraved circle background (non-pentagram)
 			local cx, cy = w * 0.5, h * 0.44
 			local radius = math.min(w, h) * 0.36
+
 			-- Stone base
 			draw.NoTexture()
 			surface.DisableClipping(true)
@@ -860,9 +863,9 @@ if CLIENT then
 				end
 			end
 
-			thickCircle(radius - 8, 2)
-			thickCircle(radius * 0.82, 2)
-			thickCircle(radius * 0.64, 2)
+			thickCircle(radius - 8, 1)
+			thickCircle(radius * 0.82, 1)
+			thickCircle(radius * 0.64, 1)
 
 			-- Helpers
 			local function pnt(a, r)
@@ -881,8 +884,10 @@ if CLIENT then
 
 			-- Fine ticks between main ticks (keep within outer band)
 			UI_DrawMinorTicks(cx, cy, radius * 0.89, radius * 0.865, 48, Color(200, 180, 140, 160))
+
 			-- Engraved glyph rings (slow counter-rotation)
 			local t = CurTime()
+
 			-- Outer glyph band (slightly larger for breathing room)
 			local bandOuterMid = radius * 0.755
 			local bandOuterIn = radius * 0.72
@@ -891,6 +896,7 @@ if CLIENT then
 			thickCircle(bandOuterIn, 1)
 			local phraseOuter = GREEK_PHRASES[1 + (math.floor(t * 0.02) % #GREEK_PHRASES)]
 			UI_DrawGlyphRing(cx, cy, bandOuterMid, "MagicCircle_Small", phraseOuter, 0.30, 64, Color(220, 200, 150, 235), t * 0.08)
+
 			-- Inner glyph band (slightly larger)
 			local bandInnerMid = radius * 0.585
 			local bandInnerIn = radius * 0.56
@@ -899,6 +905,7 @@ if CLIENT then
 			thickCircle(bandInnerIn, 1)
 			local phraseInner = ARABIC_PHRASES[1 + (math.floor(t * 0.015 + 1) % #ARABIC_PHRASES)]
 			UI_DrawGlyphRing(cx, cy, bandInnerMid, "MagicCircle_Small", phraseInner, 0.26, 48, Color(220, 200, 150, 210), -t * 0.06)
+
 			surface.DisableClipping(false)
 		end
 
