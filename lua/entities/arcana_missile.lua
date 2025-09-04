@@ -4,6 +4,7 @@ ENT.PrintName = "Arcane Missile"
 ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
+
 -- Tunables
 ENT.MissileSpeed = 600
 ENT.MissileDamage = 22
@@ -31,8 +32,8 @@ if SERVER then
 		self.Created = CurTime()
 		self:SetTrigger(true)
 		self:EmitSound("weapons/physcannon/energy_sing_flyby1.wav", 65, 180)
-		local phys = self:GetPhysicsObject()
 
+		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:SetMass(1)
 			phys:Wake()
@@ -71,10 +72,8 @@ if SERVER then
 		end
 
 		local phys = self:GetPhysicsObject()
-
 		if IsValid(phys) then
 			local target = self:GetHomingTarget()
-
 			if IsValid(target) then
 				local desiredDir = (target:WorldSpaceCenter() - self:GetPos()):GetNormalized()
 				local curDir = phys:GetVelocity():GetNormalized()
@@ -83,19 +82,34 @@ if SERVER then
 				phys:SetVelocity(newVel)
 			else
 				phys:SetVelocity(self:GetForward() * (self.MissileSpeed or 1100))
+				local tr = util.TraceLine({
+					start = self:GetPos(),
+					endpos = self:GetPos() + self:GetForward() * 100,
+					filter = self,
+					mask = MASK_SHOT,
+				})
+
+				if tr.Hit then
+					local ed = EffectData()
+					ed:SetOrigin(self:GetPos())
+					util.Effect("cball_explode", ed, true, true)
+
+					self:Remove()
+				end
 			end
 		end
 
 		self:NextThink(CurTime())
-
 		return true
 	end
 
 	function ENT:StartTouch(ent)
 		if not IsValid(ent) then return end
+
 		local owner = self:GetSpellOwner()
 		if ent == owner then return end
-		if not (ent:IsPlayer() or ent:IsNPC()) then return end
+		if not ent:IsPlayer() or ent:IsNPC() then return end
+
 		local dmg = DamageInfo()
 		dmg:SetDamage(self.MissileDamage or 22)
 		dmg:SetDamageType(bit.bor(DMG_ENERGYBEAM, DMG_DISSOLVE))
@@ -103,9 +117,11 @@ if SERVER then
 		dmg:SetInflictor(self)
 		dmg:SetDamagePosition(ent:WorldSpaceCenter())
 		ent:TakeDamageInfo(dmg)
+
 		local ed = EffectData()
 		ed:SetOrigin(self:GetPos())
 		util.Effect("cball_explode", ed, true, true)
+
 		self:Remove()
 	end
 end
@@ -124,8 +140,8 @@ if CLIENT then
 		render.SetLightingMode(2)
 		self:DrawModel()
 		render.SetLightingMode(0)
-		local dlight = DynamicLight(self:EntIndex())
 
+		local dlight = DynamicLight(self:EntIndex())
 		if dlight then
 			dlight.pos = self:GetPos()
 			dlight.r = ARCANE_COLOR.r
