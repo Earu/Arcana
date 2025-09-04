@@ -27,7 +27,10 @@ if SERVER then
 
         local Arcane = _G.Arcane or {}
         if Arcane.ManaNetwork and Arcane.ManaNetwork.RegisterNode then
-            Arcane.ManaNetwork:RegisterNode(self, {type = "stabilizer", range = 700})
+            local cfg = Arcane.ManaNetwork.Config or {}
+            local stability = tonumber(cfg.perProcessorStability or 0.25) or 0.25
+            local falloff = tonumber(cfg.providerFalloff or 1) or 1
+            Arcane.ManaNetwork:RegisterNode(self, {type = "stabilizer", range = 700, stability_bonus = stability, radius = 700, falloff = falloff})
         end
     end
 

@@ -2,6 +2,7 @@ local Arcane = _G.Arcane or {}
 
 if SERVER then
 	util.AddNetworkString("Arcana_ManaNetwork_Flow")
+
 	Arcane.ManaNetwork = Arcane.ManaNetwork or {}
 	local MN = Arcane.ManaNetwork
 
@@ -20,6 +21,7 @@ if SERVER then
 		rawStability = 0.30,
 		perProcessorPurity = 0.25,     -- amount added to purity by each purifier
 		perProcessorStability = 0.25,  -- amount added to stability by each stabilizer
+		providerFalloff = 1.0,         -- default provider falloff exponent for distance weights
 
 		-- Enchant costs
 		manaPerEnchant = 50,
@@ -106,6 +108,12 @@ if SERVER then
 			pos = ent:GetPos(),
 			range = tonumber(def.range or MN.Config.defaultLinkRange) or MN.Config.defaultLinkRange,
 			intake = tonumber(def.intake or 0) or 0, -- only used for consumers; 0 means use defaults
+			-- Provider-field contributions (entity-agnostic providers)
+			providerPurity = tonumber(def.purity_bonus or 0) or 0,
+			providerStability = tonumber(def.stability_bonus or 0) or 0,
+			providerThroughput = tonumber(def.throughput_bonus or 0) or 0,
+			providerRadius = tonumber(def.radius or 0) or 0,
+			providerFalloff = tonumber(def.falloff or MN.Config.providerFalloff or 1) or 1,
 			links = {},
 		}
 		MN._nodes[ent] = node
@@ -158,6 +166,44 @@ if SERVER then
 		node.pos = newPos
 		addToBucket(node)
 		linkNeighbors(node)
+	end
+
+	-- Aggregate provider field around a position. Returns purity, stability, effectiveProviderCount
+	local function aggregateProvidersAt(pos)
+		local cfg = MN.Config
+		local purity = cfg.rawPurity or 0
+		local stability = cfg.rawStability or 0
+		local effectiveProviders = 0
+		for _, bucket in ipairs(nearbyBuckets(pos)) do
+			for _, n in ipairs(bucket) do
+				if IsValid(n.ent) then
+					local hasAny = (n.providerPurity and n.providerPurity ~= 0)
+						or (n.providerStability and n.providerStability ~= 0)
+						or (n.providerThroughput and n.providerThroughput ~= 0)
+					if hasAny then
+						local rad = (n.providerRadius and n.providerRadius > 0) and n.providerRadius or (n.range or cfg.defaultLinkRange)
+						if rad and rad > 0 then
+							local d = pos:Distance(n.pos)
+							if d < rad then
+								local t = math.Clamp(1 - (d / rad), 0, 1)
+								local fall = n.providerFalloff or cfg.providerFalloff or 1
+								local w = (t ^ math.max(0.0001, fall))
+								if n.providerPurity and n.providerPurity ~= 0 then
+									purity = purity + (n.providerPurity * w)
+								end
+								if n.providerStability and n.providerStability ~= 0 then
+									stability = stability + (n.providerStability * w)
+								end
+								-- Treat throughput bonus as an additional weight on effective provider count
+								local thrMul = 1 + math.max(0, n.providerThroughput or 0)
+								effectiveProviders = effectiveProviders + (w * thrMul)
+							end
+						end
+					end
+				end
+			end
+		end
+		return math.Clamp(purity, 0, 1), math.Clamp(stability, 0, 1), effectiveProviders
 	end
 
 	-- Simple BFS over current graph to collect connected nodes for a consumer
@@ -228,15 +274,11 @@ if SERVER then
 			local nProd = #comp.producers
 			if nProd <= 0 then continue end
 
-			local nStab = #comp.stabilizers
-			local nPur = #comp.purifiers
+			-- Provider-field driven quality and throughput
+			local purity, stability, effProviders = aggregateProvidersAt(cnode.pos)
 
-			-- Quality saturates at 1.0 naturally; no artificial cap
-			local purity = math.Clamp(cfg.rawPurity + nPur * (cfg.perProcessorPurity or 0), 0, 1)
-			local stability = math.Clamp(cfg.rawStability + nStab * (cfg.perProcessorStability or 0), 0, 1)
-
-			-- Throughput scales with every processor present (no cap)
-			local throughputMul = 1 + (nPur + nStab) * (cfg.perProcessorThroughputBonus or 0)
+			-- Throughput scales with effective providers (unbounded)
+			local throughputMul = 1 + (effProviders) * (cfg.perProcessorThroughputBonus or 0)
 
 			-- Determine consumer's base intake
 			local baseIntake = cnode.intake and cnode.intake > 0 and cnode.intake or cfg.consumerBaseIntake
@@ -258,6 +300,9 @@ if SERVER then
 				if got > 0 then
 					delivered = delivered + got
 					contributions[#contributions + 1] = {from = pnode.ent, amount = got}
+
+					-- Report sourced intake to environment corruption model (by crystal region)
+					Arcane.ManaCrystals:ReportConsumerSourced(pnode.ent, got)
 				end
 			end
 
