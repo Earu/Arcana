@@ -22,11 +22,14 @@ if SERVER then
 		-- Environment grouping and regen
 		regionRadius = 2000,          -- radius to group crystals into an environment cell
 		regionRegenPerSecond = 80,   -- how much mana the environment regenerates per region per sec
-		corruptionRampPerSecond = 0.08, -- how fast corruption intensity increases while overdraw persists
+		corruptionRampPerSecond = 0.08, -- legacy: simple ramp when overdrawing (kept for backwards compat)
+		corruptionOverdrawFactor = 0.01, -- new: intensity added per second per unit overdraw (demand - supply)
 	}
 
 	M.hotspots = M.hotspots or {}
 	M.regions = M.regions or {}
+	-- Accumulates consumer intake sourced from crystals per region between environment ticks
+	M._sourcedIntake = M._sourcedIntake or {} -- { [regionKey] = totalAmount }
 	M._saveDir = "arcana"
 
 	-- Save file is map-specific; resolved at runtime via GetSaveFile()
@@ -172,6 +175,17 @@ if SERVER then
 		return tostring(x) .. ":" .. tostring(y)
 	end
 
+	-- Record consumer-sourced intake by the region of a given crystal entity
+	function M:ReportConsumerSourced(crystalEnt, amount)
+		if not IsValid(crystalEnt) then return end
+
+		amount = tonumber(amount) or 0
+		if amount <= 0 then return end
+
+		local key = regionKey(crystalEnt:GetPos(), self.Config.regionRadius)
+		self._sourcedIntake[key] = (self._sourcedIntake[key] or 0) + amount
+	end
+
 	-- Find or create a corrupted area entity attached to a region center
 	local function ensureCorruptedArea(key, center)
 		local region = M.regions[key]
@@ -217,8 +231,13 @@ if SERVER then
 		for key, bucket in pairs(perRegion) do
 			local regen = cfg.regionRegenPerSecond
 			local desired = bucket.totalDesired
-			local overdrawing = desired > regen + 0.001
+
+			-- include consumer intake sourced from this region over the last tick
+			local consumerIntake = tonumber(M._sourcedIntake[key] or 0) or 0
+			local demand = desired + consumerIntake
+			local overdrawing = demand > regen + 0.001
 			local supply = math.min(desired, regen)
+
 			-- Proportional share per crystal
 			for _, c in ipairs(bucket.crystals) do
 				local need = c:IsFull() and 0 or c:GetAbsorbRate()
@@ -227,15 +246,21 @@ if SERVER then
 					c:AddStoredMana(share)
 				end
 			end
-			-- Corruption logic: if overdrawing, ramp up intensity over time; otherwise stay as-is
+
+			-- Corruption logic: increase proportionally to overdraw magnitude (demand - supply)
 			local corruptEnt = ensureCorruptedArea(key, bucket.center)
 			if IsValid(corruptEnt) then
 				local cur = corruptEnt:GetIntensity() or 0
 				if overdrawing then
-					corruptEnt:SetIntensity(math.Clamp(cur + cfg.corruptionRampPerSecond, 0, 2))
+					local over = math.max(0, demand - regen)
+					local add = over * (cfg.corruptionOverdrawFactor or 0)
+					corruptEnt:SetIntensity(math.Clamp(cur + add, 0, 2))
 				end
 			end
 		end
+
+		-- reset sourced intake accumulation after each environment tick
+		M._sourcedIntake = {}
 	end)
 
 	--====================

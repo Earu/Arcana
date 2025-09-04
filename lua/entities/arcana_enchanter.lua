@@ -46,6 +46,11 @@ if SERVER then
 		self:SetNWFloat("Arcana_ManaPurity", 0)
 		self:SetNWFloat("Arcana_ManaStability", 0)
 
+		-- Success chance tunables
+		self._baseSuccess = 0.25
+		self._purityCoeff = 0.4
+		self._stabilityCoeff = 0.4
+
 		-- Register into ManaNetwork as a consumer
 		local Arcane = _G.Arcane or {}
 		if Arcane.ManaNetwork and Arcane.ManaNetwork.RegisterConsumer then
@@ -1389,17 +1394,11 @@ end
 function ENT:ComputeSuccessChance(purity, stability)
 	purity = math.Clamp(tonumber(purity) or 0, 0, 1)
 	stability = math.Clamp(tonumber(stability) or 0, 0, 1)
-	local base = 0.25
+	local base = tonumber(self._baseSuccess or 0.25) or 0.25
+	local k1 = tonumber(self._purityCoeff or 0.4) or 0.4
+	local k2 = tonumber(self._stabilityCoeff or 0.4) or 0.4
+	local chance = base + k1 * purity + k2 * stability
 
-	-- Count current connected stabilizers/purifiers; each pair adds +12%
-	local stab, pur = 0, 0
-	local MN = Arcane and Arcane.ManaNetwork
-	if MN and MN.GetConnectedProcessorCounts then
-		stab, pur = MN:GetConnectedProcessorCounts(self)
-	end
-
-	local couples = math.min(stab, pur)
-	local chance = base + 0.12 * couples
 	return math.Clamp(chance, 0.05, 0.995)
 end
 
