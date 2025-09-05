@@ -29,7 +29,6 @@ if SERVER then
 
 	function ENT:Initialize()
 		self:SetModel("models/props/de_piranesi/pi_sundial.mdl")
-		self:SetMaterial("models/props_c17/metalladder001")
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
