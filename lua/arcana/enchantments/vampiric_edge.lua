@@ -40,11 +40,13 @@ local function attachHook(ply, wep, state)
 
     hook.Add("EntityTakeDamage", state._hookId, function(target, dmginfo)
         if not IsValid(target) or not dmginfo then return end
+
         local attacker = dmginfo:GetAttacker()
         if not IsValid(attacker) or not attacker:IsPlayer() then return end
 
         -- Must be this weapon's wielder and this specific weapon currently active
         if attacker ~= ply then return end
+
         local active = attacker:GetActiveWeapon()
         if not IsValid(active) or active ~= wep then return end
         if not isMeleeHoldType(wep) then return end
