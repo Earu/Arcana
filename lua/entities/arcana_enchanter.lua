@@ -26,6 +26,14 @@ if SERVER then
 	util.AddNetworkString("Arcana_Enchanter_Withdraw")
 	util.AddNetworkString("Arcana_Enchanter_Apply")
 	util.AddNetworkString("Arcana_Enchanter_ApplyBatch")
+	util.AddNetworkString("Arcana_Enchanter_ParticleBurst")
+
+	local function SendEnchantBurst(ent)
+		if not IsValid(ent) then return end
+		net.Start("Arcana_Enchanter_ParticleBurst", true)
+		net.WriteEntity(ent)
+		net.Broadcast()
+	end
 
 	function ENT:Initialize()
 		self:SetModel("models/props/de_piranesi/pi_sundial.mdl")
@@ -62,7 +70,7 @@ if SERVER then
 	function ENT:SpawnFunction(ply, tr, classname)
 		if not tr or not tr.Hit then return end
 
-		local pos = tr.HitPos + tr.HitNormal * 8
+		local pos = tr.HitPos + tr.HitNormal * 2
 		local ent = ents.Create(classname or "arcana_enchanter")
 		if not IsValid(ent) then return end
 
@@ -140,13 +148,20 @@ if SERVER then
 		end
 
 		wep:SetOwner(NULL)
-		wep:SetPos(ent:WorldSpaceCenter() + ent:GetUp() * ent:OBBMaxs().z * 1.5)
+		wep:SetPos(ent:WorldSpaceCenter() + ent:GetUp() * ent:OBBMaxs().z * 0.25)
 		wep:SetAngles(Angle(0, ply:EyeAngles().y or 0, 0))
 		wep:SetParent(ent)
 		wep:SetMoveType(MOVETYPE_NONE)
 		wep:SetCollisionGroup(COLLISION_GROUP_WORLD)
 		wep.ArcanaStored = true
 		wep.ms_notouch = true
+
+		-- Initialize slow multi-axis spin around its current local orientation
+		ent._spinStart = CurTime()
+		ent._spinBaseAng = wep:GetLocalAngles()
+		-- Gentle speeds in deg/sec on all axes
+		ent._spinSpeeds = Angle(8 + math.Rand(0, 4), 10 + math.Rand(0, 5), 6 + math.Rand(0, 4))
+		ent._spinActive = true
 
 		-- Ensure client can see current enchantments on this instance
 		if Arcane and Arcane.GetEntityEnchantments then
@@ -305,6 +320,8 @@ if SERVER then
 			-- Failure consumes half mana cost
 			ent._manaBuffer = math.max(0, (ent._manaBuffer or 0) - manaCost * 0.5)
 			ent:EmitSound("buttons/button10.wav", 65, 90)
+			-- Particle burst on attempt
+			SendEnchantBurst(ent)
 			return
 		end
 
@@ -320,6 +337,8 @@ if SERVER then
 		end
 
 		ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
+		-- Particle burst on attempt
+		SendEnchantBurst(ent)
 	end)
 
 	-- Batch apply: aggregate costs, deduct once, then apply all to the held weapon entity
@@ -469,6 +488,8 @@ if SERVER then
 		else
 			ent:EmitSound("buttons/button10.wav", 65, 90)
 		end
+		-- Particle burst on attempt
+		SendEnchantBurst(ent)
 	end)
 
 	-- Prevent players from picking up or physgunning weapons stored in the enchanter
@@ -481,7 +502,245 @@ if SERVER then
 	end)
 end
 
+-- Slow multi-axis spin for contained weapon (server authoritative)
+if SERVER then
+	function ENT:Think()
+		local wep = self:GetContainedWeapon()
+		if IsValid(wep) and wep:GetParent() == self and (self._spinActive or false) then
+			if not (self._spinStart and self._spinSpeeds and self._spinBaseAng) then
+				self._spinStart = CurTime()
+				self._spinBaseAng = wep:GetLocalAngles()
+				self._spinSpeeds = Angle(8, 10, 6)
+			end
+
+			local t = CurTime() - (self._spinStart or CurTime())
+			local sp = self._spinSpeeds or Angle(8, 10, 6)
+			local base = self._spinBaseAng or Angle(0, 0, 0)
+			local ang = Angle(base.p + sp.p * t, base.y + sp.y * t, base.r + sp.r * t)
+			wep:SetLocalAngles(ang)
+		end
+
+		self:NextThink(CurTime())
+		return true
+	end
+end
+
 if CLIENT then
+	-- Single-model cache for the enchanter outline (model won't change)
+	local ENCHANTER_MODEL_HULL2D
+	local function Arcana_ComputeModelHull2D(modelName)
+		local meshes = util.GetModelMeshes(modelName, 0)
+		if not istable(meshes) or #meshes == 0 then return nil end
+
+		local pts = {}
+		local cap = 6000
+		for _, part in ipairs(meshes) do
+			for _, tri in ipairs(part.triangles or {}) do
+				local v = tri.pos
+				pts[#pts + 1] = Vector(math.Round(v.x, 1), math.Round(v.y, 1), 0)
+				if #pts >= cap then break end
+			end
+			if #pts >= cap then break end
+		end
+
+		if #pts < 3 then return nil end
+
+		table.sort(pts, function(a, b)
+			if a.x == b.x then return a.y < b.y end
+			return a.x < b.x
+		end)
+
+		local function cross(o, a, b)
+			return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+		end
+
+		local lower = {}
+		for _, p in ipairs(pts) do
+			while #lower >= 2 and cross(lower[#lower - 1], lower[#lower], p) <= 0 do
+				lower[#lower] = nil
+			end
+			lower[#lower + 1] = p
+		end
+
+		local upper = {}
+		for i = #pts, 1, -1 do
+			local p = pts[i]
+			while #upper >= 2 and cross(upper[#upper - 1], upper[#upper], p) <= 0 do
+				upper[#upper] = nil
+			end
+			upper[#upper + 1] = p
+		end
+
+		local hull = {}
+		for i = 1, #lower - 1 do hull[#hull + 1] = lower[i] end
+		for i = 1, #upper - 1 do hull[#hull + 1] = upper[i] end
+
+		if #hull > 128 then
+			local step = math.ceil(#hull / 128)
+			local slim = {}
+			for i = 1, #hull, step do slim[#slim + 1] = hull[i] end
+			hull = slim
+		end
+
+		return hull
+	end
+
+	-- Particle burst: fast upward particles around enchanter outline on each attempt
+	net.Receive("Arcana_Enchanter_ParticleBurst", function()
+		local ent = net.ReadEntity()
+		if not IsValid(ent) then return end
+
+		local mdl = tostring(ent:GetModel() or "")
+		if not ENCHANTER_MODEL_HULL2D then
+			ENCHANTER_MODEL_HULL2D = Arcana_ComputeModelHull2D(mdl)
+		end
+
+		local emitter = ParticleEmitter(ent:WorldSpaceCenter(), false)
+		if not emitter then return end
+
+		local up = Vector(0,0,1)
+		local life = 0.30
+		local colR, colG, colB = 222, 198, 120
+
+		if istable(ENCHANTER_MODEL_HULL2D) and #ENCHANTER_MODEL_HULL2D >= 3 then
+			local countPerEdge = 22
+			for i = 1, #ENCHANTER_MODEL_HULL2D do
+				local aLocal = ENCHANTER_MODEL_HULL2D[i]
+				local bLocal = ENCHANTER_MODEL_HULL2D[(i % #ENCHANTER_MODEL_HULL2D) + 1]
+				local a = ent:LocalToWorld(aLocal)
+				local b = ent:LocalToWorld(bLocal)
+				local edge = (b - a)
+				local len = edge:Length()
+				if len > 1e-3 then
+					local dir = edge * (1 / len)
+					local perp = Vector(-dir.y, dir.x, 0)
+					for k = 0, countPerEdge do
+						local t = k / countPerEdge
+						local p0 = a + dir * (len * t)
+						local p = p0 + perp * math.Rand(-1.0, 1.0)
+						local par = emitter:Add("effects/softglow", p)
+						if par then
+							par:SetVelocity(up * math.Rand(190, 280))
+							par:SetDieTime(life * math.Rand(0.85, 1.05))
+							par:SetStartAlpha(235)
+							par:SetEndAlpha(0)
+							par:SetStartSize(math.Rand(1.4, 2.6))
+							par:SetEndSize(0)
+							par:SetRoll(math.Rand(0, 360))
+							par:SetRollDelta(math.Rand(-160, 160))
+							par:SetColor(colR, colG, colB)
+							par:SetAirResistance(95)
+							par:SetGravity(vector_origin)
+							par:SetCollide(false)
+							par:SetLighting(false)
+						end
+					end
+				end
+			end
+		else
+			-- Fallback to OBB outline (bottom square)
+			local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+			local c = {
+				Vector(mins.x, mins.y, 0), Vector(maxs.x, mins.y, 0),
+				Vector(maxs.x, maxs.y, 0), Vector(mins.x, maxs.y, 0)
+			}
+			local countPerEdge = 28
+			for i = 1, 4 do
+				local a = ent:LocalToWorld(c[i])
+				local b = ent:LocalToWorld(c[(i % 4) + 1])
+				local edge = (b - a)
+				local len = edge:Length()
+				if len > 1e-3 then
+					local dir = edge * (1 / len)
+					local perp = Vector(-dir.y, dir.x, 0)
+					for k = 0, countPerEdge do
+						local t = k / countPerEdge
+						local p0 = a + dir * (len * t)
+						local p = p0 + perp * math.Rand(-1.0, 1.0)
+						local par = emitter:Add("effects/softglow", p)
+						if par then
+							par:SetVelocity(up * math.Rand(190, 280))
+							par:SetDieTime(life * math.Rand(0.85, 1.05))
+							par:SetStartAlpha(235)
+							par:SetEndAlpha(0)
+							par:SetStartSize(math.Rand(1.4, 2.6))
+							par:SetEndSize(0)
+							par:SetRoll(math.Rand(0, 360))
+							par:SetRollDelta(math.Rand(-160, 160))
+							par:SetColor(colR, colG, colB)
+							par:SetAirResistance(95)
+							par:SetGravity(vector_origin)
+							par:SetCollide(false)
+							par:SetLighting(false)
+						end
+					end
+				end
+			end
+		end
+
+		emitter:Finish()
+	end)
+
+	-- Create band rings that spin around the deposited weapon
+	function ENT:ClientInitBandVis()
+		if self._bandCircle and self._bandCircle.IsActive and self._bandCircle:IsActive() then return end
+
+		local wep = self:GetContainedWeapon()
+		if not IsValid(wep) then return end
+		if not _G.BandCircle then return end
+
+		local pos = wep:WorldSpaceCenter()
+		local ang = self:GetAngles()
+		local color = Color(222, 198, 120, 255)
+		local bc = BandCircle.Create(pos, ang, color, 80)
+		if not bc then return end
+
+		local mins, maxs = wep:OBBMins(), wep:OBBMaxs()
+		local size = (maxs - mins):Length()
+		local baseR = math.max(12, size * 0.25)
+		local h = math.max(2, baseR * 0.18)
+
+		-- A few elegant, slow bands with different spin axes
+		bc:AddBand(baseR * 0.9, h, {p = 0, y = 28, r = 0}, 2)
+		bc:AddBand(baseR * 0.72, h * 0.9, {p = 22, y = -18, r = 0}, 2)
+		bc:AddBand(baseR * 1.08, h * 0.75, {p = 0, y = 0, r = 32}, 2)
+		bc:AddBand(baseR * 1.32, h * 0.75, {p = -26, y = 0, r = 28}, 2)
+
+		for i, r in ipairs(bc.rings or {}) do
+			r.zBias = (i - 1) * 0.25
+		end
+
+		self._bandCircle = bc
+	end
+
+	function ENT:ClientCleanupBandVis()
+		if self._bandCircle then
+			local bc = self._bandCircle
+			self._bandCircle = nil
+			if bc.Remove then bc:Remove() end
+		end
+	end
+
+	-- Keep the band circle following the weapon
+	function ENT:Think()
+		local wep = self:GetContainedWeapon()
+		if IsValid(wep) then
+			if not (self._bandCircle and self._bandCircle.IsActive and self._bandCircle:IsActive()) then
+				self:ClientInitBandVis()
+			end
+			if self._bandCircle then
+				self._bandCircle.position = wep:WorldSpaceCenter()
+				self._bandCircle.angles = self:GetAngles()
+			end
+		else
+			self:ClientCleanupBandVis()
+		end
+	end
+
+	function ENT:OnRemove()
+		self:ClientCleanupBandVis()
+	end
+
 	-- Minimal styling reuse from altar
 	surface.CreateFont("Arcana_AncientSmall", {
 		font = "Georgia",
