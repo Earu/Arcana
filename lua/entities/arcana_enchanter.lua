@@ -140,7 +140,7 @@ if SERVER then
 		end
 
 		wep:SetOwner(NULL)
-		wep:SetPos(ent:GetPos() + ent:GetForward() * 16 + ent:GetUp() * 24)
+		wep:SetPos(ent:WorldSpaceCenter() + ent:GetUp() * ent:OBBMaxs().z * 1.5)
 		wep:SetAngles(Angle(0, ply:EyeAngles().y or 0, 0))
 		wep:SetParent(ent)
 		wep:SetMoveType(MOVETYPE_NONE)
@@ -1202,6 +1202,14 @@ if CLIENT then
 					end
 				end
 			end
+
+			-- Clear selections that have just become applied so UI/state stays consistent
+			for id, on in pairs(selected) do
+				if on and appliedSet[id] then
+					selected[id] = nil
+				end
+			end
+
 			-- Build visible list filtered by can_apply for the deposited weapon (if any)
 			local visible = {}
 			for enchId, ench in pairs(getEnchantmentsList()) do
