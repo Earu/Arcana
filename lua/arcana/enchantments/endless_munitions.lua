@@ -5,7 +5,9 @@ local function attachInfiniteAmmo(ply, wep, state)
 	-- Continuously top off the weapon clips while this weapon is active
 	state._hookId = string.format("Arcana_Ench_InfiniteAmmo_%d_%d", wep:EntIndex(), ply:EntIndex())
 	hook.Add("Think", state._hookId, function()
+		ply = wep:GetOwner() -- owner might have changed
 		if not IsValid(ply) then return end
+
 		local active = ply:GetActiveWeapon()
 		if not IsValid(active) or active ~= wep then return end
 
