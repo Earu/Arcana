@@ -121,6 +121,7 @@ if CLIENT then
 		end
 
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+
 		local now = CurTime()
 		if now >= (self._fxNext or 0) and self._fxEmitter then
 			self._fxNext = now + 0.12
