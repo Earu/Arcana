@@ -25,43 +25,15 @@ local function applyFrostbite(attacker, target, hitPos)
 		end
 	end
 
-	-- Apply slow on players only
-	if target:IsPlayer() then
-		local untilTime = CurTime() + slowDuration
-		target.ArcanaFrostSlowUntil = math.max(target.ArcanaFrostSlowUntil or 0, untilTime)
-		-- Phase 1: heavy initial chill for responsiveness
-		target:SetLaggedMovementValue(0.2)
-
-		timer.Simple(0.5, function()
-			if not IsValid(target) then return end
-			if CurTime() < (target.ArcanaFrostSlowUntil or 0) then
-				target:SetLaggedMovementValue(slowMult)
-			end
-		end)
-
-		-- Small icy band on slowed target
-		Arcane:SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
-			{
-				radius = 18,
-				height = 6,
-				spin = { p = 0, y = 40, r = 0 },
-				lineWidth = 2,
-			},
-		}, "frost_slow")
-
-		-- Tell the affected client to show cold breath and vignette
-		net.Start("Arcana_FrostNovaChill", true)
-		net.WriteFloat(slowDuration)
-		net.Send(target)
-
-		timer.Create("Arcana_FrostSlowRestore_" .. target:EntIndex(), 0.25, math.ceil(slowDuration / 0.25) + 2, function()
-			if not IsValid(target) then return end
-			if CurTime() >= (target.ArcanaFrostSlowUntil or 0) then
-				target:SetLaggedMovementValue(1)
-				Arcane:ClearBandVFX(target, "frost_slow")
-				timer.Remove("Arcana_FrostSlowRestore_" .. target:EntIndex())
-			end
-		end)
+	-- Apply slow via shared Frost status
+	local isActor = target:IsPlayer() or target:IsNPC() or (target.IsNextBot and target:IsNextBot())
+	if isActor then
+		Arcane.Status.Frost.Apply(target, {
+			slowMult = slowMult,
+			duration = slowDuration,
+			vfxTag = "frost_slow",
+			sendClientFX = true
+		})
 	end
 
 	-- Impact visuals and audio at hit position

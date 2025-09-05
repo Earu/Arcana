@@ -24,6 +24,17 @@ if CLIENT then
 	include("arcana/voice_activation.lua")
 end
 
+-- Load all statuses from arcana/status/*.lua
+do
+	local files = file.Find("arcana/status/*.lua", "LUA")
+	for _, fname in ipairs(files) do
+		if SERVER then
+			AddCSLuaFile("arcana/status/" .. fname)
+		end
+		include("arcana/status/" .. fname)
+	end
+end
+
 -- Load all spells from arcana/spells/*.lua so each spell can live in its own file
 do
 	local files = file.Find("arcana/spells/*.lua", "LUA")

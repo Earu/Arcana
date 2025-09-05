@@ -1,6 +1,5 @@
 if SERVER then
 	util.AddNetworkString("Arcana_FrostNovaBurst")
-	util.AddNetworkString("Arcana_FrostNovaChill")
 end
 
 Arcane:RegisterSpell({
@@ -60,8 +59,10 @@ Arcane:RegisterSpell({
 		for _, ent in ipairs(ents.FindInSphere(pos, radius)) do
 			if not IsValid(ent) then continue end
 			if ent == caster then continue end
+
 			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
 			if not isActor then continue end
+
 			-- Deal damage
 			local dmg = DamageInfo()
 			dmg:SetDamage(baseDamage)
@@ -82,50 +83,13 @@ Arcane:RegisterSpell({
 				end
 			end
 
-			-- Apply slow to players only (engine-supported)
-			if ent:IsPlayer() then
-				local untilTime = CurTime() + slowDuration
-				ent.ArcanaFrostSlowUntil = math.max(ent.ArcanaFrostSlowUntil or 0, untilTime)
-				-- Phase 1: heavy initial chill for responsiveness
-				ent:SetLaggedMovementValue(0.2)
-
-				timer.Simple(0.5, function()
-					if not IsValid(ent) then return end
-
-					if CurTime() < (ent.ArcanaFrostSlowUntil or 0) then
-						ent:SetLaggedMovementValue(slowMult)
-					end
-				end)
-
-				-- Small icy band on slowed target
-				Arcane:SendAttachBandVFX(ent, Color(170, 220, 255, 255), 24, 0.8, {
-					{
-						radius = 18,
-						height = 6,
-						spin = {
-							p = 0,
-							y = 40,
-							r = 0
-						},
-						lineWidth = 2
-					},
-				}, "frost_slow")
-
-				-- Tell the affected client to show cold breath and vignette
-				net.Start("Arcana_FrostNovaChill")
-				net.WriteFloat(slowDuration)
-				net.Send(ent)
-
-				timer.Create("Arcana_FrostSlowRestore_" .. ent:EntIndex(), 0.25, math.ceil(slowDuration / 0.25) + 2, function()
-					if not IsValid(ent) then return end
-
-					if CurTime() >= (ent.ArcanaFrostSlowUntil or 0) then
-						ent:SetLaggedMovementValue(1)
-						Arcane:ClearBandVFX(ent, "frost_slow")
-						timer.Remove("Arcana_FrostSlowRestore_" .. ent:EntIndex())
-					end
-				end)
-			end
+			-- Apply slow via shared Frost status
+			Arcane.Status.Frost.Apply(ent, {
+				slowMult = slowMult,
+				duration = slowDuration,
+				vfxTag = "frost_slow",
+				sendClientFX = ent:IsPlayer()
+			})
 		end
 
 		-- Impact visuals and audio
@@ -271,7 +235,7 @@ if CLIENT then
 			-- icy shard flecks
 			for i = 1, 34 do
 				local mat = (math.random() < 0.5) and "effects/fleck_glass1" or "effects/fleck_glass2"
-				local p = emitter:Add(mat, pos)
+				local p = emitter.Add and emitter:Add(mat, pos)
 
 				if p then
 					local dir = Angle(0, (i / 34) * 360, 0):Forward()
@@ -319,82 +283,5 @@ if CLIENT then
 				}
 			end
 		end
-	end)
-
-	-- Local chill FX when slowed by frost nova
-	local chillEnd = 0
-	local nextBreath = 0
-	local breathEmitter
-
-	net.Receive("Arcana_FrostNovaChill", function()
-		local dur = net.ReadFloat() or 2
-		chillEnd = math.max(chillEnd, CurTime() + dur)
-
-		if not breathEmitter then
-			breathEmitter = ParticleEmitter(LocalPlayer():GetPos())
-		end
-	end)
-
-	hook.Add("Think", "Arcana_FrostNova_Breath", function()
-		if CurTime() > chillEnd then return end
-		local lp = LocalPlayer()
-		if not IsValid(lp) then return end
-		if CurTime() < nextBreath then return end
-		nextBreath = CurTime() + 0.08
-
-		if not breathEmitter then
-			breathEmitter = ParticleEmitter(lp:GetPos())
-		end
-
-		local eye = lp:EyePos()
-		local fwd = lp:EyeAngles():Forward()
-		local p = breathEmitter:Add("particle/particle_smokegrenade", eye + fwd * 4)
-
-		if p then
-			p:SetVelocity(fwd * 20 + VectorRand() * 6)
-			p:SetDieTime(0.5)
-			p:SetStartAlpha(60)
-			p:SetEndAlpha(0)
-			p:SetStartSize(2)
-			p:SetEndSize(8)
-			p:SetColor(220, 235, 255)
-			p:SetAirResistance(60)
-		end
-	end)
-
-	hook.Add("RenderScreenspaceEffects", "Arcana_FrostNova_Vignette", function()
-		if CurTime() > chillEnd then return end
-		local t = math.Clamp((chillEnd - CurTime()) / 3, 0, 1)
-
-		local cm = {
-			["$pp_colour_addr"] = 0,
-			["$pp_colour_addg"] = 0,
-			["$pp_colour_addb"] = 0.01 * t,
-			["$pp_colour_brightness"] = -0.02 * t,
-			["$pp_colour_contrast"] = 1 + 0.04 * t,
-			["$pp_colour_colour"] = 1 - 0.1 * t,
-			["$pp_colour_mulr"] = 0,
-			["$pp_colour_mulg"] = 0,
-			["$pp_colour_mulb"] = 0.02 * t,
-		}
-
-		DrawColorModify(cm)
-		-- Frosted edge overlay
-		local w, h = ScrW(), ScrH()
-		local edge = math.floor(math.min(w, h) * 0.08 * t)
-
-		if edge > 0 then
-			surface.SetMaterial(frostOverlayMat)
-			surface.SetDrawColor(210, 230, 255, math.floor(110 * t))
-			-- top / bottom
-			surface.DrawTexturedRect(0, 0, w, edge)
-			surface.DrawTexturedRect(0, h - edge, w, edge)
-			-- left / right
-			surface.DrawTexturedRect(0, 0, edge, h)
-			surface.DrawTexturedRect(w - edge, 0, edge, h)
-		end
-
-		-- Subtle sharpen for a crisp cold feel
-		DrawSharpen(0.4 * t, 1 + 1.5 * t)
 	end)
 end
