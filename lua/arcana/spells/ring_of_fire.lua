@@ -55,7 +55,15 @@ Arcane:RegisterSpell({
 				for _, ent in ipairs(ents.FindInSphere(origin, outer + 24)) do
 					if not IsValid(ent) then continue end
 					if ent == caster then continue end
+					if ent:IsWeapon() then continue end
 					if processed[ent] then continue end
+
+					local parent = ent:GetParent()
+					if IsValid(parent) then
+						if parent == caster then continue end
+						if parent:IsWeapon() then continue end
+						if processed[parent] then continue end
+					end
 
 					local c = ent:WorldSpaceCenter()
 					local dist = c:Distance(origin)
