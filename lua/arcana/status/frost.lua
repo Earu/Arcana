@@ -124,6 +124,7 @@ function Frost.Apply(target, options)
 					end
 				end
 			end
+		end
 	end)
 end
 
