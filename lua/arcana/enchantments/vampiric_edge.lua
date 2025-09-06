@@ -20,7 +20,7 @@ end
 local function healAttacker(attacker, amount)
     if not IsValid(attacker) or not attacker:IsPlayer() then return end
     if amount <= 0 then return end
-    local max = attacker:GetMaxHealth and attacker:GetMaxHealth() or 100
+    local max = attacker.GetMaxHealth and attacker:GetMaxHealth() or 100
     local newHealth = math.min(attacker:Health() + amount, max)
     attacker:SetHealth(newHealth)
 
