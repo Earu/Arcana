@@ -1,5 +1,4 @@
 -- Vampiric Edge: Melee-only enchantment that regenerates health on hit
-
 local function isMeleeHoldType(wep)
     if not IsValid(wep) then return false end
 
@@ -60,8 +59,8 @@ local function attachHook(ply, wep, state)
         local dealt = math.max(0, tonumber(dmginfo:GetDamage() or 0) or 0)
         if dealt <= 0 then return end
 
-        -- Heal for 25% of dealt damage, at least 1, capped to 15 per trigger
-        local heal = math.floor(math.Clamp(dealt * 0.25, 1, 15))
+        -- Heal for 75% of dealt damage, at least 1, capped to 15 per trigger
+        local heal = math.floor(math.Clamp(dealt * 0.75, 1, 15))
         healAttacker(attacker, heal)
     end)
 end
