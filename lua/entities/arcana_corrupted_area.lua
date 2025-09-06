@@ -198,17 +198,6 @@ if CLIENT then
 		["$translucent"] = "1"
 	})
 
-	-- Dedicated font for corrupted glyphs (avoid dependency on circles.lua fonts)
-	surface.CreateFont("Arcana_CorruptGlyph", {
-		font = "Arial",
-		size = 80,
-		weight = 700,
-		antialias = true
-	})
-
-	-- 3D2D scale used for glyph drawing (world units per 1/scale of 2D units)
-	local GLYPH_SCALE = 0.06
-
 	-- server applier above; client has applyIntensityClient below
 	local function applyIntensityClient(self)
 		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
@@ -281,85 +270,6 @@ if CLIENT then
 		end
 	end
 
-	-- Corrupted glyph particle system (spread out and darker)
-	local EVIL_GLYPHS = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"}
-
-	local function pickGlyph()
-		return EVIL_GLYPHS[math.random(1, #EVIL_GLYPHS)] or "*"
-	end
-
-	function ENT:PrepareCorruptGlyphs()
-		self._glyphParticles = {}
-		self._glyphSpawnRate = 10
-		self._glyphMaxParticles = 150
-		self._glyphSpawnAccumulator = 0
-		-- Seed some initial glyphs so the area looks active right away
-		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
-		local sp = math.Clamp((k - 0.7) / 1.3, 0, 1)
-
-		if sp > 0.15 then
-			for i = 1, math.min(1, self._glyphMaxParticles or 1) do
-				self:_SpawnCorruptGlyph()
-			end
-		end
-	end
-
-	function ENT:_SpawnCorruptGlyph()
-		local now = CurTime()
-		local radius = math.max(1, self:GetRadius() or 200)
-		local ang = math.Rand(0, math.pi * 2)
-		local r = math.Rand(-radius, radius)
-		local baseX = math.cos(ang) * r
-		local baseY = math.sin(ang) * r
-		-- Compute travel so glyph reaches top of the corruption sphere
-		local targetWorldHeight = math.sqrt(math.max(0, radius * radius - (baseX * baseX + baseY * baseY))) * 0.5
-		local travel = math.max(0, targetWorldHeight / GLYPH_SCALE)
-		local lifeSeconds = math.Rand(3.0, 7.0)
-		local speed = travel / lifeSeconds
-		-- No horizontal drift/orbit, only vertical movement
-		local driftX = 0
-		local driftY = 0
-		local orbitRadius = 0
-		local orbitSpeed = 0
-		local orbitPhase = 0
-
-		local particle = {
-			born = now,
-			dieAt = now + lifeSeconds,
-			h = 0,
-			speed = speed,
-			travel = travel,
-			char = pickGlyph(),
-			alpha = math.random(200, 255),
-			baseX = baseX,
-			baseY = baseY,
-			driftX = driftX,
-			driftY = driftY,
-			orbitR = orbitRadius,
-			orbitW = orbitSpeed,
-			orbitP = orbitPhase,
-			rot = math.Rand(0, 360),
-			rotSpeed = math.Rand(-40, 40),
-			-- jitter/glitch params (pixels in 3D2D space)
-			jxAmp = math.random(1, 5),
-			jyAmp = math.random(1, 4),
-			jxW = math.Rand(8, 18),
-			jyW = math.Rand(9, 20),
-			jxP = math.Rand(0, math.pi * 2),
-			jyP = math.Rand(0, math.pi * 2),
-			glitchChance = 0.05,
-			glitchPx = math.random(6, 14),
-			-- teleport burst params (world units)
-			nextTp = now + math.Rand(0.5, 2.5),
-			tpDur = math.Rand(0.05, 0.15),
-			tpMax = math.max(16, radius * 0.25),
-			tpx = 0,
-			tpy = 0
-		}
-
-		self._glyphParticles[#self._glyphParticles + 1] = particle
-	end
-
 	local function updateRenderBounds(self)
 		local r = math.max(64, (self:GetRadius() or 100) + 64)
 		self:SetRenderBounds(Vector(-r, -r, -32), Vector(r, r, r))
@@ -376,59 +286,13 @@ if CLIENT then
 	function ENT:Think()
 		-- Spawn/update evil glyph particles (use CurTime delta for stable speed)
 		local now = CurTime()
-		local dt = math.Clamp(now - (self._lastUpdate or now), 0, 0.2)
 		self._lastUpdate = now
+
 		-- Intensity changes live
 		local curI = self:GetIntensity() or 1
-
 		if curI ~= (self._lastIntensity or -1) then
 			applyIntensityClient(self)
 			self._lastIntensity = curI
-		end
-
-		self._glyphSpawnAccumulator = (self._glyphSpawnAccumulator or 0) + (self._glyphSpawnRate or 24) * dt
-		local toSpawn = math.floor(self._glyphSpawnAccumulator)
-		self._glyphSpawnAccumulator = self._glyphSpawnAccumulator - toSpawn
-
-		if self._glyphParticles and (#self._glyphParticles < (self._glyphMaxParticles or 90)) then
-			for i = 1, math.min(toSpawn, (self._glyphMaxParticles or 90) - #self._glyphParticles) do
-				self:_SpawnCorruptGlyph()
-			end
-		end
-
-		if self._glyphParticles and #self._glyphParticles > 0 then
-			local write = 1
-
-			for read = 1, #self._glyphParticles do
-				local p = self._glyphParticles[read]
-
-				if p and now < (p.dieAt or 0) then
-					p.h = (p.h or 0) + (p.speed or 40) * dt
-					p.rot = (p.rot or 0) + (p.rotSpeed or 0) * dt
-
-					-- teleport scheduling (instant x/y bursts)
-					if p.tpEnd and now >= p.tpEnd then
-						p.tpx = 0
-						p.tpy = 0
-						p.tpEnd = nil
-					end
-
-					if (not p.tpEnd) and p.nextTp and now >= p.nextTp then
-						local max = p.tpMax or math.max(16, radius * 0.25)
-						p.tpx = math.Rand(-max, max)
-						p.tpy = math.Rand(-max, max)
-						p.tpEnd = now + (p.tpDur or math.Rand(0.05, 0.12))
-						p.nextTp = now + math.Rand(1.2, 3.5)
-					end
-
-					self._glyphParticles[write] = p
-					write = write + 1
-				end
-			end
-
-			for i = write, #self._glyphParticles do
-				self._glyphParticles[i] = nil
-			end
 		end
 
 		updateRenderBounds(self)
@@ -437,61 +301,7 @@ if CLIENT then
 		return true
 	end
 
-	local OFFSET = Vector(0, 0, 40)
-	local MAX_DIST = 3500 * 3500
-
 	function ENT:DrawTranslucent()
-		local ply = LocalPlayer()
-		if ply:GetPos():DistToSqr(self:GetPos()) > MAX_DIST then return end
-		-- Draw corrupted glyphs rising from the ground around the area
-		if not self._glyphParticles or #self._glyphParticles == 0 then return end
-		surface.SetFont("Arcana_CorruptGlyph")
-		local baseTop = self:GetPos() - OFFSET
-
-		for _, p in ipairs(self._glyphParticles) do
-			local now = CurTime()
-			local lifeFrac = 1
-
-			if p.dieAt then
-				local remain = p.dieAt - now
-				local total = (p.dieAt - (p.born or now))
-				lifeFrac = math.Clamp(remain / math.max(0.001, total), 0, 1)
-			end
-
-			local travelFrac = math.Clamp((p.h or 0) / math.max(1, p.travel or 200), 0, 1)
-			local tailFadeStart = 0.85
-			local tailFade = travelFrac >= tailFadeStart and (1 - (travelFrac - tailFadeStart) / (1 - tailFadeStart)) or 1
-			local alpha = math.floor((p.alpha or 220) * lifeFrac * tailFade)
-
-			if alpha > 0 then
-				-- Only vertical rise: keep baseX/baseY fixed
-				local worldPos = baseTop + Vector((p.baseX or 0) + (p.tpx or 0), (p.baseY or 0) + (p.tpy or 0), 0)
-				local ang = Angle(0, 0, 0)
-
-				if IsValid(ply) then
-					ang = (ply:GetPos() - worldPos):Angle()
-				end
-
-				ang:RotateAroundAxis(ang:Right(), -90)
-				ang:RotateAroundAxis(ang:Up(), 90)
-				-- compute per-frame jitter in 3D2D pixels
-				local jx = (p.jxAmp or 2) * math.sin(now * (p.jxW or 12) + (p.jxP or 0))
-				local jy = (p.jyAmp or 2) * math.cos(now * (p.jyW or 14) + (p.jyP or 0))
-
-				if (p.glitchChance and math.random() < p.glitchChance) then
-					jx = jx + math.random(-(p.glitchPx or 8), p.glitchPx or 8)
-					jy = jy + math.random(-(p.glitchPx or 8), p.glitchPx or 8)
-					alpha = math.floor(alpha * math.Rand(0.6, 1.0))
-				end
-
-				cam.Start3D2D(worldPos, ang, GLYPH_SCALE)
-				local txt = p.char or "*"
-				surface.SetTextColor(180, 180, 180, alpha)
-				surface.SetTextPos(-18 + jx, -math.floor(p.h or 0) + jy)
-				surface.DrawText(txt)
-				cam.End3D2D()
-			end
-		end
 	end
 
 	function ENT:Draw()

@@ -243,10 +243,8 @@ if SERVER then
 
 	-- Utilities expected on entities
 	local function crystalTake(ent, amt)
-		if ent and ent.TakeStoredMana then
-			return ent:TakeStoredMana(amt)
-		end
-		return 0
+		-- Crystals are non-depleting providers now; deliver requested amount
+		return tonumber(amt) or 0
 	end
 
 	local function consumerAdd(ent, amt, purity, stability)
@@ -301,8 +299,7 @@ if SERVER then
 					delivered = delivered + got
 					contributions[#contributions + 1] = {from = pnode.ent, amount = got}
 
-					-- Report sourced intake to environment corruption model (by crystal region)
-					Arcane.ManaCrystals:ReportConsumerSourced(pnode.ent, got)
+					-- Environment regen/corruption reporting removed
 				end
 			end
 
