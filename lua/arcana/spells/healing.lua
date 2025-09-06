@@ -3,7 +3,7 @@ Arcane:RegisterSpell({
 	name = "Healing",
 	description = "Restore a player's health.",
 	category = Arcane.CATEGORIES.PROTECTION,
-	level_required = 2,
+	level_required = 6,
 	knowledge_cost = 2,
 	cooldown = 8.0,
 	cost_type = Arcane.COST_TYPES.COINS,
