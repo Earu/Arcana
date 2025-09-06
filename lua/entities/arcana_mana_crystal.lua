@@ -14,11 +14,9 @@ require("shader_to_gma")
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "AbsorbRadius")
 	self:NetworkVar("Float", 1, "CrystalScale")
-	self:NetworkVar("Float", 2, "StoredMana")
 
 	if SERVER then
 		self:SetAbsorbRadius(520)
-		self:SetStoredMana(0)
 	end
 
 	-- Apply model scaling whenever CrystalScale changes (both realms)
@@ -72,16 +70,6 @@ function ENT:_OnScaleChanged(_)
 end
 
 -- Shared capacity and absorption helpers (computed from scale)
-function ENT:GetMaxMana()
-	local minScale = self._minScale or 0.35
-	local maxScale = self._maxScale or 2.2
-	local s = math.Clamp(self:GetCrystalScale() or 1, minScale, maxScale)
-	local t = (s - minScale) / math.max(0.0001, maxScale - minScale)
-	local minCap = 200
-	local maxCap = 2000
-	return minCap + (maxCap - minCap) * t
-end
-
 function ENT:GetAbsorbRate()
 	local minScale = self._minScale or 0.35
 	local maxScale = self._maxScale or 2.2
@@ -90,10 +78,6 @@ function ENT:GetAbsorbRate()
 	local minRate = 6 -- mana/sec
 	local maxRate = 30
 	return minRate + (maxRate - minRate) * t
-end
-
-function ENT:IsFull()
-	return (self:GetStoredMana() or 0) >= self:GetMaxMana() - 0.001
 end
 
 if SERVER then
@@ -181,6 +165,11 @@ if SERVER then
 		ed:SetOrigin(self:WorldSpaceCenter())
 		util.Effect("GlassImpact", ed, true, true)
 		self:EmitSound("physics/glass/glass_largesheet_break1.wav", 70, 100)
+		-- Report destruction to corruption system before removal
+		local Arcane = _G.Arcane or {}
+		if Arcane.ManaCrystals and Arcane.ManaCrystals.ReportCrystalDestroyed then
+			Arcane.ManaCrystals:ReportCrystalDestroyed(self)
+		end
 		self:Remove()
 	end
 
@@ -224,31 +213,7 @@ if SERVER then
 		self:EmitSound("buttons/blip1.wav", 55, 140)
 	end
 
-	function ENT:AddStoredMana(amount)
-		amount = tonumber(amount) or 0
-		if amount <= 0 then return 0 end
-		local cap = self:GetMaxMana()
-		local cur = math.max(0, self:GetStoredMana() or 0)
-		local add = math.min(amount, math.max(0, cap - cur))
-
-		if add > 0 then
-			self:SetStoredMana(cur + add)
-		end
-
-		return add
-	end
-
-	-- Extract and return the actually removed amount
-	function ENT:TakeStoredMana(amount)
-		amount = tonumber(amount) or 0
-		if amount <= 0 then return 0 end
-		local cur = math.max(0, self:GetStoredMana() or 0)
-		local take = math.min(amount, cur)
-		if take > 0 then
-			self:SetStoredMana(cur - take)
-		end
-		return take
-	end
+	-- Stored mana mechanics removed: crystals no longer hold/deplete mana
 
 	-- Register into the ManaNetwork on spawn
 	function ENT:OnRemove()
@@ -374,7 +339,7 @@ if CLIENT then
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
 
 		local now = CurTime()
-		if not self:IsFull() and now >= (self._fxNextAbsorb or 0) then
+		if now >= (self._fxNextAbsorb or 0) then
 			self:_SpawnAbsorbParticles()
 			self._fxNextAbsorb = now + 0.06
 		end

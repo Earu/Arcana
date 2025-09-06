@@ -19,18 +19,20 @@ if SERVER then
 		crystalMaxPerArea = 2,      -- limit new spawns if too many are near
 		areaLimitRadius = 2000,      -- radius to count nearby crystals for the area limit
 		hotspotSpawnCooldown = 10,   -- minimum seconds between spawns per hotspot
-		-- Environment grouping and regen
-		regionRadius = 2000,          -- radius to group crystals into an environment cell
-		regionRegenPerSecond = 80,   -- how much mana the environment regenerates per region per sec
-		corruptionRampPerSecond = 0.08, -- legacy: simple ramp when overdrawing (kept for backwards compat)
-		corruptionOverdrawFactor = 0.01, -- new: intensity added per second per unit overdraw (demand - supply)
+		-- Corruption area grouping
+		regionRadius = 2000,          -- radius used to group positions into a corruption area cell
+
+		-- Corruption from crystal destruction (replaces overdraw-based corruption)
+		corruptionDestructionBase = 0.05,       -- very light base corruption per destroyed crystal
+		corruptionDestructionSizeFactor = 0.35, -- additional corruption scaled by crystal size (0..1)
+		corruptionDestructionEscalation = 0.06, -- per-region escalation per successive destruction (linear)
 	}
 
 	M.hotspots = M.hotspots or {}
 	M.regions = M.regions or {}
-	-- Accumulates consumer intake sourced from crystals per region between environment ticks
-	M._sourcedIntake = M._sourcedIntake or {} -- { [regionKey] = totalAmount }
 	M._saveDir = "arcana"
+	-- Track per-region destruction counts to escalate corruption on repeated crystal destruction
+	M._regionDestructionCounts = M._regionDestructionCounts or {} -- { [regionKey] = count }
 
 	-- Save file is map-specific; resolved at runtime via GetSaveFile()
 	function M:GetSaveFile()
@@ -175,16 +177,7 @@ if SERVER then
 		return tostring(x) .. ":" .. tostring(y)
 	end
 
-	-- Record consumer-sourced intake by the region of a given crystal entity
-	function M:ReportConsumerSourced(crystalEnt, amount)
-		if not IsValid(crystalEnt) then return end
-
-		amount = tonumber(amount) or 0
-		if amount <= 0 then return end
-
-		local key = regionKey(crystalEnt:GetPos(), self.Config.regionRadius)
-		self._sourcedIntake[key] = (self._sourcedIntake[key] or 0) + amount
-	end
+	-- Removed: ReportConsumerSourced (environment regen removed)
 
 	-- Find or create a corrupted area entity attached to a region center
 	local function ensureCorruptedArea(key, center)
@@ -205,63 +198,39 @@ if SERVER then
 		return ent
 	end
 
-	-- Main environment absorption and corruption loop
-	timer.Create("Arcana_ManaEnvironment_Think", 1.0, 0, function()
-		local cfg = M.Config
-		local crystals = ents.FindByClass("arcana_mana_crystal")
-		if #crystals < 1 then return end
-		-- Group crystals by region key and compute draw
-		local perRegion = {}
-		for _, c in ipairs(crystals) do
-			if IsValid(c) and not c:IsFull() then
-				local k = regionKey(c:GetPos(), cfg.regionRadius)
-				local bucket = perRegion[k]
-				if not bucket then
-					bucket = {center = c:GetPos(), crystals = {}, totalDesired = 0}
-					perRegion[k] = bucket
-				else
-					-- keep center stable by averaging lightly
-					bucket.center = (bucket.center * 0.9) + (c:GetPos() * 0.1)
-				end
-				table.insert(bucket.crystals, c)
-				bucket.totalDesired = bucket.totalDesired + math.max(0, c:GetAbsorbRate())
-			end
-		end
-		-- For each region, allocate environment regen proportionally, fill crystals, and handle corruption
-		for key, bucket in pairs(perRegion) do
-			local regen = cfg.regionRegenPerSecond
-			local desired = bucket.totalDesired
+	-- Environment regen loop removed
 
-			-- include consumer intake sourced from this region over the last tick
-			local consumerIntake = tonumber(M._sourcedIntake[key] or 0) or 0
-			local demand = desired + consumerIntake
-			local overdrawing = demand > regen + 0.001
-			local supply = math.min(desired, regen)
+	-- Report crystal destruction to increase corruption in the affected region
+	function M:ReportCrystalDestroyed(crystalEnt)
+		if not IsValid(crystalEnt) then return end
+		local cfg = self.Config or {}
+		local pos = crystalEnt:GetPos()
+		local key = regionKey(pos, cfg.regionRadius)
+		local center = pos
+		local corruptEnt = ensureCorruptedArea(key, center)
+		if not IsValid(corruptEnt) then return end
 
-			-- Proportional share per crystal
-			for _, c in ipairs(bucket.crystals) do
-				local need = c:IsFull() and 0 or c:GetAbsorbRate()
-				if need > 0 and supply > 0 and desired > 0 then
-					local share = supply * (need / desired)
-					c:AddStoredMana(share)
-				end
-			end
-
-			-- Corruption logic: increase proportionally to overdraw magnitude (demand - supply)
-			local corruptEnt = ensureCorruptedArea(key, bucket.center)
-			if IsValid(corruptEnt) then
-				local cur = corruptEnt:GetIntensity() or 0
-				if overdrawing then
-					local over = math.max(0, demand - regen)
-					local add = over * (cfg.corruptionOverdrawFactor or 0)
-					corruptEnt:SetIntensity(math.Clamp(cur + add, 0, 2))
-				end
-			end
+		-- Determine size factor from crystal scale (normalized 0..1 between min/max)
+		local s = (crystalEnt.GetCrystalScale and crystalEnt:GetCrystalScale()) or 1
+		local minS = tonumber(cfg.crystalMinScale or 0.35) or 0.35
+		local maxS = tonumber(cfg.crystalMaxScale or 2.2) or 2.2
+		local sizeT = 0
+		if maxS > minS then
+			sizeT = math.Clamp((s - minS) / (maxS - minS), 0, 1)
 		end
 
-		-- reset sourced intake accumulation after each environment tick
-		M._sourcedIntake = {}
-	end)
+		-- Per-region escalation: each destruction increases subsequent corruption slightly
+		local count = (self._regionDestructionCounts[key] or 0) + 1
+		self._regionDestructionCounts[key] = count
+		local escalateMul = 1 + (count - 1) * (cfg.corruptionDestructionEscalation or 0.06)
+
+		local base = cfg.corruptionDestructionBase or 0.05
+		local sizeAdd = (cfg.corruptionDestructionSizeFactor or 0.35) * sizeT
+		local add = (base + sizeAdd) * escalateMul
+
+		local cur = corruptEnt:GetIntensity() or 0
+		corruptEnt:SetIntensity(math.Clamp(cur + add, 0, 2))
+	end
 
 	--====================
 	-- Persistence (Server)
@@ -284,7 +253,6 @@ if SERVER then
 				state.crystals[#state.crystals + 1] = {
 					pos = encodeVector(c:GetPos()),
 					scale = tonumber(c.GetCrystalScale and c:GetCrystalScale() or 1) or 1,
-					stored = tonumber(c.GetStoredMana and c:GetStoredMana() or 0) or 0,
 				}
 			end
 		end
@@ -322,9 +290,7 @@ if SERVER then
 		local ent = spawnCrystalAt(groundPos, nrm)
 		if IsValid(ent) then
 			local scale = tonumber(entry.scale) or M.Config.crystalMinScale
-			local stored = math.max(0, tonumber(entry.stored) or 0)
 			if ent.SetCrystalScale then ent:SetCrystalScale(scale) end
-			if ent.SetStoredMana then ent:SetStoredMana(stored) end
 		end
 	end
 
