@@ -23,6 +23,7 @@ if SERVER then
 	local LASER_INTERVAL = 1.2
 	local LASER_RANGE = 200
 	local LASER_DAMAGE = 10
+	local WISP_XP = 10
 
 	function ENT:Initialize()
 		self:SetModel("models/hunter/misc/sphere025x025.mdl")
@@ -62,9 +63,21 @@ if SERVER then
 		local cur = self:Health()
 		local new = math.max(0, cur - (dmginfo:GetDamage() or 0))
 		self:SetHealth(new)
+
+		-- Track last player who hurt the wisp for XP attribution
+		local atk = dmginfo:GetAttacker()
+		if IsValid(atk) and atk:IsPlayer() then
+			self._lastHurtBy = atk
+		else
+			local inf = dmginfo:GetInflictor()
+			local owner = IsValid(inf) and inf.GetOwner and inf:GetOwner() or nil
+			if IsValid(owner) and owner:IsPlayer() then
+				self._lastHurtBy = owner
+			end
+		end
+
 		-- brief hit feedback: small tesla burst
 		local tes = ents.Create("point_tesla")
-
 		if IsValid(tes) then
 			tes:SetPos(self:GetPos())
 			tes:SetKeyValue("m_SoundName", "DoSpark")
@@ -87,10 +100,22 @@ if SERVER then
 
 		if new <= 0 and not self._arcanaDead then
 			self._arcanaDead = true
+
 			-- death flash
 			local ed = EffectData()
 			ed:SetOrigin(self:GetPos())
 			util.Effect("cball_explode", ed, true, true)
+
+			-- Award XP to the killer (very small amount)
+			local killer = atk
+			if not (IsValid(killer) and killer:IsPlayer()) then
+				killer = self._lastHurtBy
+			end
+
+			if IsValid(killer) and killer:IsPlayer() then
+				Arcane:GiveXP(killer, WISP_XP, "Wisp destroyed")
+			end
+
 			self:Remove()
 		end
 	end
