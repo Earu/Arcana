@@ -210,6 +210,15 @@ if SERVER then
 		local corruptEnt = ensureCorruptedArea(key, center)
 		if not IsValid(corruptEnt) then return end
 
+		-- If the existing corrupted area does not cover this position, move it here
+		local r = (corruptEnt.GetRadius and corruptEnt:GetRadius()) or (cfg.regionRadius or 900)
+		local curI = corruptEnt:GetIntensity() or 0
+		if pos:DistToSqr(corruptEnt:GetPos()) > (r * r) and curI < 0.7 then
+			corruptEnt:SetPos(pos)
+			M.regions[key] = M.regions[key] or {}
+			M.regions[key].center = pos
+		end
+
 		-- Determine size factor from crystal scale (normalized 0..1 between min/max)
 		local s = (crystalEnt.GetCrystalScale and crystalEnt:GetCrystalScale()) or 1
 		local minS = tonumber(cfg.crystalMinScale or 0.35) or 0.35
@@ -228,8 +237,7 @@ if SERVER then
 		local sizeAdd = (cfg.corruptionDestructionSizeFactor or 0.35) * sizeT
 		local add = (base + sizeAdd) * escalateMul
 
-		local cur = corruptEnt:GetIntensity() or 0
-		corruptEnt:SetIntensity(math.Clamp(cur + add, 0, 2))
+		corruptEnt:SetIntensity(math.Clamp(curI + add, 0, 2))
 	end
 
 	--====================
