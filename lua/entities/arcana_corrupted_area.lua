@@ -276,7 +276,6 @@ if CLIENT then
 	end
 
 	function ENT:Initialize()
-		self:PrepareCorruptGlyphs()
 		updateRenderBounds(self)
 		self._lastUpdate = CurTime()
 		self._lastIntensity = -1
