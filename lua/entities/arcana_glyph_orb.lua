@@ -86,7 +86,11 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400)
+		if Arcane and Arcane.BlastDamage then
+			Arcane:BlastDamage(IsValid(owner) and owner or self, self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400, DMG_DISSOLVE, true)
+		else
+			util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400)
+		end
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)
