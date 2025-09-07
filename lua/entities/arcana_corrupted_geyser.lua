@@ -118,7 +118,7 @@ if SERVER then
                 local perTickDamage = dps * tick
 
                 for _, ent in ipairs(ents.FindInSphere(pos, r)) do
-                    if not IsValid(ent) or ent == self then goto continue end
+                    if not IsValid(ent) or ent == self then continue end
                     local entPos = ent:WorldSpaceCenter()
                     local dist = entPos:Distance(pos)
                     local falloff = math.Clamp(1 - dist / r, 0, 1)
@@ -144,8 +144,6 @@ if SERVER then
                             phys:ApplyForceCenter(Vector(0, 0, upPush * phys:GetMass()))
                         end
                     end
-
-                    ::continue::
                 end
             end
         end
@@ -225,5 +223,3 @@ if CLIENT then
         end
     end
 end
-
-
