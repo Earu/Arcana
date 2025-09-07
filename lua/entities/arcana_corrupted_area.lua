@@ -42,6 +42,11 @@ if SERVER then
 		self._maxWisps = 3
 		self._spawnInterval = 8
 		self._nextWispSpawn = CurTime() + 3
+		-- Geyser spawn control
+		self._geysers = {}
+		self._maxGeysers = 0
+		self._geyserInterval = 8
+		self._nextGeyserSpawn = CurTime() + math.Rand(2, 5)
 		-- Idle timeout (despawn when no players for a while)
 		self._lastPlayerPresence = CurTime()
 		self._despawnGrace = 15
@@ -79,6 +84,26 @@ if SERVER then
 				table.remove(self._wisps, i)
 			end
 		end
+
+		-- Geysers from 1.0→2.0 scale with radius
+		local sg = math.Clamp((k - 1.0) / 1.0, 0, 1)
+		local radius = self:GetRadius() or 900
+		local areaFactor = math.Clamp(radius / 900, 0.6, 2.5)
+		self._maxGeysers = math.min(12, math.floor((1 + 7 * sg) * areaFactor))
+		self._geyserInterval = math.max(2, (10 - 8 * sg) / areaFactor)
+
+		-- Trim excess geysers if limits reduced
+		if self._maxGeysers < #self._geysers then
+			for i = #self._geysers, self._maxGeysers + 1, -1 do
+				local g = self._geysers[i]
+
+				if IsValid(g) then
+					g:Remove()
+				end
+
+				table.remove(self._geysers, i)
+			end
+		end
 	end
 
 	local function playerInRange(center, radius)
@@ -97,9 +122,8 @@ if SERVER then
 		local radius = self:GetRadius() or 500
 		local ent = ents.Create("arcana_corrupted_wisp")
 		if not IsValid(ent) then return end
-		local ang = math.Rand(0, math.pi * 2)
-		local r = math.Rand(math.max(12, radius * 0.15), math.max(24, radius * 0.55))
-		local pos = center + Vector(math.cos(ang) * r, math.sin(ang) * r, math.Rand(24, 80))
+		local base = self:FindSpawnPos(false) or center
+		local pos = base + Vector(0, 0, math.Rand(24, 80))
 		ent:SetPos(pos)
 		ent:Spawn()
 		ent:Activate()
@@ -114,6 +138,86 @@ if SERVER then
 			for i = #self._wisps, 1, -1 do
 				if not IsValid(self._wisps[i]) then
 					table.remove(self._wisps, i)
+				end
+			end
+		end)
+	end
+
+	local function groundAt(pos, up)
+		up = up or Vector(0, 0, 1)
+		local tr = util.TraceLine({
+			start = pos + up * 512,
+			endpos = pos - up * 4096,
+			filter = {}
+		})
+
+		return tr.HitPos, tr.HitNormal
+	end
+
+	-- Shared spawn position selector: prioritizes players, then NPCs, then NextBots within the area.
+	-- If grounded is true, returns a ground position via trace; otherwise returns a flat XY position.
+	function ENT:FindSpawnPos(grounded)
+		local center = self:GetPos()
+		local radius = self:GetRadius() or 500
+		local candPlayers, candNPCs, candNB = {}, {}, {}
+		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
+			if not IsValid(ent) or ent == self then continue end
+			if ent:IsPlayer() then
+				if ent:Alive() then candPlayers[#candPlayers + 1] = ent end
+			elseif ent:IsNPC() then
+				candNPCs[#candNPCs + 1] = ent
+			elseif ent.IsNextBot and ent:IsNextBot() then
+				candNB[#candNB + 1] = ent
+			end
+		end
+
+		local targetList = (#candPlayers > 0 and candPlayers) or (#candNPCs > 0 and candNPCs) or candNB
+		local pos
+		if targetList and #targetList > 0 then
+			local t = targetList[math.random(1, #targetList)]
+			local base = IsValid(t) and t:GetPos() or center
+			local ang = math.Rand(0, math.pi * 2)
+			local off = math.Rand(0, math.min(180, radius * 0.25))
+			pos = base + Vector(math.cos(ang) * off, math.sin(ang) * off, 0)
+		else
+			local ang = math.Rand(0, math.pi * 2)
+			local rr = math.Rand(math.max(24, radius * 0.2), math.max(64, radius * 0.9))
+			pos = center + Vector(math.cos(ang) * rr, math.sin(ang) * rr, 0)
+		end
+
+		if grounded then
+			local hp = select(1, groundAt(pos))
+			return hp
+		else
+			return pos
+		end
+	end
+
+	function ENT:_SpawnGeyser()
+		local center = self:GetPos()
+		local radius = self:GetRadius() or 500
+		local hitPos = self:FindSpawnPos(true)
+		if not hitPos then return end
+
+		local ent = ents.Create("arcana_corrupted_geyser")
+		if not IsValid(ent) then return end
+
+		ent:SetPos(hitPos + Vector(0, 0, 2))
+		ent:Spawn()
+		ent:Activate()
+
+		-- Scale radius and damage with area size and intensity
+		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		local sg = math.Clamp((k - 1.0) / 1.0, 0, 1)
+		local gr = math.Clamp(radius * 0.2, 180, 380)
+		if ent.SetRadius then ent:SetRadius(gr) end
+		if ent.SetDamage then ent:SetDamage(50 + math.floor(40 * sg)) end
+
+		self._geysers[#self._geysers + 1] = ent
+		ent:CallOnRemove("Arcana_GeyserRemoved" .. ent:EntIndex(), function()
+			for i = #self._geysers, 1, -1 do
+				if not IsValid(self._geysers[i]) then
+					table.remove(self._geysers, i)
 				end
 			end
 		end)
@@ -158,6 +262,15 @@ if SERVER then
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
 		end
 
+		-- Geyser spawn logic
+		if hasPlayer and now >= (self._nextGeyserSpawn or 0) then
+			if (#self._geysers) < (self._maxGeysers or 0) and (self._maxGeysers or 0) > 0 then
+				self:_SpawnGeyser()
+			end
+
+			self._nextGeyserSpawn = now + (self._geyserInterval or 8)
+		end
+
 		-- Despawn wisps if area idle for too long
 		if (now - (self._lastPlayerPresence or now)) > (self._despawnGrace or 15) then
 			for i = #self._wisps, 1, -1 do
@@ -170,12 +283,23 @@ if SERVER then
 				table.remove(self._wisps, i)
 			end
 
+			-- remove lingering geysers as well
+			for i = #self._geysers, 1, -1 do
+				local g = self._geysers[i]
+
+				if IsValid(g) then
+					g:Remove()
+				end
+
+				table.remove(self._geysers, i)
+			end
+
 			-- back off spawn timer to avoid immediate respawn on next presence
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
+			self._nextGeyserSpawn = now + (self._geyserInterval or 8)
 		end
 
 		self:NextThink(now + 0.5)
-
 		return true
 	end
 
