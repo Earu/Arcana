@@ -47,6 +47,11 @@ if SERVER then
 		self._maxGeysers = 0
 		self._geyserInterval = 8
 		self._nextGeyserSpawn = CurTime() + math.Rand(2, 5)
+		-- Heavy wisp spawn control
+		self._heavyWisps = {}
+		self._maxHeavyWisps = 0
+		self._heavySpawnInterval = 12
+		self._nextHeavySpawn = CurTime() + math.Rand(4, 10)
 		-- Idle timeout (despawn when no players for a while)
 		self._lastPlayerPresence = CurTime()
 		self._despawnGrace = 15
@@ -91,6 +96,11 @@ if SERVER then
 		local areaFactor = math.Clamp(radius / 900, 0.6, 2.5)
 		self._maxGeysers = math.min(12, math.floor((1 + 7 * sg) * areaFactor))
 		self._geyserInterval = math.max(2, (10 - 8 * sg) / areaFactor)
+
+		-- Heavy wisps appear at higher intensity
+		local sh = math.Clamp((k - 1.3) / 0.7, 0, 1)
+		self._maxHeavyWisps = math.floor(1 * areaFactor + 2 * sh)
+		self._heavySpawnInterval = math.max(6, 16 - 10 * sh)
 
 		-- Trim excess geysers if limits reduced
 		if self._maxGeysers < #self._geysers then
@@ -223,6 +233,27 @@ if SERVER then
 		end)
 	end
 
+	function ENT:_SpawnHeavyWisp()
+		local center = self:GetPos()
+		local radius = self:GetRadius() or 500
+		local pos = self:FindSpawnPos(false) or center
+		local ent = ents.Create("arcana_corrupted_wisp_heavy")
+		if not IsValid(ent) then return end
+		ent:SetPos(pos + Vector(0, 0, math.Rand(40, 90)))
+		ent:Spawn()
+		ent:Activate()
+		ent._areaCenter = Vector(center)
+		ent._areaRadius = radius
+		self._heavyWisps[#self._heavyWisps + 1] = ent
+		ent:CallOnRemove("Arcana_HeavyWispRemoved" .. ent:EntIndex(), function()
+			for i = #self._heavyWisps, 1, -1 do
+				if not IsValid(self._heavyWisps[i]) then
+					table.remove(self._heavyWisps, i)
+				end
+			end
+		end)
+	end
+
 	function ENT:Think()
 		local now = CurTime()
 		local center = self:GetPos()
@@ -271,6 +302,15 @@ if SERVER then
 			self._nextGeyserSpawn = now + (self._geyserInterval or 8)
 		end
 
+		-- Heavy wisp spawn logic
+		if hasPlayer and now >= (self._nextHeavySpawn or 0) then
+			if (#self._heavyWisps) < (self._maxHeavyWisps or 0) and (self._maxHeavyWisps or 0) > 0 then
+				self:_SpawnHeavyWisp()
+			end
+
+			self._nextHeavySpawn = now + (self._heavySpawnInterval or 12)
+		end
+
 		-- Despawn wisps if area idle for too long
 		if (now - (self._lastPlayerPresence or now)) > (self._despawnGrace or 15) then
 			for i = #self._wisps, 1, -1 do
@@ -294,9 +334,21 @@ if SERVER then
 				table.remove(self._geysers, i)
 			end
 
+			-- remove heavy wisps
+			for i = #self._heavyWisps, 1, -1 do
+				local hw = self._heavyWisps[i]
+
+				if IsValid(hw) then
+					hw:Remove()
+				end
+
+				table.remove(self._heavyWisps, i)
+			end
+
 			-- back off spawn timer to avoid immediate respawn on next presence
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
 			self._nextGeyserSpawn = now + (self._geyserInterval or 8)
+			self._nextHeavySpawn = now + (self._heavySpawnInterval or 12)
 		end
 
 		self:NextThink(now + 0.5)
