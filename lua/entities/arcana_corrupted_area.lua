@@ -97,13 +97,12 @@ if SERVER then
 			self._geyserInterval = 8
 		else
 			self._maxGeysers = math.floor(1 + 7 * sg)
-			self._geyserInterval = math.max(2, 10 - 8 * sg)
+			self._geyserInterval = math.max(5, 10 - 8 * sg)
 		end
 
 		-- Heavy wisps appear only after 1.5 intensity
 		self._maxHeavyWisps = k < 1.5 and 0 or 1
-		local sh = math.Clamp((k - 1.5) / 0.5, 0, 1)
-		self._heavySpawnInterval = math.max(6, 16 - 10 * sh)
+		self._heavySpawnInterval = 6
 
 		-- Trim excess geysers if limits reduced
 		if self._maxGeysers < #self._geysers then
