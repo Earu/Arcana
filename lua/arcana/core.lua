@@ -1647,4 +1647,38 @@ if SERVER then
 	end)
 end
 
+-- Custom BlastDamage that prefers ForceTakeDamageInfo when available
+function Arcane:BlastDamage(attacker, inflictor, center, radius, baseDamage, damageType, force)
+	attacker = IsValid(attacker) and attacker or game.GetWorld()
+	inflictor = IsValid(inflictor) and inflictor or attacker
+	radius = math.max(1, tonumber(radius) or 0)
+	baseDamage = math.max(0, tonumber(baseDamage) or 0)
+	damageType = damageType or DMG_BLAST
+	force = force or false
+
+	for _, ent in ipairs(ents.FindInSphere(center, radius)) do
+		if not IsValid(ent) or ent == inflictor then continue end
+
+		-- Compute linear falloff
+		local dist = ent:WorldSpaceCenter():Distance(center)
+		local frac = 1 - (dist / radius)
+		if frac <= 0 then continue end
+
+		local dmgAmt = baseDamage * frac
+		if dmgAmt <= 0 then continue end
+
+		local dmg = DamageInfo()
+		dmg:SetDamage(dmgAmt)
+		dmg:SetDamageType(damageType)
+		dmg:SetAttacker(attacker)
+		dmg:SetInflictor(inflictor)
+		dmg:SetDamagePosition(ent:WorldSpaceCenter())
+
+		local takeDamageInfo = force and ent.ForceTakeDamageInfo or ent.TakeDamageInfo
+		if isfunction(takeDamageInfo) then
+			takeDamageInfo(ent, dmg)
+		end
+	end
+end
+
 return Arcane

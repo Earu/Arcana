@@ -65,8 +65,12 @@ if SERVER then
         local r = math.max(24, self:GetRadius() or DEFAULT_RADIUS)
         local dmg = self:GetDamage() or DEFAULT_DAMAGE
 
-        -- Damage pulse
-        util.BlastDamage(self, self, pos, r, dmg)
+        -- Damage pulse (custom blast for ForceTakeDamageInfo support)
+        if Arcane and Arcane.BlastDamage then
+            Arcane:BlastDamage(self, self, pos, r, dmg, DMG_DISSOLVE, true)
+        else
+            util.BlastDamage(self, self, pos, r, dmg)
+        end
 
         -- Knockback for physics objects
         for _, ent in ipairs(ents.FindInSphere(pos, r)) do
@@ -119,14 +123,15 @@ if SERVER then
                     local dist = entPos:Distance(pos)
                     local falloff = math.Clamp(1 - dist / r, 0, 1)
 
-                    -- Apply damage (players/NPCs prioritized)
+                    -- Apply damage (players/NPCs prioritized) using ForceTakeDamageInfo if available
                     if ent:IsPlayer() or ent:IsNPC() then
                         local dmginfo = DamageInfo()
                         dmginfo:SetDamage(perTickDamage * (0.6 + 0.4 * falloff))
                         dmginfo:SetDamageType(DMG_DISSOLVE)
                         dmginfo:SetAttacker(self)
                         dmginfo:SetInflictor(self)
-                        ent:TakeDamageInfo(dmginfo)
+                        local tdi = ent.ForceTakeDamageInfo or ent.TakeDamageInfo
+                        if isfunction(tdi) then tdi(ent, dmginfo) end
                     end
 
                     -- Upward push
