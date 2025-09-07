@@ -19,7 +19,7 @@ Arcane:RegisterRitualSpell({
 			if IsValid(e) and e:GetClass() == "arcana_corrupted_area" then
 				local cur = e.GetIntensity and (e:GetIntensity() or 0) or 0
 				if cur > 0 then
-					local newI = math.max(0, cur - 0.5)
+					local newI = math.max(0, cur - 2)
 					e:SetIntensity(math.Clamp(newI, 0, 2))
 					reduced = reduced + (cur - newI)
 				end
