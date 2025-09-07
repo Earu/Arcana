@@ -160,7 +160,7 @@ if SERVER then
 		local tr = util.TraceLine({
 			start = pos + up * 512,
 			endpos = pos - up * 4096,
-			filter = {}
+			filter = MASK_SOLID_BRUSHONLY
 		})
 
 		return tr.HitPos, tr.HitNormal
@@ -168,30 +168,37 @@ if SERVER then
 
 	-- Shared spawn position selector: prioritizes players, then NPCs, then NextBots within the area.
 	-- If grounded is true, returns a ground position via trace; otherwise returns a flat XY position.
-	function ENT:FindSpawnPos(grounded)
+	function ENT:FindSpawnPos(grounded, randomize)
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
-		local candPlayers, candNPCs, candNB = {}, {}, {}
-		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
-			if not IsValid(ent) or ent == self then continue end
-			if ent:IsPlayer() then
-				if ent:Alive() then candPlayers[#candPlayers + 1] = ent end
-			elseif ent:IsNPC() then
-				candNPCs[#candNPCs + 1] = ent
-			elseif ent.IsNextBot and ent:IsNextBot() then
-				candNB[#candNB + 1] = ent
+
+		local foundTarget = false
+		if not randomize then
+			local candPlayers, candNPCs, candNB = {}, {}, {}
+			for _, ent in ipairs(ents.FindInSphere(center, radius)) do
+				if not IsValid(ent) or ent == self then continue end
+				if ent:IsPlayer() then
+					if ent:Alive() then candPlayers[#candPlayers + 1] = ent end
+				elseif ent:IsNPC() then
+					candNPCs[#candNPCs + 1] = ent
+				elseif ent.IsNextBot and ent:IsNextBot() then
+					candNB[#candNB + 1] = ent
+				end
+			end
+
+			local targetList = (#candPlayers > 0 and candPlayers) or (#candNPCs > 0 and candNPCs) or candNB
+			local pos
+			if targetList and #targetList > 0 then
+				local t = targetList[math.random(1, #targetList)]
+				local base = IsValid(t) and t:GetPos() or center
+				local ang = math.Rand(0, math.pi * 2)
+				local off = math.Rand(0, math.min(180, radius * 0.25))
+				pos = base + Vector(math.cos(ang) * off, math.sin(ang) * off, 0)
+				foundTarget = true
 			end
 		end
 
-		local targetList = (#candPlayers > 0 and candPlayers) or (#candNPCs > 0 and candNPCs) or candNB
-		local pos
-		if targetList and #targetList > 0 then
-			local t = targetList[math.random(1, #targetList)]
-			local base = IsValid(t) and t:GetPos() or center
-			local ang = math.Rand(0, math.pi * 2)
-			local off = math.Rand(0, math.min(180, radius * 0.25))
-			pos = base + Vector(math.cos(ang) * off, math.sin(ang) * off, 0)
-		else
+		if randomize or not foundTarget then
 			local ang = math.Rand(0, math.pi * 2)
 			local rr = math.Rand(math.max(24, radius * 0.2), math.max(64, radius * 0.9))
 			pos = center + Vector(math.cos(ang) * rr, math.sin(ang) * rr, 0)
@@ -208,7 +215,7 @@ if SERVER then
 	function ENT:_SpawnGeyser()
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
-		local hitPos = self:FindSpawnPos(true)
+		local hitPos = self:FindSpawnPos(true, true)
 		if not hitPos then return end
 
 		local ent = ents.Create("arcana_corrupted_geyser")
