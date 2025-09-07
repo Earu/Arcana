@@ -109,7 +109,6 @@ if SERVER then
 		util.Effect("Explosion", ed4, true, true)
 		util.ScreenShake(pos, 8, 150, 0.4, 700)
 
-		sound.Play("ambient/levels/citadel/weapon_disintegrate3.wav", pos, 95, 100)
 		self:Remove()
 	end
 end
@@ -149,17 +148,7 @@ if CLIENT then
 	function ENT:Draw()
 		local pos = self:GetPos()
 		render.SetMaterial(SPRITE)
-		local t = CurTime()
-		local pulse = 0.5 + 0.5 * math.sin(t * 7.0)
-		local sOuter = 650 + 26 * pulse
-		local sMid = 300 + 16 * pulse
-		-- Outer bright, blending away (lower alpha)
-		render.DrawSprite(pos, sOuter, sOuter, Color(255, 255, 255, 140))
-		-- Middle bright solid
-		render.DrawSprite(pos, sMid, sMid, Color(255, 255, 255, 255))
-		-- Tiny pure black core sphere
-		render.SetColorMaterial()
-		render.DrawSphere(pos, 10, 16, 16, Color(0, 0, 0, 255))
+		render.DrawSprite(pos, 150, 150, Color(255, 255, 255, 255))
 
 		-- Dynamic light (grayscale)
 		local d = DynamicLight(self:EntIndex())
@@ -175,6 +164,9 @@ if CLIENT then
 		end
 
 		-- Orbiting glyphs on multiple planes around the sphere
+		local t = CurTime()
+		local pulse = 0.5 + 0.5 * math.sin(t * 7.0)
+		local sMid = 150 + 16 * pulse
 		local ringR = (sMid * 0.25)
 		local ply = LocalPlayer()
 		for _, r in ipairs(self._rings or {}) do
