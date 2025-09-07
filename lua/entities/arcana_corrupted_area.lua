@@ -66,9 +66,9 @@ if SERVER then
 
 	local function applyIntensityServer(self)
 		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+
 		-- Wisps only from 1.2→2: at 1.2 => 1 max, at 2 => 6 max (linear)
 		local sw = math.Clamp((k - 1.2) / 0.8, 0, 1)
-
 		if sw <= 0 then
 			self._maxWisps = 0
 			self._spawnInterval = 8
@@ -90,6 +90,20 @@ if SERVER then
 			end
 		end
 
+		-- Heavy wisps appear only after 1.5 intensity
+		self._maxHeavyWisps = k < 1.5 and 0 or 1
+		self._heavySpawnInterval = 6
+		if self._maxHeavyWisps < #self._heavyWisps then
+			for i = #self._heavyWisps, self._maxHeavyWisps + 1, -1 do
+				local h = self._heavyWisps[i]
+				if IsValid(h) then
+					h:Remove()
+				end
+			end
+
+			table.remove(self._heavyWisps, i)
+		end
+
 		-- Geysers from 1.0→2.0 scale with intensity only
 		local sg = math.Clamp((k - 1.0) / 1.0, 0, 1)
 		if k < 1.0 then
@@ -99,10 +113,6 @@ if SERVER then
 			self._maxGeysers = math.floor(1 + 7 * sg)
 			self._geyserInterval = math.max(5, 10 - 8 * sg)
 		end
-
-		-- Heavy wisps appear only after 1.5 intensity
-		self._maxHeavyWisps = k < 1.5 and 0 or 1
-		self._heavySpawnInterval = 6
 
 		-- Trim excess geysers if limits reduced
 		if self._maxGeysers < #self._geysers then
@@ -144,7 +154,7 @@ if SERVER then
 		-- Bind the wisp to this area
 		ent._areaCenter = Vector(center)
 		ent._areaRadius = radius
-		self._wisps[#self._wisps + 1] = ent
+		table.insert(self._wisps, ent)
 
 		ent:CallOnRemove("Arcana_WispRemoved" .. ent:EntIndex(), function()
 			for i = #self._wisps, 1, -1 do
@@ -232,7 +242,7 @@ if SERVER then
 		if ent.SetRadius then ent:SetRadius(gr) end
 		if ent.SetDamage then ent:SetDamage(50 + math.floor(40 * sg)) end
 
-		self._geysers[#self._geysers + 1] = ent
+		table.insert(self._geysers, ent)
 		ent:CallOnRemove("Arcana_GeyserRemoved" .. ent:EntIndex(), function()
 			for i = #self._geysers, 1, -1 do
 				if not IsValid(self._geysers[i]) then
@@ -253,7 +263,7 @@ if SERVER then
 		ent:Activate()
 		ent._areaCenter = Vector(center)
 		ent._areaRadius = radius
-		self._heavyWisps[#self._heavyWisps + 1] = ent
+		table.insert(self._heavyWisps, ent)
 		ent:CallOnRemove("Arcana_HeavyWispRemoved" .. ent:EntIndex(), function()
 			for i = #self._heavyWisps, 1, -1 do
 				if not IsValid(self._heavyWisps[i]) then
