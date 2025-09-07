@@ -42,16 +42,19 @@ if SERVER then
 		self._maxWisps = 3
 		self._spawnInterval = 8
 		self._nextWispSpawn = CurTime() + 3
+
 		-- Geyser spawn control
 		self._geysers = {}
 		self._maxGeysers = 0
 		self._geyserInterval = 8
 		self._nextGeyserSpawn = CurTime() + math.Rand(2, 5)
+
 		-- Heavy wisp spawn control
 		self._heavyWisps = {}
 		self._maxHeavyWisps = 0
 		self._heavySpawnInterval = 12
 		self._nextHeavySpawn = CurTime() + math.Rand(4, 10)
+
 		-- Idle timeout (despawn when no players for a while)
 		self._lastPlayerPresence = CurTime()
 		self._despawnGrace = 15
@@ -255,15 +258,17 @@ if SERVER then
 	function ENT:_SpawnHeavyWisp()
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
-		local pos = self:FindSpawnPos(false) or center
+		local pos = center + Vector(0, 0, 100)
 		local ent = ents.Create("arcana_corrupted_wisp_heavy")
 		if not IsValid(ent) then return end
+
 		ent:SetPos(pos + Vector(0, 0, math.Rand(40, 90)))
 		ent:Spawn()
 		ent:Activate()
 		ent._areaCenter = Vector(center)
 		ent._areaRadius = radius
 		table.insert(self._heavyWisps, ent)
+
 		ent:CallOnRemove("Arcana_HeavyWispRemoved" .. ent:EntIndex(), function()
 			for i = #self._heavyWisps, 1, -1 do
 				if not IsValid(self._heavyWisps[i]) then
@@ -273,13 +278,65 @@ if SERVER then
 		end)
 	end
 
+	function ENT:ClearEntities()
+		if self._wisps then
+			for _, w in ipairs(self._wisps) do
+				if IsValid(w) then
+					w:Remove()
+				end
+			end
+
+			self._wisps = {}
+		end
+
+		if self._geysers then
+			for _, g in ipairs(self._geysers) do
+				if IsValid(g) then
+					g:Remove()
+				end
+			end
+
+			self._geysers = {}
+		end
+
+		if self._heavyWisps then
+			for _, h in ipairs(self._heavyWisps) do
+				if IsValid(h) then
+					h:Remove()
+				end
+			end
+
+			self._heavyWisps = {}
+		end
+	end
+
+	function ENT:ClearInvalidEntities()
+		for i, w in ipairs(self._wisps) do
+			if not IsValid(w) then
+				table.remove(self._wisps, i)
+			end
+		end
+
+		for i, g in ipairs(self._geysers) do
+			if not IsValid(g) then
+				table.remove(self._geysers, i)
+			end
+		end
+
+		for i, h in ipairs(self._heavyWisps) do
+			if not IsValid(h) then
+				table.remove(self._heavyWisps, i)
+			end
+		end
+	end
+
 	function ENT:Think()
 		local now = CurTime()
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
+
 		-- Apply intensity changes live
 		local curI = self:GetIntensity() or 1
-
 		if curI ~= (self._lastIntensity or -1) then
 			applyIntensityServer(self)
 			self._lastIntensity = curI
@@ -298,7 +355,6 @@ if SERVER then
 		end
 
 		local hasPlayer = playerInRange(center, radius)
-
 		if hasPlayer then
 			self._lastPlayerPresence = now
 		end
@@ -332,37 +388,7 @@ if SERVER then
 
 		-- Despawn wisps if area idle for too long
 		if (now - (self._lastPlayerPresence or now)) > (self._despawnGrace or 15) then
-			for i = #self._wisps, 1, -1 do
-				local w = self._wisps[i]
-
-				if IsValid(w) then
-					w:Remove()
-				end
-
-				table.remove(self._wisps, i)
-			end
-
-			-- remove lingering geysers as well
-			for i = #self._geysers, 1, -1 do
-				local g = self._geysers[i]
-
-				if IsValid(g) then
-					g:Remove()
-				end
-
-				table.remove(self._geysers, i)
-			end
-
-			-- remove heavy wisps
-			for i = #self._heavyWisps, 1, -1 do
-				local hw = self._heavyWisps[i]
-
-				if IsValid(hw) then
-					hw:Remove()
-				end
-
-				table.remove(self._heavyWisps, i)
-			end
+			self:ClearEntities()
 
 			-- back off spawn timer to avoid immediate respawn on next presence
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
@@ -370,18 +396,13 @@ if SERVER then
 			self._nextHeavySpawn = now + (self._heavySpawnInterval or 12)
 		end
 
+		self:ClearInvalidEntities()
 		self:NextThink(now + 0.5)
 		return true
 	end
 
 	function ENT:OnRemove()
-		if self._wisps then
-			for _, w in ipairs(self._wisps) do
-				if IsValid(w) then
-					w:Remove()
-				end
-			end
-		end
+		self:ClearEntities()
 	end
 end
 
