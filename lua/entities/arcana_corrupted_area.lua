@@ -90,16 +90,19 @@ if SERVER then
 			end
 		end
 
-		-- Geysers from 1.0→2.0 scale with radius
+		-- Geysers from 1.0→2.0 scale with intensity only
 		local sg = math.Clamp((k - 1.0) / 1.0, 0, 1)
-		local radius = self:GetRadius() or 900
-		local areaFactor = math.Clamp(radius / 900, 0.6, 2.5)
-		self._maxGeysers = math.min(12, math.floor((1 + 7 * sg) * areaFactor))
-		self._geyserInterval = math.max(2, (10 - 8 * sg) / areaFactor)
+		if k < 1.0 then
+			self._maxGeysers = 0
+			self._geyserInterval = 8
+		else
+			self._maxGeysers = math.floor(1 + 7 * sg)
+			self._geyserInterval = math.max(2, 10 - 8 * sg)
+		end
 
-		-- Heavy wisps appear at higher intensity
-		local sh = math.Clamp((k - 1.3) / 0.7, 0, 1)
-		self._maxHeavyWisps = math.floor(1 * areaFactor + 2 * sh)
+		-- Heavy wisps appear only after 1.5 intensity
+		self._maxHeavyWisps = k < 1.5 and 0 or 1
+		local sh = math.Clamp((k - 1.5) / 0.5, 0, 1)
 		self._heavySpawnInterval = math.max(6, 16 - 10 * sh)
 
 		-- Trim excess geysers if limits reduced
