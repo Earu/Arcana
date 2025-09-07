@@ -54,6 +54,8 @@ Arcane.Config = {
 	MAX_LEVEL = 100,
 	-- Full XP is awarded at this cast time; shorter casts scale down, longer casts scale up (clamped)
 	XP_BASE_CAST_TIME = 1.0,
+	-- XP gained per successful enchantment application (applied per enchant)
+	XP_PER_ENCHANT_SUCCESS = 20,
 	-- Spell Configuration
 	DEFAULT_SPELL_COOLDOWN = 1.0,
 	RITUAL_CASTING_TIME = 10.0,
@@ -181,6 +183,12 @@ function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
 
 	if self.UpdateWeaponEnchantmentVFX then
 		self:UpdateWeaponEnchantmentVFX(ply, wep)
+	end
+
+	-- Award XP for a successful enchantment application
+	if SERVER then
+		local amount = tonumber(self.Config.XP_PER_ENCHANT_SUCCESS) or 20
+		self:GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
 	end
 
 	return true
