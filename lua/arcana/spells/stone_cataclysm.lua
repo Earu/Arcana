@@ -36,14 +36,17 @@ Arcane:RegisterSpell({
 		local duration = 20
 		local tick = 0.6
 		local columnsPerTick = 4
+
 		-- Global rumble and opening crack
 		util.ScreenShake(center, 10, 90, 1.0, 1200)
 		sound.Play("physics/concrete/concrete_break2.wav", center, 90, 95)
 		sound.Play("ambient/materials/rock_impact_hard2.wav", center, 90, 95)
+
 		local ed0 = EffectData()
 		ed0:SetOrigin(center)
 		util.Effect("ThumperDust", ed0, true, true)
 		util.Effect("cball_explode", ed0, true, true)
+
 		-- Broadcast VFX once with center, base radius, and duration
 		net.Start("Arcana_StoneCataclysm_VFX", true)
 		net.WriteVector(center)
@@ -84,33 +87,9 @@ Arcane:RegisterSpell({
 		local function explodeRock(rock)
 			if not IsValid(rock) then return end
 			local origin = rock:GetPos()
-			-- Spawn pebbles that blast outward and clean up shortly
-			local pebbleModels = {
-				"models/props_debris/concrete_chunk05g.mdl",
-				"models/props_debris/concrete_chunk08a.mdl"
-			}
+
 			sound.Play("ambient/materials/rock_impact_hard2.wav", origin, 88, 100)
 			sound.Play("physics/concrete/concrete_break2.wav", origin, 88, 95)
-			local count = 14
-			for i = 1, count do
-				local p = ents.Create("prop_physics")
-				if not IsValid(p) then continue end
-				p:SetModel(pebbleModels[math.random(#pebbleModels)])
-				p:SetPos(origin + VectorRand() * 6 + Vector(0, 0, 8))
-				p:SetAngles(AngleRand())
-				p:Spawn()
-				p:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-				local phys = p:GetPhysicsObject()
-
-				if IsValid(phys) then
-					phys:Wake()
-					local dir = Angle(0, (i / count) * 360 + math.Rand(-12, 12), 0):Forward()
-					phys:ApplyForceCenter(dir * math.Rand(52000, 90000) + Vector(0, 0, math.Rand(36000, 56000)))
-					phys:AddAngleVelocity(VectorRand() * 600)
-				end
-
-				SafeRemoveEntityDelayed(p, 2)
-			end
 
 			rock:Remove()
 		end
@@ -125,6 +104,7 @@ Arcane:RegisterSpell({
 			if not tr2.Hit then return end
 			local rock = ents.Create("prop_physics")
 			if not IsValid(rock) then return end
+
 			-- Use HL2 concrete debris chunks as stone columns
 			local hl2Models = {
 				"models/props_wasteland/rockcliff01b.mdl",
@@ -133,8 +113,10 @@ Arcane:RegisterSpell({
 				"models/props_wasteland/rockcliff01j.mdl",
 				"models/props_wasteland/rockcliff01k.mdl"
 			}
+
 			local model = hl2Models[math.random(#hl2Models)]
 			rock:SetModel(model)
+
 			-- Emergence: start below ground and rise to target
 			local targetPos = tr2.HitPos + tr2.HitNormal * 8
 			local startPos = tr2.HitPos - tr2.HitNormal * 64
@@ -168,9 +150,11 @@ Arcane:RegisterSpell({
 			ed:SetOrigin(tr2.HitPos)
 			util.Effect("ThumperDust", ed, true, true)
 			util.Decal("Scorch", tr2.HitPos + tr2.HitNormal * 4, tr2.HitPos - tr2.HitNormal * 8)
+
 			-- Spawn heavy stone impact sounds
 			sound.Play("physics/concrete/concrete_break2.wav", tr2.HitPos, 85, 95)
 			sound.Play("ambient/materials/rock_impact_hard2.wav", tr2.HitPos, 80, 100)
+
 			-- Ring VFX for each spike (raise slightly along surface normal so it renders above ground)
 			net.Start("Arcana_StoneCataclysm_SpikeVFX", true)
 			net.WriteVector(tr2.HitPos + tr2.HitNormal * 10)
@@ -183,9 +167,11 @@ Arcane:RegisterSpell({
 			local tname = "Arcana_StoneCata_Rise_" .. tostring(rock)
 			timer.Create(tname, 0.02, math.ceil(riseDur / 0.02), function()
 				if not IsValid(rock) then return end
+
 				local t = math.Clamp((CurTime() - t0) / riseDur, 0, 1)
 				local newPos = LerpVector(t, startPos, targetPos)
 				rock:SetPos(newPos)
+
 				if t >= 1 then
 					rock:SetPos(targetPos)
 					timer.Remove(tname)
@@ -350,11 +336,9 @@ Arcane:RegisterSpell({
 
 						-- Heavy local dust burst at spike
 						local emitter = ParticleEmitter(tr2.HitPos)
-
 						if emitter then
 							for di = 1, 28 do
 								local dp = emitter:Add("particle/particle_smokegrenade", tr2.HitPos + VectorRand() * 12)
-
 								if dp then
 									dp:SetVelocity(VectorRand() * 80 + Vector(0, 0, math.Rand(120, 220)))
 									dp:SetDieTime(math.Rand(1.2, 1.8))
@@ -385,10 +369,12 @@ Arcane:RegisterSpell({
 			local delay = n * tick
 			timer.Simple(delay, function()
 				if not IsValid(caster) then return end
+
 				-- Ring-based spawning: expanding ring radius over time
 				local frac = math.Clamp((CurTime() + 0.001 - (endTime - duration)) / math.max(duration, 0.001), 0, 1)
 				local ringR = Lerp(frac, baseRadius * 0.2, baseRadius)
 				local jitter = bandWidth * 0.25
+
 				-- Prioritize spawning under actors in area; then fall back to ring/random
 				local spawned = 0
 				local candidates = ents.FindInSphere(center, baseRadius)
@@ -417,6 +403,7 @@ Arcane:RegisterSpell({
 					local pos = center + Vector(math.cos(a) * r, math.sin(a) * r, 0)
 					spawnSpikeAt(pos)
 				end
+
 				-- Per-tick ambient dust columns around perimeter
 				for i = 1, 6 do
 					local aa = math.Rand(0, math.pi * 2)
@@ -425,6 +412,7 @@ Arcane:RegisterSpell({
 					ed2:SetOrigin(p)
 					util.Effect("ThumperDust", ed2, true, true)
 				end
+
 				-- Ongoing area rumble
 				util.ScreenShake(center, 6, 60, 0.35, baseRadius * 2)
 			end)
@@ -469,7 +457,6 @@ Arcane:RegisterSpell({
 	trigger_phrase_aliases = {
 		"cataclysm",
 		"earth cataclysm",
-		"tectonic",
 	}
 })
 
@@ -605,8 +592,6 @@ if CLIENT then
 			render.SetMaterial(matGlow)
 			render.DrawSprite(b.pos + Vector(0, 0, 4), curr * 0.42, curr * 0.42, Color(200, 160, 90, math.floor(alpha * 0.5)))
 		end
-
-		-- MagicCircle is self-rendered; nothing to draw here for the area marker
 	end)
 
 	-- Casting-time magic circle at aimed ground, like blackhole
