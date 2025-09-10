@@ -701,7 +701,7 @@ function Arcane:StartCasting(ply, spellId)
 				d.casting_spell = nil
 			end
 			-- Re-check basic conditions before executing
-			local ok = select(1, self:CanCastSpell(ply, spellId))
+			local ok, _ = self:CanCastSpell(ply, spellId)
 			if not ok then
 				net.Start("Arcane_SpellFailed", true)
 				net.WriteEntity(ply)

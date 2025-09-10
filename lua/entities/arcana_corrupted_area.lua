@@ -218,7 +218,7 @@ if SERVER then
 		end
 
 		if grounded then
-			local hp = select(1, groundAt(pos))
+			local hp, _ = groundAt(pos)
 			return hp
 		else
 			return pos

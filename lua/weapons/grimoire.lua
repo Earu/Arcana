@@ -851,7 +851,7 @@ if CLIENT then
 				-- XP label centered over the bar
 				local xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext)
 				surface.SetFont("Arcana_Ancient")
-				local lx = select(1, surface.GetTextSize(xpLabel))
+				local lx, _ = surface.GetTextSize(xpLabel)
 				draw.SimpleText(xpLabel, "Arcana_Ancient", barX + barW - lx, barY - 4, textBright)
 			end
 		end
