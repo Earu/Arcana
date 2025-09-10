@@ -1079,7 +1079,7 @@ if CLIENT then
 				-- Text right-aligned
 				local txt = string.format("%s / %s", string.Comma(haveClamped), string.Comma(needSafe))
 				surface.SetFont("Arcana_AncientSmall")
-				local tw = select(1, surface.GetTextSize(txt))
+				local tw, _ = surface.GetTextSize(txt)
 				draw.SimpleText(txt, "Arcana_AncientSmall", x + bw - innerPad - tw, barY - 15, textBright)
 			end
 
@@ -1617,7 +1617,7 @@ if CLIENT then
 				row.PerformLayout = function(pnl, w, h)
 					-- Position info icon right after the enchant name
 					surface.SetFont("Arcana_AncientLarge")
-					local nameW = select(1, surface.GetTextSize(ench.name or enchId))
+					local nameW, _ = surface.GetTextSize(ench.name or enchId)
 					local nameX = 36
 					infoIcon:SetPos(nameX + nameW + 8, 10)
 					-- Costs under the name
