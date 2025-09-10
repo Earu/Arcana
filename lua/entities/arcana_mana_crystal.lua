@@ -89,6 +89,9 @@ if SERVER then
 	resource.AddFile("materials/models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge_multi.vmt")
 	resource.AddFile("materials/models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge.vmt")
 
+	-- Cooldown to prevent excessive shard drops from multi-hit weapons (non-shatter only)
+	local DAMAGE_SHARD_COOLDOWN = 1
+
 	function ENT:Initialize()
 		self:SetModel("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_" .. (math.random() > 0.5 and "a" or "b") .. ".mdl")
 		self:SetMaterial("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge.vmt")
@@ -191,11 +194,15 @@ if SERVER then
 			dir = dmginfo:GetDamageForce()
 		end
 
-		-- Chance to drop shards scales with damage
-		local chance = math.Clamp(0.15 + (dmg * 0.01), 0.15, 0.9)
-		if math.Rand(0, 1) <= chance then
-			local num = math.Clamp(math.floor(1 + dmg / 35), 1, 6)
-			self:DropShards(num, 1, dir, crystalPos)
+		-- Chance to drop shards scales with damage, gated by per-crystal cooldown
+		local now = CurTime()
+		if now >= (self._nextShardDrop or 0) then
+			local chance = math.Clamp(0.15 + (dmg * 0.01), 0.15, 0.9)
+			if math.Rand(0, 1) <= chance then
+				local num = math.Clamp(math.floor(1 + dmg / 35), 1, 6)
+				self:DropShards(num, 1, dir, crystalPos)
+				self._nextShardDrop = now + DAMAGE_SHARD_COOLDOWN
+			end
 		end
 
 		-- Apply health damage and shatter at zero
