@@ -158,6 +158,8 @@ if SERVER then
 	end
 
 	function ENT:_Shatter()
+		if self._shattered then return end
+
 		-- burst of shards, glass effect, remove
 		local count = math.random(8, 16)
 		for i = 1, count do
@@ -173,6 +175,8 @@ if SERVER then
 		if Arcane.ManaCrystals and Arcane.ManaCrystals.ReportCrystalDestroyed then
 			Arcane.ManaCrystals:ReportCrystalDestroyed(self)
 		end
+
+		self._shattered = true
 		self:Remove()
 	end
 
