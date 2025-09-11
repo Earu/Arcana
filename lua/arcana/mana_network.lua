@@ -2,331 +2,120 @@ local Arcane = _G.Arcane or {}
 
 if SERVER then
 	util.AddNetworkString("Arcana_ManaNetwork_Flow")
-
 	Arcane.ManaNetwork = Arcane.ManaNetwork or {}
 	local MN = Arcane.ManaNetwork
 
-	-- Configuration
+	-- Minimal configuration
 	MN.Config = MN.Config or {
-		-- Graph/linking
-		gridCell = 600,           -- spatial bucket size for neighbor discovery
-		defaultLinkRange = 500,   -- default link range when a node doesn't specify
-
-		-- Transfer
-		consumerBaseIntake = 30,        -- base mana per second a consumer can intake from the network
-		perProcessorThroughputBonus = 0.25, -- each stabilizer/purifier increases throughput by 25%
-
-		-- Quality
-		rawPurity = 0.30,
-		rawStability = 0.30,
-		perProcessorPurity = 0.25,     -- amount added to purity by each purifier
-		perProcessorStability = 0.25,  -- amount added to stability by each stabilizer
-		providerFalloff = 1.0,         -- default provider falloff exponent for distance weights
-
-		-- Enchant costs
-		manaPerEnchant = 50,
+		defaultRange = 500,
+		pulseInterval = 0.5, -- seconds
 	}
 
-	MN._nodes = MN._nodes or {}        -- { [ent] = node }
-	MN._buckets = MN._buckets or {}    -- { [key] = {node, ...} }
-	MN._consumers = MN._consumers or {} -- array of nodes of type "consumer"
+	MN._producers = MN._producers or {} -- array of { ent=Entity, range=number }
+	MN._consumers = MN._consumers or {} -- optional; not used in pulse logic but kept for API compatibility
+	MN._nodes = MN._nodes or {} -- map for quick unregister lookup
 
-	local function regionKey(pos, size)
-		size = size or MN.Config.gridCell
-		local cell = size
-		local x = math.floor(pos.x / cell)
-		local y = math.floor(pos.y / cell)
-		return tostring(x) .. ":" .. tostring(y)
-	end
+	local function addProducer(ent, range)
+		local rec = {ent = ent, range = range}
+		MN._nodes[ent] = rec
+		MN._producers[#MN._producers + 1] = rec
 
-	local function addToBucket(node)
-		local key = regionKey(node.pos)
-		node._bucket = key
-		MN._buckets[key] = MN._buckets[key] or {}
-		table.insert(MN._buckets[key], node)
-	end
-
-	local function removeFromBucket(node)
-		local key = node._bucket
-		if not key then return end
-		local arr = MN._buckets[key]
-		if not arr then return end
-		for i = #arr, 1, -1 do
-			if arr[i] == node then table.remove(arr, i) end
-		end
-		if #arr == 0 then MN._buckets[key] = nil end
-		node._bucket = nil
-	end
-
-	local function nearbyBuckets(pos)
-		local cell = MN.Config.gridCell
-		local baseX = math.floor(pos.x / cell)
-		local baseY = math.floor(pos.y / cell)
-		local out = {}
-		for dy = -1, 1 do
-			for dx = -1, 1 do
-				local key = tostring(baseX + dx) .. ":" .. tostring(baseY + dy)
-				local b = MN._buckets[key]
-				if b then out[#out + 1] = b end
-			end
-		end
-		return out
-	end
-
-	local function linkNeighbors(node)
-		node.links = node.links or {}
-		local range = node.range or MN.Config.defaultLinkRange
-		local r2 = range * range
-		for _, bucket in ipairs(nearbyBuckets(node.pos)) do
-			for _, other in ipairs(bucket) do
-				if other ~= node and IsValid(other.ent) then
-					local maxR = math.min(range, other.range or MN.Config.defaultLinkRange)
-					local d2 = other.pos:DistToSqr(node.pos)
-					if d2 <= maxR * maxR then
-						node.links[other] = true
-						other.links = other.links or {}
-						other.links[node] = true
-					end
-				end
-			end
-		end
-	end
-
-	local function unlinkAll(node)
-		if not node.links then return end
-		for other in pairs(node.links) do
-			if other.links then other.links[node] = nil end
-		end
-		node.links = {}
-	end
-
-	function MN:RegisterNode(ent, def)
-		if not IsValid(ent) then return nil end
-		local node = {
-			ent = ent,
-			type = tostring(def.type or "misc"),
-			pos = ent:GetPos(),
-			range = tonumber(def.range or MN.Config.defaultLinkRange) or MN.Config.defaultLinkRange,
-			intake = tonumber(def.intake or 0) or 0, -- only used for consumers; 0 means use defaults
-			-- Provider-field contributions (entity-agnostic providers)
-			providerPurity = tonumber(def.purity_bonus or 0) or 0,
-			providerStability = tonumber(def.stability_bonus or 0) or 0,
-			providerThroughput = tonumber(def.throughput_bonus or 0) or 0,
-			providerRadius = tonumber(def.radius or 0) or 0,
-			providerFalloff = tonumber(def.falloff or MN.Config.providerFalloff or 1) or 1,
-			links = {},
-		}
-		MN._nodes[ent] = node
-		addToBucket(node)
-		linkNeighbors(node)
-		if node.type == "consumer" then
-			MN._consumers[#MN._consumers + 1] = node
-		end
 		-- Auto-clean on remove
 		ent:CallOnRemove("Arcana_MN_Unregister", function(e)
 			MN:UnregisterNode(e)
 		end)
-		return node
-	end
 
-	-- Convenience wrappers
-	function MN:RegisterConsumer(ent, opts)
-		opts = opts or {}
-		opts.type = "consumer"
-		return self:RegisterNode(ent, opts)
+		return rec
 	end
 
 	function MN:RegisterProducer(ent, opts)
+		if not IsValid(ent) then return nil end
+
 		opts = opts or {}
-		opts.type = "producer"
-		return self:RegisterNode(ent, opts)
+		local range = tonumber(opts.range or MN.Config.defaultRange) or MN.Config.defaultRange
+		return addProducer(ent, range)
+	end
+
+	function MN:RegisterConsumer(ent, _opts)
+		if not IsValid(ent) then return nil end
+
+		local rec = {ent = ent}
+		MN._nodes[ent] = rec
+		MN._consumers[#MN._consumers + 1] = rec
+		ent:CallOnRemove("Arcana_MN_Unregister", function(e)
+			MN:UnregisterNode(e)
+		end)
+
+		return rec
 	end
 
 	function MN:UnregisterNode(ent)
-		local node = MN._nodes[ent]
-		if not node then return end
-		unlinkAll(node)
-		removeFromBucket(node)
+		local rec = MN._nodes[ent]
+		if not rec then return end
+
 		MN._nodes[ent] = nil
-		if node.type == "consumer" then
-			for i = #MN._consumers, 1, -1 do
-				if MN._consumers[i] == node then table.remove(MN._consumers, i) end
-			end
-		end
+
+		-- remove from producers
+		table.RemoveByValue(MN._producers, rec)
+
+		-- remove from consumers
+		table.RemoveByValue(MN._consumers, rec)
 	end
 
-	function MN:UpdateNodePosition(ent)
-		local node = MN._nodes[ent]
-		if not node then return end
-		local newPos = ent:GetPos()
-		if node.pos:DistToSqr(newPos) < 1 then return end
-		-- Rebucket and relink
-		unlinkAll(node)
-		removeFromBucket(node)
-		node.pos = newPos
-		addToBucket(node)
-		linkNeighbors(node)
-	end
+	-- Periodic pulse: each producer pings nearby entities that implement AddMana, and we broadcast simple flow visuals
+	local function doPulse()
+		if not MN._producers or #MN._producers == 0 then return end
 
-	-- Aggregate provider field around a position. Returns purity, stability, effectiveProviderCount
-	local function aggregateProvidersAt(pos)
-		local cfg = MN.Config
-		local purity = cfg.rawPurity or 0
-		local stability = cfg.rawStability or 0
-		local effectiveProviders = 0
-		for _, bucket in ipairs(nearbyBuckets(pos)) do
-			for _, n in ipairs(bucket) do
-				if IsValid(n.ent) then
-					local hasAny = (n.providerPurity and n.providerPurity ~= 0)
-						or (n.providerStability and n.providerStability ~= 0)
-						or (n.providerThroughput and n.providerThroughput ~= 0)
-					if hasAny then
-						local rad = (n.providerRadius and n.providerRadius > 0) and n.providerRadius or (n.range or cfg.defaultLinkRange)
-						if rad and rad > 0 then
-							local d = pos:Distance(n.pos)
-							if d < rad then
-								local t = math.Clamp(1 - (d / rad), 0, 1)
-								local fall = n.providerFalloff or cfg.providerFalloff or 1
-								local w = (t ^ math.max(0.0001, fall))
-								if n.providerPurity and n.providerPurity ~= 0 then
-									purity = purity + (n.providerPurity * w)
-								end
-								if n.providerStability and n.providerStability ~= 0 then
-									stability = stability + (n.providerStability * w)
-								end
-								-- Treat throughput bonus as an additional weight on effective provider count
-								local thrMul = 1 + math.max(0, n.providerThroughput or 0)
-								effectiveProviders = effectiveProviders + (w * thrMul)
-							end
-						end
-					end
-				end
-			end
-		end
-		return math.Clamp(purity, 0, 1), math.Clamp(stability, 0, 1), effectiveProviders
-	end
-
-	-- Simple BFS over current graph to collect connected nodes for a consumer
-	local function collectComponent(startNode)
-		local out = {producers = {}, stabilizers = {}, purifiers = {}}
-		local q = {startNode}
-		local seen = {[startNode] = true}
-		while #q > 0 do
-			local cur = table.remove(q, 1)
-			for other in pairs(cur.links or {}) do
-				if not seen[other] and IsValid(other.ent) then
-					seen[other] = true
-					q[#q + 1] = other
-					if other.type == "producer" then
-						out.producers[#out.producers + 1] = other
-					elseif other.type == "stabilizer" then
-						out.stabilizers[#out.stabilizers + 1] = other
-					elseif other.type == "purifier" then
-						out.purifiers[#out.purifiers + 1] = other
-					end
-				end
-			end
-		end
-		return out
-	end
-
-	-- Public: get counts of connected processors for a given consumer entity
-	function MN:GetConnectedProcessorCounts(consumerEnt)
-		if not IsValid(consumerEnt) then return 0, 0 end
-
-		local node = MN._nodes[consumerEnt]
-		if not node then return 0, 0 end
-
-		local comp = collectComponent(node)
-		return #comp.stabilizers, #comp.purifiers
-	end
-
-	-- Utilities expected on entities
-	local function crystalTake(ent, amt)
-		-- Crystals are non-depleting providers now; deliver requested amount
-		return tonumber(amt) or 0
-	end
-
-	local function consumerAdd(ent, amt, purity, stability)
-		if ent and ent.AddMana then
-			ent:AddMana(amt, purity, stability)
-		end
-	end
-
-	-- Periodic transfer: pull from connected producers into consumers, applying stages
-	timer.Create("Arcana_ManaNetwork_Tick", 1.0, 0, function()
-		if not next(MN._nodes) then return end
-		local cfg = MN.Config
-		for i = #MN._consumers, 1, -1 do
-			local cnode = MN._consumers[i]
-			if not cnode or not IsValid(cnode.ent) then
-				table.remove(MN._consumers, i)
+		local flows = {}
+		for i = #MN._producers, 1, -1 do
+			local p = MN._producers[i]
+			local ent = p and p.ent
+			if not ent or not IsValid(ent) then
+				table.remove(MN._producers, i)
 				continue
 			end
 
-			-- Refresh position once in a while (mostly static entities)
-			MN:UpdateNodePosition(cnode.ent)
+			local range = tonumber(p.range or MN.Config.defaultRange) or MN.Config.defaultRange
+			local pos = ent:GetPos()
+			local around = ents.FindInSphere(pos, range)
+			for _, target in ipairs(around or {}) do
+				if target ~= ent and target.AddMana then
+					local succ, err = pcall(target.AddMana, target, 1)
+					if not succ then
+						ErrorNoHalt(err)
+					end
 
-			-- Discover connected component
-			local comp = collectComponent(cnode)
-			local nProd = #comp.producers
-			if nProd <= 0 then continue end
+					local list = flows[target]
+					if not list then
+						list = {}
+						flows[target] = list
+					end
 
-			-- Provider-field driven quality and throughput
-			local purity, stability, effProviders = aggregateProvidersAt(cnode.pos)
-
-			-- Throughput scales with effective providers (unbounded)
-			local throughputMul = 1 + (effProviders) * (cfg.perProcessorThroughputBonus or 0)
-
-			-- Determine consumer's base intake
-			local baseIntake = cnode.intake and cnode.intake > 0 and cnode.intake or cfg.consumerBaseIntake
-			if cnode.ent.GetManaIntakePerSecond then
-				local ok, v = pcall(cnode.ent.GetManaIntakePerSecond, cnode.ent)
-				if ok and tonumber(v) and v > 0 then baseIntake = v end
-			end
-
-			local intake = baseIntake * throughputMul
-
-			-- Pull evenly from producers
-			local per = intake / nProd
-			local delivered = 0
-			local contributions = {}
-			for _, pnode in ipairs(comp.producers) do
-				if not IsValid(pnode.ent) then continue end
-
-				local got = crystalTake(pnode.ent, per)
-				if got > 0 then
-					delivered = delivered + got
-					contributions[#contributions + 1] = {from = pnode.ent, amount = got}
-
-					-- Environment regen/corruption reporting removed
+					list[#list + 1] = ent
 				end
 			end
+		end
 
-			if delivered > 0 then
-				consumerAdd(cnode.ent, delivered, purity, stability)
-				-- Broadcast a flow snapshot (throttled by tick at 1s)
+		for target, producers in pairs(flows) do
+			if IsValid(target) then
 				net.Start("Arcana_ManaNetwork_Flow", true)
-				net.WriteEntity(cnode.ent)
-				net.WriteFloat(purity)
-				net.WriteFloat(stability)
-				net.WriteUInt(#contributions, 8)
-				for _, rec in ipairs(contributions) do
-					net.WriteEntity(rec.from)
-					net.WriteFloat(rec.amount)
+				net.WriteEntity(target)
+				net.WriteUInt(#producers, 8)
+				for _, fromEnt in ipairs(producers) do
+					net.WriteEntity(fromEnt)
+					net.WriteFloat(1)
 				end
 				net.Broadcast()
 			end
 		end
-	end)
+	end
 
+	timer.Create("Arcana_ManaNetwork_Pulse", MN.Config.pulseInterval or 0.5, 0, doPulse)
 end
 
 if CLIENT then
-	local flows = {}
 	local glyphParticles = {}
 
-	-- Glyph stream config
 	local GLYPH_PHRASES = {
 		"αβραξασθεοσγνωσιςφωςζωηαληθειακοσμοςψυχηπνευμα",
 		"αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",
@@ -339,7 +128,7 @@ if CLIENT then
 
 	local function pickGlyph(idx)
 		local phrase = GLYPH_PHRASES[(idx % #GLYPH_PHRASES) + 1]
-		local len = utf8 and utf8.len and utf8.len(phrase) or #phrase
+		local len = (utf8 and utf8.len and utf8.len(phrase)) or #phrase
 		if len < 1 then return "*" end
 		local i = (idx % len) + 1
 		if utf8 and utf8.sub then return utf8.sub(phrase, i, i) end
@@ -355,7 +144,6 @@ if CLIENT then
 
 	local function randomPointOnOBBSurface(ent)
 		if not IsValid(ent) then return ent:WorldSpaceCenter() end
-
 		local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
 		local axis = math.random(1, 3)
 		local pos = Vector(0, 0, 0)
@@ -380,32 +168,16 @@ if CLIENT then
 		return a * (u * u) + b * (2 * u * t) + c * (t * t)
 	end
 
-	-- Receive flow snapshots
 	net.Receive("Arcana_ManaNetwork_Flow", function()
 		local toEnt = net.ReadEntity()
-		local purity = net.ReadFloat()
-		local stability = net.ReadFloat()
 		local count = net.ReadUInt(8)
-		if not IsValid(toEnt) then
-			for i = 1, count do
-				net.ReadEntity()
-				net.ReadFloat()
-			end
+		if not IsValid(toEnt) then return end
 
-			return
-		end
-
-		flows[toEnt] = flows[toEnt] or {}
 		local now = CurTime()
-		local list = {}
 		for i = 1, count do
 			local fromEnt = net.ReadEntity()
 			local amt = net.ReadFloat()
 			if IsValid(fromEnt) and amt > 0 then
-				local rec = {from = fromEnt, amount = amt, t = now, purity = purity, stability = stability}
-				list[#list + 1] = rec
-
-				-- spawn glyph particles for this contribution
 				local fromPos = randomPointOnOBBSurface(fromEnt)
 				local toPos = toEnt:WorldSpaceCenter()
 				local dir = (toPos - fromPos)
@@ -423,13 +195,11 @@ if CLIENT then
 					local curveAmt = math.Clamp(dist * 0.25, 20, 160)
 					local ctrl = mid + right * math.Rand(-curveAmt, curveAmt)
 					local baseColor = fromEnt:GetColor() or Color(255, 255, 255)
-					local density = 2
-					local countGlyphs = math.Clamp(math.floor(amt * 0.15 * density), 5, 80)
+					local countGlyphs = math.Clamp(math.floor(8 + dist * 0.02), 5, 50)
 					for gi = 1, countGlyphs do
-						local speed = math.Rand(120, 220) -- slower travel
+						local speed = math.Rand(120, 220)
 						local dur = dist / speed
-						local startDelay = math.Rand(0, 1.0) -- slightly more stagger
-
+						local startDelay = math.Rand(0, 0.7)
 						glyphParticles[#glyphParticles + 1] = {
 							startPos = fromPos,
 							ctrlPos = ctrl,
@@ -438,19 +208,15 @@ if CLIENT then
 							duration = dur,
 							char = pickGlyph(gi + math.floor(now * 13)),
 							baseColor = Color(baseColor.r, baseColor.g, baseColor.b, 255),
-							quality = math.Clamp((purity + stability) * 0.5, 0, 1),
 							size = math.Rand(10, 16)
 						}
 					end
 				end
 			end
 		end
-
-		flows[toEnt] = list
 	end)
 
 	local MAX_RENDER_DIST = 2000 * 2000
-	-- Glyph particles travel independently along curved bezier paths; color fades toward white by quality
 	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function()
 		local eye = EyePos()
 		local now = CurTime()
@@ -464,11 +230,9 @@ if CLIENT then
 				local u = math.Clamp((now - startT) / math.max(0.001, p.duration), 0, 1)
 				local pos = bezierPoint(p.startPos, p.ctrlPos, p.endPos, u)
 				if eye:DistToSqr(pos) <= MAX_RENDER_DIST then
-					-- Color gradient: base producer color to white by quality and progress
-					local mix = math.Clamp(p.quality * u, 0, 1)
-					local br = Lerp(mix, p.baseColor.r, 255)
-					local bg = Lerp(mix, p.baseColor.g, 255)
-					local bb = Lerp(mix, p.baseColor.b, 255)
+					local br = Lerp(u, p.baseColor.r, 255)
+					local bg = Lerp(u, p.baseColor.g, 255)
+					local bb = Lerp(u, p.baseColor.b, 255)
 					local alpha = math.floor(220 * (1 - 0.15 * u))
 					local ang = billboardAnglesAt(pos)
 					cam.Start3D2D(pos, ang, 0.08)
@@ -479,15 +243,11 @@ if CLIENT then
 					cam.End3D2D()
 				end
 			end
-
 			if now <= endT + 0.05 then
 				glyphParticles[write] = p
 				write = write + 1
 			end
 		end
-
 		for i = write, #glyphParticles do glyphParticles[i] = nil end
 	end)
 end
-
-

@@ -10,11 +10,6 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.UseCooldown = 0.75
 ENT.HintDistance = 140
 
--- Success chance tunables
-ENT._baseSuccess = 0
-ENT._purityCoeff = 0.4
-ENT._stabilityCoeff = 0.4
-
 function ENT:SetupDataTables()
 	self:NetworkVar("Entity", 0, "ContainedWeapon") -- weapon entity stored inside machine
 	self:NetworkVar("String", 0, "ContainedClass") -- class name for persistence on client
@@ -50,15 +45,10 @@ if SERVER then
 
 		self._nextUse = 0
 
-		-- Mana buffer and quality accumulated from network
-		self._manaBuffer = 0
-		self._purity = 0
-		self._stability = 0
-
-		-- NW for client UI
-		self:SetNWFloat("Arcana_ManaBuffer", 0)
-		self:SetNWFloat("Arcana_ManaPurity", 0)
-		self:SetNWFloat("Arcana_ManaStability", 0)
+		-- Mana receive state (boolean pulse, no buffering/costs)
+		self._receivingMana = false
+		self._receivingUntil = 0
+		self:SetNWBool("Arcana_ReceivingMana", false)
 
 		-- Register into ManaNetwork as a consumer
 		local Arcane = _G.Arcane or {}
@@ -294,16 +284,10 @@ if SERVER then
 			return
 		end
 
-		-- Mana requirement and success chance based on purity/stability
-		local manaCost = (ent.GetManaCostPerEnchant and ent:GetManaCostPerEnchant()) or 50
-		if (ent._manaBuffer or 0) < manaCost then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Insufficient refined mana")
-			end
-			return
-		end
+		-- Success depends only on receiving mana pulse; no buffer/costs
+		local hasMana = (ent._receivingUntil or 0) > CurTime()
 
-		-- Deduct other costs
+		-- Deduct other costs (coins/items)
 		local ok, reason = canAffordEnchantment(ply, ench)
 		if not ok then
 			if Arcane and Arcane.SendErrorNotification then
@@ -314,19 +298,15 @@ if SERVER then
 
 		takeEnchantmentCost(ply, ench)
 
-		-- Success roll (computed in enchanter)
-		local chance = (ent.ComputeSuccessChance and ent:ComputeSuccessChance(ent._purity or 0, ent._stability or 0)) or 0.5
+		-- Success roll (25% with mana pulse, 5% without)
+		local chance = ent:ComputeSuccessChance()
 		if math.Rand(0, 1) > chance then
-			-- Failure consumes half mana cost
-			ent._manaBuffer = math.max(0, (ent._manaBuffer or 0) - manaCost * 0.5)
 			ent:EmitSound("buttons/button10.wav", 65, 90)
 			-- Particle burst on attempt
 			SendEnchantBurst(ent)
 			return
 		end
 
-		-- Success consumes full mana cost
-		ent._manaBuffer = math.max(0, (ent._manaBuffer or 0) - manaCost)
 		local success, err = Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
 		if not success then
 			if Arcane and Arcane.SendErrorNotification then
@@ -452,15 +432,6 @@ if SERVER then
 			end
 		end
 
-		-- Compute required mana and chance per attempt (fixed chance for the batch)
-		local manaPer = (ent.GetManaCostPerEnchant and ent:GetManaCostPerEnchant()) or 50
-		local totalMana = manaPer * #enchs
-		if (ent._manaBuffer or 0) < totalMana then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Insufficient refined mana")
-			end
-			return
-		end
 
 		-- Deduct currency/items up front
 		if sumCoins > 0 and ply.TakeCoins then
@@ -470,16 +441,13 @@ if SERVER then
 			if ply.TakeItem then ply:TakeItem(name, amt) end
 		end
 
-		local chance = (ent.ComputeSuccessChance and ent:ComputeSuccessChance(ent._purity or 0, ent._stability or 0)) or 0.5
+		local chance = ent:ComputeSuccessChance()
 		local successes = 0
 		for _, it in ipairs(enchs) do
-			if (ent._manaBuffer or 0) < manaPer then break end
+			local hasMana = (ent._receivingUntil or 0) > CurTime()
 			if math.Rand(0, 1) <= chance then
 				Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
 				successes = successes + 1
-				ent._manaBuffer = math.max(0, ent._manaBuffer - manaPer)
-			else
-				ent._manaBuffer = math.max(0, ent._manaBuffer - manaPer * 0.5)
 			end
 		end
 
@@ -488,6 +456,7 @@ if SERVER then
 		else
 			ent:EmitSound("buttons/button10.wav", 65, 90)
 		end
+
 		-- Particle burst on attempt
 		SendEnchantBurst(ent)
 	end)
@@ -518,6 +487,15 @@ if SERVER then
 			local base = self._spinBaseAng or Angle(0, 0, 0)
 			local ang = Angle(base.p + sp.p * t, base.y + sp.y * t, base.r + sp.r * t)
 			wep:SetLocalAngles(ang)
+		end
+
+		-- Decay the receiving flag so success falls back to 5%
+		if (self._receivingUntil or 0) > 0 and CurTime() > (self._receivingUntil or 0) then
+			self._receivingUntil = 0
+			if self._receivingMana then
+				self._receivingMana = false
+				self:SetNWBool("Arcana_ReceivingMana", false)
+			end
 		end
 
 		self:NextThink(CurTime())
@@ -1188,12 +1166,10 @@ if CLIENT then
 		successBadge:SetPos(12, 12)
 		successBadge.Paint = function(pnl, w, h)
 			if not IsValid(machine) then return end
-			local purity = machine:GetNWFloat("Arcana_ManaPurity", 0)
-			local stability = machine:GetNWFloat("Arcana_ManaStability", 0)
 
-			-- Pair-based success (same as server): base 25%, +12% per full stage up to 3
-			local chance = machine:ComputeSuccessChance(purity, stability)
-			chance = math.Clamp(chance, 0.05, 0.995)
+			-- Simplified: receiving pulse => 25%, otherwise 5%
+			local hasMana = machine:GetNWBool("Arcana_ReceivingMana", false) or ((machine._receivingUntil or 0) > CurTime())
+			local chance = hasMana and 0.25 or 0.05
 
 			-- Badge background
 			Arcana_FillDecoPanel(0, 0, w, h, Color(46, 36, 26, 235), 8)
@@ -1637,8 +1613,6 @@ if CLIENT then
 		end
 
 		rebuild()
-
-		-- frame.Think is defined above to live-update preview
 	end
 
 	net.Receive("Arcana_OpenEnchanterMenu", function()
@@ -1650,48 +1624,20 @@ if CLIENT then
 	end)
 end
 
--- Server + Client shared: basic accessors for networked visualization later
-function ENT:GetManaBuffer()
-	return self._manaBuffer or 0
-end
 
-function ENT:GetManaQuality()
-	return math.Clamp(self._purity or 0, 0, 1), math.Clamp(self._stability or 0, 0, 1)
-end
-
-function ENT:GetManaCostPerEnchant()
-	-- Centralized mana cost per enchant; can be tuned or made dynamic later
-	return 50
-end
-
-function ENT:ComputeSuccessChance(purity, stability)
-	purity = math.Clamp(tonumber(purity) or 0, 0, 1)
-	stability = math.Clamp(tonumber(stability) or 0, 0, 1)
-	local base = tonumber(self._baseSuccess or 0.25) or 0.25
-	local k1 = tonumber(self._purityCoeff or 0.4) or 0.4
-	local k2 = tonumber(self._stabilityCoeff or 0.4) or 0.4
-	local chance = base + k1 * purity + k2 * stability
-
-	return math.Clamp(chance, 0.05, 0.995)
+function ENT:ComputeSuccessChance()
+	local now = CurTime()
+	local receiving = (self._receivingUntil or 0) > now
+	return receiving and 0.25 or 0.05
 end
 
 if SERVER then
-	-- Called by ManaNetwork to add mana with current quality
-	function ENT:AddMana(amount, purity, stability)
-		amount = tonumber(amount) or 0
-		if amount <= 0 then return 0 end
-
-		self._manaBuffer = (self._manaBuffer or 0) + amount
-
-		-- Weighted rolling average towards incoming qualities
-		local w = math.min(1, amount / 100)
-		self._purity = (self._purity or 0) * (1 - w) + (math.Clamp(purity or 0, 0, 1)) * w
-		self._stability = (self._stability or 0) * (1 - w) + (math.Clamp(stability or 0, 0, 1)) * w
-
-		-- Sync for client visuals
-		self:SetNWFloat("Arcana_ManaBuffer", self._manaBuffer or 0)
-		self:SetNWFloat("Arcana_ManaPurity", self._purity or 0)
-		self:SetNWFloat("Arcana_ManaStability", self._stability or 0)
-		return amount
+	-- Called by ManaNetwork to signal mana receive
+	function ENT:AddMana(_amount)
+		-- Treat any positive call as a pulse of receiving state
+		self._receivingUntil = CurTime() + 0.6
+		self._receivingMana = true
+		self:SetNWBool("Arcana_ReceivingMana", true)
+		return _amount or 0
 	end
 end
