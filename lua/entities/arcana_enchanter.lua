@@ -19,7 +19,6 @@ if SERVER then
 	util.AddNetworkString("Arcana_OpenEnchanterMenu")
 	util.AddNetworkString("Arcana_Enchanter_Deposit")
 	util.AddNetworkString("Arcana_Enchanter_Withdraw")
-	util.AddNetworkString("Arcana_Enchanter_Apply")
 	util.AddNetworkString("Arcana_Enchanter_ApplyBatch")
 	util.AddNetworkString("Arcana_Enchanter_ParticleBurst")
 
@@ -125,18 +124,29 @@ if SERVER then
 		local hasCls = tostring(ent:GetContainedClass() or "")
 		if hasCls ~= "" or IsValid(ent:GetContainedWeapon()) then return end -- already holding a weapon
 
-		local wep = ply:GetActiveWeapon()
-		if not IsValid(wep) then return end
+		local orig = ply:GetActiveWeapon()
+		if not IsValid(orig) then return end
 
-		-- Store actual entity reference and class
-		ent:SetContainedClass(wep:GetClass())
-		ent:SetContainedWeapon(wep)
+		local cls = orig:GetClass()
+		if not isstring(cls) or cls == "" then return end
 
-		-- Drop from player and attach to machine for display/safety
-		if ply.DropWeapon then
-			ply:DropWeapon(wep)
+		-- Capture existing enchantments on player's weapon
+		local transferIds = {}
+		local map = Arcane:GetEntityEnchantments(orig)
+		for id, _ in pairs(map or {}) do
+			transferIds[#transferIds + 1] = id
 		end
 
+		-- Always strip the player's weapon (some remove themselves on drop)
+		if ply:HasWeapon(cls) then
+			ply:StripWeapon(cls)
+		end
+
+		-- Spawn a fresh weapon entity for display
+		local wep = ents.Create(cls)
+		if not IsValid(wep) then return end
+		wep:Spawn()
+		wep:Activate()
 		wep:SetOwner(NULL)
 		wep:SetPos(ent:WorldSpaceCenter() + ent:GetUp() * ent:OBBMaxs().z * 0.25)
 		wep:SetAngles(Angle(0, ply:EyeAngles().y or 0, 0))
@@ -146,21 +156,26 @@ if SERVER then
 		wep.ArcanaStored = true
 		wep.ms_notouch = true
 
+		-- Store class and contained reference
+		ent:SetContainedClass(cls)
+		ent:SetContainedWeapon(wep)
+
+		-- Re-apply enchantments to new entity and sync
+		for _, id in ipairs(transferIds) do
+			Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
+		end
+
+		Arcane:SyncWeaponEnchantNW(wep)
+
+		-- Keep a snapshot for fallback re-give
+		ent._containedEnchantIds = table.Copy(transferIds)
+
 		-- Initialize slow multi-axis spin around its current local orientation
 		ent._spinStart = CurTime()
 		ent._spinBaseAng = wep:GetLocalAngles()
 		-- Gentle speeds in deg/sec on all axes
 		ent._spinSpeeds = Angle(8 + math.Rand(0, 4), 10 + math.Rand(0, 5), 6 + math.Rand(0, 4))
 		ent._spinActive = true
-
-		-- Ensure client can see current enchantments on this instance
-		if Arcane and Arcane.GetEntityEnchantments then
-			local _ = Arcane:GetEntityEnchantments(wep) -- ensures table exists
-
-			if Arcane.SyncWeaponEnchantNW then
-				Arcane:SyncWeaponEnchantNW(wep)
-			end
-		end
 
 		ent:EmitSound("items/suitchargeok1.wav", 70, 120)
 	end)
@@ -199,6 +214,7 @@ if SERVER then
 
 			ent:SetContainedWeapon(NULL)
 			ent:SetContainedClass("")
+			ent._containedEnchantIds = nil
 			ent:EmitSound("items/smallmedkit1.wav", 70, 115)
 
 			return
@@ -209,116 +225,32 @@ if SERVER then
 			ent:SetContainedClass("")
 
 			-- Remove any pre-existing weapon of the same class first
-			if ply.HasWeapon and ply:HasWeapon(cls) then
+			if ply:HasWeapon(cls) then
 				ply:StripWeapon(cls)
 			end
 
-			if ply.Give then
-				ply:Give(cls)
-			end
+			ply:Give(cls)
 
 			-- Force switch to this weapon after giving
 			timer.Simple(0, function()
-				if IsValid(ply) then ply:SelectWeapon(cls) end
+				if not IsValid(ply) then return end
+
+				local newWep = ply.GetWeapon and ply:GetWeapon(cls) or nil
+				if IsValid(newWep) then
+					local ids = ent._containedEnchantIds or {}
+					for _, id in ipairs(ids) do
+						Arcane:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
+					end
+
+					Arcane:SyncWeaponEnchantNW(newWep)
+				end
+				ply:SelectWeapon(cls)
 			end)
+
+			ent._containedEnchantIds = nil
 
 			ent:EmitSound("items/smallmedkit1.wav", 70, 115)
 		end
-	end)
-
-	-- Apply a single enchantment to the deposited weapon instance (player's active weapon of that class)
-	net.Receive("Arcana_Enchanter_Apply", function(_, ply)
-		local ent = net.ReadEntity()
-		local enchId = net.ReadString()
-		if not IsValid(ent) or ent:GetClass() ~= "arcana_enchanter" then return end
-
-		local cls = ent:GetContainedClass()
-		if not cls or cls == "" then return end
-
-		local ench = (Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[enchId]) or nil
-		if not ench then return end
-
-		-- Resolve weapon entity from the machine (the stored instance is the one being enchanted)
-		local wep = ent:GetContainedWeapon()
-		if not IsValid(wep) then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Deposit a weapon first")
-			end
-
-			return
-		end
-
-		-- Applicability check with the real entity
-		if ench.can_apply then
-			local ok, reason = pcall(ench.can_apply, ply, wep)
-
-			if not ok or reason == false then
-				if Arcane and Arcane.SendErrorNotification then
-					Arcane:SendErrorNotification(ply, "Cannot apply: " .. tostring(reason or "invalid"))
-				end
-
-				return
-			end
-		end
-
-		-- Prevent duplicates and enforce cap
-		local current = Arcane and Arcane.GetEntityEnchantments and Arcane:GetEntityEnchantments(wep) or {}
-		if current[enchId] then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Enchantment already on weapon")
-			end
-
-			return
-		end
-
-		local count = 0
-		for _ in pairs(current) do
-			count = count + 1
-		end
-
-		if count >= 3 then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Max 3 enchantments per weapon")
-			end
-
-			return
-		end
-
-		-- Success depends only on receiving mana pulse; no buffer/costs
-		local hasMana = (ent._receivingUntil or 0) > CurTime()
-
-		-- Deduct other costs (coins/items)
-		local ok, reason = canAffordEnchantment(ply, ench)
-		if not ok then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, tostring(reason or "Insufficient resources"))
-			end
-			return
-		end
-
-		takeEnchantmentCost(ply, ench)
-
-		-- Success roll (25% with mana pulse, 5% without)
-		local chance = ent:ComputeSuccessChance()
-		if math.Rand(0, 1) > chance then
-			ent:EmitSound("buttons/button10.wav", 65, 90)
-			-- Particle burst on attempt
-			SendEnchantBurst(ent)
-			return
-		end
-
-		local success, err = Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
-		if not success then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, tostring(err or "Failed to apply enchantment"))
-			end
-
-			return
-		end
-
-		ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
-		-- Particle burst on attempt
-		SendEnchantBurst(ent)
 	end)
 
 	-- Batch apply: aggregate costs, deduct once, then apply all to the held weapon entity
@@ -326,11 +258,12 @@ if SERVER then
 		local ent = net.ReadEntity()
 		local list = net.ReadTable() or {}
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_enchanter" then return end
+
 		local cls = ent:GetContainedClass()
 		if not cls or cls == "" then return end
 		if not istable(list) or #list == 0 then return end
-		local wep = ent:GetContainedWeapon()
 
+		local wep = ent:GetContainedWeapon()
 		if not IsValid(wep) then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, "Deposit a weapon first")
@@ -455,6 +388,14 @@ if SERVER then
 			ent:EmitSound("ambient/machines/teleport1.wav", 70, 110)
 		else
 			ent:EmitSound("buttons/button10.wav", 65, 90)
+		end
+
+		-- Refresh stored enchantment IDs snapshot on the contained weapon
+		if IsValid(wep) then
+			local cur = Arcane:GetEntityEnchantments(wep)
+			local arr = {}
+			for id, _ in pairs(cur or {}) do arr[#arr + 1] = id end
+			ent._containedEnchantIds = arr
 		end
 
 		-- Particle burst on attempt

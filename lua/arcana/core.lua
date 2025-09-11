@@ -159,7 +159,7 @@ local function syncWeaponEnchantNW(wep)
 end
 
 -- Apply/remove on a specific weapon entity instance
-function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
+function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 
@@ -186,7 +186,7 @@ function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)
 	end
 
 	-- Award XP for a successful enchantment application
-	if SERVER then
+	if SERVER and not skipXP then
 		local amount = tonumber(self.Config.XP_PER_ENCHANT_SUCCESS) or 20
 		self:GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
 	end
