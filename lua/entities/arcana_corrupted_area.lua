@@ -145,16 +145,15 @@ if SERVER then
 	function ENT:_SpawnWisp()
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
+		local base = self:FindSpawnPos(false)
+		local pos = base + Vector(0, 0, math.Rand(24, 80))
+		if not isvector(pos) then return end -- why the fuck does this happen?
+
 		local ent = ents.Create("arcana_corrupted_wisp")
 		if not IsValid(ent) then return end
 
-		local base = self:FindSpawnPos(false) or center
-		if not IsValid(base) then return end -- why the fuck does this happen?
-
-		local pos = base + Vector(0, 0, math.Rand(24, 80))
 		ent:SetPos(pos)
 		ent:Spawn()
-		ent:Activate()
 		ent:SetRadius(radius * 2)
 
 		-- Bind the wisp to this area
@@ -316,19 +315,22 @@ if SERVER then
 
 	function ENT:ClearInvalidEntities()
 		for i, w in ipairs(self._wisps) do
-			if not IsValid(w) then
+			if not IsValid(w) or w:GetPos():DistToSqr(self:GetPos()) > (self:GetRadius() or 500) ^ 2 then
+				SafeRemoveEntity(w)
 				table.remove(self._wisps, i)
 			end
 		end
 
 		for i, g in ipairs(self._geysers) do
-			if not IsValid(g) then
+			if not IsValid(g) or g:GetPos():DistToSqr(self:GetPos()) > (self:GetRadius() or 500) ^ 2 then
+				SafeRemoveEntity(g)
 				table.remove(self._geysers, i)
 			end
 		end
 
 		for i, h in ipairs(self._heavyWisps) do
-			if not IsValid(h) then
+			if not IsValid(h) or h:GetPos():DistToSqr(self:GetPos()) > (self:GetRadius() or 500) ^ 2 then
+				SafeRemoveEntity(h)
 				table.remove(self._heavyWisps, i)
 			end
 		end
@@ -350,7 +352,8 @@ if SERVER then
 		for i = #self._wisps, 1, -1 do
 			local w = self._wisps[i]
 
-			if not IsValid(w) then
+			if not IsValid(w) or w:GetPos():DistToSqr(center) > (radius or 500) ^ 2 then
+				SafeRemoveEntity(w)
 				table.remove(self._wisps, i)
 			else
 				w._areaCenter = Vector(center)
