@@ -24,6 +24,7 @@ if SERVER then
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetCollisionGroup(COLLISION_GROUP_PROJECTILE)
 		self:DrawShadow(false)
+		self:SetTrigger(true)
 
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
@@ -45,7 +46,6 @@ if SERVER then
 
 	function ENT:LaunchTowards(dir)
 		local phys = self:GetPhysicsObject()
-
 		if IsValid(phys) then
 			phys:SetVelocity(dir:GetNormalized() * (self.OrbSpeed or 520))
 		end
@@ -54,19 +54,20 @@ if SERVER then
 	local function isSolidNonTrigger(ent)
 		if not IsValid(ent) then return false end
 		if ent:IsWorld() then return true end
+
 		local solid = ent.GetSolid and ent:GetSolid() or SOLID_NONE
 		if solid == SOLID_NONE then return false end
-		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
 
+		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
 		return bit.band(flags, FSOLID_TRIGGER) == 0
 	end
 
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
-		local hit = data.HitEntity
 
-		if (IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit)) or data.HitWorld then
+		local hit = data.HitEntity
+		if (IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit)) or hit:IsWorld() then
 			self:Detonate()
 		end
 	end
@@ -227,11 +228,13 @@ if CLIENT then
 	function EFFECT:Think()
 		local now = CurTime()
 		if now > (self.Die or 0) then return false end
+
 		local dt = FrameTime()
 		for _, g in ipairs(self.Glyphs or {}) do
 			g.pos = g.pos + g.vel * dt
 			g.vel = g.vel * 0.96
 		end
+
 		return true
 	end
 

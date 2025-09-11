@@ -24,8 +24,9 @@ if SERVER then
 		self:SetSolid(SOLID_VPHYSICS)
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetCollisionGroup(COLLISION_GROUP_PROJECTILE)
-		local phys = self:GetPhysicsObject()
+		self:SetTrigger(true)
 
+		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:EnableGravity(false)
 			phys:Wake()
@@ -75,18 +76,19 @@ if SERVER then
 	local function isSolidNonTrigger(ent)
 		if not IsValid(ent) then return false end
 		if ent:IsWorld() then return true end
+
 		local solid = ent.GetSolid and ent:GetSolid() or SOLID_NONE
 		if solid == SOLID_NONE then return false end
-		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
 
+		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
 		return bit.band(flags, FSOLID_TRIGGER) == 0
 	end
 
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
-		local hit = data.HitEntity
 
+		local hit = data.HitEntity
 		if (IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit)) or hit:IsWorld() then
 			self:Detonate()
 		end
@@ -105,6 +107,7 @@ if SERVER then
 	function ENT:Detonate()
 		if self._detonated then return end
 		self._detonated = true
+
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
 		util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.FireballRadius or 180, self.FireballDamage or 60)
@@ -120,6 +123,7 @@ if SERVER then
 		util.Effect("Explosion", ed, true, true)
 		util.ScreenShake(pos, 5, 5, 0.35, 512)
 		util.Decal("Scorch", pos + Vector(0, 0, 8), pos - Vector(0, 0, 16))
+
 		sound.Play("ambient/explosions/explode_4.wav", pos, 90, 100)
 		self:Remove()
 	end
@@ -145,7 +149,6 @@ if CLIENT then
 		end
 
 		local now = CurTime()
-
 		if now >= (self._nextPFX or 0) and self.Emitter then
 			self._nextPFX = now + 1 / 90
 			local pos = self:GetPos()
@@ -155,7 +158,6 @@ if CLIENT then
 
 			for i = 1, 3 do
 				local p = self.Emitter:Add("effects/yellowflare", pos + VectorRand() * 2)
-
 				if p then
 					p:SetVelocity(back * (60 + math.random(0, 40)) + VectorRand() * 20)
 					p:SetDieTime(0.4 + math.Rand(0.1, 0.3))
@@ -176,7 +178,6 @@ if CLIENT then
 			for i = 1, 2 do
 				local mat = (math.random() < 0.5) and "effects/fire_cloud1" or "effects/fire_cloud2"
 				local p = self.Emitter:Add(mat, pos)
-
 				if p then
 					p:SetVelocity(back * (40 + math.random(0, 30)) + VectorRand() * 10)
 					p:SetDieTime(0.6 + math.Rand(0.2, 0.5))
@@ -195,7 +196,6 @@ if CLIENT then
 			end
 
 			local hw = self.Emitter:Add("sprites/heatwave", pos)
-
 			if hw then
 				hw:SetVelocity(VectorRand() * 10)
 				hw:SetDieTime(0.25)
@@ -210,13 +210,11 @@ if CLIENT then
 		end
 
 		self:NextThink(now)
-
 		return true
 	end
 
 	function ENT:Draw()
 		local dlight = DynamicLight(self:EntIndex())
-
 		if dlight then
 			local c = self:GetColor()
 			dlight.pos = self:GetPos()
