@@ -400,6 +400,7 @@ if CLIENT then
 		self.ShaderMat:SetFloat("$c0_z", curColor.r / 255 * 3)
 		self.ShaderMat:SetFloat("$c0_w", curColor.g / 255 * 3)
 		self.ShaderMat:SetFloat("$c1_x", curColor.b / 255 * 3)
+		self.ShaderMat:SetFloat("$c2_x", CurTime()) -- animate grain
 
 		render.OverrideDepthEnable(true, true) -- no Z write
 
@@ -408,17 +409,11 @@ if CLIENT then
 			self.ShaderMat:SetFloat("$c0_x", baseDisp * (1 + 0.25 * (i - 1)))
 			-- reduce opacity per pass
 			self.ShaderMat:SetFloat("$c1_y", perPassOpacity)
-			-- animate grain if you added it
-			-- SHADER_MAT:SetFloat("$c2_x", CurTime())
-			-- facet/bounce can be adjusted live too
-			-- SHADER_MAT:SetFloat("$c3_x", 1.2)
-			-- SHADER_MAT:SetFloat("$c3_y", 12)
-			-- SHADER_MAT:SetFloat("$c3_z", 0.75)
-			-- SHADER_MAT:SetFloat("$c3_w", 4)
 
 			render.MaterialOverride(self.ShaderMat)
 			self:DrawModel()
 			render.MaterialOverride()
+
 			-- capture the result to feed into next pass
 			render.CopyRenderTargetToTexture(scr)
 		end
