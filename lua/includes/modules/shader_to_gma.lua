@@ -177,6 +177,7 @@ if SERVER then
 end
 
 if CLIENT then
+	local materials_to_fix = {}
 	net.Receive("shader_to_gma", function()
 		local base64 = net.ReadString()
 		local data = util.Base64Decode(base64)
@@ -190,13 +191,35 @@ if CLIENT then
 		-- create new gma file
 		local fileName = "shader_to_gma_" .. os.time() .. ".gma"
 		file.Write(fileName, data)
-		local ok, err = game.MountGMA("data/" .. fileName)
 
+		local ok, files_or_err = game.MountGMA("data/" .. fileName)
 		if not ok then
-			log("Failed to mount GMA:", err)
+			log("Failed to mount GMA:", files_or_err)
 		else
 			log("Mounted GMA")
-			PrintTable(err)
+			PrintTable(files_or_err)
+
+			for _, path in ipairs(files_or_err) do
+				local shader = path:match("shaders%/fxc%/(.*)%.vcs")
+				if shader then
+					local pixel_key = "pixel__" .. shader
+					local pixel_mat = materials_to_fix[pixel_key]
+					if pixel_mat then
+						pixel_mat["$pixshader"] = shader
+						pixel_mat:Recompute()
+						materials_to_fix[pixel_key] = nil
+						continue
+					end
+
+					local vertex_key = "vertex__" .. shader
+					local vertex_mat = materials_to_fix[vertex_key]
+					if vertex_mat then
+						vertex_mat["$vertexshader"] = shader
+						vertex_mat:Recompute()
+						materials_to_fix[vertex_key] = nil
+					end
+				end
+			end
 		end
 	end)
 
@@ -231,12 +254,33 @@ if CLIENT then
 	function CreateShaderMaterial(name, opts)
 		local key_values = util.KeyValuesToTable(shader_mat, false, true)
 
+		local ignored_shaders = {}
 		if opts then
 			for k, v in pairs(opts) do
 				key_values[k] = v
 			end
+
+			-- remove $pixshader and $vertexshader if they're not mounted yet to avoid weird things happening
+			if opts["$pixshader"] and not file.Exists("shaders/fxc/" .. opts["$pixshader"] .. ".vcs", "GAME") then
+				ignored_shaders = { pixel = opts["$pixshader"] }
+				opts["$pixshader"] = nil
+			end
+
+			if opts["$vertexshader"] and not file.Exists("shaders/fxc/" .. opts["$vertexshader"] .. ".vcs", "GAME") then
+				ignored_shaders = { vertex = opts["$vertexshader"] }
+				opts["$vertexshader"] = nil
+			end
 		end
 
-		return CreateMaterial(name, "screenspace_general", key_values)
+		local mat = CreateMaterial(name, "screenspace_general", key_values)
+		if ignored_shaders.pixel then
+			materials_to_fix["pixel__" .. ignored_shaders.pixel] = mat
+		end
+
+		if ignored_shaders.vertex then
+			materials_to_fix["vertex__" .. ignored_shaders.vertex] = mat
+		end
+
+		return mat
 	end
 end
