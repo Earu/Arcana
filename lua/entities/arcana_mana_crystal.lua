@@ -258,7 +258,6 @@ if CLIENT then
 		self.ShaderMat = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
-			["$basetexture"] = self.Material:GetTexture("$basetexture"),
 			["$model"] = 1,
 			["$vertexnormal"] = 1,
 			["$softwareskin"] = 1,
