@@ -161,15 +161,17 @@ if SERVER then
 		if self._shattered then return end
 
 		-- burst of shards, glass effect, remove
-		local count = math.random(8, 16)
+		local count = math.random(8, 16) * math.max(self:GetCrystalScale(), 1)
 		for i = 1, count do
 			local dir = Vector(math.Rand(-1, 1), math.Rand(-1, 1), math.Rand(0.1, 1))
 			SpawnShard(self, 1, dir)
 		end
+
 		local ed = EffectData()
 		ed:SetOrigin(self:WorldSpaceCenter())
 		util.Effect("GlassImpact", ed, true, true)
 		self:EmitSound("physics/glass/glass_largesheet_break1.wav", 70, 100)
+
 		-- Report destruction to corruption system before removal
 		local Arcane = _G.Arcane or {}
 		if Arcane.ManaCrystals and Arcane.ManaCrystals.ReportCrystalDestroyed then
