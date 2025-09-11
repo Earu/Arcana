@@ -400,7 +400,7 @@ if CLIENT then
 		self.ShaderMat:SetFloat("$c0_z", curColor.r / 255 * 3)
 		self.ShaderMat:SetFloat("$c0_w", curColor.g / 255 * 3)
 		self.ShaderMat:SetFloat("$c1_x", curColor.b / 255 * 3)
-		self.ShaderMat:SetFloat("$c2_x", CurTime()) -- animate grain
+		-- self.ShaderMat:SetFloat("$c2_x", CurTime()) -- animate grain
 
 		render.OverrideDepthEnable(true, true) -- no Z write
 
