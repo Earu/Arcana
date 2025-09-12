@@ -396,7 +396,7 @@ if SERVER then
 
 			local merged_xp = math.max(existing_xp, incoming_xp)
 			local merged_level = math.max(existing_level, incoming_level)
-			local merged_kp = math.max(existing_kp, incoming_kp)
+			local merged_kp = incoming_kp
 
 			local merged_unlocked = {}
 			for id, v in pairs(existing_unlocked or {}) do if v then merged_unlocked[id] = true end end
