@@ -374,7 +374,7 @@ if SERVER then
 			if ply.TakeItem then ply:TakeItem(name, amt) end
 		end
 
-		local chance = ent:ComputeSuccessChance()
+		local chance = ent:ComputeSuccessChance(ply)
 		local successes = 0
 		for _, it in ipairs(enchs) do
 			local hasMana = (ent._receivingUntil or 0) > CurTime()
@@ -1108,9 +1108,9 @@ if CLIENT then
 		successBadge.Paint = function(pnl, w, h)
 			if not IsValid(machine) then return end
 
-			-- Simplified: receiving pulse => 25%, otherwise 5%
-			local hasMana = machine:GetNWBool("Arcana_ReceivingMana", false) or ((machine._receivingUntil or 0) > CurTime())
-			local chance = hasMana and 0.25 or 0.05
+			-- Compute chance (client mirrors server logic; scales with player level when receiving)
+			local lp = LocalPlayer()
+			local chance = machine:ComputeSuccessChance(lp) or 0.05
 
 			-- Badge background
 			Arcana_FillDecoPanel(0, 0, w, h, Color(46, 36, 26, 235), 8)
@@ -1566,10 +1566,23 @@ if CLIENT then
 end
 
 
-function ENT:ComputeSuccessChance()
-	local now = CurTime()
-	local receiving = (self._receivingUntil or 0) > now
-	return receiving and 0.25 or 0.05
+function ENT:ComputeSuccessChance(ply)
+	-- Determine if currently receiving mana; client mirrors via NWBool
+	local receiving = self:GetNWBool("Arcana_ReceivingMana", false) or ((self._receivingUntil or 0) > CurTime())
+	local base = receiving and 0.25 or 0.05
+
+	-- Only scale while receiving mana
+	if not receiving then
+		return base
+	end
+
+	-- Scale from base (25%) up to 80% at max Arcane level
+	local playerLevel = ply:GetArcaneLevel() or 0
+	local maxLevel = ((Arcane.Config and Arcane.Config.MAX_LEVEL) or 100) / 1.75
+	local t = math.Clamp(playerLevel / math.max(1, maxLevel), 0, 1)
+	local maxCap = 0.80
+	local chance = base + (maxCap - base) * t
+	return math.Clamp(chance, 0, maxCap)
 end
 
 if SERVER then
