@@ -146,8 +146,6 @@ if SERVER then
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
 		local base = self:FindSpawnPos(false)
-		if not isvector(base) then return end -- why the fuck does this happen?
-
 		local pos = base + Vector(0, 0, math.Rand(24, 80))
 
 		local ent = ents.Create("arcana_corrupted_wisp")
@@ -189,6 +187,7 @@ if SERVER then
 		local radius = self:GetRadius() or 500
 
 		local foundTarget = false
+		local pos
 		if not randomize then
 			local candPlayers, candNPCs, candNB = {}, {}, {}
 			for _, ent in ipairs(ents.FindInSphere(center, radius)) do
@@ -203,7 +202,6 @@ if SERVER then
 			end
 
 			local targetList = (#candPlayers > 0 and candPlayers) or (#candNPCs > 0 and candNPCs) or candNB
-			local pos
 			if targetList and #targetList > 0 then
 				local t = targetList[math.random(1, #targetList)]
 				local base = IsValid(t) and t:GetPos() or center
@@ -233,7 +231,6 @@ if SERVER then
 		local radius = self:GetRadius() or 500
 		local hitPos = self:FindSpawnPos(true, true)
 		if not hitPos then return end
-		if not isvector(hitPos) then return end -- why the fuck does this happen?
 
 		local ent = ents.Create("arcana_corrupted_geyser")
 		if not IsValid(ent) then return end
