@@ -146,8 +146,9 @@ if SERVER then
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
 		local base = self:FindSpawnPos(false)
+		if not isvector(base) then return end -- why the fuck does this happen?
+
 		local pos = base + Vector(0, 0, math.Rand(24, 80))
-		if not isvector(pos) then return end -- why the fuck does this happen?
 
 		local ent = ents.Create("arcana_corrupted_wisp")
 		if not IsValid(ent) then return end
