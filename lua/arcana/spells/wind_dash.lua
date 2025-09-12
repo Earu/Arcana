@@ -22,19 +22,21 @@ Arcane:RegisterSpell({
 	can_cast = function(caster)
 		if caster:InVehicle() then return false, "Cannot use Wind Dash while in a vehicle" end
 
-		-- Check if player is stuck or in a very confined space
-		local trace = util.TraceHull({
-			start = caster:GetPos(),
-			endpos = caster:GetPos() + caster:GetAimVector() * 100,
-			filter = caster,
-			mins = Vector(-16, -16, 0),
-			maxs = Vector(16, 16, 72),
-			mask = MASK_PLAYERSOLID
-		})
+		return true
+	end,
+	cast = function(caster, _, _, ctx)
+		if not SERVER then return true end
 
-		if trace.Hit and trace.Fraction < 0.3 then return false, "Not enough space to dash" end
+		-- Get the direction the player is looking
+		local aimDir = caster:GetAimVector()
+
+		-- Calculate propulsion force with slight upward component for better mobility
+		local forceVector = aimDir * DASH_FORCE + Vector(0, 0, UPWARD_LIFT)
+		local curVel = caster:GetVelocity()
+		caster:SetVelocity(curVel + forceVector)
+		caster:SetGroundEntity(NULL)
+
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
-
 		Arcane:SendAttachBandVFX(caster, Color(150, 220, 255, 255), 30, .5, {
 			{
 				radius = r * 0.9,
@@ -48,19 +50,9 @@ Arcane:RegisterSpell({
 			},
 		})
 
-		return true
-	end,
-	cast = function(caster, _, _, ctx)
-		if not SERVER then return true end
-		-- Get the direction the player is looking
-		local aimDir = caster:GetAimVector()
-		-- Calculate propulsion force with slight upward component for better mobility
-		local forceVector = aimDir * DASH_FORCE + Vector(0, 0, UPWARD_LIFT)
-		local curVel = caster:GetVelocity()
-		caster:SetVelocity(curVel + forceVector)
-		caster:SetGroundEntity(NULL)
 		-- Grant temporary fall damage immunity
 		caster.ArcanaWindDashProtection = CurTime() + FALL_DAMAGE_IMMUNITY_TIME
+
 		-- Wind sound effect
 		caster:EmitSound("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", 75, math.random(110, 130))
 
@@ -73,9 +65,9 @@ if SERVER then
 	hook.Add("EntityTakeDamage", "Arcana_WindDashFallProtection", function(target, dmg)
 		if not target:IsPlayer() then return end
 		if not target.ArcanaWindDashProtection then return end
+
 		-- Check if this is fall damage
 		local damageType = dmg:GetDamageType()
-
 		if bit.band(damageType, DMG_FALL) == DMG_FALL then
 			-- Still protected?
 			if CurTime() < target.ArcanaWindDashProtection then
