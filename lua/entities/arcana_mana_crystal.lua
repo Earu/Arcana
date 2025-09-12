@@ -99,7 +99,7 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		self:SetColor(Color(255, 0, 123))
+		self:SetColor(Color(55, 155, 255))
 
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then

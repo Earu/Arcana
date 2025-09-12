@@ -1,7 +1,7 @@
 msitems.StartItem("mana_crystal_shard")
 
 local SHINY_MAT = Material("models/shiny")
-local COLOR = Color(255, 0, 123)
+local COLOR = Color(55, 155, 255)
 
 ITEM.State = "entity"
 ITEM.WorldModel = "models/props_debris/concrete_chunk05g.mdl"
