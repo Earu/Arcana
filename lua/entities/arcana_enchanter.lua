@@ -1006,7 +1006,7 @@ if CLIENT then
 			local bw = w - pad * 2
 			local eachH = math.floor((h - pad * 3) * 0.5)
 			drawBar(pad, pad, bw, eachH, "Coins", haveCoins, needCoins, Color(210, 182, 100, 220))
-			drawBar(pad, pad * 2 + eachH, bw, eachH, "Crystal Shards", haveShards, needShards, Color(255, 110, 180, 220))
+			drawBar(pad, pad * 2 + eachH, bw, eachH, "Crystal Shards", haveShards, needShards, Color(105, 180, 255, 220))
 		end
 
 		-- Left: Engraved circle with weapon model/name + controls
