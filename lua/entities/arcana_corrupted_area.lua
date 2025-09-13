@@ -9,12 +9,17 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.PhysgunDisabled = true
 ENT.ms_notouch = true
 
+require("shader_to_gma")
+
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "Radius")
 	self:NetworkVar("Float", 1, "Intensity")
 end
 
 if SERVER then
+	resource.AddShader("arcana_crystal_surface_vs30")
+	resource.AddShader("arcana_crystal_surface_ps30")
+
 	function ENT:UpdateTransmitState()
 		return TRANSMIT_ALWAYS
 	end
@@ -227,7 +232,6 @@ if SERVER then
 	end
 
 	function ENT:_SpawnGeyser()
-		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
 		local hitPos = self:FindSpawnPos(true, true)
 		if not hitPos then return end
@@ -412,6 +416,36 @@ if SERVER then
 end
 
 if CLIENT then
+	-- Dispersion sphere (3D) using the crystal surface shader (no stencils)
+	local function createDispersionMaterial()
+		local mat = CreateShaderMaterial("corruption_dispersion_sphere", {
+			["$pixshader"] = "arcana_crystal_surface_ps30",
+			["$vertexshader"] = "arcana_crystal_surface_vs30",
+			["$model"] = 1,
+			["$vertexnormal"] = 1,
+			["$softwareskin"] = 1,
+			["$alpha_blend"] = 1,
+			["$linearwrite"] = 1,
+			["$linearread_basetexture"] = 1,
+			["$c0_x"] = 3.0, -- dispersion strength
+			["$c0_y"] = 4.0, -- fresnel power
+			["$c0_z"] = 1, -- tint r
+			["$c0_w"] = 1, -- tint g
+			["$c1_x"] = 1, -- tint b
+			["$c1_y"] = 1, -- opacity
+		})
+
+		mat:SetFloat("$c2_y", 12) -- NOISE_SCALE
+		mat:SetFloat("$c2_z", 0.6) -- GRAIN_STRENGTH
+		mat:SetFloat("$c2_w", 0.2) -- SPARKLE_STRENGTH
+		mat:SetFloat("$c3_x", 0.05) -- THICKNESS_SCALE
+		mat:SetFloat("$c3_y", 80) -- FACET_QUANT
+		mat:SetFloat("$c3_z", 8) -- BOUNCE_FADE
+		mat:SetFloat("$c3_w", 1.4) -- BOUNCE_STEPS (1..4)
+
+		return mat
+	end
+
 	-- Invisible material used to write to the stencil buffer
 	local INVISIBLE_MAT = CreateMaterial("arcana_corruption_stencil", "UnlitGeneric", {
 		["$basetexture"] = "color/white",
@@ -431,7 +465,7 @@ if CLIENT then
 		self._intensityScale = sp
 	end
 
-	local function drawCorruption(self)
+	function ENT:_DrawCorruption()
 		if not IsValid(self) then return end
 
 		local world_pos = self:GetPos()
@@ -446,6 +480,7 @@ if CLIENT then
 		local s0 = math.Clamp((k - 0.5) / 1.5, 0, 1)
 		local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
 		local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
+
 		-- Compute post-process values from s: moderate contrast, clear desaturation, slight darken
 		local cm = {
 			["$pp_colour_addr"] = 0,
@@ -462,7 +497,6 @@ if CLIENT then
 		if distance < radius then
 			-- Inside corruption volume: apply post-processing + darken overlay
 			DrawColorModify(cm)
-			--drawDarkOverlay(s)
 		else
 			-- Outside: mask with a 3D sphere in the stencil buffer
 			render.SetStencilEnable(true)
@@ -474,6 +508,7 @@ if CLIENT then
 			render.SetStencilPassOperation(STENCIL_REPLACE)
 			render.SetStencilFailOperation(STENCIL_KEEP)
 			render.SetStencilZFailOperation(STENCIL_KEEP)
+
 			-- Draw invisible sphere to stencil
 			render.SetMaterial(INVISIBLE_MAT)
 			local matrix = Matrix()
@@ -484,8 +519,10 @@ if CLIENT then
 			cam.PopModelMatrix()
 			render.SetStencilCompareFunction(STENCIL_EQUAL)
 			render.SetStencilPassOperation(STENCIL_KEEP)
+
 			-- Apply post-processing within stencil
 			DrawColorModify(cm)
+
 			--drawDarkOverlay(s)
 			render.SetStencilEnable(false)
 		end
@@ -496,11 +533,80 @@ if CLIENT then
 		self:SetRenderBounds(Vector(-r, -r, -32), Vector(r, r, r))
 	end
 
+	function ENT:_DrawDispersionSphere()
+		local radius = math.max(8, self:GetRadius() or 500)
+		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
+		local s0 = math.Clamp((k - 0.5) / 1.5, 0, 1)
+		local sSmooth = (s0 * s0) * (3 - 2 * s0)
+		local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
+		if s <= 0.01 then return end
+
+		if not self._dispMat or self._dispMat:IsError() then
+			self._dispMat = createDispersionMaterial()
+		end
+
+		local mat = self._dispMat
+
+		-- Ensure a clientside model sphere exists and is scaled to our radius
+		if not IsValid(self._sphereModel) then
+			self._sphereModel = ClientsideModel("models/holograms/hq_icosphere.mdl", RENDERGROUP_BOTH)
+			if IsValid(self._sphereModel) then
+				self._sphereModel:SetNoDraw(true)
+				self._sphereModel:SetPos(self:GetPos())
+				self._sphereModel:SetAngles(angle_zero)
+				self._sphereBaseRadius = self._sphereModel:BoundingRadius() or 64
+			end
+		end
+
+		if not IsValid(self._sphereModel) then return end
+
+		-- Update transform
+		self._sphereModel:SetPos(self:GetPos())
+		if (self._lastRadius or -1) ~= radius or not self._sphereScale then
+			local base = math.max(1, self._sphereBaseRadius or (self._sphereModel:BoundingRadius() or 64))
+			self._sphereScale = radius / base * 1.71
+			self._sphereModel:SetModelScale(self._sphereScale, 0)
+			self._lastRadius = radius
+		end
+
+		render.UpdateScreenEffectTexture()
+		local scr = render.GetScreenEffectTexture()
+		mat:SetTexture("$basetexture", scr)
+		mat:SetFloat("$c0_z", 1)
+		mat:SetFloat("$c0_w", 1)
+		mat:SetFloat("$c1_x", 1)
+		mat:SetFloat("$c2_x", CurTime()) -- animate grain
+
+		local PASSES = 4
+		local BASE_DISP = 1.0
+		local maxAlpha = 1
+		local perPassOpacity = (maxAlpha * s) / PASSES
+
+		render.OverrideDepthEnable(true, true) -- no Z write
+		for i = 1, PASSES do
+			-- ramp dispersion a bit each pass
+			mat:SetFloat("$c0_x", BASE_DISP * (1 + 0.25 * (i - 1)))
+
+			-- reduce opacity per pass
+			mat:SetFloat("$c1_y", perPassOpacity)
+
+			render.MaterialOverride(mat)
+			self._sphereModel:DrawModel()
+			render.MaterialOverride()
+
+			-- capture the result to feed into next pass
+			render.CopyRenderTargetToTexture(scr)
+		end
+		render.OverrideDepthEnable(false, false) -- no Z write
+	end
+
 	function ENT:Initialize()
 		updateRenderBounds(self)
 		self._lastUpdate = CurTime()
 		self._lastIntensity = -1
 		applyIntensityClient(self)
+		self._dispMat = createDispersionMaterial()
+		self._sphereModel = nil
 	end
 
 	function ENT:Think()
@@ -525,6 +631,14 @@ if CLIENT then
 	end
 
 	function ENT:Draw()
-		drawCorruption(self)
+		self:_DrawDispersionSphere()
+		self:_DrawCorruption()
+	end
+
+	function ENT:OnRemove()
+		if IsValid(self._sphereModel) then
+			self._sphereModel:Remove()
+			self._sphereModel = nil
+		end
 	end
 end
