@@ -205,7 +205,7 @@ if CLIENT then
 					local pixel_key = "pixel__" .. shader
 					local pixel_mat = materials_to_fix[pixel_key]
 					if pixel_mat then
-						pixel_mat["$pixshader"] = shader
+						pixel_mat:SetString("$pixshader", shader)
 						pixel_mat:Recompute()
 						materials_to_fix[pixel_key] = nil
 						continue
@@ -214,7 +214,7 @@ if CLIENT then
 					local vertex_key = "vertex__" .. shader
 					local vertex_mat = materials_to_fix[vertex_key]
 					if vertex_mat then
-						vertex_mat["$vertexshader"] = shader
+						vertex_mat:SetString("$vertexshader", shader)
 						vertex_mat:Recompute()
 						materials_to_fix[vertex_key] = nil
 					end
@@ -261,13 +261,15 @@ if CLIENT then
 			end
 
 			-- remove $pixshader and $vertexshader if they're not mounted yet to avoid weird things happening
-			if opts["$pixshader"] and not file.Exists("shaders/fxc/" .. opts["$pixshader"] .. ".vcs", "GAME") then
-				ignored_shaders = { pixel = opts["$pixshader"] }
+			local pixshader = opts["$pixshader"]
+			if pixshader and not file.Exists("shaders/fxc/" .. pixshader .. ".vcs", "GAME") then
+				ignored_shaders = { pixel = pixshader }
 				opts["$pixshader"] = nil
 			end
 
-			if opts["$vertexshader"] and not file.Exists("shaders/fxc/" .. opts["$vertexshader"] .. ".vcs", "GAME") then
-				ignored_shaders = { vertex = opts["$vertexshader"] }
+			local vertexshader = opts["$vertexshader"]
+			if vertexshader and not file.Exists("shaders/fxc/" .. vertexshader .. ".vcs", "GAME") then
+				ignored_shaders = { vertex = vertexshader }
 				opts["$vertexshader"] = nil
 			end
 		end
