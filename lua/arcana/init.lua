@@ -2,6 +2,7 @@ if SERVER then
 	AddCSLuaFile("arcana/core.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/hud.lua")
+	AddCSLuaFile("arcana/spell_browser.lua")
 	AddCSLuaFile("arcana/voice_activation.lua")
 	AddCSLuaFile("arcana/mana_network.lua")
 	AddCSLuaFile("arcana/mana_crystals.lua")
@@ -21,6 +22,7 @@ end
 if CLIENT then
 	include("arcana/circles.lua")
 	include("arcana/hud.lua")
+	include("arcana/spell_browser.lua")
 	include("arcana/voice_activation.lua")
 end
 
