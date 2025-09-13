@@ -378,25 +378,24 @@ if SERVER then
 		local lastsave = tonumber(data.last_save) or os.time()
 
 		-- Merge strategy to prevent data loss if an earlier load failed:
-		-- - xp/level/knowledge_points: take max(existing, incoming)
+		-- - xp/level: take max(existing, incoming)
+		-- - knowledge_points: ignore existing and use incoming
 		-- - unlocked_spells: union
 		-- - quickslots: prefer incoming when set, otherwise keep existing
 		-- - selected_quickslot: prefer incoming if valid
 		local function mergeWithExistingRow(row)
 			if not istable(row) then
-				return incoming_xp, incoming_level, incoming_kp, incoming_unlocked_map, incoming_quickslots, incoming_selected
+				return incoming_xp, incoming_level, incoming_unlocked_map, incoming_quickslots, incoming_selected
 			end
 
 			local existing_xp = tonumber(row.xp) or 0
 			local existing_level = tonumber(row.level) or 1
-			local existing_kp = tonumber(row.knowledge_points) or 0
 			local existing_unlocked = deserializeUnlockedSpells(row.unlocked_spells)
 			local existing_quick = deserializeQuickslots(row.quickspell_slots)
 			local existing_selected = tonumber(row.selected_quickslot) or 1
 
 			local merged_xp = math.max(existing_xp, incoming_xp)
 			local merged_level = math.max(existing_level, incoming_level)
-			local merged_kp = incoming_kp
 
 			local merged_unlocked = {}
 			for id, v in pairs(existing_unlocked or {}) do if v then merged_unlocked[id] = true end end
@@ -412,7 +411,7 @@ if SERVER then
 
 			local merged_selected = (incoming_selected >= 1 and incoming_selected <= 8) and incoming_selected or existing_selected
 
-			return merged_xp, merged_level, merged_kp, merged_unlocked, merged_quick, merged_selected
+			return merged_xp, merged_level, merged_unlocked, merged_quick, merged_selected
 		end
 
 		if _G.co and _G.db then
@@ -420,7 +419,7 @@ if SERVER then
 			_G.co(function()
 				-- Read existing row to merge conservatively
 				local existing = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
-				local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(existing) and existing[1] or nil)
+				local mxp, mlevel, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(existing) and existing[1] or nil)
 				local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
 				local quick = sql.SQLStr(serializeQuickslots(mquick))
 				local upsert = [[
@@ -435,17 +434,17 @@ if SERVER then
 						selected_quickslot = EXCLUDED.selected_quickslot,
 						last_save = EXCLUDED.last_save
 				]]
-				_G.db.Query(upsert, steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
+				_G.db.Query(upsert, steamid, mxp, mlevel, incoming_kp, unlocked, quick, mselected, lastsave)
 			end)
 
 			return
 		else
 			-- fallback to sqlite
 			local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
-			local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
+			local mxp, mlevel, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
 			local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
 			local quick = sql.SQLStr(serializeQuickslots(mquick))
-			local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
+			local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, incoming_kp, unlocked, quick, mselected, lastsave)
 			local ok = sql.Query(q)
 
 			if ok == false then
