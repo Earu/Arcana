@@ -213,8 +213,10 @@ if CLIENT then
 		if IsValid(ply) then
 			ang = (ply:GetPos() - pos):Angle()
 		end
+
 		ang:RotateAroundAxis(ang:Right(), -90)
 		ang:RotateAroundAxis(ang:Up(), 90)
+
 		cam.Start3D2D(pos, ang, 0.14)
 			surface.SetFont("Arcana_HeavyGlyph")
 			local txt = self._glyphChar or "*"
@@ -222,7 +224,6 @@ if CLIENT then
 			surface.SetTextColor(0, 0, 0, 230)
 			surface.SetTextPos(-tw * 0.5 + 2, -th * 0.5 + 2)
 			surface.DrawText(txt)
-			--surface.SetTextColor(255, 255, 255)
 			surface.SetTextPos(-tw * 0.5, -th * 0.5)
 			surface.DrawText(txt)
 		cam.End3D2D()

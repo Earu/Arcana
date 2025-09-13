@@ -354,6 +354,7 @@ if CLIENT then
 		self:DrawModel()
 		render.SetLightingMode(0)
 		render.SuppressEngineLighting(false)
+
 		-- Core glow sprites layered over the sphere
 		render.SetMaterial(SPRITE_MAT)
 		local t = CurTime()
@@ -372,39 +373,22 @@ if CLIENT then
 		ang:RotateAroundAxis(ang:Up(), 90)
 		local jx = (self._jxAmp or 3) * math.sin(t * (self._jxW or 12) + (self._jxP or 0))
 		local jy = (self._jyAmp or 3) * math.cos(t * (self._jyW or 14) + (self._jyP or 0))
+
 		cam.IgnoreZ(true)
 		cam.Start3D2D(self:GetPos(), ang, 0.12)
-		surface.SetFont("Arcana_WispGlyph")
-		local txt = self._glyphChar or "*"
-		local tw, th = surface.GetTextSize(txt)
-		local cx = -tw * 0.5
-		local cy = -th * 0.5
-		-- Stroke around center
-		surface.SetTextColor(0, 0, 0, 230)
-		surface.SetTextPos(cx - 1 + jx, cy - 1 + jy)
-		surface.DrawText(txt)
-		surface.SetTextPos(cx + 1 + jx, cy - 1 + jy)
-		surface.DrawText(txt)
-		surface.SetTextPos(cx - 1 + jx, cy + 1 + jy)
-		surface.DrawText(txt)
-		surface.SetTextPos(cx + 1 + jx, cy + 1 + jy)
-		surface.DrawText(txt)
-		-- Bright core
-		surface.SetTextColor(255, 255, 255)
-		surface.SetTextPos(cx + jx, cy + jy)
-		surface.DrawText(txt)
-		-- Chromatic offsets
-		surface.SetTextColor(COL_PURPLE.r, COL_PURPLE.g, COL_PURPLE.b, 170)
-		surface.SetTextPos(cx + 2 + jx * 0.8, cy + 2 + jy * 0.8)
-		surface.DrawText(txt)
-		surface.SetTextColor(255, 255, 255, 160)
-		surface.SetTextPos(cx - 2 + jx * 0.6, cy - 2 + jy * 0.6)
-		surface.DrawText(txt)
+			surface.SetFont("Arcana_WispGlyph")
+			local txt = self._glyphChar or "*"
+			local tw, th = surface.GetTextSize(txt)
+			surface.SetTextColor(0, 0, 0, 230)
+			surface.SetTextPos(-tw * 0.5 + 2, -th * 0.5 + 2)
+			surface.DrawText(txt)
+			surface.SetTextPos(-tw * 0.5, -th * 0.5)
+			surface.DrawText(txt)
 		cam.End3D2D()
 		cam.IgnoreZ(false)
+
 		-- Dynamic light
 		local d = DynamicLight(self:EntIndex())
-
 		if d then
 			d.pos = self:GetPos()
 			d.r = 150
