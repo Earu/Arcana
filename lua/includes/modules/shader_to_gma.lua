@@ -272,7 +272,7 @@ if CLIENT then
 			end
 		end
 
-		local mat = CreateMaterial(name, "screenspace_general", key_values)
+		local mat = CreateMaterial(name .. "_" .. FrameNumber(), "screenspace_general", key_values)
 		if ignored_shaders.pixel then
 			materials_to_fix["pixel__" .. ignored_shaders.pixel] = mat
 		end
