@@ -416,27 +416,22 @@ if SERVER then
 end
 
 if CLIENT then
-	-- Dispersion sphere (3D) using the crystal surface shader (no stencils)
-	local function createDispersionMaterial()
-		local mat = CreateShaderMaterial("corruption_dispersion_sphere", {
-			["$pixshader"] = "arcana_crystal_surface_ps30",
-			["$c0_x"] = 3.0, -- dispersion strength
-			["$c0_y"] = 4.0, -- fresnel power
-			["$c0_z"] = 1, -- tint r
-			["$c0_w"] = 1, -- tint g
-			["$c1_x"] = 1, -- tint b
-			["$c1_y"] = 1, -- opacity
-			["$c2_y"] = 12, -- NOISE_SCALE
-			["$c2_z"] = 0.6, -- GRAIN_STRENGTH
-			["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
-			["$c3_x"] = 0.25, -- THICKNESS_SCALE
-			["$c3_y"] = 20, -- FACET_QUANT
-			["$c3_z"] = 50, -- BOUNCE_FADE
-			["$c3_w"] = 1, -- BOUNCE_STEPS (1..4)
-		})
-
-		return mat
-	end
+	local SHADER_MAT = CreateShaderMaterial("corruption_dispersion_sphere", {
+		["$pixshader"] = "arcana_crystal_surface_ps30",
+		["$c0_x"] = 3.0, -- dispersion strength
+		["$c0_y"] = 4.0, -- fresnel power
+		["$c0_z"] = 1, -- tint r
+		["$c0_w"] = 1, -- tint g
+		["$c1_x"] = 1, -- tint b
+		["$c1_y"] = 1, -- opacity
+		["$c2_y"] = 12, -- NOISE_SCALE
+		["$c2_z"] = 0.6, -- GRAIN_STRENGTH
+		["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
+		["$c3_x"] = 0.25, -- THICKNESS_SCALE
+		["$c3_y"] = 20, -- FACET_QUANT
+		["$c3_z"] = 50, -- BOUNCE_FADE
+		["$c3_w"] = 1, -- BOUNCE_STEPS (1..4)
+	})
 
 	-- Invisible material used to write to the stencil buffer
 	local INVISIBLE_MAT = CreateMaterial("arcana_corruption_stencil", "UnlitGeneric", {
@@ -512,11 +507,11 @@ if CLIENT then
 			cam.Start2D()
 			render.UpdateScreenEffectTexture()
 			local scr = render.GetScreenEffectTexture()
-			self._dispMat:SetTexture("$basetexture", scr)
-			self._dispMat:SetFloat("$c0_z", 1)
-			self._dispMat:SetFloat("$c0_w", 1)
-			self._dispMat:SetFloat("$c1_x", 1)
-			self._dispMat:SetFloat("$c2_x", CurTime()) -- animate grain
+			SHADER_MAT:SetTexture("$basetexture", scr)
+			SHADER_MAT:SetFloat("$c0_z", 1)
+			SHADER_MAT:SetFloat("$c0_w", 1)
+			SHADER_MAT:SetFloat("$c1_x", 1)
+			SHADER_MAT:SetFloat("$c2_x", CurTime()) -- animate grain
 
 			local PASSES = 10
 			local BASE_DISP = 1.0
@@ -525,13 +520,13 @@ if CLIENT then
 
 			for i = 1, PASSES do
 				-- ramp dispersion a bit each pass
-				self._dispMat:SetFloat("$c0_x", BASE_DISP * (1 + 0.25 * (i - 1)))
+				SHADER_MAT:SetFloat("$c0_x", BASE_DISP * (1 + 0.25 * (i - 1)))
 
 				-- reduce opacity per pass
-				self._dispMat:SetFloat("$c1_y", perPassOpacity)
+				SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
 
 				surface.SetDrawColor(255, 255, 255, 255)
-				surface.SetMaterial(self._dispMat)
+				surface.SetMaterial(SHADER_MAT)
 
 				-- https://github.com/Jaffies/rboxes/blob/main/rboxes.lua
 				-- fixes setting $basetexture to ""(none) not working correctly
@@ -570,7 +565,6 @@ if CLIENT then
 		self._lastIntensity = -1
 
 		applyIntensityClient(self)
-		self._dispMat = createDispersionMaterial()
 	end
 
 	function ENT:Think()
