@@ -177,7 +177,6 @@ if SERVER then
 end
 
 if CLIENT then
-	local materials_to_fix = {}
 	net.Receive("shader_to_gma", function()
 		local base64 = net.ReadString()
 		local data = util.Base64Decode(base64)
@@ -198,28 +197,6 @@ if CLIENT then
 		else
 			log("Mounted GMA")
 			PrintTable(files_or_err)
-
-			for _, path in ipairs(files_or_err) do
-				local shader = path:match("shaders%/fxc%/(.*)%.vcs")
-				if shader then
-					local pixel_key = "pixel__" .. shader
-					local pixel_mat = materials_to_fix[pixel_key]
-					if pixel_mat then
-						pixel_mat:SetString("$pixshader", shader)
-						pixel_mat:Recompute()
-						materials_to_fix[pixel_key] = nil
-						continue
-					end
-
-					local vertex_key = "vertex__" .. shader
-					local vertex_mat = materials_to_fix[vertex_key]
-					if vertex_mat then
-						vertex_mat:SetString("$vertexshader", shader)
-						vertex_mat:Recompute()
-						materials_to_fix[vertex_key] = nil
-					end
-				end
-			end
 		end
 	end)
 
@@ -263,26 +240,15 @@ if CLIENT then
 			-- remove $pixshader and $vertexshader if they're not mounted yet to avoid weird things happening
 			local pixshader = opts["$pixshader"]
 			if pixshader and not file.Exists("shaders/fxc/" .. pixshader .. ".vcs", "GAME") then
-				ignored_shaders = { pixel = pixshader }
 				opts["$pixshader"] = nil
 			end
 
 			local vertexshader = opts["$vertexshader"]
 			if vertexshader and not file.Exists("shaders/fxc/" .. vertexshader .. ".vcs", "GAME") then
-				ignored_shaders = { vertex = vertexshader }
 				opts["$vertexshader"] = nil
 			end
 		end
 
-		local mat = CreateMaterial(name .. "_" .. FrameNumber(), "screenspace_general", key_values)
-		if ignored_shaders.pixel then
-			materials_to_fix["pixel__" .. ignored_shaders.pixel] = mat
-		end
-
-		if ignored_shaders.vertex then
-			materials_to_fix["vertex__" .. ignored_shaders.vertex] = mat
-		end
-
-		return mat
+		return CreateMaterial(name .. "_" .. FrameNumber(), "screenspace_general", key_values)
 	end
 end
