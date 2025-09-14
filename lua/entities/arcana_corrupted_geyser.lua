@@ -160,7 +160,6 @@ end
 
 if CLIENT then
     local MAT_RING = Material("sprites/light_glow02_add")
-    local MAT_BEAM = Material("effects/beam001_white")
 
     function ENT:Initialize()
         self._made = CurTime()
@@ -180,19 +179,6 @@ if CLIENT then
         local alpha = 200 * (0.4 + 0.6 * math.abs(math.sin(now * 9)))
         render.SetMaterial(MAT_RING)
         render.DrawSprite(pos + Vector(0,0,4), size * 2.2, size * 2.2, Color(220, 220, 220, alpha))
-
-        -- Column: fast, tall beam using multiple stacked beams
-        local h = r * 3.5
-        local base = pos + Vector(0,0,6)
-        local top = base + Vector(0,0,h)
-        render.SetMaterial(MAT_BEAM)
-        local beamW = math.max(16, r * 0.25)
-        local flicker = 0.7 + 0.3 * math.sin(now * 20)
-        local c = math.floor(200 * flicker)
-        for i = 1, 4 do
-            local jitter = VectorRand() * 6
-            render.DrawBeam(base + jitter, top + jitter * 0.3, beamW * (0.9 + 0.1 * i), 0, 1, Color(c, c, c, 140))
-        end
 
         -- After eruption: fast rising smoke (grayscale)
         if now > telegraphEnd then
