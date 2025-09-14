@@ -197,6 +197,7 @@ if CLIENT then
 		else
 			log("Mounted GMA")
 			PrintTable(files_or_err)
+			hook.Run("ShaderMounted", files_or_err)
 		end
 	end)
 
