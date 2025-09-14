@@ -242,7 +242,7 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	hook.Add("ShaderMounted", "crystal_dispersion", function()
+	hook.Add("ShaderMounted", "arcana_crystal_dispersion", function()
 		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",

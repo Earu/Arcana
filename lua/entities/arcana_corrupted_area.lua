@@ -417,31 +417,22 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	hook.Add("ShaderMounted", "crystal_dispersion", function()
-		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
+	hook.Add("ShaderMounted", "corruption_dispersion_sphere", function()
+		SHADER_MAT = CreateShaderMaterial("corruption_dispersion_sphere", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
-			["$vertexshader"] = "arcana_crystal_surface_vs30",
-			["$model"] = 1,
-			["$vertexnormal"] = 1,
-			["$softwareskin"] = 1,
-			["$alpha_blend"] = 1,
-			["$linearwrite"] = 1,
-			["$linearread_basetexture"] = 1,
 			["$c0_x"] = 3.0, -- dispersion strength
 			["$c0_y"] = 4.0, -- fresnel power
-			["$c0_z"] = 0.1, -- tint r
-			["$c0_w"] = 0.5, -- tint g
-			["$c1_x"] = 3, -- tint b
+			["$c0_z"] = 1, -- tint r
+			["$c0_w"] = 1, -- tint g
+			["$c1_x"] = 1, -- tint b
 			["$c1_y"] = 1, -- opacity
-
-			-- Defaults for grain/sparkles and facet multi-bounce
 			["$c2_y"] = 12, -- NOISE_SCALE
 			["$c2_z"] = 0.6, -- GRAIN_STRENGTH
 			["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
-			["$c3_x"] = 0.15, -- THICKNESS_SCALE
-			["$c3_y"] = 12, -- FACET_QUANT
-			["$c3_z"] = 8, -- BOUNCE_FADE
-			["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
+			["$c3_x"] = 0.25, -- THICKNESS_SCALE
+			["$c3_y"] = 20, -- FACET_QUANT
+			["$c3_z"] = 50, -- BOUNCE_FADE
+			["$c3_w"] = 1, -- BOUNCE_STEPS (1..4)
 		})
 	end)
 
