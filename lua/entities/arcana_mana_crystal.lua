@@ -241,31 +241,34 @@ if SERVER then
 end
 
 if CLIENT then
-	local SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
-		["$pixshader"] = "arcana_crystal_surface_ps30",
-		["$vertexshader"] = "arcana_crystal_surface_vs30",
-		["$model"] = 1,
-		["$vertexnormal"] = 1,
-		["$softwareskin"] = 1,
-		["$alpha_blend"] = 1,
-		["$linearwrite"] = 1,
-		["$linearread_basetexture"] = 1,
-		["$c0_x"] = 3.0, -- dispersion strength
-		["$c0_y"] = 4.0, -- fresnel power
-		["$c0_z"] = 0.1, -- tint r
-		["$c0_w"] = 0.5, -- tint g
-		["$c1_x"] = 3, -- tint b
-		["$c1_y"] = 1, -- opacity
+	local SHADER_MAT
+	hook.Add("ShaderMounted", "crystal_dispersion", function()
+		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
+			["$pixshader"] = "arcana_crystal_surface_ps30",
+			["$vertexshader"] = "arcana_crystal_surface_vs30",
+			["$model"] = 1,
+			["$vertexnormal"] = 1,
+			["$softwareskin"] = 1,
+			["$alpha_blend"] = 1,
+			["$linearwrite"] = 1,
+			["$linearread_basetexture"] = 1,
+			["$c0_x"] = 3.0, -- dispersion strength
+			["$c0_y"] = 4.0, -- fresnel power
+			["$c0_z"] = 0.1, -- tint r
+			["$c0_w"] = 0.5, -- tint g
+			["$c1_x"] = 3, -- tint b
+			["$c1_y"] = 1, -- opacity
 
-		-- Defaults for grain/sparkles and facet multi-bounce
-		["$c2_y"] = 12, -- NOISE_SCALE
-		["$c2_z"] = 0.6, -- GRAIN_STRENGTH
-		["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
-		["$c3_x"] = 0.15, -- THICKNESS_SCALE
-		["$c3_y"] = 12, -- FACET_QUANT
-		["$c3_z"] = 8, -- BOUNCE_FADE
-		["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
-	})
+			-- Defaults for grain/sparkles and facet multi-bounce
+			["$c2_y"] = 12, -- NOISE_SCALE
+			["$c2_z"] = 0.6, -- GRAIN_STRENGTH
+			["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
+			["$c3_x"] = 0.15, -- THICKNESS_SCALE
+			["$c3_y"] = 12, -- FACET_QUANT
+			["$c3_z"] = 8, -- BOUNCE_FADE
+			["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
+		})
+	end)
 
 	local MAX_RENDER_DIST = 2000 * 2000
 	function ENT:Initialize()
@@ -384,6 +387,11 @@ if CLIENT then
 
 	function ENT:DrawTranslucent()
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+
+		if not SHADER_MAT then
+			self:DrawModel()
+			return
+		end
 
 		-- draw only the refractive passes (skip solid base draw to avoid overbright)
 		local PASSES = 4 -- try 3–6
