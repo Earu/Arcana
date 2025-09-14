@@ -241,6 +241,32 @@ if SERVER then
 end
 
 if CLIENT then
+	local SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
+		["$pixshader"] = "arcana_crystal_surface_ps30",
+		["$vertexshader"] = "arcana_crystal_surface_vs30",
+		["$model"] = 1,
+		["$vertexnormal"] = 1,
+		["$softwareskin"] = 1,
+		["$alpha_blend"] = 1,
+		["$linearwrite"] = 1,
+		["$linearread_basetexture"] = 1,
+		["$c0_x"] = 3.0, -- dispersion strength
+		["$c0_y"] = 4.0, -- fresnel power
+		["$c0_z"] = 0.1, -- tint r
+		["$c0_w"] = 0.5, -- tint g
+		["$c1_x"] = 3, -- tint b
+		["$c1_y"] = 1, -- opacity
+
+		-- Defaults for grain/sparkles and facet multi-bounce
+		["$c2_y"] = 12, -- NOISE_SCALE
+		["$c2_z"] = 0.6, -- GRAIN_STRENGTH
+		["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
+		["$c3_x"] = 0.15, -- THICKNESS_SCALE
+		["$c3_y"] = 12, -- FACET_QUANT
+		["$c3_z"] = 8, -- BOUNCE_FADE
+		["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
+	})
+
 	local MAX_RENDER_DIST = 2000 * 2000
 	function ENT:Initialize()
 		-- Ensure client has consistent scale constants and apply current scale
@@ -252,34 +278,8 @@ if CLIENT then
 		self._spawnFadeStart = SysTime()
 		self._spawnFadeDur = 1
 		self._origColor = self:GetColor() or Color(255, 255, 255)
-		-- We avoid changing entity alpha; we handle fade in our draw passes
 
 		self.Material = Material(self:GetMaterial())
-		self.ShaderMat = CreateShaderMaterial("crystal_dispersion", {
-			["$pixshader"] = "arcana_crystal_surface_ps30",
-			["$vertexshader"] = "arcana_crystal_surface_vs30",
-			["$model"] = 1,
-			["$vertexnormal"] = 1,
-			["$softwareskin"] = 1,
-			["$alpha_blend"] = 1,
-			["$linearwrite"] = 1,
-			["$linearread_basetexture"] = 1,
-			["$c0_x"] = 3.0, -- dispersion strength
-			["$c0_y"] = 4.0, -- fresnel power
-			["$c0_z"] = 0.1, -- tint r
-			["$c0_w"] = 0.5, -- tint g
-			["$c1_x"] = 3, -- tint b
-			["$c1_y"] = 1, -- opacity
-		})
-
-		-- Defaults for grain/sparkles and facet multi-bounce
-		self.ShaderMat:SetFloat("$c2_y", 12) -- NOISE_SCALE
-		self.ShaderMat:SetFloat("$c2_z", 0.6) -- GRAIN_STRENGTH
-		self.ShaderMat:SetFloat("$c2_w", 0.2) -- SPARKLE_STRENGTH
-		self.ShaderMat:SetFloat("$c3_x", 0.15) -- THICKNESS_SCALE
-		self.ShaderMat:SetFloat("$c3_y", 12) -- FACET_QUANT
-		self.ShaderMat:SetFloat("$c3_z", 8) -- BOUNCE_FADE
-		self.ShaderMat:SetFloat("$c3_w", 1.4) -- BOUNCE_STEPS (1..4)
 
 		-- Particle FX state
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
@@ -393,23 +393,23 @@ if CLIENT then
 		-- start from current screen
 		render.UpdateScreenEffectTexture()
 		local scr = render.GetScreenEffectTexture()
-		self.ShaderMat:SetTexture("$basetexture", scr)
+		SHADER_MAT:SetTexture("$basetexture", scr)
 
 		local curColor = self:GetColor()
-		self.ShaderMat:SetFloat("$c0_z", curColor.r / 255 * 3)
-		self.ShaderMat:SetFloat("$c0_w", curColor.g / 255 * 3)
-		self.ShaderMat:SetFloat("$c1_x", curColor.b / 255 * 3)
+		SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 3)
+		SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 3)
+		SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 3)
 		-- self.ShaderMat:SetFloat("$c2_x", CurTime()) -- animate grain
 
 		render.OverrideDepthEnable(true, true) -- no Z write
 
 		for i = 1, PASSES do
 			-- ramp dispersion a bit each pass
-			self.ShaderMat:SetFloat("$c0_x", baseDisp * (1 + 0.25 * (i - 1)))
+			SHADER_MAT:SetFloat("$c0_x", baseDisp * (1 + 0.25 * (i - 1)))
 			-- reduce opacity per pass
-			self.ShaderMat:SetFloat("$c1_y", perPassOpacity)
+			SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
 
-			render.MaterialOverride(self.ShaderMat)
+			render.MaterialOverride(SHADER_MAT)
 			self:DrawModel()
 			render.MaterialOverride()
 

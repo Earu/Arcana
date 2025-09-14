@@ -238,6 +238,6 @@ if CLIENT then
 			end
 		end
 
-		return CreateMaterial(name .. "_" .. FrameNumber(), "screenspace_general", key_values)
+		return CreateMaterial(name, "screenspace_general", key_values)
 	end
 end
