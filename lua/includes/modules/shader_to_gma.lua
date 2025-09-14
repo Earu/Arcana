@@ -236,17 +236,6 @@ if CLIENT then
 			for k, v in pairs(opts) do
 				key_values[k] = v
 			end
-
-			-- remove $pixshader and $vertexshader if they're not mounted yet to avoid weird things happening
-			local pixshader = opts["$pixshader"]
-			if pixshader and not file.Exists("shaders/fxc/" .. pixshader .. ".vcs", "GAME") then
-				opts["$pixshader"] = nil
-			end
-
-			local vertexshader = opts["$vertexshader"]
-			if vertexshader and not file.Exists("shaders/fxc/" .. vertexshader .. ".vcs", "GAME") then
-				opts["$vertexshader"] = nil
-			end
 		end
 
 		return CreateMaterial(name .. "_" .. FrameNumber(), "screenspace_general", key_values)
