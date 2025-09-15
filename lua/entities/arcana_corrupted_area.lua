@@ -417,7 +417,7 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	--[[hook.Add("ShaderMounted", "corruption_dispersion_sphere", function()
+	local function initShaderMaterial()
 		SHADER_MAT = CreateShaderMaterial("corruption_dispersion_sphere", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$c0_x"] = 3.0, -- dispersion strength
@@ -434,7 +434,13 @@ if CLIENT then
 			["$c3_z"] = 50, -- BOUNCE_FADE
 			["$c3_w"] = 1, -- BOUNCE_STEPS (1..4)
 		})
-	end)]]
+	end
+
+	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") then
+		initShaderMaterial()
+	else
+		hook.Add("ShaderMounted", "corruption_dispersion_sphere", initShaderMaterial)
+	end
 
 	-- Invisible material used to write to the stencil buffer
 	local INVISIBLE_MAT = CreateMaterial("arcana_corruption_stencil", "UnlitGeneric", {
@@ -501,6 +507,15 @@ if CLIENT then
 	end
 
 	local MAX_RENDER_DIST = 4000 * 4000
+	local cam_Start2D = _G.cam.Start2D
+	local cam_End2D = _G.cam.End2D
+	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
+	local render_GetScreenEffectTexture = _G.render.GetScreenEffectTexture
+	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
+	local surface_SetDrawColor = _G.surface.SetDrawColor
+	local surface_SetMaterial = _G.surface.SetMaterial
+	local surface_DrawTexturedRectUV = _G.surface.DrawTexturedRectUV
+	local DrawColorModify = _G.DrawColorModify
 	function ENT:_DrawCorruption()
 		self:_DrawSphere(function()
 			local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
@@ -512,16 +527,16 @@ if CLIENT then
 				local maxAlpha = 1
 				local BASE_DISP = 1.0
 
-				cam.Start2D()
-					render.UpdateScreenEffectTexture()
-					local scr = render.GetScreenEffectTexture()
+				cam_Start2D()
+					render_UpdateScreenEffectTexture()
+					local scr = render_GetScreenEffectTexture()
 					SHADER_MAT:SetTexture("$basetexture", scr)
 					SHADER_MAT:SetFloat("$c0_z", 1)
 					SHADER_MAT:SetFloat("$c0_w", 1)
 					SHADER_MAT:SetFloat("$c1_x", 1)
 					SHADER_MAT:SetFloat("$c2_x", CurTime()) -- animate grain
 
-					local PASSES = 4
+					local PASSES = 1
 					local perPassOpacity = (maxAlpha * s) / PASSES
 					for i = 1, PASSES do
 						-- ramp dispersion a bit each pass
@@ -530,17 +545,17 @@ if CLIENT then
 						-- reduce opacity per pass
 						SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
 
-						surface.SetDrawColor(255, 255, 255, 255)
-						surface.SetMaterial(SHADER_MAT)
+						surface_SetDrawColor(255, 255, 255, 255)
+						surface_SetMaterial(SHADER_MAT)
 
 						-- https://github.com/Jaffies/rboxes/blob/main/rboxes.lua
 						-- fixes setting $basetexture to ""(none) not working correctly
-						surface.DrawTexturedRectUV(0, 0, ScrW(), ScrH(), -0.015625, -0.015625, 1.015625, 1.015625)
+						surface_DrawTexturedRectUV(0, 0, ScrW(), ScrH(), -0.015625, -0.015625, 1.015625, 1.015625)
 
 						-- capture the result to feed into next pass
-						render.CopyRenderTargetToTexture(scr)
+						render_CopyRenderTargetToTexture(scr)
 					end
-				cam.End2D()
+				cam_End2D()
 			end
 
 			-- Compute post-process values from s: moderate contrast, clear desaturation, slight darken
