@@ -242,7 +242,7 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	--[[hook.Add("ShaderMounted", "arcana_crystal_dispersion", function()
+	local function initShaderMaterial()
 		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
@@ -268,21 +268,22 @@ if CLIENT then
 			["$c3_z"] = 8, -- BOUNCE_FADE
 			["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
 		})
-	end)]]
+	end
+
+	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+		initShaderMaterial()
+	else
+		hook.Add("ShaderMounted", "arcana_crystal_dispersion", function()
+			initShaderMaterial()
+		end)
+	end
 
 	local MAX_RENDER_DIST = 2000 * 2000
 	function ENT:Initialize()
-		-- Ensure client has consistent scale constants and apply current scale
-		self._maxScale = 2.2
-		self._minScale = 0.35
-		self:_ApplyScale(self:GetCrystalScale())
-
 		-- Fade-in setup
 		self._spawnFadeStart = SysTime()
 		self._spawnFadeDur = 1
 		self._origColor = self:GetColor() or Color(255, 255, 255)
-
-		self.Material = Material(self:GetMaterial())
 
 		-- Particle FX state
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
