@@ -19,6 +19,7 @@ if SERVER then
 		crystalMaxPerArea = 2,      -- limit new spawns if too many are near
 		areaLimitRadius = 2000,      -- radius to count nearby crystals for the area limit
 		hotspotSpawnCooldown = 10,   -- minimum seconds between spawns per hotspot
+
 		-- Corruption area grouping
 		regionRadius = 2000,          -- radius used to group positions into a corruption area cell
 
@@ -31,6 +32,7 @@ if SERVER then
 	M.hotspots = M.hotspots or {}
 	M.regions = M.regions or {}
 	M._saveDir = "arcana"
+
 	-- Track per-region destruction counts to escalate corruption on repeated crystal destruction
 	M._regionDestructionCounts = M._regionDestructionCounts or {} -- { [regionKey] = count }
 
@@ -38,6 +40,7 @@ if SERVER then
 	function M:GetSaveFile()
 		local map = game.GetMap()
 		map = tostring(map)
+
 		-- sanitize map name for filesystem
 		map = map:gsub("[^%w_%-%.]", "_")
 		return string.format("%s/arcana_mana_state_%s.json", self._saveDir, map)
@@ -120,11 +123,7 @@ if SERVER then
 		end)
 
 		-- Start small
-		if ent.SetCrystalScale then
-			ent:SetCrystalScale(M.Config.crystalMinScale)
-		else
-			ent:SetModelScale(M.Config.crystalMinScale, 0)
-		end
+		ent:SetCrystalScale(M.Config.crystalMinScale)
 
 		return ent
 	end
@@ -162,6 +161,7 @@ if SERVER then
 				local seedGrowth = cfg.crystalSpawnInitialGrowth or cfg.crystalGrowthPerCast or 0
 				ent:AddCrystalGrowth(seedGrowth)
 			end
+
 			-- Reduce hotspot to avoid immediately spawning again
 			h.value = math.max(0, (h.value or 0) - cfg.hotspotSpawnThreshold * 0.75)
 			h.lastSpawn = now
@@ -177,8 +177,6 @@ if SERVER then
 		return tostring(x) .. ":" .. tostring(y)
 	end
 
-	-- Removed: ReportConsumerSourced (environment regen removed)
-
 	-- Find or create a corrupted area entity attached to a region center
 	local function ensureCorruptedArea(key, center)
 		local region = M.regions[key]
@@ -193,12 +191,11 @@ if SERVER then
 		ent:Activate()
 		ent:SetRadius(M.Config.regionRadius)
 		ent:SetIntensity(0)
+
 		M.regions[key] = M.regions[key] or {center = center}
 		M.regions[key].corruptEnt = ent
 		return ent
 	end
-
-	-- Environment regen loop removed
 
 	-- Report crystal destruction to increase corruption in the affected region
 	function M:ReportCrystalDestroyed(crystalEnt)
@@ -255,6 +252,7 @@ if SERVER then
 	function M:SerializeState()
 		local map = game and game.GetMap and game.GetMap() or "unknown_map"
 		local state = {version = 1, map = map, crystals = {}, hotspots = {}, corruption = {}}
+
 		-- Crystals: position, scale, stored mana
 		for _, c in ipairs(ents.FindByClass("arcana_mana_crystal")) do
 			if IsValid(c) then
@@ -264,11 +262,13 @@ if SERVER then
 				}
 			end
 		end
+
 		-- Hotspots: pos, value
 		for i = 1, #self.hotspots do
 			local h = self.hotspots[i]
 			state.hotspots[#state.hotspots + 1] = {pos = encodeVector(h.pos), value = tonumber(h.value) or 0}
 		end
+
 		-- Corruption areas: center, intensity
 		for key, reg in pairs(self.regions) do
 			local e = reg and reg.corruptEnt
@@ -306,11 +306,13 @@ if SERVER then
 		local center = decodeVector(entry.center or {})
 		local e = ents.Create("arcana_corrupted_area")
 		if not IsValid(e) then return end
+
 		e:SetPos(center)
 		e:Spawn()
 		e:Activate()
 		e:SetRadius(M.Config.regionRadius)
 		e:SetIntensity(math.Clamp(tonumber(entry.intensity) or 0, 0, 2))
+
 		local key = regionKey(center, M.Config.regionRadius)
 		M.regions[key] = M.regions[key] or {center = center}
 		M.regions[key].corruptEnt = e
@@ -319,31 +321,38 @@ if SERVER then
 	function M:LoadState()
 		local savePath = self:GetSaveFile()
 		if not file.Exists(savePath, "DATA") then return false end
+
 		local raw = file.Read(savePath, "DATA") or "{}"
 		local ok, data = pcall(util.JSONToTable, raw)
 		if not ok or not istable(data) then return false end
+
 		-- Guard: ensure the stored map matches current map (in case of manual copy)
 		local curMap = (game and game.GetMap and game.GetMap()) or "unknown_map"
 		if isstring(data.map) and data.map ~= curMap then
 			return false
 		end
+
 		-- Clear current tracking tables
 		self.hotspots = {}
 		self.regions = {}
+
 		-- Restore hotspots
 		for _, h in ipairs(data.hotspots or {}) do
 			local pos = decodeVector(h.pos or {})
 			local value = tonumber(h.value) or 0
 			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, touched = CurTime()}
 		end
+
 		-- Restore crystals
 		for _, c in ipairs(data.crystals or {}) do
 			spawnCrystalRestored(c)
 		end
+
 		-- Restore corruption areas
 		for _, ca in ipairs(data.corruption or {}) do
 			spawnCorruptionRestored(ca)
 		end
+
 		return true
 	end
 
