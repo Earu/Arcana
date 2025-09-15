@@ -280,21 +280,11 @@ if CLIENT then
 
 	local MAX_RENDER_DIST = 2000 * 2000
 	function ENT:Initialize()
-		-- Fade-in setup
-		self._spawnFadeStart = SysTime()
-		self._spawnFadeDur = 1
 		self._origColor = self:GetColor() or Color(255, 255, 255)
 
 		-- Particle FX state
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
 		self._fxNextAbsorb = 0
-	end
-
-	function ENT:_GetSpawnFadeFrac()
-		if not self._spawnFadeStart then return 1 end
-		local d = self._spawnFadeDur or 0.5
-		if d <= 0 then return 1 end
-		return math.Clamp((SysTime() - self._spawnFadeStart) / d, 0, 1)
 	end
 
 	function ENT:OnRemove()
@@ -316,6 +306,7 @@ if CLIENT then
 
 	function ENT:_SpawnAbsorbParticles()
 		if not self._fxEmitter then return end
+
 		local center = getCorePos(self)
 		local radius = math.max(48, (self:GetAbsorbRadius() or 300) * 0.6)
 		local rate = self:GetAbsorbRate() or 10
@@ -331,6 +322,7 @@ if CLIENT then
 				p:SetStartSize(math.Rand(3, 6))
 				p:SetEndSize(0)
 				p:SetDieTime(math.Rand(0.5, 0.9))
+
 				local vel = (center - pos):GetNormalized() * math.Rand(80, 160)
 				p:SetVelocity(vel)
 				p:SetAirResistance(60)
@@ -343,11 +335,6 @@ if CLIENT then
 	end
 
 	function ENT:Think()
-		-- complete fade tracking once done
-		if self._spawnFadeStart and self:_GetSpawnFadeFrac() >= 1 then
-			self._spawnFadeStart = nil
-		end
-
 		if self._fxEmitter then
 			self._fxEmitter:SetPos(self:GetPos())
 		end
@@ -365,10 +352,7 @@ if CLIENT then
 	end
 
 	function ENT:Draw()
-		local fadeFrac = self._GetSpawnFadeFrac and self:_GetSpawnFadeFrac() or 1
-		if fadeFrac >= 1 then
-			self:DrawModel()
-		end
+		self:DrawModel()
 
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
 
@@ -379,38 +363,39 @@ if CLIENT then
 			dl.r = curColor.r
 			dl.g = curColor.g
 			dl.b = curColor.b
-			dl.brightness = 6 * (self._GetSpawnFadeFrac and self:_GetSpawnFadeFrac() or 1)
+			dl.brightness = 6
 			dl.Decay = 100
 			dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
 			dl.DieTime = CurTime() + 0.1
 		end
 	end
 
+	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
+	local render_GetScreenEffectTexture = _G.render.GetScreenEffectTexture
+	local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
+	local render_MaterialOverride = _G.render.MaterialOverride
+	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
+	local render_SetMaterial = _G.render.SetMaterial
 	function ENT:DrawTranslucent()
+		if not SHADER_MAT then return end
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
-
-		if not SHADER_MAT then
-			self:DrawModel()
-			return
-		end
 
 		-- draw only the refractive passes (skip solid base draw to avoid overbright)
 		local PASSES = 4 -- try 3–6
 		local baseDisp = 0.5 -- your $c0_x base
-		local perPassOpacity = (1 / PASSES) * (self._GetSpawnFadeFrac and self:_GetSpawnFadeFrac() or 1)
+		local perPassOpacity = (1 / PASSES)
 
 		-- start from current screen
-		render.UpdateScreenEffectTexture()
-		local scr = render.GetScreenEffectTexture()
+		render_UpdateScreenEffectTexture()
+		local scr = render_GetScreenEffectTexture()
 		SHADER_MAT:SetTexture("$basetexture", scr)
 
 		local curColor = self:GetColor()
 		SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 3)
 		SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 3)
 		SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 3)
-		-- self.ShaderMat:SetFloat("$c2_x", CurTime()) -- animate grain
 
-		render.OverrideDepthEnable(true, true) -- no Z write
+		render_OverrideDepthEnable(true, true) -- no Z write
 
 		for i = 1, PASSES do
 			-- ramp dispersion a bit each pass
@@ -418,14 +403,14 @@ if CLIENT then
 			-- reduce opacity per pass
 			SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
 
-			render.MaterialOverride(SHADER_MAT)
+			render_MaterialOverride(SHADER_MAT)
 			self:DrawModel()
-			render.MaterialOverride()
+			render_MaterialOverride()
 
 			-- capture the result to feed into next pass
-			render.CopyRenderTargetToTexture(scr)
+			render_CopyRenderTargetToTexture(scr)
 		end
 
-		render.OverrideDepthEnable(false, false)
+		render_OverrideDepthEnable(false, false)
 	end
 end
