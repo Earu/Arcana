@@ -524,7 +524,7 @@ if CLIENT then
 			local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
 
 			if SHADER_MAT and EyePos():DistToSqr(self:GetPos()) <= MAX_RENDER_DIST then
-				local maxAlpha = 1
+				local maxAlpha = 0.75
 				local BASE_DISP = 1.0
 
 				cam_Start2D()
@@ -536,7 +536,7 @@ if CLIENT then
 					SHADER_MAT:SetFloat("$c1_x", 1)
 					SHADER_MAT:SetFloat("$c2_x", CurTime()) -- animate grain
 
-					local PASSES = 4
+					local PASSES = 1
 					local perPassOpacity = (maxAlpha * s) / PASSES
 					for i = 1, PASSES do
 						-- ramp dispersion a bit each pass
