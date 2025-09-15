@@ -417,7 +417,7 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	hook.Add("ShaderMounted", "corruption_dispersion_sphere", function()
+	--[[hook.Add("ShaderMounted", "corruption_dispersion_sphere", function()
 		SHADER_MAT = CreateShaderMaterial("corruption_dispersion_sphere", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$c0_x"] = 3.0, -- dispersion strength
@@ -429,12 +429,12 @@ if CLIENT then
 			["$c2_y"] = 12, -- NOISE_SCALE
 			["$c2_z"] = 0.6, -- GRAIN_STRENGTH
 			["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
-			["$c3_x"] = 0.25, -- THICKNESS_SCALE
+			["$c3_x"] = 0.15, -- THICKNESS_SCALE
 			["$c3_y"] = 20, -- FACET_QUANT
 			["$c3_z"] = 50, -- BOUNCE_FADE
 			["$c3_w"] = 1, -- BOUNCE_STEPS (1..4)
 		})
-	end)
+	end)]]
 
 	-- Invisible material used to write to the stencil buffer
 	local INVISIBLE_MAT = CreateMaterial("arcana_corruption_stencil", "UnlitGeneric", {
@@ -500,6 +500,7 @@ if CLIENT then
 		end
 	end
 
+	local MAX_RENDER_DIST = 4000 * 4000
 	function ENT:_DrawCorruption()
 		self:_DrawSphere(function()
 			local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
@@ -507,7 +508,10 @@ if CLIENT then
 			local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
 			local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
 
-			if SHADER_MAT then
+			if SHADER_MAT and EyePos():DistToSqr(self:GetPos()) <= MAX_RENDER_DIST then
+				local maxAlpha = 1
+				local BASE_DISP = 1.0
+
 				cam.Start2D()
 					render.UpdateScreenEffectTexture()
 					local scr = render.GetScreenEffectTexture()
@@ -517,11 +521,8 @@ if CLIENT then
 					SHADER_MAT:SetFloat("$c1_x", 1)
 					SHADER_MAT:SetFloat("$c2_x", CurTime()) -- animate grain
 
-					local PASSES = 10
-					local BASE_DISP = 1.0
-					local maxAlpha = 1
+					local PASSES = 4
 					local perPassOpacity = (maxAlpha * s) / PASSES
-
 					for i = 1, PASSES do
 						-- ramp dispersion a bit each pass
 						SHADER_MAT:SetFloat("$c0_x", BASE_DISP * (1 + 0.25 * (i - 1)))

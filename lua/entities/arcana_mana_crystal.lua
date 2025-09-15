@@ -242,7 +242,7 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	hook.Add("ShaderMounted", "arcana_crystal_dispersion", function()
+	--[[hook.Add("ShaderMounted", "arcana_crystal_dispersion", function()
 		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
@@ -268,7 +268,7 @@ if CLIENT then
 			["$c3_z"] = 8, -- BOUNCE_FADE
 			["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
 		})
-	end)
+	end)]]
 
 	local MAX_RENDER_DIST = 2000 * 2000
 	function ENT:Initialize()
