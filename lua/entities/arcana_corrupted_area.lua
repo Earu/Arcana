@@ -536,7 +536,7 @@ if CLIENT then
 					SHADER_MAT:SetFloat("$c1_x", 1)
 					SHADER_MAT:SetFloat("$c2_x", CurTime()) -- animate grain
 
-					local PASSES = 1
+					local PASSES = 4
 					local perPassOpacity = (maxAlpha * s) / PASSES
 					for i = 1, PASSES do
 						-- ramp dispersion a bit each pass
