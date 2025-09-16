@@ -60,7 +60,7 @@ function ENT:GetMaxHealthFromScale()
 	return minHP + (maxHP - minHP) * t
 end
 
-function ENT:_OnScaleChanged(_)
+function ENT:_OnScaleChanged()
 	if SERVER then
 		local newMax = math.floor(self:GetMaxHealthFromScale())
 		self._maxHealth = newMax
@@ -158,7 +158,6 @@ if SERVER then
 		for i = 1, count do
 			SpawnShard(self, amountPerShard, dir, crystalPos)
 		end
-		self:EmitSound("physics/glass/glass_impact_bullet4.wav", 60, 130)
 	end
 
 	function ENT:_Shatter()
@@ -195,6 +194,8 @@ if SERVER then
 		local attacker = dmginfo:GetAttacker()
 		local crystalPos = self:WorldSpaceCenter()
 		if IsValid(attacker) and attacker:IsPlayer() then
+			self:EmitSound("physics/glass/glass_impact_bullet4.wav", 60, 130)
+
 			local tr = attacker:GetEyeTrace()
 			crystalPos = tr.Entity == self and tr.HitPos or crystalPos
 			dir = -(crystalPos - attacker:WorldSpaceCenter())
