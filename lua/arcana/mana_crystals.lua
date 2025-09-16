@@ -187,7 +187,6 @@ if SERVER then
 		if not IsValid(ent) then return nil end
 		ent:SetPos(center)
 		ent:Spawn()
-		ent:Activate()
 		ent:SetRadius(M.Config.regionRadius)
 		ent:SetIntensity(0)
 
@@ -308,7 +307,6 @@ if SERVER then
 
 		e:SetPos(center)
 		e:Spawn()
-		e:Activate()
 		e:SetRadius(M.Config.regionRadius)
 		e:SetIntensity(math.Clamp(tonumber(entry.intensity) or 0, 0, 2))
 

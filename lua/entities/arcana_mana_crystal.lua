@@ -37,8 +37,11 @@ function ENT:_ApplyScale(scale)
 	self._minScale = self._minScale or 0.35
 	self._maxScale = self._maxScale or 2.2
 	local s = math.Clamp(tonumber(scale) or 1, self._minScale, self._maxScale)
-	self:SetModelScale(s)
-	self:Activate()
+
+	if SERVER then
+		self:SetModelScale(s)
+		self:Activate()
+	end
 
 	-- adjust absorb radius with size subtly
 	if self.SetAbsorbRadius then
@@ -226,8 +229,6 @@ if SERVER then
 		self:SetCrystalScale(target)
 		self:EmitSound("buttons/blip1.wav", 55, 140)
 	end
-
-	-- Stored mana mechanics removed: crystals no longer hold/deplete mana
 
 	-- Register into the ManaNetwork on spawn
 	function ENT:OnRemove()
