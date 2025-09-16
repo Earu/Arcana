@@ -168,6 +168,7 @@ if CLIENT then
 
     function ENT:Draw()
         local pos = self:GetPos()
+        local base = pos + Vector(0, 0, 6)
         local telegraphEnd = self:GetTelegraphTime()
         local now = CurTime()
         local r = math.max(24, self:GetRadius() or 240)
