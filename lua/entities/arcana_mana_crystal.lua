@@ -21,6 +21,7 @@ function ENT:SetupDataTables()
 
 	-- Apply model scaling whenever CrystalScale changes (both realms)
 	self:NetworkVarNotify("CrystalScale", function(ent, name, old, new)
+		if old == new then return end
 		if ent._ApplyScale then
 			ent:_ApplyScale(new)
 		end

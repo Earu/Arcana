@@ -107,7 +107,6 @@ if SERVER then
 		ent:SetPos(pos + (normal or vector_up) * 4)
 		ent:SetAngles(Angle(0, math.random(0, 359), 0))
 		ent:Spawn()
-		ent:Activate()
 		ent:DropToFloor()
 
 		local snd = CreateSound(ent, "ambient/levels/labs/teleport_winddown1.wav")
