@@ -22,6 +22,8 @@ if SERVER then
 	util.AddNetworkString("Arcana_Enchanter_ApplyBatch")
 	util.AddNetworkString("Arcana_Enchanter_ParticleBurst")
 
+	resource.AddFile("materials/entities/arcana_enchanter.png")
+
 	local function SendEnchantBurst(ent)
 		if not IsValid(ent) then return end
 		net.Start("Arcana_Enchanter_ParticleBurst", true)
