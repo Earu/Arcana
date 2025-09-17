@@ -489,11 +489,6 @@ if CLIENT then
 			local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
 			local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
 
-			if _G.RenderChromaticAberration then
-				local mul = 20 * s
-				RenderChromaticAberration(8 * mul, 4 * mul, 0 * mul, 4 * mul, 2 * mul, 0 * mul, 1, 1, 1)
-			end
-
 			-- Compute post-process values from s: moderate contrast, clear desaturation, slight darken
 			local cm = {
 				["$pp_colour_addr"] = 0,
