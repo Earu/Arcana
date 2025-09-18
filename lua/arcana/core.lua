@@ -1480,6 +1480,7 @@ if CLIENT then
 		local duration = net.ReadFloat()
 		local count = net.ReadUInt(8)
 		if not IsValid(ent) or not BandCircle then return end
+
 		local bc = BandCircle.Create(ent:WorldSpaceCenter(), ent:GetAngles(), color, size, duration)
 		if not bc then return end
 
@@ -1500,10 +1501,10 @@ if CLIENT then
 
 		-- Read optional tag after band list
 		local tag = net.ReadString() or ""
+
 		-- Follow entity for duration
 		local hookName = "BandCircleFollow_" .. tostring(bc)
-
-		hook.Add("Think", hookName, function()
+		hook.Add("PostDrawOpaqueRenderables", hookName, function()
 			if not IsValid(ent) or not bc or not bc.isActive then
 				bc:Remove()
 				hook.Remove("Think", hookName)
