@@ -4,9 +4,10 @@ ENT.PrintName = "Fireball"
 ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false
+
 -- Tunables
 ENT.FireballSpeed = 900
-ENT.FireballRadius = 300
+ENT.FireballRadius = 150
 ENT.FireballDamage = 120
 ENT.FireballIgniteTime = 5
 ENT.MaxLifetime = 6
@@ -58,7 +59,7 @@ if SERVER then
 		addSprite(self, "sprites/light_glow02_add.vmt", Color(255, 140, 60), 0.6, "ArcanaFB_S2")
 		self.Created = CurTime()
 
-		timer.Simple(self.MaxLifetime or 6, function()
+		timer.Simple(self.MaxLifetime, function()
 			if IsValid(self) and not self._detonated then
 				self:Detonate()
 			end
@@ -69,7 +70,7 @@ if SERVER then
 		local phys = self:GetPhysicsObject()
 
 		if IsValid(phys) then
-			phys:SetVelocity(dir:GetNormalized() * (self.FireballSpeed or 900))
+			phys:SetVelocity(dir:GetNormalized() * self.FireballSpeed)
 		end
 	end
 
@@ -110,11 +111,11 @@ if SERVER then
 
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.FireballRadius or 180, self.FireballDamage or 60)
+		util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.FireballRadius, self.FireballDamage)
 
-		for _, v in ipairs(ents.FindInSphere(pos, self.FireballRadius or 180)) do
+		for _, v in ipairs(ents.FindInSphere(pos, self.FireballRadius)) do
 			if IsValid(v) and (v:IsPlayer() or v:IsNPC()) then
-				v:Ignite(self.FireballIgniteTime or 5)
+				v:Ignite(self.FireballIgniteTime)
 			end
 		end
 
