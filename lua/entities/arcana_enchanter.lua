@@ -873,7 +873,7 @@ if CLIENT then
 	end
 
 	local function getEnchantmentsList()
-		return Arcane and Arcane.GetEnchantments and Arcane:GetEnchantments() or {}
+		return Arcane and Arcane.RegisteredEnchantments or {}
 	end
 
 	local function OpenEnchanterMenu(machine)

@@ -125,10 +125,6 @@ function Arcane:RegisterEnchantment(def)
 	return true
 end
 
-function Arcane:GetEnchantments()
-	return Arcane.RegisteredEnchantments or {}
-end
-
 -- Store enchantments on weapon entities directly
 local function ensureEntityEnchantTable(wep)
 	if not IsValid(wep) then return {} end
@@ -139,7 +135,30 @@ end
 
 function Arcane:GetEntityEnchantments(wep)
 	if not IsValid(wep) then return {} end
-	return ensureEntityEnchantTable(wep)
+
+	if SERVER then
+		return ensureEntityEnchantTable(wep)
+	end
+
+	if CLIENT then
+		if istable(wep.ArcanaEnchantments) and wep.ArcanaEnchantmentsNextUpdate and wep.ArcanaEnchantmentsNextUpdate > CurTime() then
+			return wep.ArcanaEnchantments
+		end
+
+		wep.ArcanaEnchantmentsNextUpdate = CurTime() + 0.5
+
+		local appliedSet = {}
+		local json = wep:GetNWString("Arcana_EnchantIds", "[]")
+		local ok, arr = pcall(util.JSONToTable, json)
+		if ok and istable(arr) then
+			for _, id in ipairs(arr) do
+				appliedSet[id] = true
+			end
+		end
+
+		wep.ArcanaEnchantments = appliedSet
+		return wep.ArcanaEnchantments
+	end
 end
 
 function Arcane:HasEntityEnchantment(wep, enchId)
