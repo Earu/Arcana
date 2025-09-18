@@ -1507,7 +1507,7 @@ if CLIENT then
 		hook.Add("PostDrawOpaqueRenderables", hookName, function()
 			if not IsValid(ent) or not bc or not bc.isActive then
 				bc:Remove()
-				hook.Remove("Think", hookName)
+				hook.Remove("PostDrawOpaqueRenderables", hookName)
 
 				return
 			end
