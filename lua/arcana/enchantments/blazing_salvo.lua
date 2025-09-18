@@ -8,6 +8,9 @@ local function attachHook(ply, wep, state)
 		local active = ent:GetActiveWeapon()
 		if not IsValid(active) or active ~= wep then return end
 
+		ply = self:GetOwner() -- refresh player based on wep ownership
+		if not IsValid(ply) then return end
+
 		-- rate limit using state
 		local now = CurTime()
 		state._next = state._next or 0
