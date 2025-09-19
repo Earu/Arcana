@@ -8,9 +8,11 @@
 #define OPACITY             Constants1.y
 // Blend factor for original albedo (from $texture1). 0=no albedo, 1=full albedo
 #define ALBEDO_BLEND        Constants1.z
+// Self-illumination intensity scale
+#define SELFILLUM_STRENGTH  Constants1.w
 
 // Extra controls
-#define NOISE_TIME          Constants2.x
+#define TIME                Constants2.x
 #define NOISE_SCALE         Constants2.y
 #define GRAIN_STRENGTH      Constants2.z
 #define SPARKLE_STRENGTH    Constants2.w
@@ -20,6 +22,8 @@
 #define FACET_QUANT         Constants3.y   // e.g. 6..24, snaps normals
 #define BOUNCE_FADE         Constants3.z   // 0..1 weight decay
 #define BOUNCE_STEPS        Constants3.w   // 1..4 effective steps
+
+#define TWO_PI 6.2831853
 
 struct PS_IN
 {
@@ -78,8 +82,8 @@ float4 main(PS_IN i) : COLOR
 
 	float f = fresnelTerm(n, viewDir, max(FRESNEL_POWER, 0.5));
 
-	// Grain (animated)
-	float g = noise2(screen * max(NOISE_SCALE, 0.1) + NOISE_TIME * 0.5);
+	// Grain (static; no time animation)
+	float g = noise2(screen * max(NOISE_SCALE, 0.1));
 	float grain = lerp(1.0 - GRAIN_STRENGTH, 1.0 + GRAIN_STRENGTH, g);
 
 	// Multi-bounce refractive walk in screen space with facetized normals
@@ -135,15 +139,15 @@ float4 main(PS_IN i) : COLOR
 	finalCol *= (0.2 + 0.8 * f);
 
 	// Sample original material/albedo from $texture1 using mesh UVs
-	float3 albedo = tex2D(Tex1, i.uv).rgb;
+	float3 albedo = tex2D(Tex1, i.uv).rgb * tint;
 	// Blend albedo more in the center, keep dispersion on edges (Fresnel)
 	float albedoMix = saturate(ALBEDO_BLEND) * (1.0 - f);
 	finalCol = lerp(finalCol, albedo, albedoMix);
 
-	// Sparkles: rarity driven by noise threshold and view alignment
-	float sparkleMask = step(0.85, noise2(screen * (NOISE_SCALE * 0.5) + NOISE_TIME * 0.8));
-	float sparkleFacing = pow(saturate(1.0 - abs(dot(n, viewDir))), 8.0);
-	finalCol += sparkleMask * sparkleFacing * SPARKLE_STRENGTH;
+	// Self-illumination driven by sine (replicates VMT Sine proxy behavior)
+	// Uses TIME as time source; period ~2.5s (matches your VMT example)
+	float osc = 0.5 + 0.5 * sin(TIME * (TWO_PI / 2.5));
+	finalCol += albedo * (osc * saturate(SELFILLUM_STRENGTH));
 
 	float alpha = saturate(OPACITY) * (0.2 + 0.8 * f) * i.color.a;
 	return float4(finalCol, alpha);

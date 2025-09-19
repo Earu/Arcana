@@ -263,6 +263,7 @@ if CLIENT then
 			["$c1_x"] = 3, -- tint b
 			["$c1_y"] = 1, -- opacity
 			["$c1_z"] = 0.75, -- albedo blend
+			["$c1_w"] = 1.0, -- selfillum glow strength
 
 			-- Defaults for grain/sparkles and facet multi-bounce
 			["$c2_y"] = 12, -- NOISE_SCALE
@@ -282,6 +283,8 @@ if CLIENT then
 	end
 
 	local MAX_RENDER_DIST = 2000 * 2000
+	local RENDER_MAX_DIST = 2000
+	local FADE_WINDOW = 600
 	function ENT:Initialize()
 		self._origColor = self:GetColor() or Color(255, 255, 255)
 
@@ -360,28 +363,42 @@ if CLIENT then
 	local render_MaterialOverride = _G.render.MaterialOverride
 	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
 	function ENT:Draw()
-		local albedoFactor = 0.75 * (1 - EyePos():DistToSqr(self:GetPos()) / MAX_RENDER_DIST)
-		local isFar = EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST
+		local distSqr = EyePos():DistToSqr(self:GetPos())
+		local dist = math.sqrt(distSqr)
+		local albedoFactor = 0.75 * (1 - distSqr / MAX_RENDER_DIST)
+		local isFar = dist > RENDER_MAX_DIST
+		local fade = 1
+		if dist > (RENDER_MAX_DIST - FADE_WINDOW) then
+			fade = math.Clamp(1 - (dist - (RENDER_MAX_DIST - FADE_WINDOW)) / FADE_WINDOW, 0, 1)
+		end
 
 		if SHADER_MAT then
 			if isFar then
 				self:DrawModel()
 			else
-				-- draw only the refractive passes (skip solid base draw to avoid overbright)
+				-- draw base model underneath at a low alpha to unify color
+				local baseUnderAlpha = 0.99 * fade
+				if baseUnderAlpha > 0 then
+					render.SetBlend(baseUnderAlpha)
+					self:DrawModel()
+					render.SetBlend(1)
+				end
+
+				-- draw refractive passes with distance-based fade
 				local PASSES = 4 -- try 3–6
-				local baseDisp = 0.5 -- your $c0_x base
-				local perPassOpacity = (1 / PASSES)
+				local baseDisp = 0.5 * (0.6 + 0.4 * fade)
+				local perPassOpacity = (1 / PASSES) * fade
 
 				-- start from current screen
 				render_UpdateScreenEffectTexture()
 				local scr = render_GetScreenEffectTexture()
 				SHADER_MAT:SetTexture("$basetexture", scr)
-				-- SHADER_MAT:SetFloat("$c2_x", CurTime())
+				SHADER_MAT:SetFloat("$c2_x", RealTime())
 
 				local curColor = self:GetColor()
-				SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 3)
-				SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 3)
-				SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 3)
+				SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 1.5)
+				SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 1.5)
+				SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 1.5)
 				SHADER_MAT:SetFloat("$c1_z", albedoFactor)
 
 				render_OverrideDepthEnable(true, true) -- no Z write
@@ -401,6 +418,13 @@ if CLIENT then
 				end
 
 				render_OverrideDepthEnable(false, false)
+
+				-- crossfade in the base model as shader fades out
+				if fade < 1 then
+					render.SetBlend(1 - fade)
+					self:DrawModel()
+					render.SetBlend(1)
+				end
 			end
 		else
 			self:DrawModel()
