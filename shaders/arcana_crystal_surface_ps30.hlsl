@@ -6,6 +6,8 @@
 #define TINT_G              Constants0.w
 #define TINT_B              Constants1.x
 #define OPACITY             Constants1.y
+// Blend factor for original albedo (from $texture1). 0=no albedo, 1=full albedo
+#define ALBEDO_BLEND        Constants1.z
 
 // Extra controls
 #define NOISE_TIME          Constants2.x
@@ -131,6 +133,12 @@ float4 main(PS_IN i) : COLOR
 	float3 tint = float3(TINT_R, TINT_G, TINT_B);
 	float3 finalCol = lerp(dispersed, dispersed * tint, 0.5);
 	finalCol *= (0.2 + 0.8 * f);
+
+	// Sample original material/albedo from $texture1 using mesh UVs
+	float3 albedo = tex2D(Tex1, i.uv).rgb;
+	// Blend albedo more in the center, keep dispersion on edges (Fresnel)
+	float albedoMix = saturate(ALBEDO_BLEND) * (1.0 - f);
+	finalCol = lerp(finalCol, albedo, albedoMix);
 
 	// Sparkles: rarity driven by noise threshold and view alignment
 	float sparkleMask = step(0.85, noise2(screen * (NOISE_SCALE * 0.5) + NOISE_TIME * 0.8));
