@@ -249,6 +249,7 @@ if CLIENT then
 		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
+			["$texture1"] = "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge",
 			["$model"] = 1,
 			["$vertexnormal"] = 1,
 			["$softwareskin"] = 1,
@@ -261,6 +262,7 @@ if CLIENT then
 			["$c0_w"] = 0.5, -- tint g
 			["$c1_x"] = 3, -- tint b
 			["$c1_y"] = 1, -- opacity
+			["$c1_z"] = 0.75, -- albedo blend
 
 			-- Defaults for grain/sparkles and facet multi-bounce
 			["$c2_y"] = 12, -- NOISE_SCALE
@@ -352,66 +354,74 @@ if CLIENT then
 		return true
 	end
 
-	function ENT:Draw()
-		self:DrawModel()
-
-		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
-
-		local curColor = self:GetColor()
-		local dl = DynamicLight(self:EntIndex())
-		if dl then
-			dl.pos = self:GetPos() + Vector(0, 0, 50)
-			dl.r = curColor.r
-			dl.g = curColor.g
-			dl.b = curColor.b
-			dl.brightness = 6
-			dl.Decay = 100
-			dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
-			dl.DieTime = CurTime() + 0.1
-		end
-	end
-
 	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
 	local render_GetScreenEffectTexture = _G.render.GetScreenEffectTexture
 	local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
 	local render_MaterialOverride = _G.render.MaterialOverride
 	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
-	local render_SetMaterial = _G.render.SetMaterial
-	function ENT:DrawTranslucent()
-		if not SHADER_MAT then return end
-		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+	function ENT:Draw()
+		local albedoFactor = 0.75 * (1 - EyePos():DistToSqr(self:GetPos()) / MAX_RENDER_DIST)
+		local isFar = EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST
 
-		-- draw only the refractive passes (skip solid base draw to avoid overbright)
-		local PASSES = 4 -- try 3–6
-		local baseDisp = 0.5 -- your $c0_x base
-		local perPassOpacity = (1 / PASSES)
+		if SHADER_MAT then
+			if isFar then
+				self:DrawModel()
+			else
+				-- draw only the refractive passes (skip solid base draw to avoid overbright)
+				local PASSES = 4 -- try 3–6
+				local baseDisp = 0.5 -- your $c0_x base
+				local perPassOpacity = (1 / PASSES)
 
-		-- start from current screen
-		render_UpdateScreenEffectTexture()
-		local scr = render_GetScreenEffectTexture()
-		SHADER_MAT:SetTexture("$basetexture", scr)
+				-- start from current screen
+				render_UpdateScreenEffectTexture()
+				local scr = render_GetScreenEffectTexture()
+				SHADER_MAT:SetTexture("$basetexture", scr)
+				-- SHADER_MAT:SetFloat("$c2_x", CurTime())
 
-		local curColor = self:GetColor()
-		SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 3)
-		SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 3)
-		SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 3)
+				local curColor = self:GetColor()
+				SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 3)
+				SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 3)
+				SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 3)
+				SHADER_MAT:SetFloat("$c1_z", albedoFactor)
 
-		render_OverrideDepthEnable(true, true) -- no Z write
+				render_OverrideDepthEnable(true, true) -- no Z write
 
-		for i = 1, PASSES do
-			-- ramp dispersion a bit each pass
-			SHADER_MAT:SetFloat("$c0_x", baseDisp * (1 + 0.25 * (i - 1)))
-			-- reduce opacity per pass
-			SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
+				for i = 1, PASSES do
+					-- ramp dispersion a bit each pass
+					SHADER_MAT:SetFloat("$c0_x", baseDisp * (1 + 0.25 * (i - 1)))
+					-- reduce opacity per pass
+					SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
 
-			render_MaterialOverride(SHADER_MAT)
+					render_MaterialOverride(SHADER_MAT)
+					self:DrawModel()
+					render_MaterialOverride()
+
+					-- capture the result to feed into next pass
+					render_CopyRenderTargetToTexture(scr)
+				end
+
+				render_OverrideDepthEnable(false, false)
+			end
+		else
 			self:DrawModel()
-			render_MaterialOverride()
-
-			-- capture the result to feed into next pass
-			render_CopyRenderTargetToTexture(scr)
 		end
 
-		render_OverrideDepthEnable(false, false)
+		if not isFar then
+			local curColor = self:GetColor()
+			local dl = DynamicLight(self:EntIndex())
+			if dl then
+				dl.pos = self:GetPos() + Vector(0, 0, 50)
+				dl.r = curColor.r
+				dl.g = curColor.g
+				dl.b = curColor.b
+				dl.brightness = 6
+				dl.Decay = 100
+				dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
+				dl.DieTime = CurTime() + 0.1
+			end
+		end
+	end
+
+	function ENT:DrawTranslucent()
 	end
 end
