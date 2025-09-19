@@ -249,7 +249,7 @@ if CLIENT then
 		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
-			["$texture1"] = "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge",
+			--["$texture1"] = "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge",
 			["$model"] = 1,
 			["$vertexnormal"] = 1,
 			["$softwareskin"] = 1,
@@ -365,7 +365,6 @@ if CLIENT then
 	function ENT:Draw()
 		local distSqr = EyePos():DistToSqr(self:GetPos())
 		local dist = math.sqrt(distSqr)
-		local albedoFactor = 0.75 * (1 - distSqr / MAX_RENDER_DIST)
 		local isFar = dist > RENDER_MAX_DIST
 		local fade = 1
 		if dist > (RENDER_MAX_DIST - FADE_WINDOW) then
@@ -376,8 +375,10 @@ if CLIENT then
 			if isFar then
 				self:DrawModel()
 			else
+				render_OverrideDepthEnable(true, true) -- no Z write
+
 				-- draw base model underneath at a low alpha to unify color
-				local baseUnderAlpha = 0.99 * fade
+				local baseUnderAlpha = 0.9 * fade
 				if baseUnderAlpha > 0 then
 					render.SetBlend(baseUnderAlpha)
 					self:DrawModel()
@@ -394,14 +395,13 @@ if CLIENT then
 				local scr = render_GetScreenEffectTexture()
 				SHADER_MAT:SetTexture("$basetexture", scr)
 				SHADER_MAT:SetFloat("$c2_x", RealTime())
+				SHADER_MAT:SetFloat("$c1_w", 0.25)
 
 				local curColor = self:GetColor()
 				SHADER_MAT:SetFloat("$c0_z", curColor.r / 255 * 1.5)
 				SHADER_MAT:SetFloat("$c0_w", curColor.g / 255 * 1.5)
 				SHADER_MAT:SetFloat("$c1_x", curColor.b / 255 * 1.5)
-				SHADER_MAT:SetFloat("$c1_z", albedoFactor)
-
-				render_OverrideDepthEnable(true, true) -- no Z write
+				SHADER_MAT:SetFloat("$c1_z", 0)
 
 				for i = 1, PASSES do
 					-- ramp dispersion a bit each pass
