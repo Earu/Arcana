@@ -128,7 +128,8 @@ if SERVER then
 		local path = "shaders/fxc/" .. shaderName .. ".vcs"
 
 		if not file.Exists(path, "MOD") then
-			error("Missing shader file: " .. path)
+			ErrorNoHalt("Missing shader file: " .. path .. "\n")
+			return
 		end
 
 		shaderFiles[shaderName] = path
