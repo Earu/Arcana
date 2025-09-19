@@ -7,7 +7,7 @@ Arcane:RegisterSpell({
 	knowledge_cost = 10,
 	cooldown = 60,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 1e6,
+	cost_amount = 750000,
 	cast_time = 6,
 	range = 0,
 	icon = "icon16/brick.png",
