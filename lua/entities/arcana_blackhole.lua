@@ -54,7 +54,7 @@ function ENT:Think()
 					if IsValid(physObj) then
 						physObj:ApplyForceCenter(direction * pullStrength * physObj:GetMass())
 
-						if not ent:IsPlayer() then
+						if not ent:IsPlayer() and ent:GetClass():match("^prop%_") then
 							ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 						end
 					end
@@ -67,7 +67,7 @@ function ENT:Think()
 					end
 
 					-- If too close to center, remove/kill the entity
-					if distance < 20 and (ent:IsPlayer() or ent:IsNPC()) then
+					if distance < 200 and (ent:IsPlayer() or ent:IsNPC()) then
 						local dmg = DamageInfo()
 						dmg:SetDamage(2e6)
 						dmg:SetDamageType(DMG_BLAST)
