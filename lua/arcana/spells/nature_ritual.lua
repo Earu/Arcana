@@ -231,6 +231,11 @@ Arcane:RegisterRitualSpell({
 	cost_amount = 10000,
 	cast_time = 10.0,
 	ritual_color = Color(0, 99, 0),
+	ritual_items = {
+		banana = 20,
+		melon = 20,
+		orange = 20
+	},
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
 
