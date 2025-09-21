@@ -25,7 +25,7 @@ local function playAegisVFX(ply)
 	-- Multi-ring band similar to arcane_barrier, scaled to player bounds
 	Arcane:ClearBandVFX(ply, "duelist_aegis_fx")
 	local r = math.max(ply:OBBMaxs():Unpack()) * 0.6
-	Arcane:SendAttachBandVFX(ply, Color(120, 200, 255, 255), 28, 2, {
+	Arcane:SendAttachBandVFX(ply, Color(142, 120, 225), 28, 2, {
 		{
 			radius = r * 0.95,
 			height = 6,
@@ -136,5 +136,3 @@ Arcane:RegisterEnchantment({
 	apply = attachHook,
 	remove = detachHook,
 })
-
-
