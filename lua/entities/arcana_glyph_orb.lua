@@ -1,7 +1,7 @@
 AddCSLuaFile()
 ENT.Type = "anim"
 ENT.Base = "base_anim"
-ENT.PrintName = "Glyph Orb"
+ENT.PrintName = "Corrupted Orb"
 ENT.Author = "Arcana"
 ENT.Spawnable = false
 ENT.AdminSpawnable = false

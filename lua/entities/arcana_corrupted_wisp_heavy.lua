@@ -16,6 +16,11 @@ if SERVER then
 	local FIRE_INTERVAL = 2.2
 	local PROJECTILE_SPEED = 520
 	local SEARCH_RADIUS_FACTOR = 0.9 -- use 90% of area radius for targetable range
+	local CHASE_SPEED = 60 -- slower than normal wisps
+	local STANDOFF_MIN = 350 -- prefer to keep far from players
+	local STANDOFF_MAX = 700
+	local STANDOFF_AREA_FRACTION = 0.8 -- cap by area radius
+	local HIGH_ALTITUDE = 260 -- fly high above ground when possible
 	local HEAVY_WISP_XP = 50
 
 	function ENT:Initialize()
@@ -38,6 +43,13 @@ if SERVER then
 		self._nextFire = CurTime() + 1.2
 		self._areaCenter = self._areaCenter or self:GetPos()
 		self._areaRadius = self._areaRadius or 500
+
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:SetMass(0.2)
+			phys:EnableGravity(false)
+			phys:Wake()
+		end
 	end
 
 	function ENT:OnTakeDamage(dmginfo)
@@ -128,23 +140,121 @@ if SERVER then
 		self:EmitSound("weapons/physcannon/energy_sing_flyby1.wav", 65, 90)
 	end
 
-	function ENT:Think()
+	local function isValidEnemy(ply)
+		return IsValid(ply) and ply:IsPlayer() and ply:Alive()
+	end
+
+	function ENT:_PickTarget()
 		local now = CurTime()
+		if now < (self._lastTargetCheck or 0) then return end
+		self._lastTargetCheck = now + 0.3
+		local myPos = self:GetPos()
+		local nearest, nd2 = nil, math.huge
+
+		for _, ply in ipairs(player.GetAll()) do
+			if isValidEnemy(ply) then
+				local d2 = myPos:DistToSqr(ply:GetPos())
+				if d2 < nd2 then
+					nearest, nd2 = ply, d2
+				end
+			end
+		end
+
+		if IsValid(nearest) then
+			local center = self._areaCenter or self:GetPos()
+			local r = self._areaRadius or 500
+			if nearest:GetPos():DistToSqr(center) <= r * r then
+				self._target = nearest
+			else
+				self._target = nil
+			end
+		else
+			self._target = nil
+		end
+	end
+
+	function ENT:_Chase(dt)
 		local center = self._areaCenter or self:GetPos()
 		local r = self._areaRadius or 500
-		-- Drift slightly but mostly static
-		if not self._anchor then
-			self._anchor = Vector(self:GetPos())
+		local myPos = self:GetPos()
+
+		-- keep within area bounds
+		if myPos:DistToSqr(center) > r * r then
+			local dir = (center - myPos)
+			local dist = dir:Length()
+			if dist > 1 then
+				dir:Mul(1 / dist)
+			end
+			self:SetPos(myPos + dir * (CHASE_SPEED * 1.1) * dt)
+			self:SetAngles(dir:Angle())
+			return
 		end
-		local drift = Vector(math.sin(now * 0.2), math.cos(now * 0.25), math.sin(now * 0.15)) * 6
-		self:SetPos(self._anchor + drift)
+
+		-- idle hover when no target (prefer high over ground)
+		if not IsValid(self._target) then
+			local tr = util.TraceLine({ start = myPos + Vector(0, 0, 200), endpos = myPos + Vector(0, 0, -10000), filter = self })
+			local desired = Vector(myPos)
+			desired.z = (tr.HitPos.z or myPos.z) + HIGH_ALTITUDE
+			local dz = desired.z - myPos.z
+			local vz = math.Clamp(dz, -1, 1) * (CHASE_SPEED * 0.8)
+			self:SetPos(myPos + Vector(0, 0, vz * dt))
+			-- face roughly towards area center while idling
+			local face = (center - myPos):GetNormalized()
+			self:SetAngles(face:Angle())
+			return
+		end
+
+		-- keep large distance and fly high; no orbiting
+		local targetPos = self._target:EyePos()
+		local trGround = util.TraceLine({ start = targetPos + Vector(0, 0, 600), endpos = targetPos + Vector(0, 0, -10000), filter = self })
+		local desiredZ = (trGround.HitPos.z or targetPos.z) + HIGH_ALTITUDE
+		local standoff = math.Clamp((self._areaRadius or 500) * STANDOFF_AREA_FRACTION, STANDOFF_MIN, STANDOFF_MAX)
+
+		local toTarget = targetPos - myPos
+		local horiz = Vector(toTarget.x, toTarget.y, 0)
+		local distH = horiz:Length()
+		local move = Vector(0, 0, 0)
+		local speed = CHASE_SPEED
+
+		if distH > 1 then horiz:Mul(1 / distH) end
+		-- horizontal control: move towards/away to maintain standoff, no strafing
+		if distH < (standoff - 30) then
+			move = move - horiz * speed -- move directly away
+		elseif distH > (standoff + 60) then
+			move = move + horiz * (speed * 0.75) -- close in slowly
+		end
+
+		-- vertical control: go to desiredZ
+		local dz = desiredZ - myPos.z
+		if math.abs(dz) > 6 then
+			move = move + Vector(0, 0, math.Clamp(dz, -1, 1) * speed)
+		end
+
+		-- apply movement if any
+		local mvLen = move:Length()
+		if mvLen > 0 then
+			move:Mul(1 / mvLen)
+			self:SetPos(myPos + move * speed * dt)
+		end
+		-- face towards the player
+		local face = (self._target:WorldSpaceCenter() - self:WorldSpaceCenter()):GetNormalized()
+		self:SetAngles(face:Angle())
+	end
+
+	function ENT:Think()
+		local now = CurTime()
+		local dt = math.Clamp(now - (self._lastThink or now), 0, 0.2)
+		self._lastThink = now
+
+		self:_PickTarget()
+		self:_Chase(dt)
 
 		if now >= (self._nextFire or 0) then
 			self:_FireAtTarget()
 			self._nextFire = now + FIRE_INTERVAL
 		end
 
-		self:NextThink(now + 0.05)
+		self:NextThink(now + 0.03)
 		return true
 	end
 
@@ -304,5 +414,3 @@ if CLIENT then
 	function ENT:Draw()
 	end
 end
-
-
