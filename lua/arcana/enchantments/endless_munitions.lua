@@ -64,7 +64,7 @@ local function isMeleeHoldType(wep)
 end
 
 Arcane:RegisterEnchantment({
-	id = "infinite_ammo",
+	id = "endless_munitions",
 	name = "Endless Munitions",
 	description = "This weapon never consumes ammo while equipped; clips auto-refill.",
 	icon = "icon16/bullet_black.png",

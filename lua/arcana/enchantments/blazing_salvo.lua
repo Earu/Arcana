@@ -8,7 +8,7 @@ local function attachHook(ply, wep, state)
 		local active = ent:GetActiveWeapon()
 		if not IsValid(active) or active ~= wep then return end
 
-		ply = self:GetOwner() -- refresh player based on wep ownership
+		ply = wep:GetOwner() -- refresh player based on wep ownership
 		if not IsValid(ply) then return end
 
 		-- rate limit using state
@@ -55,7 +55,7 @@ local function isMeleeHoldType(wep)
 end
 
 Arcane:RegisterEnchantment({
-	id = "fireball_on_shoot",
+	id = "blazing_salvo",
 	name = "Blazing Salvo",
 	description = "Fires a fireball every second while shooting this weapon.",
 	icon = "icon16/fire.png",
