@@ -295,6 +295,17 @@ local function ensureVFXFor(wep)
 		end
 		return
 	end
+
+	-- Hide VFX for local player's active weapon when in first person
+	if IsValid(owner) and owner == LocalPlayer() and owner:GetActiveWeapon() == wep and not owner:ShouldDrawLocalPlayer() then
+		local s = ActiveVFXByEnt[wep]
+		if s then
+			destroyVFX(s)
+			ActiveVFXByEnt[wep] = nil
+		end
+		return
+	end
+
 	local count = getEnchantCount(wep)
 	local s = ActiveVFXByEnt[wep]
 	local str = wep:GetNWString("Arcana_EnchantIds", "[]")
@@ -357,10 +368,17 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 
 		-- For rifle-like hold types when actively held, use hand bone direction
 		local owner = wep:GetOwner()
+
+		-- Skip rendering for local player's active viewmodel in first person
+		if IsValid(owner) and owner == LocalPlayer() and wep == owner:GetActiveWeapon() and not owner:ShouldDrawLocalPlayer() then
+			continue
+		end
+
 		-- If a player holds this weapon but it isn't active, skip rendering
 		if IsValid(owner) and owner:GetActiveWeapon() ~= wep then
 			continue
 		end
+
 		local handledType = false
 		if IsValid(owner) and isHeldActive(wep) and isRifleHoldType(wep) then
 			local rp, lp = getPlayerHandPositions(owner)
