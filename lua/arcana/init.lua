@@ -1,6 +1,7 @@
 if SERVER then
 	AddCSLuaFile("arcana/core.lua")
 	AddCSLuaFile("arcana/circles.lua")
+	AddCSLuaFile("arcana/enchant_vfx.lua")
 	AddCSLuaFile("arcana/hud.lua")
 	AddCSLuaFile("arcana/spell_browser.lua")
 	AddCSLuaFile("arcana/voice_activation.lua")
@@ -21,6 +22,7 @@ end
 
 if CLIENT then
 	include("arcana/circles.lua")
+	include("arcana/enchant_vfx.lua")
 	include("arcana/hud.lua")
 	include("arcana/spell_browser.lua")
 	include("arcana/voice_activation.lua")
