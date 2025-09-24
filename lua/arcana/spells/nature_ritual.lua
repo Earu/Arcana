@@ -23,6 +23,8 @@ local treeLogs = {
 	"models/props_foliage/tree_slice02.mdl",
 }
 
+local FOREST_LOCK_UNTIL = 0
+
 local function freeze(ent)
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then
@@ -113,8 +115,8 @@ local function spanAlignedPose(centerPos, approxUp, halfSpan)
 	return ang, groundCenter, upAvg
 end
 
-local FOREST_RANGE = 2000 * 4
-local TREE_COUNT = 200 * 5
+local FOREST_RANGE = 8000
+local TREE_COUNT = 600
 local TREE_LOG_COUNT = 3
 
 local function generateForest(ply, base)
@@ -163,7 +165,7 @@ local function generateForest(ply, base)
 					log:SetModelScale(math.random(0.25, 4))
 					log:SetAngles(logAng)
 					log:Spawn()
-					log:Activate()
+					log:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 
 					if log.CPPISetOwner then
 						log:CPPISetOwner(ply)
@@ -178,7 +180,9 @@ local function generateForest(ply, base)
 		end
 
 		tree:SetModel(mdl)
-		tree:SetModelScale(math.random(1, 2.5), 1)
+		local finalScale = math.random(1, 2.5)
+		-- Scale over 0.5s instead of 1s
+		tree:SetModelScale(finalScale, 0.5)
 
 		if isFallenTreeModel(mdl) then
 			-- Align fallen trees to terrain using span-based orientation
@@ -190,10 +194,7 @@ local function generateForest(ply, base)
 			tree:SetAngles(Angle(0, math.random(360), 0))
 		end
 		tree:Spawn()
-		timer.Simple(1, function()
-			if not IsValid(tree) then return end
-			tree:Activate()
-		end)
+		tree:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 
 		sound.Play("arcana/arcane_" .. math.random(1, 3) .. ".ogg", tree:GetPos() + Vector(0, 0, 100), 100, math.random(96, 104), 1)
 		sound.Play("ambient/energy/ion_cannon_shot" .. math.random(1, 3) .. ".wav", tree:GetPos() + Vector(0, 0, 100), 100, math.random(96, 104), 1)
@@ -239,6 +240,16 @@ Arcane:RegisterRitualSpell({
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
 
+		-- Global lockout: only one forest may be created per hour (shared across all players)
+		if CurTime() < (FOREST_LOCK_UNTIL or 0) then
+			local remaining = math.max(0, math.floor((FOREST_LOCK_UNTIL - CurTime())))
+			if IsValid(activatingPly) and activatingPly.ChatPrint then
+				activatingPly:ChatPrint("The spirits are resting. Nature ritual available in " .. tostring(remaining) .. "s.")
+			end
+			return
+		end
+
+		FOREST_LOCK_UNTIL = CurTime() + 60 * 60
 		generateForest(activatingPly, selfEnt:GetPos())
 		selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 70, 110)
 	end,
