@@ -1,5 +1,5 @@
 Arcane:RegisterRitualSpell({
-	id = "purification_ritual",
+	id = "ritual_of_purification",
 	name = "Ritual: Purification",
 	description = "Perform a ritual to cleanse corruption in the area.",
 	category = Arcane.CATEGORIES.PROTECTION,

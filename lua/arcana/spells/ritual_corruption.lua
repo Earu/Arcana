@@ -1,5 +1,5 @@
 Arcane:RegisterRitualSpell({
-	id = "corruption_ritual",
+	id = "ritual_of_corruption",
 	name = "Ritual: Corruption",
 	description = "Perform a ritual that increases corruption nearby or creates a new corrupted area.",
 	category = Arcane.CATEGORIES.UTILITY,
