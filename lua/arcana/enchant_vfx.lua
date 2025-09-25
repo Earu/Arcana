@@ -173,6 +173,86 @@ local function getMuzzleAttachmentPos(wep)
 	return nil
 end
 
+-- Map a viewmodel attachment position from viewmodel FOV space to world space
+local function formatViewModelAttachment(vOrigin, bFrom)
+    local view = render.GetViewSetup()
+    local vEyePos = view.origin
+    local aEyesRot = view.angles
+    local vOffset = vOrigin - vEyePos
+    local vForward = aEyesRot:Forward()
+
+    local nViewX = math.tan(view.fovviewmodel_unscaled * math.pi / 360)
+    if (nViewX == 0) then
+        vForward:Mul(vForward:Dot(vOffset))
+        vEyePos:Add(vForward)
+        return vEyePos
+    end
+
+    local nWorldX = math.tan(view.fov_unscaled * math.pi / 360)
+    if (nWorldX == 0) then
+        vForward:Mul(vForward:Dot(vOffset))
+        vEyePos:Add(vForward)
+        return vEyePos
+    end
+
+    local vRight = aEyesRot:Right()
+    local vUp = aEyesRot:Up()
+
+    if (bFrom) then
+        local nFactor = nWorldX / nViewX
+        vRight:Mul(vRight:Dot(vOffset) * nFactor)
+        vUp:Mul(vUp:Dot(vOffset) * nFactor)
+    else
+        local nFactor = nViewX / nWorldX
+        vRight:Mul(vRight:Dot(vOffset) * nFactor)
+        vUp:Mul(vUp:Dot(vOffset) * nFactor)
+    end
+
+    vForward:Mul(vForward:Dot(vOffset))
+    vEyePos:Add(vRight)
+    vEyePos:Add(vUp)
+    vEyePos:Add(vForward)
+    return vEyePos
+end
+
+-- Build angles given desired Up and Right vectors (orthonormalized)
+local function anglesFromUpRight(up, right)
+    up = (isvector(up) and up or Vector(0, 0, 1))
+    right = (isvector(right) and right or Vector(1, 0, 0))
+    if up:LengthSqr() < 1e-6 then up = Vector(0, 0, 1) end
+    -- Gram-Schmidt: make right orthogonal to up
+    right = right - up * right:Dot(up)
+    if right:LengthSqr() < 1e-6 then right = Vector(1, 0, 0) - up * up.x end
+    right:Normalize()
+    local forward = right:Cross(up)
+    if forward:LengthSqr() < 1e-6 then forward = Vector(0, 1, 0) end
+    forward:Normalize()
+    local ang = forward:Angle()
+    -- Adjust roll so computed Right matches target Right
+    local curRight = ang:Right()
+    local axis = forward
+    local cross = curRight:Cross(right)
+    local dot = math.Clamp(curRight:Dot(right), -1, 1)
+    local sign = (cross:Dot(axis) >= 0) and 1 or -1
+    local roll = math.deg(math.atan2(sign * cross:Length(), dot))
+    ang:RotateAroundAxis(axis, roll)
+    return ang
+end
+
+-- Find a muzzle-like attachment on any entity (worldmodel or viewmodel)
+local function getMuzzleAttachmentFull(ent)
+    if not (IsValid(ent) and ent.LookupAttachment and ent.GetAttachment) then return nil end
+    local candidates = {"muzzle", "muzzle_flash", "muzzle_flash1", "muzzle_end", "1", "0"}
+    for _, name in ipairs(candidates) do
+        local idx = ent:LookupAttachment(name)
+        if idx and idx > 0 then
+            local att = ent:GetAttachment(idx)
+            if att then return att end
+        end
+    end
+    return nil
+end
+
 local function getPhysgunColorFor(wep)
     -- Prefer color from current owner when held; cache to reuse when dropped
     local owner = IsValid(wep) and wep:GetOwner() or NULL
@@ -349,13 +429,6 @@ local function rescanWeapons()
 	end
 end
 
-hook.Add("Think", "Arcana_EnchantVFX_Scan", function()
-	local now = CurTime()
-	if now - lastRescan >= RESCAN_INTERVAL then
-		lastRescan = now
-		rescanWeapons()
-	end
-end)
 
 hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 	for wep, st in pairs(ActiveVFXByEnt) do
@@ -455,6 +528,133 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 	end
 end)
 
+--
+-- First-person viewmodel rendering for local player's active enchanted weapon
+--
+local ActiveVMVFX = ActiveVMVFX or {}
+
+local function destroyVMVFX(state)
+    if not state then return end
+    local bc = state.bc
+    if bc and bc.Remove then bc:Remove() end
+end
+
+local function pruneViewModelVFX()
+    for wep, st in pairs(ActiveVMVFX) do
+        local valid = IsValid(wep)
+        if not valid then
+            destroyVMVFX(st)
+            ActiveVMVFX[wep] = nil
+        else
+            local owner = wep:GetOwner()
+            if not IsValid(owner) or owner ~= LocalPlayer() then
+                destroyVMVFX(st)
+                ActiveVMVFX[wep] = nil
+            else
+                if owner:ShouldDrawLocalPlayer() or owner:GetActiveWeapon() ~= wep or getEnchantCount(wep) <= 0 then
+                    destroyVMVFX(st)
+                    ActiveVMVFX[wep] = nil
+                end
+            end
+        end
+    end
+end
+
+local function createBandsForViewModel(wep, count)
+    if not _G.BandCircle then return nil end
+    count = math.max(1, math.floor(count))
+    local owner = IsValid(wep) and wep:GetOwner() or LocalPlayer()
+    local col = getPhysgunColorFor(wep)
+    local bc = BandCircle.Create(owner:EyePos(), owner:EyeAngles(), col, 40, 0)
+    if bc and bc.SetDrawnManually then bc:SetDrawnManually(true) end
+    if not bc then return nil end
+
+    local ringCount = math.min(3, count)
+    -- Compact sizes for first person
+    local baseR = 6
+    local bandH = 2.2
+
+    local totalSpan = 8
+    local step = (ringCount > 1) and (totalSpan / (ringCount - 1)) or 0
+    local startOffset = -0.5 * (ringCount - 1) * step
+
+    for i = 1, ringCount do
+        local r = baseR + (i - 1) * 2
+        local h = bandH * (1 - (i - 1) * 0.12)
+        local ring = bc:AddBand(r, h, nil, 2)
+        if ring then
+            ring.rotationSpeed = 35
+            ring.rotationDirection = (i % 2 == 0) and 1 or -1
+            ring.zBias = startOffset + (i - 1) * step
+        end
+    end
+
+    return {
+        bc = bc,
+        lastStr = wep:GetNWString("Arcana_EnchantIds", "[]"),
+        count = count,
+    }
+end
+
+hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, wep)
+    if not IsValid(ply) or ply ~= LocalPlayer() then return end
+    -- If third person or weapon mismatch, ensure any lingering state is cleared for this player
+    if (not IsValid(wep)) or (wep ~= ply:GetActiveWeapon()) or ply:ShouldDrawLocalPlayer() then
+        pruneViewModelVFX()
+        return
+    end
+
+    local count = getEnchantCount(wep)
+    if count <= 0 then
+        local s = ActiveVMVFX[wep]
+        if s then
+            destroyVMVFX(s)
+            ActiveVMVFX[wep] = nil
+        end
+        return
+    end
+
+    -- Require a muzzle-like attachment on the viewmodel
+    local tAttachment = getMuzzleAttachmentFull(vm)
+    if not tAttachment then
+        local s = ActiveVMVFX[wep]
+        if s then
+            destroyVMVFX(s)
+            ActiveVMVFX[wep] = nil
+        end
+        return
+    end
+
+    local s = ActiveVMVFX[wep]
+    local str = wep:GetNWString("Arcana_EnchantIds", "[]")
+    if (not s) or (s.lastStr ~= str) then
+        if s then destroyVMVFX(s) end
+        ActiveVMVFX[wep] = createBandsForViewModel(wep, count)
+        s = ActiveVMVFX[wep]
+        if not s then return end
+    end
+
+    -- Position and orient using the muzzle attachment
+	local attPos = formatViewModelAttachment(tAttachment.Pos, false)
+    local attAng = tAttachment.Ang
+    -- Use attachment basis: Up aligned to muzzle forward; yaw from attachment Right vs player view Right
+    local up = attAng:Forward()
+    local right = attAng:Right()
+	local ang = anglesFromUpRight(up, right)
+
+	-- Bring the circle slightly closer to the player along +Up (towards camera)
+	local pos = attPos + ang:Up() * 12
+
+    s.bc.position = pos
+    s.bc.angles = ang
+    s.bc.color = getPhysgunColorFor(wep)
+
+    -- Draw immediately in the viewmodel pass to avoid one-frame lag
+    if s.bc.Draw then
+        s.bc:Draw()
+    end
+end)
+
 -- Cleanup when a weapon entity is removed
 hook.Add("EntityRemoved", "Arcana_EnchantVFX_Remove", function(ent)
 	local st = ActiveVFXByEnt[ent]
@@ -462,6 +662,24 @@ hook.Add("EntityRemoved", "Arcana_EnchantVFX_Remove", function(ent)
 		destroyVFX(st)
 		ActiveVFXByEnt[ent] = nil
 	end
+
+    local stvm = ActiveVMVFX[ent]
+    if stvm then
+        destroyVMVFX(stvm)
+        ActiveVMVFX[ent] = nil
+    end
+end)
+
+hook.Add("Think", "Arcana_EnchantVFX_Scan", function()
+    -- Always prune VM VFX quickly to avoid lingering
+    pruneViewModelVFX()
+
+    -- Interval-based world rescan
+    local now = CurTime()
+    if now - lastRescan >= RESCAN_INTERVAL then
+        lastRescan = now
+        rescanWeapons()
+    end
 end)
 
 
