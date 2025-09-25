@@ -274,6 +274,13 @@ if SERVER then
 
 		-- Apply intensity changes live
 		local curI = self:GetIntensity() or 1
+
+		if curI > 0 and self._lastIntensity == 0 then
+			self:AddEFlags(EFL_FORCE_CHECK_TRANSMIT)
+		elseif curI == 0 and self._lastIntensity > 0 then
+			self:AddEFlags(EFL_FORCE_CHECK_TRANSMIT)
+		end
+
 		if curI ~= (self._lastIntensity or -1) then
 			applyIntensityServer(self)
 			self._lastIntensity = curI
