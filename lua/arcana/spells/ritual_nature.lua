@@ -221,7 +221,7 @@ local function generateForest(ply, base)
 end
 
 Arcane:RegisterRitualSpell({
-	id = "nature_ritual",
+	id = "ritual_of_nature",
 	name = "Ritual: Nature",
 	description = "Perform a powerful ritual to create a dense forest (only works on grass).",
 	category = Arcane.CATEGORIES.UTILITY,
