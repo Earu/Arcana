@@ -16,13 +16,13 @@ function ENT:SetupDataTables()
 	self:NetworkVar("Float", 1, "Intensity")
 end
 
+function ENT:UpdateTransmitState()
+	return TRANSMIT_ALWAYS
+end
+
 if SERVER then
 	resource.AddShader("arcana_crystal_surface_vs30")
 	resource.AddShader("arcana_crystal_surface_ps30")
-
-	function ENT:UpdateTransmitState()
-		return TRANSMIT_ALWAYS
-	end
 
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
@@ -101,9 +101,9 @@ if SERVER then
 				if IsValid(h) then
 					h:Remove()
 				end
-			end
 
-			table.remove(self._heavyWisps, i)
+				table.remove(self._heavyWisps, i)
+			end
 		end
 	end
 
@@ -395,7 +395,10 @@ if CLIENT then
 		end
 	end
 
-	local MAX_RENDER_DIST = 4000 * 4000
+	local SHADER_MAT = Material("effects/water_warp01")
+	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
+	local render_SetMaterial = _G.render.SetMaterial
+	local render_DrawScreenQuad = _G.render.DrawScreenQuad
 	local DrawColorModify = _G.DrawColorModify
 	function ENT:_DrawCorruption()
 		self:_DrawSphere(function()
@@ -418,6 +421,14 @@ if CLIENT then
 			}
 
 			DrawColorModify(cm)
+
+			SHADER_MAT:SetFloat("$envmap", 0)
+			SHADER_MAT:SetFloat("$envmaptint", 0 )
+			SHADER_MAT:SetInt("$ignorez", 1)
+			SHADER_MAT:SetFloat("$refractamount", 0.05 * s)
+			render_UpdateScreenEffectTexture()
+			render_SetMaterial(SHADER_MAT)
+			render_DrawScreenQuad(true)
 		end)
 	end
 
