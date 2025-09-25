@@ -996,6 +996,7 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.startTime = CurTime()
 	circle.duration = 0
 	circle.isActive = true
+	circle._drawnManually = false
 	-- Fade-out state
 	circle.isFading = false
 	circle.fadeStart = 0
@@ -1175,6 +1176,14 @@ function MagicCircle:Draw()
 	end
 end
 
+function MagicCircle:SetDrawnManually(b)
+	self._drawnManually = b and true or false
+end
+
+function MagicCircle:IsDrawnManually()
+	return self._drawnManually == true
+end
+
 function MagicCircle:SetAnimated(duration)
 	self.isAnimated = true
 	self.duration = duration or 5
@@ -1314,7 +1323,10 @@ end
 function MagicCircleManager:Draw()
 	for _, circle in ipairs(self.circles) do
 		if circle.Draw then
-			circle:Draw()
+			local manual = (circle.IsDrawnManually and circle:IsDrawnManually()) or false
+			if not manual then
+				circle:Draw()
+			end
 		end
 	end
 end
@@ -1424,6 +1436,7 @@ function BandCircle.new(pos, ang, color, size)
 	bc.size = math_max(10, size or 80)
 	bc.rings = {}
 	bc.isActive = true
+	bc._drawnManually = false
 	bc.isAnimated = false
 	bc.startTime = CurTime()
 	bc.duration = 0
@@ -1517,6 +1530,14 @@ function BandCircle:Draw()
 			r:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), t)
 		end
 	end
+end
+
+function BandCircle:SetDrawnManually(b)
+	self._drawnManually = b and true or false
+end
+
+function BandCircle:IsDrawnManually()
+	return self._drawnManually == true
 end
 
 function BandCircle:IsActive()
