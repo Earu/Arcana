@@ -560,7 +560,7 @@ local function pruneViewModelVFX()
     end
 end
 
-local function createBandsForViewModel(wep, count)
+local function createBandsForViewModel(wep, count, style)
     if not _G.BandCircle then return nil end
     count = math.max(1, math.floor(count))
     local owner = IsValid(wep) and wep:GetOwner() or LocalPlayer()
@@ -569,30 +569,49 @@ local function createBandsForViewModel(wep, count)
     if bc and bc.SetDrawnManually then bc:SetDrawnManually(true) end
     if not bc then return nil end
 
-    local ringCount = math.min(3, count)
-    -- Compact sizes for first person
-    local baseR = 6
-    local bandH = 2.2
+	style = style or "axis"
+	local ringCount = math.min(3, count)
+	-- Compact sizes for first person
+	local baseR = 6
+	local bandH = 2.2
 
-    local totalSpan = 8
-    local step = (ringCount > 1) and (totalSpan / (ringCount - 1)) or 0
-    local startOffset = -0.5 * (ringCount - 1) * step
-
-    for i = 1, ringCount do
-        local r = baseR + (i - 1) * 2
-        local h = bandH * (1 - (i - 1) * 0.12)
-        local ring = bc:AddBand(r, h, nil, 2)
-        if ring then
-            ring.rotationSpeed = 35
-            ring.rotationDirection = (i % 2 == 0) and 1 or -1
-            ring.zBias = startOffset + (i - 1) * step
-        end
-    end
+	if style == "orbital" then
+		-- Barrier-like spinning rings
+		local configs = {
+			{ radius = baseR * 1.2, height = bandH * 1.1, spin = {p = 0,   y = 120, r = 0} },
+			{ radius = baseR * 1.2, height = bandH * 1.1, spin = {p = -30, y = -40, r = 10} },
+			{ radius = baseR * 1.2, height = bandH * 1.1, spin = {p = 30,  y = -50, r = -15} },
+		}
+		for i = 1, ringCount do
+			local cfg = configs[i] or configs[#configs]
+			local ring = bc:AddBand(cfg.radius, cfg.height, cfg.spin, 2)
+			if ring then
+				ring.rotationSpeed = 0
+				ring.zBias = (i - 1) * 0.4
+			end
+		end
+	else
+		-- Axis style
+		local totalSpan = 8
+		local step = (ringCount > 1) and (totalSpan / (ringCount - 1)) or 0
+		local startOffset = -0.5 * (ringCount - 1) * step
+		for i = 1, ringCount do
+			local r = baseR + (i - 1) * 2
+			local h = bandH * (1 - (i - 1) * 0.12)
+			local ring = bc:AddBand(r, h, nil, 2)
+			if ring then
+				ring.rotationSpeed = 35
+				ring.rotationDirection = (i % 2 == 0) and 1 or -1
+				ring.zBias = startOffset + (i - 1) * step
+			end
+		end
+	end
 
     return {
         bc = bc,
         lastStr = wep:GetNWString("Arcana_EnchantIds", "[]"),
-        count = count,
+		count = count,
+		style = style,
     }
 end
 
@@ -627,9 +646,11 @@ hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, w
 
     local s = ActiveVMVFX[wep]
     local str = wep:GetNWString("Arcana_EnchantIds", "[]")
-    if (not s) or (s.lastStr ~= str) then
+    -- Decide desired style for viewmodel similar to world handling
+    local styleWanted = (isMeleeHoldType(wep) or isPistolHoldType(wep) or isRifleHoldType(wep)) and "axis" or "orbital"
+    if (not s) or (s.lastStr ~= str) or (s.style ~= styleWanted) then
         if s then destroyVMVFX(s) end
-        ActiveVMVFX[wep] = createBandsForViewModel(wep, count)
+        ActiveVMVFX[wep] = createBandsForViewModel(wep, count, styleWanted)
         s = ActiveVMVFX[wep]
         if not s then return end
     end
