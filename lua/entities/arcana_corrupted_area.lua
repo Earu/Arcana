@@ -17,6 +17,10 @@ function ENT:SetupDataTables()
 end
 
 function ENT:UpdateTransmitState()
+	if self:GetIntensity() == 0 then
+		return TRANSMIT_NEVER
+	end
+
 	return TRANSMIT_ALWAYS
 end
 
