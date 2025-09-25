@@ -48,12 +48,6 @@ if SERVER then
 		self._spawnInterval = 8
 		self._nextWispSpawn = CurTime() + 3
 
-		-- Geyser spawn control
-		self._geysers = {}
-		self._maxGeysers = 0
-		self._geyserInterval = 8
-		self._nextGeyserSpawn = CurTime() + math.Rand(2, 5)
-
 		-- Heavy wisp spawn control
 		self._heavyWisps = {}
 		self._maxHeavyWisps = 0
@@ -110,29 +104,6 @@ if SERVER then
 			end
 
 			table.remove(self._heavyWisps, i)
-		end
-
-		-- Geysers from 1.0→2.0 scale with intensity only
-		local sg = math.Clamp((k - 1.0) / 1.0, 0, 1)
-		if k < 1.0 then
-			self._maxGeysers = 0
-			self._geyserInterval = 8
-		else
-			self._maxGeysers = math.floor(1 + 7 * sg)
-			self._geyserInterval = math.max(5, 10 - 8 * sg)
-		end
-
-		-- Trim excess geysers if limits reduced
-		if self._maxGeysers < #self._geysers then
-			for i = #self._geysers, self._maxGeysers + 1, -1 do
-				local g = self._geysers[i]
-
-				if IsValid(g) then
-					g:Remove()
-				end
-
-				table.remove(self._geysers, i)
-			end
 		end
 	end
 
@@ -231,35 +202,6 @@ if SERVER then
 		end
 	end
 
-	function ENT:_SpawnGeyser()
-		local radius = self:GetRadius() or 500
-		local hitPos = self:FindSpawnPos(true, true)
-		if not hitPos then return end
-
-		local ent = ents.Create("arcana_corrupted_geyser")
-		if not IsValid(ent) then return end
-
-		ent:SetPos(hitPos + Vector(0, 0, 2))
-		ent:Spawn()
-		ent:Activate()
-
-		-- Scale radius and damage with area size and intensity
-		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
-		local sg = math.Clamp((k - 1.0) / 1.0, 0, 1)
-		local gr = math.Clamp(radius * 0.2, 180, 380)
-		if ent.SetRadius then ent:SetRadius(gr) end
-		if ent.SetDamage then ent:SetDamage(50 + math.floor(40 * sg)) end
-
-		table.insert(self._geysers, ent)
-		ent:CallOnRemove("Arcana_GeyserRemoved" .. ent:EntIndex(), function()
-			for i = #self._geysers, 1, -1 do
-				if not IsValid(self._geysers[i]) then
-					table.remove(self._geysers, i)
-				end
-			end
-		end)
-	end
-
 	function ENT:_SpawnHeavyWisp()
 		local center = self:GetPos()
 		local radius = self:GetRadius() or 500
@@ -294,16 +236,6 @@ if SERVER then
 			self._wisps = {}
 		end
 
-		if self._geysers then
-			for _, g in ipairs(self._geysers) do
-				if IsValid(g) then
-					g:Remove()
-				end
-			end
-
-			self._geysers = {}
-		end
-
 		if self._heavyWisps then
 			for _, h in ipairs(self._heavyWisps) do
 				if IsValid(h) then
@@ -320,13 +252,6 @@ if SERVER then
 			if not IsValid(w) or w:GetPos():DistToSqr(self:GetPos()) > (self:GetRadius() or 500) ^ 2 then
 				SafeRemoveEntity(w)
 				table.remove(self._wisps, i)
-			end
-		end
-
-		for i, g in ipairs(self._geysers) do
-			if not IsValid(g) or g:GetPos():DistToSqr(self:GetPos()) > (self:GetRadius() or 500) ^ 2 then
-				SafeRemoveEntity(g)
-				table.remove(self._geysers, i)
 			end
 		end
 
@@ -377,15 +302,6 @@ if SERVER then
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
 		end
 
-		-- Geyser spawn logic
-		if hasPlayer and now >= (self._nextGeyserSpawn or 0) then
-			if (#self._geysers) < (self._maxGeysers or 0) and (self._maxGeysers or 0) > 0 then
-				self:_SpawnGeyser()
-			end
-
-			self._nextGeyserSpawn = now + (self._geyserInterval or 8)
-		end
-
 		-- Heavy wisp spawn logic
 		if hasPlayer and now >= (self._nextHeavySpawn or 0) then
 			if (#self._heavyWisps) < (self._maxHeavyWisps or 0) and (self._maxHeavyWisps or 0) > 0 then
@@ -401,7 +317,6 @@ if SERVER then
 
 			-- back off spawn timer to avoid immediate respawn on next presence
 			self._nextWispSpawn = now + (self._spawnInterval or 8)
-			self._nextGeyserSpawn = now + (self._geyserInterval or 8)
 			self._nextHeavySpawn = now + (self._heavySpawnInterval or 12)
 		end
 
