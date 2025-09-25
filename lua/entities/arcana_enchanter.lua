@@ -158,6 +158,11 @@ if SERVER then
 		wep.ArcanaStored = true
 		wep.ms_notouch = true
 
+		wep:AddEFlags(EFL_FORCE_CHECK_TRANSMIT)
+		wep.UpdateTransmitState = function()
+			return TRANSMIT_PVS
+		end
+
 		-- Store class and contained reference
 		ent:SetContainedClass(cls)
 		ent:SetContainedWeapon(wep)
