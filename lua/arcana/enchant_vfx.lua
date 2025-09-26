@@ -703,4 +703,65 @@ hook.Add("Think", "Arcana_EnchantVFX_Scan", function()
     end
 end)
 
+-- =========================== HELPERS ===========================
 
+local Arcane = _G.Arcane or {}
+_G.Arcane = Arcane
+
+-- Reusable: render rings for an entity in an active 3D context (e.g., PostDrawModel)
+function Arcane:RenderEnchantBandsForEntity(ent, count, color, style)
+    if not IsValid(ent) or not _G.BandCircle then return end
+    count = math.max(1, math.floor(count or 1))
+    style = style or "axis"
+
+    local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(ent)
+    local upAxis = (style == "orbital") and Vector(0, 0, 1)
+        or ((axis == "x" and ent:GetForward()) or (axis == "y" and ent:GetRight()) or ent:GetUp())
+    local refFwd = (style == "axis") and getSecondLongestAxisVector(ent, axis, lenX, lenY, lenZ) or ent:GetForward()
+    local ang = buildOrientedAnglesForAxis(upAxis, nil, refFwd)
+
+    local pos = ent:WorldSpaceCenter()
+    local col = color or Color(198, 160, 74, 255)
+    local bc = BandCircle.Create(pos, ang, col, 80, 0)
+    if not bc then return end
+
+    local smallest = math.max(4, math.min(lenX or 8, math.min(lenY or 8, lenZ or 8)))
+    local baseR = math.max(6, smallest * 0.55)
+    local bandH = math.max(2.5, baseR * 0.18)
+    local ringCount = math.min(3, count)
+
+    if style == "orbital" then
+        local base = math.max(10, smallest * 0.9)
+        local heightscale = math.max(3, base * 0.18)
+        local configs = {
+            { radius = base * 0.95, height = heightscale, spin = {p = 0,   y = 120, r = 0} },
+            { radius = base * 0.95, height = heightscale, spin = {p = -30, y = -40, r = 10} },
+            { radius = base * 0.95, height = heightscale, spin = {p = 30,  y = -50, r = -15} },
+        }
+        for i = 1, ringCount do
+            local cfg = configs[i] or configs[#configs]
+            local ring = bc:AddBand(cfg.radius, cfg.height, cfg.spin, 2)
+            if ring then
+                ring.rotationSpeed = 0
+                ring.zBias = (i - 1) * 0.5
+            end
+        end
+    else
+        local totalSpan = (longest or 24) * 0.40
+        local step = (ringCount > 1) and (totalSpan / (ringCount - 1)) or 0
+        local startOffset = -0.5 * (ringCount - 1) * step
+        for i = 1, ringCount do
+            local r = baseR + (i - 1) * math.max(2.5, smallest * 0.16)
+            local h = bandH * (1 - (i - 1) * 0.10)
+            local ring = bc:AddBand(r, h, nil, 2)
+            if ring then
+                ring.rotationSpeed = 35
+                ring.rotationDirection = (i % 2 == 0) and 1 or -1
+                ring.zBias = startOffset + (i - 1) * step
+            end
+        end
+    end
+
+    if bc.Draw then bc:Draw() end
+    if bc.Remove then bc:Remove() end
+end
