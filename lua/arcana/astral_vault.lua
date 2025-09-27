@@ -568,9 +568,26 @@ if CLIENT then
 			local summon = vgui.Create("DButton", card)
 			summon:SetText("")
 			summon.Paint = function(pnl, w, h)
-				FillDeco(0, 0, w, h, Color(46, 36, 26, 235), 8)
-				DrawDecoFrame(0, 0, w, h, gold, 8)
-				draw.SimpleText(it and "Summon" or "Imprint", "Arcana_Ancient", w * 0.5, h * 0.5, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				local enabled = pnl:IsEnabled()
+				local hovered = enabled and pnl:IsHovered()
+				local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+				FillDeco(0, 0, w, h, bgCol, 8)
+				local frameCol = enabled and gold or Color(140, 120, 90, 255)
+				DrawDecoFrame(0, 0, w, h, frameCol, 8)
+				local txtCol = enabled and textBright or Color(200, 190, 170, 255)
+				draw.SimpleText(it and "Summon" or "Imprint", "Arcana_Ancient", w * 0.5, h * 0.5, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+
+			-- Live affordability check for summon
+			summon.Think = function(pnl)
+				if not it then pnl:SetEnabled(false) return end
+				local lp = LocalPlayer()
+				local haveCoins = (IsValid(lp) and lp.GetCoins and lp:GetCoins()) or 0
+				local haveShards = (IsValid(lp) and lp.GetItemCount and lp:GetItemCount("mana_crystal_shard")) or 0
+				local needCoins = tonumber(VAULT_CFG.SUMMON_COINS) or 0
+				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
+				local ok = (haveCoins >= needCoins) and (haveShards >= needShards)
+				pnl:SetEnabled(ok)
 			end
 
 			-- Cost panel (secondary) above the summon button for filled slots
@@ -683,9 +700,14 @@ if CLIENT then
 		imprintBtn:DockMargin(12, 12, 12, 12)
 		imprintBtn:SetText("")
 		imprintBtn.Paint = function(pnl, w, h)
-			FillDeco(0, 0, w, h, Color(46, 36, 26, 235), 8)
-			DrawDecoFrame(0, 0, w, h, gold, 8)
-			draw.SimpleText("Imprint Current Weapon", "Arcana_AncientLarge", w * 0.5, h * 0.5 - 8, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			local enabled = pnl:IsEnabled()
+			local hovered = enabled and pnl:IsHovered()
+			local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+			FillDeco(0, 0, w, h, bgCol, 8)
+			local frameCol = enabled and gold or Color(140, 120, 90, 255)
+			DrawDecoFrame(0, 0, w, h, frameCol, 8)
+			local txtCol = enabled and textBright or Color(200, 190, 170, 255)
+			draw.SimpleText("Imprint Current Weapon", "Arcana_AncientLarge", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local sub = "Cost: " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
 			surface.SetFont("Arcana_AncientSmall")
 			local tw, th = surface.GetTextSize(sub)
@@ -693,7 +715,25 @@ if CLIENT then
 			-- Draw a smaller, tighter subtext closer to center line
 			draw.SimpleText(sub, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 6, Color(170, 160, 140), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
+		-- Enable/disable imprint based on weapon presence, vault space and affordability
+		imprintBtn.Think = function(pnl)
+			local lp = LocalPlayer()
+			local hasWeapon = IsValid(lp) and IsValid(lp:GetActiveWeapon())
+			local items = VAULT.items or {}
+			local hasRoom = (#items) < (tonumber(VAULT_CFG.MAX_SLOTS) or 0)
+			local haveCoins = (IsValid(lp) and lp.GetCoins and lp:GetCoins()) or 0
+			local haveShards = (IsValid(lp) and lp.GetItemCount and lp:GetItemCount("mana_crystal_shard")) or 0
+			local needCoins = tonumber(VAULT_CFG.STORE_COINS) or 0
+			local needShards = tonumber(VAULT_CFG.STORE_SHARDS) or 0
+			local ok = hasWeapon and hasRoom and (haveCoins >= needCoins) and (haveShards >= needShards)
+			pnl:SetEnabled(ok)
+		end
+
 		imprintBtn.DoClick = function()
+			if not imprintBtn:IsEnabled() then
+				surface.PlaySound("buttons/button8.wav")
+				return
+			end
 			net.Start("Arcana_AstralVault_Imprint")
 			net.WriteString("")
 			net.SendToServer()
