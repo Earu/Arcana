@@ -1199,7 +1199,11 @@ if CLIENT then
 				net.WriteString(item.id)
 				net.SendToServer()
 
-				frame:Close()
+				-- Close the grimoire unless Control is held
+				local ctrlDown = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
+				if not ctrlDown then
+					frame:Close()
+				end
 			end
 
 			castBtn.Paint = function(pnl, w, h)
