@@ -193,10 +193,9 @@ if SERVER then
 
 	-- Summon an entry (give fresh weapon and apply enchants)
 	net.Receive("Arcana_AstralVault_Summon", function(_, ply)
-		local entryId = tostring(net.ReadString() or "")
+		local entryId = net.ReadUInt(16)
 		readVault(ply, function(_, items)
-			local idx, entry
-			for i, it in ipairs(items or {}) do if tostring(it.id) == entryId then idx, entry = i, it break end end
+			local entry = items and items[entryId]
 			if not entry then return end
 
 			local ok, reason = canAfford(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS)
@@ -263,7 +262,7 @@ if CLIENT then
 		end
 
 		net.Start("Arcana_AstralVault_Summon")
-		net.WriteString(tostring(idx))
+		net.WriteUInt(idx, 16)
 		net.SendToServer()
 		surface.PlaySound("buttons/button15.wav")
 	end, nil, "Summon the weapon from astral vault slot 1-6")
@@ -628,7 +627,7 @@ if CLIENT then
 				-- costPanel draws its own content
 				summon.DoClick = function()
 					net.Start("Arcana_AstralVault_Summon")
-					net.WriteString(tostring(it.id))
+					net.WriteUInt(slotIndex, 16)
 					net.SendToServer()
 					surface.PlaySound("buttons/button15.wav")
 				end
