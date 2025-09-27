@@ -647,6 +647,12 @@ if CLIENT then
 					net.WriteUInt(slotIndex, 16)
 					net.SendToServer()
 					surface.PlaySound("buttons/button15.wav")
+
+					-- Close the vault unless Control is held
+					local ctrlDown = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
+					if not ctrlDown then
+						if VAULT and IsValid(VAULT.frame) then VAULT.frame:Close() end
+					end
 				end
 				delBtn.DoClick = function()
 					net.Start("Arcana_AstralVault_Delete")
