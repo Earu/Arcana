@@ -6,6 +6,8 @@ local Arcane = _G.Arcane or {}
 
 -- Networking
 if SERVER then
+	resource.AddFile("materials/arcana/astral_vault.png")
+
 	util.AddNetworkString("Arcana_AstralVault_Open")
 	util.AddNetworkString("Arcana_AstralVault_RequestOpen")
 	util.AddNetworkString("Arcana_AstralVault_Imprint")
@@ -242,6 +244,14 @@ if CLIENT then
 		net.Start("Arcana_AstralVault_RequestOpen")
 		net.SendToServer()
 	end, nil, "Open the Arcana Astral Vault")
+
+	list.Set("DesktopWindows", "ArcanaAstralVault", {
+		title = "Astral Vault",
+		icon = "arcana/astral_vault.png",
+		init = function(icon, window)
+			RunConsoleCommand("arcana_vault")
+		end
+	})
 
 	-- Summon by slot: arcana_vault_summon <1-6>
 	concommand.Add("arcana_vault_summon", function(_, _, args)
