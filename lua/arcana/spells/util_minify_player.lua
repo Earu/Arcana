@@ -39,16 +39,28 @@ Arcane:RegisterSpell({
 		end
 
 		if not target._arcanaminified then
-			target:SetModelScale(target:GetModelScale() * .75, .5)
-			target:EmitSound("player/suit_sprint.wav", 70, 90)
-			minify_bandvfx(target)
-			target._arcanaminified = true
-
-			timer.Simple(20, function()
-				target:SetModelScale(1, .5)
-				target._arcanaminified = nil
+			if target.SetKidMode then
+				target:SetKidMode(true)
 				minify_bandvfx(target)
-			end)
+				target._arcanaminified = true
+
+				timer.Simple(20, function()
+					target:SetKidMode(false)
+					minify_bandvfx(target)
+					target._arcanaminified = nil
+				end)
+			else
+				target:SetModelScale(target:GetModelScale() * .75, .5)
+				target:EmitSound("player/suit_sprint.wav", 70, 90)
+				minify_bandvfx(target)
+				target._arcanaminified = true
+
+				timer.Simple(20, function()
+					target:SetModelScale(1, .5)
+					target._arcanaminified = nil
+					minify_bandvfx(target)
+				end)
+			end
 
 			return true
 		else
