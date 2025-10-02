@@ -276,10 +276,12 @@ if CLIENT then
 		})
 	end
 
-	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
-		initShaderMaterial()
-	else
-		hook.Add("ShaderMounted", "arcana_crystal_dispersion", initShaderMaterial)
+	if system.IsWindows() then
+		if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+			initShaderMaterial()
+		else
+			hook.Add("ShaderMounted", "arcana_crystal_dispersion", initShaderMaterial)
+		end
 	end
 
 	local MAX_RENDER_DIST = 2000 * 2000
