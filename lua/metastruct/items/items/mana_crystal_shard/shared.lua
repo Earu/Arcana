@@ -26,7 +26,7 @@ if SERVER then
 end
 
 if CLIENT then
-	local MAX_RENDER_DIST = 700 * 700
+	local MAX_RENDER_DIST = 1500 * 1500
 	local function drawOverride(ent)
 		if EyePos():DistToSqr(ent:GetPos()) <= MAX_RENDER_DIST then
 			local now = CurTime()
@@ -91,6 +91,19 @@ if CLIENT then
 		function self:RenderOverride()
 			drawOverride(self)
 		end
+
+		local baseCrystalEntity = scripted_ents.Get("arcana_crystal_shard")
+		local drawGlow = baseCrystalEntity and baseCrystalEntity.DrawGlow
+		if not drawGlow then return end
+
+		hook.Add("RenderScreenspaceEffects", self, function()
+			if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+
+			cam.Start3D()
+			render.UpdateScreenEffectTexture()
+			drawGlow(self)
+			cam.End3D()
+		end)
 	end
 
 	function ITEM:OnRemove()
