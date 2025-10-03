@@ -66,7 +66,8 @@ Arcane:RegisterSpell({
 			end
 
 			-- Small splash along the lance for feedback
-			util.BlastDamage(caster, caster, hitPos, 80, 18)
+			Arcane:BlastDamage(caster, caster, hitPos, 80, 18, DMG_DISSOLVE, false, true)
+
 			-- Prepare for next penetration
 			table.insert(filter, hitEnt or tr.Entity)
 			startPos = hitPos + dir * 6
