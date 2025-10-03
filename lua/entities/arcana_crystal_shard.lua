@@ -126,6 +126,17 @@ if CLIENT then
 		return tempColorCache
 	end
 
+	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
+	local render_SetMaterial = _G.render.SetMaterial
+	local render_DrawSprite = _G.render.DrawSprite
+	local render_StartBeam = _G.render.StartBeam
+	local render_EndBeam = _G.render.EndBeam
+	local render_AddBeam = _G.render.AddBeam
+	local cam_IgnoreZ = _G.cam.IgnoreZ
+	local cam_Start3D = _G.cam.Start3D
+	local cam_End3D = _G.cam.End3D
+	local util_PixelVisible = _G.util.PixelVisible
+	local util_GetPixelVisibleHandle = _G.util.GetPixelVisibleHandle
 	function ENT:DrawGlow()
 		local now = RealTime()
 
@@ -138,37 +149,37 @@ if CLIENT then
 		local color = self:GetColor()
 		local distance = EyePos():DistToSqr(posCenter)
 
-		self.crystalItemsPixVis = self.crystalItemsPixVis or util.GetPixelVisibleHandle()
-		self.crystalItemsPixVis2 = self.crystalItemsPixVis2 or util.GetPixelVisibleHandle()
+		self.crystalItemsPixVis = self.crystalItemsPixVis or util_GetPixelVisibleHandle()
+		self.crystalItemsPixVis2 = self.crystalItemsPixVis2 or util_GetPixelVisibleHandle()
 
-		local vis = util.PixelVisible(posCenter, radius * 0.5, self.crystalItemsPixVis)
-		if vis == 0 and util.PixelVisible(posCenter, radius * 5, self.crystalItemsPixVis2) == 0 then return end
+		local vis = util_PixelVisible(posCenter, radius * 0.5, self.crystalItemsPixVis)
+		if vis == 0 and util_PixelVisible(posCenter, radius * 5, self.crystalItemsPixVis2) == 0 then return end
 
 		-- Depth-ignored core warp + layered glare
-		cam.IgnoreZ(true)
+		cam_IgnoreZ(true)
 
 		local r = radius / 8
 		local pos = self:GetBonePosition(1) or self:GetBonePosition(0) or posCenter
-		render.SetMaterial(WARP_MAT)
-		render.DrawSprite(pos, 50, 50, tempColor(color.r * 2, color.g * 2, color.b * 2, vis * 20), self.crystalItemsRandom.rotation)
+		render_SetMaterial(WARP_MAT)
+		render_DrawSprite(pos, 50, 50, tempColor(color.r * 2, color.g * 2, color.b * 2, vis * 20), self.crystalItemsRandom.rotation)
 		local glow = math.sin(now * 5) * 0.5 + 0.5
-		render.SetMaterial(GLARE2_MAT)
+		render_SetMaterial(GLARE2_MAT)
 		local c = tempColor(color.r, color.g, color.b)
 		c.a = vis * 170 * glow
-		render.DrawSprite(pos, r * 10, r * 10, c)
+		render_DrawSprite(pos, r * 10, r * 10, c)
 		c.a = vis * 170 * (glow + 0.25)
-		render.DrawSprite(pos, r * 20, r * 20, c)
+		render_DrawSprite(pos, r * 20, r * 20, c)
 		c.a = vis * 120 * (glow + 0.5)
-		render.DrawSprite(pos, r * 30, r * 30, c)
+		render_DrawSprite(pos, r * 30, r * 30, c)
 
-		cam.IgnoreZ(false)
+		cam_IgnoreZ(false)
 
-		render.SetMaterial(GLARE_MAT)
+		render_SetMaterial(GLARE_MAT)
 		c.a = vis * 20
-		render.DrawSprite(pos, r * 180, r * 50, c)
+		render_DrawSprite(pos, r * 180, r * 50, c)
 
 		-- Trailing beams based on velocity
-		render.SetMaterial(FIRE_MAT)
+		render_SetMaterial(FIRE_MAT)
 
 		self.crystalItemFade = self.crystalItemFade or 0
 		self.crystalItemRandom = self.crystalItemRandom or math.Rand(0.5, 1)
@@ -204,7 +215,7 @@ if CLIENT then
 			f2 = f2 * 5 + items[i2]
 			local offset = pos * 1
 			local trailOffset = -(radius / 13) * math.abs(math.sin(f2 + now / 5) * 100)
-			render.StartBeam(max_inner)
+			render_StartBeam(max_inner)
 
 			for i = 1, max_inner do
 				local f = i / max_inner
@@ -220,25 +231,29 @@ if CLIENT then
 				end
 
 				c.a = 255 * f
-				render.AddBeam(offset, (-f + 1) * radius, f * 0.3 - now * 0.1 + items[i2], c)
+				render_AddBeam(offset, (-f + 1) * radius, f * 0.3 - now * 0.1 + items[i2], c)
 			end
 
-			render.EndBeam()
+			render_EndBeam()
 		end
 	end
+
+	hook.Add("RenderScreenspaceEffects", "arcana_crystal_shard_glow", function()
+		cam_Start3D()
+		render_UpdateScreenEffectTexture()
+
+		for _, ent in ipairs(ents.FindByClass("arcana_crystal_shard")) do
+			if EyePos():DistToSqr(ent:GetPos()) > MAX_RENDER_DIST then continue end
+
+			ent:DrawGlow()
+		end
+
+		cam_End3D()
+	end)
 
 	function ENT:Initialize()
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
 		self._fxNext = 0
-
-		hook.Add("RenderScreenspaceEffects", self, function()
-			if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
-
-			cam.Start3D()
-			render.UpdateScreenEffectTexture()
-			self:DrawGlow()
-			cam.End3D()
-		end)
 	end
 
 	function ENT:OnRemove()
