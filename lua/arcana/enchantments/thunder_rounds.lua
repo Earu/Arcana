@@ -38,10 +38,11 @@ end
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
 	local baseDamage = 60
-	util.BlastDamage(attacker, attacker, hitPos, radius, baseDamage)
+	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, false, true)
 
 	local candidates = {}
 	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do
+		if ent == attacker then continue end
 		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
 			table.insert(candidates, ent)
 		end
@@ -57,7 +58,7 @@ local function applyLightningDamage(attacker, hitPos, normal)
 		local tpos = tgt:WorldSpaceCenter()
 
 		timer.Simple(0.03 * i, function()
-			if not IsValid(tgt) then return end
+			if not IsValid(tgt) or tgt == attacker then return end
 			local tesla = spawnTeslaBurst(tpos)
 			if IsValid(tesla) and tesla.CPPISetOwner then
 				tesla:CPPISetOwner(attacker)

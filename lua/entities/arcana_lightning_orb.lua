@@ -203,7 +203,8 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		util.BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 55)
+		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 55, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), false, true)
+
 		local ed = EffectData()
 		ed:SetOrigin(pos)
 		util.Effect("cball_explode", ed, true, true)
