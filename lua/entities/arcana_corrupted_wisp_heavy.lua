@@ -95,15 +95,19 @@ if SERVER then
 			local ed = EffectData()
 			ed:SetOrigin(self:GetPos())
 			util.Effect("cball_explode", ed, true, true)
+
 			-- award XP
 			local killer = atk
 			if not (IsValid(killer) and killer:IsPlayer()) then
 				killer = self._lastHurtBy
 			end
+
 			if IsValid(killer) and killer:IsPlayer() and Arcane and Arcane.GiveXP then
 				Arcane:GiveXP(killer, HEAVY_WISP_XP, "Heavy wisp destroyed")
 			end
-			self:Remove()
+
+			SafeRemoveEntityDelayed(self, 0.1)
+			hook.Run("OnNPCKilled", self, killer, dmginfo:GetInflictor())
 		end
 	end
 
