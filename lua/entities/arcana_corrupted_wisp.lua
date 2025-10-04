@@ -116,7 +116,8 @@ if SERVER then
 				Arcane:GiveXP(killer, WISP_XP, "Wisp destroyed")
 			end
 
-			self:Remove()
+			SafeRemoveEntityDelayed(self, 0.1)
+			hook.Run("OnNPCKilled", self, killer, dmginfo:GetInflictor())
 		end
 	end
 
