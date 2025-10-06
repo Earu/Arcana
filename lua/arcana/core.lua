@@ -1,11 +1,19 @@
 AddCSLuaFile()
--- Arcane Magic System Core
--- A comprehensive magic system for Garry's Mod featuring spells, rituals, and progression
+
 local Arcane = _G.Arcane or {}
 _G.Arcane = Arcane
 
 function Arcane:Print(...)
 	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), table.concat({...}, " "), "\n")
+end
+
+local function runHook(name, ...)
+	local success, a, b, c, d, e, f = xpcall(hook.Run, function(err)
+		ErrorNoHalt(debug.traceback(err))
+	end, "Arcana_" .. name, ...)
+
+	if not success then return nil end
+	return a, b, c, d, e, f
 end
 
 -- Client-side stub for autocomplete and help so players see the command
@@ -192,6 +200,9 @@ function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	for _ in pairs(list) do count = count + 1 end
 	if count >= 3 then return false, "Max enchantments reached" end
 
+	local ok, reason = runHook("CanApplyEnchantment", ply, wep, enchId)
+	if ok == false then return false, reason or "Enchantment not allowed" end
+
 	list[enchId] = { stacks = 1, applied_at = os.time() }
 	syncWeaponEnchantNW(wep)
 
@@ -200,16 +211,13 @@ function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 		if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
 	end
 
-	if self.UpdateWeaponEnchantmentVFX then
-		self:UpdateWeaponEnchantmentVFX(ply, wep)
-	end
-
 	-- Award XP for a successful enchantment application
 	if SERVER and not skipXP then
 		local amount = tonumber(self.Config.XP_PER_ENCHANT_SUCCESS) or 20
 		self:GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
 	end
 
+	runHook("AppliedEnchantment", ply, wep, enchId)
 	return true
 end
 
@@ -229,10 +237,7 @@ function Arcane:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
 	list[enchId] = nil
 	syncWeaponEnchantNW(wep)
 
-	if self.UpdateWeaponEnchantmentVFX then
-		self:UpdateWeaponEnchantmentVFX(ply, wep)
-	end
-
+	runHook("RemovedEnchantment", ply, wep, enchId)
 	return true
 end
 
@@ -594,6 +599,8 @@ function Arcane:SavePlayerData(ply)
 	if SERVER then
 		self:SavePlayerDataToSQL(ply, data)
 	end
+
+	runHook("SavedPlayerData", ply, data)
 end
 
 function Arcane:LoadPlayerData(ply, callback)
@@ -603,14 +610,14 @@ function Arcane:LoadPlayerData(ply, callback)
 	if SERVER then
 		self:LoadPlayerDataFromSQL(ply, function(loaded, data)
 			self.PlayerData[steamid] = data
-			callback()
+			callback(data)
 		end)
 	else
 		if not self.PlayerData[steamid] then
 			self.PlayerData[steamid] = CreateDefaultPlayerData()
 		end
 
-		callback()
+		callback(self.PlayerData[steamid])
 	end
 end
 
@@ -646,6 +653,8 @@ if SERVER then
 		net.Start("Arcane_FullSync")
 		net.WriteTable(payload)
 		net.Send(ply)
+
+		runHook("SyncPlayerData", ply, data)
 	end
 end
 
@@ -689,6 +698,8 @@ function Arcane:StartCasting(ply, spellId)
 		pdata.casting_spell = spellId
 	end
 
+	runHook("BeginCasting", ply, spellId)
+
 	-- Decide gesture and broadcast to clients to play locally
 	if SERVER then
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
@@ -712,12 +723,14 @@ function Arcane:StartCasting(ply, spellId)
 		-- Schedule execution after cast time
 		timer.Simple(castTime, function()
 			if not IsValid(ply) then return end
+
 			-- Clear casting lock before final validation and execution
 			local d = self:GetPlayerData(ply)
 			if d then
 				d.casting_until = nil
 				d.casting_spell = nil
 			end
+
 			-- Re-check basic conditions before executing
 			local ok, _ = self:CanCastSpell(ply, spellId)
 			if not ok then
@@ -728,6 +741,7 @@ function Arcane:StartCasting(ply, spellId)
 
 				return
 			end
+
 			-- Recompute circle context at actual cast moment so it follows the player
 			local ctxPos = ply:GetPos() + Vector(0, 0, 2)
 			local ctxAng = Angle(0, 180, 180)
@@ -760,6 +774,9 @@ function Arcane:GiveXP(ply, amount, reason)
 	local data = self:GetPlayerData(ply)
 	local oldLevel = data.level
 	data.xp = data.xp + amount
+
+	runHook("PlayerGainedXP", ply, amount, reason)
+
 	-- Check for level up
 	local newLevel = self:CalculateLevel(data.xp)
 
@@ -813,7 +830,7 @@ function Arcane:LevelUp(ply, oldLevel, newLevel)
 	end
 
 	-- Hook for other addons
-	hook.Run("Arcane_PlayerLevelUp", ply, oldLevel, newLevel, data.knowledge_points)
+	runHook("PlayerLevelUp", ply, oldLevel, newLevel, data.knowledge_points)
 end
 
 -- Spell Registration API
@@ -862,14 +879,12 @@ function Arcane:RegisterSpell(spellData)
 	end
 
 	self:Print("Registered spell '" .. spell.name .. "' (ID: " .. spell.id .. "')\n")
-
 	return true
 end
 
 function Arcane:RegisterRitualSpell(opts)
 	if not istable(opts) then
 		ErrorNoHalt("RegisterRitualSpell requires an options table\n")
-
 		return false
 	end
 
@@ -878,7 +893,6 @@ function Arcane:RegisterRitualSpell(opts)
 
 	if not id or not name then
 		ErrorNoHalt("RegisterRitualSpell requires id and name\n")
-
 		return false
 	end
 
@@ -968,15 +982,19 @@ function Arcane:CanCastSpell(ply, spellId)
 	if not ply:Alive() then return false, "You are dead" end
 	local spell = self.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
+
 	local data = self:GetPlayerData(ply)
 	-- Block re-casting while a previous cast is still winding up
 	if data.casting_until and data.casting_until > CurTime() then
 		return false, "Already casting"
 	end
+
 	-- Check if spell is unlocked
 	if not data.unlocked_spells[spellId] then return false, "Spell not unlocked" end
+
 	-- Check level requirement
 	if data.level < spell.level_required then return false, "Insufficient level" end
+
 	-- Check cooldown
 	local cooldownKey = spellId
 	if data.spell_cooldowns[cooldownKey] and data.spell_cooldowns[cooldownKey] > CurTime() then return false, "Spell on cooldown" end
@@ -989,6 +1007,9 @@ function Arcane:CanCastSpell(ply, spellId)
 		local canCast, reason = spell.can_cast(ply, nil, data)
 		if not canCast then return false, reason or "Cannot cast spell" end
 	end
+
+	local ok, reason = runHook("CanCastSpell", ply, spellId)
+	if ok == false then return false, reason or "Cannot cast spell" end
 
 	return true
 end
@@ -1026,65 +1047,6 @@ if SERVER then
 		net.WriteString(tostring(tag or ""))
 		net.Broadcast()
 	end
-
-	-- Attach rotating BandCircle rings to a weapon, one per enchantment, rotating around the longest axis
-	function Arcane:UpdateWeaponEnchantmentVFX(ply, wep, clearOnly)
-		--[[if not IsValid(ply) or not IsValid(wep) then return end
-		-- Clear any previous VFX for this weapon
-		self:ClearBandVFX(wep, "ArcanaWeaponEnchants")
-		if clearOnly then return end
-
-		-- Count applied enchantments for this weapon class
-		local list = self:GetWeaponEnchantments(ply, wep:GetClass())
-		local count = 0
-		for _ in pairs(list) do count = count + 1 end
-		if count <= 0 then return end
-
-		-- Determine weapon's longest axis using its OBB
-		local mins, maxs = wep:OBBMins(), wep:OBBMaxs()
-		local size = maxs - mins
-		local lenX, lenY, lenZ = math.abs(size.x), math.abs(size.y), math.abs(size.z)
-		local axis = "x"
-		if lenY >= lenX and lenY >= lenZ then
-			axis = "y"
-		elseif lenZ >= lenX and lenZ >= lenY then
-			axis = "z"
-		end
-
-		-- Use player's physgun color (weapon color) for the bands
-		local color = ply.GetWeaponColor and ply:GetWeaponColor():ToColor() or Color(120, 200, 255, 255)
-
-		-- Build band configurations
-		local bandConfigs = {}
-		local smallest = math.max(4, math.min(lenX, math.min(lenY, lenZ)))
-		local baseRadius = smallest * 0.6
-		local spinSpeed = 90 * 50 -- baseline spin around chosen axis
-
-		for i = 1, count do
-			local r = baseRadius + (i - 1) * 4
-			local spin = { p = 0, y = 0, r = 0 }
-			-- Alternate spin direction for visual variety
-			local dir = (i % 2 == 0) and 1 or -1
-			if axis == "x" then
-				spin.p = dir * spinSpeed
-			elseif axis == "y" then
-				spin.y = dir * spinSpeed
-			else
-				spin.r = dir * spinSpeed
-			end
-
-			bandConfigs[#bandConfigs + 1] = {
-				radius = r,
-				height = 2,
-				spin = spin,
-				lineWidth = 2,
-			}
-		end
-
-		-- Attach for a long duration; the follow hook will keep it aligned
-		local overallSize = math.max(12, baseRadius + count * 4)
-		self:SendAttachBandVFX(wep, color, overallSize, 3600, bandConfigs, "ArcanaWeaponEnchants")]]
-	end
 end
 
 function Arcane:CastSpell(ply, spellId, has_target, context)
@@ -1115,9 +1077,11 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 			dmg:SetDamage(spell.cost_amount)
 			dmg:SetAttacker(IsValid(ply) and ply or game.GetWorld())
 			dmg:SetInflictor(IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or ply)
+
 			-- Use DMG_DIRECT so armor is ignored by Source damage rules
 			dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_DIRECT))
 			takeDamageInfo(ply, dmg)
+
 			if spell.cost_amount > 100 then return false, "Insufficient coins" end
 		end
 	elseif spell.cost_type == Arcane.COST_TYPES.HEALTH then
@@ -1126,6 +1090,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		dmg:SetDamage(spell.cost_amount)
 		dmg:SetAttacker(IsValid(ply) and ply or game.GetWorld())
 		dmg:SetInflictor(IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or ply)
+
 		-- Use DMG_DIRECT so armor is ignored by Source damage rules
 		dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_DIRECT))
 		takeDamageInfo(ply, dmg)
@@ -1133,13 +1098,15 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 
 	-- Set cooldown
 	data.spell_cooldowns[spellId] = CurTime() + spell.cooldown
+
 	-- Cast the spell
 	local success = true
 	local result = spell.cast(ply, has_target, data, context)
-
 	if result == false then
 		success = false
 	end
+
+	runHook("CastSpell", ply, spellId, has_target, data, context, success)
 
 	-- Handle success/failure
 	if success then
@@ -1147,6 +1114,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		local baseCast = math.max(0.1, Arcane.Config.XP_BASE_CAST_TIME or 1.0)
 		local castTime = math.max(0.05, tonumber(spell.cast_time) or 0)
 		local ratio = castTime / baseCast
+
 		-- Clamp ratio to avoid extreme values
 		ratio = math.Clamp(ratio, 0.001, 2.0)
 		local baseXP = math.max(5, (tonumber(spell.knowledge_cost) or 1) * 10)
@@ -1168,6 +1136,8 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		if spell.on_failure then
 			spell.on_failure(ply, has_target, data)
 		end
+
+		runHook("CastSpellFailure", ply, spellId, has_target, data, context)
 
 		-- Notify clients to break down the casting circle visuals
 		if SERVER then
@@ -1196,6 +1166,9 @@ function Arcane:CanUnlockSpell(ply, spellId)
 	if data.unlocked_spells[spellId] then return false, "Already unlocked" end
 	if data.level < spell.level_required then return false, "Insufficient level" end
 	if data.knowledge_points < spell.knowledge_cost then return false, "Insufficient knowledge points" end
+
+	local ok, reason = runHook("CanUnlockSpell", ply, spellId)
+	if ok == false then return false, reason or "Cannot unlock spell" end
 
 	return true
 end
@@ -1228,6 +1201,7 @@ function Arcane:UnlockSpell(ply, spellId, force)
 
 	if SERVER then
 		self:SyncPlayerData(ply)
+
 		-- Tell the unlocking client to show an on-screen announcement & play a sound
 		net.Start("Arcane_SpellUnlocked")
 		net.WriteString(spellId)
@@ -1236,6 +1210,7 @@ function Arcane:UnlockSpell(ply, spellId, force)
 	end
 
 	self:SavePlayerData(ply)
+	runHook("SpellUnlocked", ply, spellId, spell.name or spellId)
 
 	return true
 end
@@ -1338,7 +1313,7 @@ if CLIENT then
 		data.level = newLevel
 		data.knowledge_points = newKnowledgeTotal
 		-- Notify UI (HUD) with deltas
-		hook.Run("Arcane_ClientLevelUp", prevLevel, newLevel, math.max(0, newKnowledgeTotal - prevKnowledge))
+		runHook("ClientLevelUp", prevLevel, newLevel, math.max(0, newKnowledgeTotal - prevKnowledge))
 	end)
 
 	net.Receive("Arcane_FullSync", function()
@@ -1376,9 +1351,11 @@ if CLIENT then
 		local forwardLike = net.ReadBool()
 		if not IsValid(caster) then return end
 		if not MagicCircle then return end
+
 		-- Allow spells to override the default casting circle. If a hook returns true, stop.
-		local handled = hook.Run("Arcane_BeginCastingVisuals", caster, spellId, castTime, forwardLike)
+		local handled = runHook("BeginCastingVisuals", caster, spellId, castTime, forwardLike)
 		if handled == true then return end
+
 		local pos = caster:GetPos() + Vector(0, 0, 2)
 		local ang = Angle(0, 180, 180)
 		local size = 60
@@ -1577,8 +1554,9 @@ if SERVER then
 		if justSpawned[ply] and not ucmd:IsForced() then
 			justSpawned[ply] = nil
 
-			Arcane:LoadPlayerData(ply, function()
+			Arcane:LoadPlayerData(ply, function(data)
 				Arcane:SyncPlayerData(ply)
+				runHook("LoadedPlayerData", ply, data)
 			end)
 		end
 	end)
@@ -1595,18 +1573,22 @@ if SERVER then
 
 	local function SpawnAltar()
 		if not _G.landmark then return end
+
 		local pos = _G.landmark.get("slight")
 		if not pos then return end
+
 		local ent = ents.Create("arcana_altar")
 		if not IsValid(ent) then return end
+
 		ent:SetPos(pos)
 		ent:Spawn()
 		ent:Activate()
 		ent.ms_notouch = true
+
 		-- Mark this altar so clients can treat it as the core-spawned one (for ambient loop, etc.)
 		ent:SetNWBool("ArcanaCoreSpawned", true)
-		local phys = ent:GetPhysicsObject()
 
+		local phys = ent:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:EnableMotion(false)
 		end
@@ -1615,21 +1597,23 @@ if SERVER then
 	end
 
 	local LOBBY3_OFFSET = Vector(-522, 285, 14)
-
 	local function SpawnPortalToAltar(altar)
 		if not IsValid(altar) then return end
 		if not _G.landmark then return end
+
 		local pos = _G.landmark.get("lobby_3")
 		if not pos then return end
+
 		local ent = ents.Create("arcana_portal")
 		if not IsValid(ent) then return end
+
 		ent:SetPos(pos + LOBBY3_OFFSET)
 		ent:Spawn()
 		ent:Activate()
 		ent:SetDestination(altar:WorldSpaceCenter() + altar:GetForward() * 200)
 		ent.ms_notouch = true
-		local phys = ent:GetPhysicsObject()
 
+		local phys = ent:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:EnableMotion(false)
 		end
@@ -1641,7 +1625,6 @@ if SERVER then
 
 		if _G.aowl and _G.aowl.GotoLocations then
 			local aliases = {"altar", "magic", "arcane", "arcana"}
-
 			for _, alias in ipairs(aliases) do
 				_G.aowl.GotoLocations[alias] = altar:WorldSpaceCenter() + altar:GetForward() * 200
 			end
