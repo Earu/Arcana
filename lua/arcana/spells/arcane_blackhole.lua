@@ -38,7 +38,7 @@ local function resolveStrikeGround(ply)
 end
 
 if CLIENT then
-	hook.Add("Arcane_BeginCastingVisuals", "Arcana_Blackhole_Circle", function(caster, spellId, castTime, _forwardLike)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_Blackhole_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "blackhole" then return end
 		if not MagicCircle then return end
 		local color = Color(100, 50, 200, 255)

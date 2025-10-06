@@ -148,7 +148,7 @@ Arcane:RegisterSpell({
 
 if CLIENT then
 	-- Custom moving magic circle for lightning_strike that follows the player's aim on the ground
-	hook.Add("Arcane_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "lightning_strike" then return end
 		if not MagicCircle then return end
 		local color = Color(170, 200, 255, 255)

@@ -111,7 +111,7 @@ Arcane:RegisterSpell({
 
 if CLIENT then
 	-- Customize the casting circle during channel
-	hook.Add("Arcane_BeginCastingVisuals", "Arcana_FrostNova_Circle", function(caster, spellId, castTime, forwardLike) end)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FrostNova_Circle", function(caster, spellId, castTime, forwardLike) end)
 	-- One-shot frosty shock ring at cast moment
 	local matGlow = Material("sprites/light_glow02_add")
 	local matRing = Material("effects/select_ring")
