@@ -8,6 +8,7 @@ if SERVER then
 	AddCSLuaFile("arcana/mana_network.lua")
 	AddCSLuaFile("arcana/mana_crystals.lua")
 	AddCSLuaFile("arcana/astral_vault.lua")
+	AddCSLuaFile("arcana/soul_mode.lua")
 
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
@@ -17,6 +18,7 @@ end
 include("arcana/core.lua")
 include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
+include("arcana/soul_mode.lua")
 
 if SERVER then
 	include("arcana/mana_crystals.lua")
