@@ -267,7 +267,7 @@ local levelAnnounce = {
 	knowledgeDelta = 0,
 }
 
-hook.Add("Arcane_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, newLevel, knowledgeDelta)
+hook.Add("Arcana_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, newLevel, knowledgeDelta)
 	levelAnnounce.active = true
 	levelAnnounce.startedAt = CurTime()
 	levelAnnounce.endsAt = CurTime() + 4.5
@@ -340,7 +340,7 @@ local activeCast = {
 	endsAt = 0,
 }
 
-hook.Add("Arcane_BeginCastingVisuals", "ArcanaHUD_TrackCast", function(caster, spellId, castTime)
+hook.Add("Arcana_BeginCastingVisuals", "ArcanaHUD_TrackCast", function(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 	activeCast.spellId = spellId
 	activeCast.startedAt = CurTime()

@@ -158,7 +158,7 @@ Arcane:RegisterSpell({
 
 if CLIENT then
 	-- Show a small targeting circle at the prospective landing spot while casting
-	hook.Add("Arcane_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "teleport" then return end
 		if not MagicCircle then return end
 		local pos = findSafeTeleportDestination(caster) or (caster:GetPos() + Vector(0, 0, 2))

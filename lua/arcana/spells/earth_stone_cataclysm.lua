@@ -595,7 +595,7 @@ if CLIENT then
 	end)
 
 	-- Casting-time magic circle at aimed ground, like blackhole
-	hook.Add("Arcane_BeginCastingVisuals", "Arcana_StoneCataclysm_Circle", function(caster, spellId, castTime, _forwardLike)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_StoneCataclysm_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "stone_cataclysm" then return end
 		if not MagicCircle then return end
 		if not IsValid(caster) then return end

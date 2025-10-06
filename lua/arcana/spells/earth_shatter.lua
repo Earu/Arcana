@@ -277,10 +277,6 @@ if CLIENT then
 		end
 	end
 
-	hook.Add("Arcane_EarthShatter_SpawnAreaDust", "Arcana_EarthShatter_DustWaves", function(center, radius)
-		spawnAreaDust(center, radius, 8)
-	end)
-
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_EarthShatter_Render", function()
 		-- Cull expired
 		for i = #bursts, 1, -1 do

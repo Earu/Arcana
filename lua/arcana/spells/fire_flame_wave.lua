@@ -71,7 +71,7 @@ Arcane:RegisterSpell({
 
 if CLIENT then
 	-- Client visuals for Flame Wave. Runs when casting begins; schedules the wave marker at completion.
-	hook.Add("Arcane_BeginCastingVisuals", "Arcane_FlameWave_Visuals", function(caster, spellId, castTime, forwardLike)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcane_FlameWave_Visuals", function(caster, spellId, castTime, forwardLike)
 		if spellId ~= "flame_wave" then return end
 		if not IsValid(caster) then return end
 
