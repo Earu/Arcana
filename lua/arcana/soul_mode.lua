@@ -183,6 +183,148 @@ if CLIENT then
 	local ambientSound
 	local windupSound
 
+	local greekRunes = {
+		"α","β","γ","δ","ε","ζ","η","θ","ι","κ","λ","μ",
+		"ν","ξ","ο","π","ρ","σ","τ","υ","φ","χ","ψ","ω",
+		"Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ",
+		"Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω",
+	}
+
+	-- 3D glyphs anchored to the soul (replicates altar glyph feel, white runes)
+	local soulGlyphs = {}
+	local glyphSpawnRate = 20 -- per second target
+	local glyphMax = 60
+	local glyphSpawnAcc = 0
+
+	local function clearRunes()
+		for i = #soulGlyphs, 1, -1 do
+			soulGlyphs[i] = nil
+		end
+		glyphSpawnAcc = 0
+	end
+
+	local function spawnSoulGlyph()
+		local now = CurTime()
+		local aura = 160
+		local rMin = math.max(24, aura * 0.30)
+		local rMax = math.max(rMin + 8, aura * 0.85)
+		local ang = math.Rand(0, math.pi * 2)
+		local r = math.Rand(rMin, rMax)
+		local baseX = math.cos(ang) * r
+		local baseY = math.sin(ang) * r
+		local speed = math.random(30, 200)
+		local travel = math.random(800, 1800)
+		local life = travel / speed
+		local driftX = math.Rand(-14, 14)
+		local driftY = math.Rand(-14, 14)
+		local orbitRadius = math.Rand(0, 10)
+		local orbitSpeed = math.Rand(-4, 4)
+		local orbitPhase = math.Rand(0, math.pi * 2)
+		local ch = greekRunes[math.random(1, #greekRunes)]
+		local alpha = math.random(90, 160)
+
+		-- occasional subtle ambient whisper near the soul
+		if math.Rand(0, 1) < 0.18 then
+			local soul = LocalPlayer():GetNW2Entity("Arcana_SoulEnt")
+			if IsValid(soul) then
+				sound.Play("arcana/altar_ambient_stereo.ogg", soul:GetPos() + VectorRand() * 6, 60, math.random(85, 105), 0.08)
+			end
+		end
+
+		soulGlyphs[#soulGlyphs + 1] = {
+			born = now,
+			dieAt = now + life,
+			h = 0,
+			speed = speed,
+			travel = travel,
+			char = ch,
+			alpha = alpha,
+			baseX = baseX,
+			baseY = baseY,
+			driftX = driftX,
+			driftY = driftY,
+			orbitR = orbitRadius,
+			orbitW = orbitSpeed,
+			orbitP = orbitPhase,
+		}
+	end
+
+	hook.Add("PostDrawTranslucentRenderables", Tag .. "_SoulRunes3D", function(bDepth, bSky)
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+
+		-- Only during soul mode
+		if ply:Alive() then
+			clearRunes()
+			return
+		end
+
+		if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
+		local soul = ply:GetNW2Entity("Arcana_SoulEnt")
+		if not IsValid(soul) then
+			clearRunes()
+			return
+		end
+
+		-- Spawn/update
+		local dt = FrameTime() > 0 and FrameTime() or 0.05
+		if #soulGlyphs < glyphMax then
+			glyphSpawnAcc = glyphSpawnAcc + glyphSpawnRate * dt
+			local toSpawn = math.floor(glyphSpawnAcc)
+			glyphSpawnAcc = glyphSpawnAcc - toSpawn
+			for i = 1, math.min(toSpawn, glyphMax - #soulGlyphs) do
+				spawnSoulGlyph()
+			end
+		end
+
+		-- Update/cull particles
+		local now = CurTime()
+		if #soulGlyphs > 0 then
+			local write = 1
+			for read = 1, #soulGlyphs do
+				local p = soulGlyphs[read]
+				if p and now < (p.dieAt or 0) then
+					p.h = (p.h or 0) + (p.speed or 60) * dt
+					soulGlyphs[write] = p
+					write = write + 1
+				end
+			end
+			for i = write, #soulGlyphs do
+				soulGlyphs[i] = nil
+			end
+		end
+
+		-- Draw
+		surface.SetFont("MagicCircle_Medium")
+		local baseTop = soul:WorldSpaceCenter() - Vector(0, 0, 50)
+		for _, p in ipairs(soulGlyphs) do
+			local lifeFrac = 1
+			if p.dieAt then
+				local remain = p.dieAt - now
+				local total = (p.dieAt - (p.born or now))
+				lifeFrac = math.Clamp(remain / math.max(0.001, total), 0, 1)
+			end
+			local travelFrac = math.Clamp((p.h or 0) / math.max(1, p.travel or 200), 0, 1)
+			local tailFadeStart = 0.9
+			local tailFade = travelFrac >= tailFadeStart and (1 - (travelFrac - tailFadeStart) / (1 - tailFadeStart)) or 1
+			local a = math.floor((p.alpha or 120) * lifeFrac * tailFade)
+			if a > 0 then
+				local ox = (p.baseX or 0) + (p.driftX or 0) + (p.orbitR or 0) * math.cos((p.orbitW or 0) * now + (p.orbitP or 0))
+				local oy = (p.baseY or 0) + (p.driftY or 0) + (p.orbitR or 0) * math.sin((p.orbitW or 0) * now + (p.orbitP or 0))
+				local worldPos = baseTop + Vector(ox, oy, 0)
+
+				-- Per-glyph billboard angle to face the viewer's eyes
+				local face = (EyePos() - worldPos):Angle()
+				local ang = Angle(0, face.y + 90, 90)
+				cam.Start3D2D(worldPos, ang, 0.06)
+					surface.SetTextColor(255, 255, 255, a)
+					surface.SetTextPos(0, -math.floor(p.h or 0))
+					surface.DrawText(p.char or "")
+				cam.End3D2D()
+			end
+		end
+	end)
+
 	-- simple vignette using gradient material
 	local grad_mat = Material("vgui/gradient-u")
 	local function DrawVignette(intensity, col)
@@ -392,6 +534,7 @@ if CLIENT then
 	net.Receive("Arcana_SoulMode", function()
 		local enabled = net.ReadBool()
 		if enabled then
+			clearRunes()
 			stashHooks({
 				"CalcView",
 				"SetupWorldFog",
@@ -401,6 +544,7 @@ if CLIENT then
 			setupHooks()
 		else
 			removeHooks()
+			clearRunes()
 			popHooks({
 				"CalcView",
 				"SetupWorldFog",
