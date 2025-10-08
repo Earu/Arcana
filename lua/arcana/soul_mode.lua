@@ -1,7 +1,35 @@
 local Tag = "Arcana_SoulMode"
 local SOUL_GRACE_SECS = 8
 
+-- helpers to stash and pop hooks
+local savedHooks = {}
+local function stashHooks(eventNames)
+	local hooks = hook.GetTable()
+	for _, eventName in ipairs(eventNames) do
+		local tbl = hooks[eventName]
+		if not tbl then continue end
+
+		savedHooks[eventName] = savedHooks[eventName] or {}
+		for hookName, hookCallback in pairs(tbl) do
+			savedHooks[eventName][hookName] = hookCallback
+			hook.Remove(eventName, hookName)
+		end
+	end
+end
+
+local function popHooks(eventNames)
+	for _, eventName in ipairs(eventNames) do
+		if not savedHooks[eventName] then continue end
+
+		for hookName, hookCallback in pairs(savedHooks[eventName]) do
+			hook.Add(eventName, hookName, hookCallback)
+		end
+	end
+end
+
 if SERVER then
+	util.AddNetworkString("Arcana_SoulMode")
+
 	hook.Add("PlayerDeath", Tag, function(ply)
 		ply:SetNW2Float("Arcana_SoulGraceUntil", CurTime() + SOUL_GRACE_SECS)
 		ply.ArcanaSoulSpawnPos = ply:GetPos()
@@ -11,6 +39,10 @@ if SERVER then
 
 	hook.Add("PlayerSpawn", Tag, function(ply)
 		SafeRemoveEntity(ply:GetNW2Entity("Arcana_SoulEnt"))
+
+		net.Start("Arcana_SoulMode")
+		net.WriteBool(false)
+		net.Send(ply)
 	end)
 
 	hook.Add("Move", Tag, function(ply, mv)
@@ -39,7 +71,7 @@ if SERVER then
 			end
 
 			if ply:KeyDown(IN_JUMP) then
-				vel = vel + ply:GetUp() * 1
+				vel = Vector(0, 0, 1)
 			end
 
 			if ply:KeyDown(IN_SPEED) then
@@ -47,7 +79,7 @@ if SERVER then
 			end
 
 			if ply:KeyDown(IN_DUCK) then
-				vel = vel * 0.25
+				vel = Vector(0, 0, -1)
 			end
 
 			if ply:KeyDown(IN_WALK) then
@@ -114,6 +146,10 @@ if SERVER then
 			ply:SetOwner(soul)
 			ply:SetNW2Entity("Arcana_SoulEnt", soul)
 			ply.ArcanaSoulSpawnPos = nil
+
+			net.Start("Arcana_SoulMode")
+			net.WriteBool(true)
+			net.Send(ply)
 		end
 
 		ply:SetDSP(130)
@@ -138,36 +174,6 @@ if CLIENT then
 				data.Pitch = data.Pitch * 0.5
 
 				return true
-			end
-		end
-	end)
-
-	hook.Add("CalcView", Tag, function(ply)
-		if not ply:Alive() then
-			if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
-			local ent = ply:GetNW2Entity("Arcana_SoulEnt")
-
-			if ent:IsValid() then
-				local ang = ply:EyeAngles()
-				local aim = ang:Forward()
-				local pos = ent:GetPos() + aim * -100
-
-				local data = util.TraceLine({
-					start = ent:GetPos(),
-					endpos = pos,
-					filter = ents.FindInSphere(ent:GetPos(), ent:BoundingRadius()),
-					mask = MASK_VISIBLE,
-				})
-
-				if data.Hit and data.Entity ~= ply and not data.Entity:IsPlayer() and not data.Entity:IsVehicle() then
-					pos = data.HitPos + aim * 5
-				end
-
-				return {
-					origin = pos,
-					fov = 50,
-					angles = ang,
-				}
 			end
 		end
 	end)
@@ -295,6 +301,112 @@ if CLIENT then
 			if windupSound then
 				windupSound:Stop()
 			end
+		end
+	end)
+
+	local function isInSoulMode()
+		local soulEnt = LocalPlayer():GetNW2Entity("Arcana_SoulEnt")
+		return IsValid(soulEnt)
+	end
+
+	local WORLD_MAT = CreateMaterial("arcana_soul_mode_world_" .. FrameNumber(), "LightmappedGeneric", {
+		["$basetexture"] = "models/debug/debugwhite",
+		["$color"] = "[0 0 0]",
+	})
+
+	hook.Add("RenderScene", Tag, function()
+		if not isInSoulMode() then return end
+
+		render.WorldMaterialOverride(WORLD_MAT)
+	end)
+
+	local function setupHooks()
+		hook.Add("SetupWorldFog", Tag, function()
+			if not isInSoulMode() then return end
+
+			render.FogMode(MATERIAL_FOG_LINEAR)
+			render.FogStart(0)
+			render.FogEnd(1000)
+			render.FogMaxDensity(1)
+			render.FogColor(0, 0, 0)
+
+			return true
+		end)
+
+		hook.Add("PreDrawSkyBox", Tag, function()
+			if not isInSoulMode() then return end
+
+			cam.IgnoreZ(true)
+			render.Clear(0, 0, 0, 255, true, true)
+			cam.IgnoreZ(false)
+
+			return true
+		end)
+
+		hook.Add("PostDraw2DSkyBox", Tag, function()
+			if not isInSoulMode() then return end
+
+			cam.IgnoreZ(true)
+			render.Clear(0, 0, 0, 255, true, true)
+			cam.IgnoreZ(false)
+		end)
+
+		hook.Add("CalcView", Tag, function(ply)
+			if not ply:Alive() then
+				if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
+
+				local ent = ply:GetNW2Entity("Arcana_SoulEnt")
+				if ent:IsValid() then
+					local ang = ply:EyeAngles()
+					local aim = ang:Forward()
+					local pos = ent:GetPos() + aim * -100
+
+					local data = util.TraceLine({
+						start = ent:GetPos(),
+						endpos = pos,
+						filter = ents.FindInSphere(ent:GetPos(), ent:BoundingRadius()),
+						mask = MASK_VISIBLE,
+					})
+
+					if data.Hit and data.Entity ~= ply and not data.Entity:IsPlayer() and not data.Entity:IsVehicle() then
+						pos = data.HitPos + aim * 5
+					end
+
+					return {
+						origin = pos,
+						fov = 50,
+						angles = ang,
+					}
+				end
+			end
+		end)
+	end
+
+	local function removeHooks()
+		hook.Remove("CalcView", Tag)
+		hook.Remove("SetupWorldFog", Tag)
+		hook.Remove("PreDrawSkyBox", Tag)
+		hook.Remove("PostDraw2DSkyBox", Tag)
+	end
+
+	net.Receive("Arcana_SoulMode", function()
+		local enabled = net.ReadBool()
+		if enabled then
+			stashHooks({
+				"CalcView",
+				"SetupWorldFog",
+				"PreDrawSkyBox",
+				"PostDraw2DSkyBox"
+			})
+			setupHooks()
+		else
+			removeHooks()
+			popHooks({
+				"CalcView",
+				"SetupWorldFog",
+				"PreDrawSkyBox",
+				"PostDraw2DSkyBox"
+			})
 		end
 	end)
 end
