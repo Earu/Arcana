@@ -132,7 +132,7 @@ if SERVER then
 			end
 
 			local soul = ents.Create("arcana_soul")
-			soul:SetPos(pos)
+			soul:SetPos(pos + Vector(0, 0, 30))
 			soul:Spawn()
 
 			if soul.CPPISetOwner then
