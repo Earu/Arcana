@@ -1669,6 +1669,7 @@ function Arcane:BlastDamage(attacker, inflictor, center, radius, baseDamage, dam
 	for _, ent in ipairs(ents.FindInSphere(center, radius)) do
 		if not IsValid(ent) or ent == inflictor then continue end
 		if ignoreAttacker and ent == attacker then continue end
+		if ent:IsPlayer() and not ent:Alive() then continue end
 
 		-- Compute linear falloff
 		local dist = ent:WorldSpaceCenter():Distance(center)
