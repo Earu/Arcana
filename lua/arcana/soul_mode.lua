@@ -165,6 +165,7 @@ end
 if CLIENT then
 	hook.Add("EntityEmitSound", Tag, function(data)
 		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
 
 		if not ply:Alive() then
 			if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
@@ -362,12 +363,13 @@ if CLIENT then
 			ent.Color = ply:GetWeaponColor():ToColor()
 		end
 
-		if not LocalPlayer():Alive() then
-			ambientSound = ambientSound or CreateSound(LocalPlayer(), "ambient/levels/citadel/citadel_hub_ambience1.mp3")
+		local ply = LocalPlayer()
+		if not ply:Alive() then
+			ambientSound = ambientSound or CreateSound(ply, "ambient/levels/citadel/citadel_hub_ambience1.mp3")
 			ambientSound:Play()
 			ambientSound:SetDSP(1)
 			ambientSound:ChangePitch(100 + math.sin(RealTime() / 5) * 5)
-			local time = LocalPlayer():GetNW2Float("Arcana_SoulGraceUntil", 0) - CurTime()
+			local time = ply:GetNW2Float("Arcana_SoulGraceUntil", 0) - CurTime()
 			local f = time
 			f = -math.Clamp(f / SOUL_GRACE_SECS, 0, 1) + 1
 			f = f ^ 5
@@ -380,7 +382,7 @@ if CLIENT then
 			end
 
 			DrawToyTown(2 * f, 500)
-			windupSound = windupSound or CreateSound(LocalPlayer(), "ambient/levels/labs/teleport_mechanism_windup5.wav")
+			windupSound = windupSound or CreateSound(ply, "ambient/levels/labs/teleport_mechanism_windup5.wav")
 			windupSound:PlayEx(1, 255)
 			windupSound:ChangeVolume(f)
 			windupSound:ChangePitch(math.min(100 + f * 255, 255))
@@ -447,7 +449,10 @@ if CLIENT then
 	end)
 
 	local function isInSoulMode()
-		local soulEnt = LocalPlayer():GetNW2Entity("Arcana_SoulEnt")
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return false end
+
+		local soulEnt = ply:GetNW2Entity("Arcana_SoulEnt")
 		return IsValid(soulEnt)
 	end
 
