@@ -154,13 +154,20 @@ if SERVER then
 
 	-- Imprint current weapon into vault (consumes weapon)
 	net.Receive("Arcana_AstralVault_Imprint", function(_, ply)
+		if not ply:Alive() then return end
+
 		local nickname = tostring(net.ReadString() or "")
 		local wep = ply:GetActiveWeapon()
 		if not IsValid(wep) then return end
-		if not wep.Spawnable then return end
-		if wep.AdminOnly and not ply:IsAdmin() then return end
 
 		local cls = wep:GetClass()
+		local swep = weapons.GetStored(cls)
+		if not swep.Spawnable then return end
+		
+		local isAdmin = ply:IsAdmin() or game.SinglePlayer()
+		if (not swep.Spawnable and not isAdmin) or (swep.AdminOnly and not isAdmin) then return end
+		if not gamemode.Call("PlayerGiveSWEP", ply, cls, swep) then return end
+
 		local ids = collectEnchantIds(wep)
 		readVault(ply, function(_, items)
 			items = items or {}
@@ -196,6 +203,8 @@ if SERVER then
 
 	-- Summon an entry (give fresh weapon and apply enchants)
 	net.Receive("Arcana_AstralVault_Summon", function(_, ply)
+		if not ply:Alive() then return end
+
 		local entryId = net.ReadUInt(16)
 		readVault(ply, function(_, items)
 			local entry = items and items[entryId]
@@ -208,8 +217,10 @@ if SERVER then
 			local cls = entry.class
 			local swep = weapons.GetStored(cls)
 			if not swep then return end
-			if not swep.Spawnable then return end
-			if swep.AdminOnly and not ply:IsAdmin() then return end
+
+			local isAdmin = ply:IsAdmin() or game.SinglePlayer()
+			if (not swep.Spawnable and not isAdmin) or (swep.AdminOnly and not isAdmin) then return end
+			if not gamemode.Call("PlayerGiveSWEP", ply, cls, swep) then return end
 
 			-- Replace existing weapon of same class
 			if cls and ply.HasWeapon and ply:HasWeapon(cls) then ply:StripWeapon(cls) end
