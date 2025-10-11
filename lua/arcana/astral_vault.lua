@@ -157,6 +157,9 @@ if SERVER then
 		local nickname = tostring(net.ReadString() or "")
 		local wep = ply:GetActiveWeapon()
 		if not IsValid(wep) then return end
+		if not wep.Spawnable then return end
+		if wep.AdminOnly and not ply:IsAdmin() then return end
+
 		local cls = wep:GetClass()
 		local ids = collectEnchantIds(wep)
 		readVault(ply, function(_, items)
@@ -203,6 +206,10 @@ if SERVER then
 
 			charge(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS, "Astral Vault Summon")
 			local cls = entry.class
+			local swep = weapons.GetStored(cls)
+			if not swep then return end
+			if not swep.Spawnable then return end
+			if swep.AdminOnly and not ply:IsAdmin() then return end
 
 			-- Replace existing weapon of same class
 			if cls and ply.HasWeapon and ply:HasWeapon(cls) then ply:StripWeapon(cls) end
