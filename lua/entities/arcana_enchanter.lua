@@ -1281,7 +1281,7 @@ if CLIENT then
 			end
 
 			modelPanel:SetVisible(true)
-			local swep = weapons.GetStored(cls)
+			local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
 			local model = (swep and (swep.WorldModel or swep.ViewModel)) or "models/weapons/w_pistol.mdl"
 			local nice = (swep and (swep.PrintName or swep.Printname)) or cls
 			modelPanel:SetModel(model)
