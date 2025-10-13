@@ -161,9 +161,9 @@ if SERVER then
 		if not IsValid(wep) then return end
 
 		local cls = wep:GetClass()
-		local swep = weapons.GetStored(cls)
+		local swep = list.Get("Weapon")[cls]
 		if not swep.Spawnable then return end
-		
+
 		local isAdmin = ply:IsAdmin() or game.SinglePlayer()
 		if (not swep.Spawnable and not isAdmin) or (swep.AdminOnly and not isAdmin) then return end
 		if not gamemode.Call("PlayerGiveSWEP", ply, cls, swep) then return end
@@ -184,7 +184,6 @@ if SERVER then
 			-- Remove weapon to avoid duplication
 			if cls and ply.HasWeapon and ply:HasWeapon(cls) then ply:StripWeapon(cls) end
 
-			local swep = weapons.GetStored(cls)
 			local pretty = (swep and (swep.PrintName or swep.Printname)) or cls
 			local entry = {
 				id = util.CRC(cls .. table.concat(ids) .. os.time()),
@@ -213,14 +212,15 @@ if SERVER then
 			local ok, reason = canAfford(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS)
 			if not ok then if Arcane.SendErrorNotification then Arcane:SendErrorNotification(ply, reason) end return end
 
-			charge(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS, "Astral Vault Summon")
 			local cls = entry.class
-			local swep = weapons.GetStored(cls)
+			local swep = list.Get("Weapon")[cls]
 			if not swep then return end
 
 			local isAdmin = ply:IsAdmin() or game.SinglePlayer()
 			if (not swep.Spawnable and not isAdmin) or (swep.AdminOnly and not isAdmin) then return end
 			if not gamemode.Call("PlayerGiveSWEP", ply, cls, swep) then return end
+
+			charge(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS, "Astral Vault Summon")
 
 			-- Replace existing weapon of same class
 			if cls and ply.HasWeapon and ply:HasWeapon(cls) then ply:StripWeapon(cls) end
@@ -652,7 +652,7 @@ if CLIENT then
 
 			if it then
 				local cls = it.class or ""
-				local swep = weapons.GetStored(cls)
+				local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
 				local mdl = (swep and (swep.WorldModel or swep.ViewModel)) or "models/weapons/w_pistol.mdl"
 				model:SetModel(mdl)
 				FitModelPanel(model)
