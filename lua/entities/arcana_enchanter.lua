@@ -86,39 +86,6 @@ if SERVER then
 		self:EmitSound("buttons/button9.wav", 60, 110)
 	end
 
-	local function canAffordEnchantment(ply, ench)
-		if not Arcane or not ench then return false, "Invalid enchantment" end
-		local coins = (ply.GetCoins and ply:GetCoins()) or 0
-		if coins < (ench.cost_coins or 0) then return false, "Insufficient coins" end
-
-		for _, it in ipairs(ench.cost_items or {}) do
-			local name = tostring(it.name or "")
-			local amt = math.max(1, math.floor(tonumber(it.amount or 1) or 1))
-
-			if name ~= "" then
-				local have = (ply.GetItemCount and ply:GetItemCount(name)) or 0
-				if have < amt then return false, "Missing item: " .. name end
-			end
-		end
-
-		return true
-	end
-
-	local function takeEnchantmentCost(ply, ench)
-		if ench.cost_coins and ench.cost_coins > 0 and ply.TakeCoins then
-			ply:TakeCoins(ench.cost_coins)
-		end
-
-		for _, it in ipairs(ench.cost_items or {}) do
-			local name = tostring(it.name or "")
-			local amt = math.max(1, math.floor(tonumber(it.amount or 1) or 1))
-
-			if name ~= "" and ply.TakeItem then
-				ply:TakeItem(name, amt)
-			end
-		end
-	end
-
 	net.Receive("Arcana_Enchanter_Deposit", function(_, ply)
 		local ent = net.ReadEntity()
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_enchanter" then return end
