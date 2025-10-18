@@ -106,7 +106,7 @@ local function spawnForest(ctx)
 	local entities = {}
 	local timersOut = {}
 	local timerName = "Arcana_Env_ForestGen_" .. tostring(IsValid(ctx.owner) and ctx.owner:SteamID64() or "world")
-	timersOut[#timersOut + 1] = timerName
+	table.insert(timersOut, timerName)
 
 	-- Scale forest size and density using precomputed effective radius
 	local effRadius = tonumber(ctx.effective_radius or 0) or 0
@@ -318,6 +318,94 @@ local function spawnMushroomHotspot(ctx)
 	return { entities = entities }
 end
 
+local fairyGroveModels = {
+	"models/props_foliage/urban_tree_giant01_medium.mdl",
+	"models/props_foliage/urban_tree_giant01_small.mdl",
+}
+local function spawnFairyGrove(ctx)
+	-- Scale grove size using precomputed effective radius
+	local effRadius = tonumber(ctx.effective_radius or 0) or 0
+	local forestRange = math.Clamp(math.floor(effRadius * 0.9), 1500, FOREST_RANGE)
+
+	local entities = {}
+	local timersOut = {}
+
+	local centerTrace = traceGrassNear(ctx.origin, forestRange) or util.TraceLine({
+		start = ctx.origin + Vector(0, 0, 1000),
+		endpos = ctx.origin - Vector(0, 0, 2000),
+		mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY)
+	})
+
+	if not centerTrace.Hit or not ACCEPTABLE_SURFACE_TYPES[centerTrace.MatType] or not util.IsInWorld(centerTrace.HitPos) then
+		return { entities = entities, timers = timersOut }
+	end
+
+	local center = centerTrace.HitPos + Vector(0, 0, 2)
+
+	-- Place a prominent tree as the grove's anchor
+	local tree = ents.Create("prop_physics")
+	if IsValid(tree) then
+		tree:SetPos(center)
+		tree:SetModel(fairyGroveModels[math.random(#fairyGroveModels)])
+		tree:SetModelScale(4, 0.5)
+		tree:SetAngles(Angle(0, math.random(0, 360), 0))
+		tree:Spawn()
+		tree:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		if tree.CPPISetOwner then tree:CPPISetOwner(ctx.owner) end
+		tree:DropToFloor()
+		tree:SetPos(tree:GetPos() - Vector(0, 0, 20 * tree:GetModelScale()))
+
+		freeze(tree)
+		table.insert(entities, tree)
+	end
+
+	-- Spawn fairies that flutter around the tree
+	local densityFactor = (forestRange / FOREST_RANGE) ^ 2
+	local fairyCount = math.Clamp(math.floor(6 + 12 * densityFactor), 6, 16)
+	local rScale = math.sqrt(math.max(0.25, forestRange / FOREST_RANGE))
+	local orbitRadius = math.floor(800 * rScale)
+
+	local timerPrefix = "Arcana_Env_FairyGrove_Move_" .. tostring(IsValid(ctx.owner) and ctx.owner:SteamID64() or "world") .. "_"
+	for i = 1, fairyCount do
+		math.randomseed(os.clock() + (i * 1000))
+
+		local a = math.Rand(0, math.pi * 2)
+		local r = math.Rand(orbitRadius * 0.5, orbitRadius)
+		local pos = center + Vector(math.cos(a) * r, math.sin(a) * r, 120 + math.random(-100, 400))
+
+		local f = ents.Create("arcana_fairy")
+		if not IsValid(f) then continue end
+
+		f:SetPos(pos)
+		f:Spawn()
+		if f.CPPISetOwner then f:CPPISetOwner(ctx.owner) end
+		table.insert(entities, f)
+
+		local tname = timerPrefix .. tostring(f:EntIndex())
+		table.insert(timersOut, tname)
+
+		local function schedule(nextDelay)
+			local delay = nextDelay or math.Rand(1.2, 3.6)
+			timer.Create(tname, delay, 1, function()
+				if Arcane.Environments.Active ~= ctx then timer.Remove(tname) return end
+				if not IsValid(f) then timer.Remove(tname) return end
+
+				local a = math.Rand(0, math.pi * 2)
+				local r = math.Rand(orbitRadius * 0.4, orbitRadius)
+				local dst = center + Vector(math.cos(a) * r, math.sin(a) * r, 120 + math.random(-80, 140))
+				f:MoveTo(dst)
+
+				schedule()
+			end)
+		end
+
+		-- initial stagger per fairy
+		schedule(math.Rand(0.25, 2.5))
+	end
+
+	return { entities = entities, timers = timersOut }
+end
+
 Envs:RegisterEnvironment({
 	id = "magical_forest",
 	name = "Magical Forest",
@@ -327,10 +415,11 @@ Envs:RegisterEnvironment({
 	spawn_base = function(ctx)
 		return spawnForest(ctx)
 	end,
-	poi_min = 1,
+	poi_min = 2,
 	poi_max = 2,
 	pois = {
 		{ id = "mushroom_hotspot", weight = 100, spawn = spawnMushroomHotspot },
+		{ id = "fairy_grove", weight = 100, spawn = spawnFairyGrove },
 	},
 })
 
