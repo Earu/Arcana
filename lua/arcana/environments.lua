@@ -46,6 +46,7 @@ function Envs:RegisterEnvironment(def)
 	def.name = def.name or id
 	def.lifetime = tonumber(def.lifetime or 3600) or 3600
 	def.lock_duration = tonumber(def.lock_duration or 0) or 0 -- seconds to prevent immediate re-cast/start
+	def.min_radius = tonumber(def.min_radius or 0) or 0 -- minimum effective radius required to allow spawn
 	def.poi_min = math.max(0, tonumber(def.poi_min or 0) or 0)
 	def.poi_max = math.max(def.poi_min, tonumber(def.poi_max or def.poi_min) or def.poi_min)
 	def.pois = istable(def.pois) and def.pois or {}
@@ -107,6 +108,45 @@ local function chooseWeightedUnique(items, k)
 	return chosen
 end
 
+-- Compute effective horizontal radius available around origin by sampling along a vertical line
+-- and tracing outwards in 4 cardinal directions every 50 units.
+function Envs:ComputeEffectiveRadius(origin)
+	if not origin or not origin.IsZero then return 0 end
+	local upStart = origin + Vector(0, 0, 8)
+	local upTrace = util.TraceLine({
+		start = upStart,
+		endpos = upStart + Vector(0, 0, 4096),
+		mask = MASK_SOLID_BRUSHONLY
+	})
+
+	local topZ = upTrace.Hit and upTrace.HitPos.z or (origin.z + 600)
+	local distances = {}
+	local dirs = {Vector(1, 0, 0), Vector(-1, 0, 0), Vector(0, 1, 0), Vector(0, -1, 0)}
+	local step = 50
+	for z = origin.z, topZ, step do
+		local sample = Vector(origin.x, origin.y, z)
+		for _, d in ipairs(dirs) do
+			local tr = util.TraceLine({
+				start = sample,
+				endpos = sample + d * 4096,
+				mask = MASK_SOLID_BRUSHONLY
+			})
+			local hitPos = tr.Hit and tr.HitPos or (sample + d * 4096)
+			distances[#distances + 1] = hitPos:Distance(sample)
+		end
+	end
+
+	if #distances < 1 then return 0 end
+
+	table.sort(distances)
+	local mid = math.floor((#distances + 1) / 2)
+	if (#distances % 2) == 1 then
+		return distances[mid]
+	else
+		return (distances[mid] + distances[mid + 1]) * 0.5
+	end
+end
+
 -- Public API: Start an environment by id at origin
 -- Returns true on success, false and reason on failure
 function Envs:Start(id, origin, owner)
@@ -120,6 +160,14 @@ function Envs:Start(id, origin, owner)
 		return false, (def.name or id) .. " is on cooldown for " .. tostring(remaining) .. "s"
 	end
 	origin = origin or Vector(0, 0, 0)
+
+	-- Space validation: ensure sufficient effective radius
+	if (def.min_radius or 0) > 0 then
+		local eff = self:ComputeEffectiveRadius(origin)
+		if eff < def.min_radius then
+			return false, "Not enough space (radius " .. tostring(math.floor(eff)) .. " < required " .. tostring(def.min_radius) .. ")"
+		end
+	end
 
 	local ctx = {
 		id = id,
