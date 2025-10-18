@@ -1,5 +1,6 @@
 if SERVER then
 	AddCSLuaFile("arcana/core.lua")
+	AddCSLuaFile("arcana/environments.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/enchant_vfx.lua")
 	AddCSLuaFile("arcana/hud.lua")
@@ -16,6 +17,7 @@ if SERVER then
 end
 
 include("arcana/core.lua")
+include("arcana/environments.lua")
 include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
 include("arcana/soul_mode.lua")
@@ -40,6 +42,17 @@ do
 			AddCSLuaFile("arcana/status/" .. fname)
 		end
 		include("arcana/status/" .. fname)
+	end
+end
+
+-- Load all environments from arcana/environments/*.lua so each environment can live in its own file
+do
+	local files = file.Find("arcana/environments/*.lua", "LUA")
+	for _, fname in ipairs(files) do
+		if SERVER then
+			AddCSLuaFile("arcana/environments/" .. fname)
+		end
+		include("arcana/environments/" .. fname)
 	end
 end
 
