@@ -1,15 +1,14 @@
 -- Magical Forest environment definition
 if not SERVER then return end
 
-local Arcane = _G.Arcane or {}
-local Envs = (Arcane and Arcane.Environments) or nil
-if not Envs then return end
+local Envs = Arcane.Environments
 
 -- Helpers borrowed from the ritual logic and kept local to this file
 local function slopeAlignedAngle(surfaceNormal)
 	local ang = surfaceNormal:Angle()
 	ang:RotateAroundAxis(ang:Right(), -90)
 	ang:RotateAroundAxis(ang:Up(), math.random(0, 360))
+
 	return ang
 end
 
@@ -20,13 +19,16 @@ local function angleFromForwardUp(forward, up)
 	if r:LengthSqr() < 1e-6 then
 		return slopeAlignedAngle(u)
 	end
+
 	r:Normalize()
 	f = u:Cross(r)
 	f:Normalize()
+
 	local ang = f:Angle()
 	local curUp = ang:Up()
 	local rot = math.deg(math.atan2(curUp:Cross(u):Dot(f), curUp:Dot(u)))
 	ang:RotateAroundAxis(f, rot)
+
 	return ang
 end
 
@@ -36,19 +38,26 @@ local function spanAlignedPose(centerPos, approxUp, halfSpan)
 	local tangent = VectorRand()
 	tangent = (tangent - up * tangent:Dot(up))
 	if tangent:LengthSqr() < 1e-6 then tangent = up:Angle():Right() end
+
 	tangent:Normalize()
+
 	local startOffset = up * 64
 	local p1 = centerPos + tangent * halfSpan
 	local p2 = centerPos - tangent * halfSpan
 	local tr1 = util.TraceLine({start = p1 + startOffset, endpos = p1 - up * 4096, mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY)})
 	local tr2 = util.TraceLine({start = p2 + startOffset, endpos = p2 - up * 4096, mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY)})
+
 	if not tr1.Hit or not tr2.Hit then return slopeAlignedAngle(approxUp), centerPos end
+
 	local forward = (tr2.HitPos - tr1.HitPos)
 	if forward:LengthSqr() < 1 then return slopeAlignedAngle(approxUp), (tr1.HitPos + tr2.HitPos) * 0.5 end
+
 	forward:Normalize()
+
 	local upAvg = (tr1.HitNormal + tr2.HitNormal):GetNormalized()
 	local ang = angleFromForwardUp(forward, upAvg)
 	local groundCenter = (tr1.HitPos + tr2.HitPos) * 0.5
+
 	return ang, groundCenter, upAvg
 end
 
@@ -136,7 +145,9 @@ local function spawnForest(ctx)
 				mdl = deadTrees[math.random(#deadTrees)]
 			end
 		end
+
 		tree:SetModel(mdl)
+
 		local finalScale = math.random(1, 2.5)
 		tree:SetModelScale(finalScale, 0.5)
 
@@ -238,6 +249,7 @@ Envs:RegisterEnvironment({
 	name = "Magical Forest",
 	lifetime = 60 * 60,
 	lock_duration = 60 * 60,
+	min_radius = 4000,
 	spawn_base = function(ctx)
 		return spawnForest(ctx)
 	end,
