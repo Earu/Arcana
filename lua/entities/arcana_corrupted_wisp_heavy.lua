@@ -107,7 +107,7 @@ if SERVER then
 			end
 
 			SafeRemoveEntityDelayed(self, 0.1)
-			hook.Run("OnNPCKilled", self, killer, dmginfo:GetInflictor())
+			hook.Run("OnNPCKilled", self, IsValid(killer) and killer or game.GetWorld(), dmginfo:GetInflictor())
 		end
 	end
 
