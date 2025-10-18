@@ -5,13 +5,20 @@ ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.Category = "Arcana"
 ENT.Spawnable = false
+ENT.RenderGroup = RENDERGROUP_TRANSLUCENT
 
 ENT.Size = 1
 ENT.Visibility = 0
+ENT.next_sound = 0
+ENT.WingSpeed = 6.3
+ENT.FlapLength = 30
+ENT.WingSize = 0.4
+ENT.SizePulse = 1
+ENT.Blink = math.huge
 
 if CLIENT then
 	local function DrawFairySunbeams()
-		local fairies = ents.FindByClass(ENT.ClassName)
+		local fairies = ents.FindByClass("arcana_fairy")
 		local count = #fairies
 		for key, ent in ipairs(fairies) do
 			ent:DrawSunbeams(ent:GetPos(), 0.05/count, 0.025)
@@ -31,8 +38,6 @@ if CLIENT then
 	end
 
 	do -- sounds
-		ENT.next_sound = 0
-
 		function ENT:CalcSoundQueue(play_next_now)
 			if #self.SoundQueue > 0 and (play_next_now or self.next_sound < CurTime()) then
 
@@ -92,15 +97,6 @@ if CLIENT then
 			end
 		end
 
-		function ENT:Laugh()
-			local path = "arcana/fairy/nymph/NymphGiggle_0"..math.random(9)..".wav"
-			local pitch = math.random(95,105)
-
-			self:AddToSoundQueue(path, pitch, true)
-
-			self.Laughing = true
-		end
-
 		function ENT:Ouch(time)
 			time = time or 0
 
@@ -128,13 +124,6 @@ if CLIENT then
 	end
 
 	local wing_mdl = Model("models/arcana/fairy/wing.mdl")
-
-	ENT.WingSpeed = 6.3
-	ENT.FlapLength = 30
-	ENT.WingSize = 0.4
-
-	ENT.SizePulse = 1
-
 	local function CreateEntity(mdl)
 		local ent = ClientsideModel(mdl)
 
@@ -200,9 +189,6 @@ if CLIENT then
 		self.bleftwing:SetNoDraw(true)
 		self.brightwing:SetNoDraw(true)
 	end
-
-	-- draw after transparent stuff
-	ENT.RenderGroup = RENDERGROUP_TRANSLUCENT
 
 	function ENT:DrawTranslucent()
 		self:CalcAngles()
@@ -295,8 +281,6 @@ if CLIENT then
 	local eye_happy = Material("icon16/error.png")
 	local eye_heart = Material("icon16/heart.png")
 
-	ENT.Blink = math.huge
-
 	function ENT:DrawSprites()
 		local pos = self:GetPos()
 		local pulse = math.sin(CurTime()*2) * 0.5
@@ -332,7 +316,6 @@ if CLIENT then
 		local fade_mult = math.Clamp(-self:GetForward():Dot((self:GetPos() - EyePos()):GetNormalized()), 0, 1)
 
 		if fade_mult ~= 0 then
-
 			if self.Hurting then
 				render.SetMaterial(eye_hurt)
 			else
@@ -362,9 +345,8 @@ if CLIENT then
 				0.6 * fade_mult * self.Size * self.SizePulse ^ 1.5,
 				0.6 * fade_mult * self.Size * self.SizePulse,
 
-				Color(10,10,10,200*fade_mult)
+				Color(10, 10, 10, 200 * fade_mult)
 			)
-
 		end
 	end
 
@@ -483,12 +465,12 @@ if CLIENT then
 		self.light.Decay = 0
 		self.light.DieTime = 0
 
-		if #ents.FindByClass(ENT.ClassName) == 1 then
+		if #ents.FindByClass("arcana_fairy") == 1 then
 			hook.Remove("RenderScreenspaceEffects", "arcana_fairy_sunbeams")
 		end
 	end
 
-	net.Receive("fairy_func_call", function()
+	net.Receive("arcana_fairy_func_call", function()
 		local ent = net.ReadEntity()
 		local func = net.ReadString()
 		local args = net.ReadTable()
@@ -601,17 +583,6 @@ if SERVER then
 			self.follow_ent = NULL
 		end
 
-		self:LaughAtMe()
-
 		phys:SetVelocity(phys:GetVelocity():GetNormalized() * data.OurOldVelocity:Length() * 0.99)
-	end
-
-	function ENT:LaughAtMe()
-		local fairies = ents.FindByClass("fairy")
-		for	key, ent in pairs(fairies) do
-			if ent ~= self and math.random() < 1 / #fairies then
-				ent:CallClientFunction("Laugh")
-			end
-		end
 	end
 end
