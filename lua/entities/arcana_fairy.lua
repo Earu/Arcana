@@ -1,7 +1,10 @@
 AddCSLuaFile()
+
 ENT.ClassName = "arcana_fairy"
 ENT.Type = "anim"
 ENT.Base = "base_anim"
+ENT.Category = "Arcana"
+ENT.Spawnable = false
 
 ENT.Size = 1
 ENT.Visibility = 0
