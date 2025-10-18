@@ -115,7 +115,7 @@ function Envs:ComputeEffectiveRadius(origin)
 	local upStart = origin + Vector(0, 0, 8)
 	local upTrace = util.TraceLine({
 		start = upStart,
-		endpos = upStart + Vector(0, 0, 4096),
+		endpos = upStart + Vector(0, 0, 40000),
 		mask = MASK_SOLID_BRUSHONLY
 	})
 
@@ -128,10 +128,11 @@ function Envs:ComputeEffectiveRadius(origin)
 		for _, d in ipairs(dirs) do
 			local tr = util.TraceLine({
 				start = sample,
-				endpos = sample + d * 4096,
+				endpos = sample + d * 40000,
 				mask = MASK_SOLID_BRUSHONLY
 			})
-			local hitPos = tr.Hit and tr.HitPos or (sample + d * 4096)
+
+			local hitPos = tr.Hit and tr.HitPos or (sample + d * 40000)
 			distances[#distances + 1] = hitPos:Distance(sample)
 		end
 	end
@@ -152,20 +153,25 @@ end
 function Envs:Start(id, origin, owner)
 	if not SERVER then return false, "Server only" end
 	if self:IsActive() then return false, "An environment is already active" end
+
 	local def = self.Registered[id]
 	if not def then return false, "Unknown environment" end
+
 	local lockUntil = tonumber(self.LockUntilById[id] or 0) or 0
 	if CurTime() < lockUntil then
 		local remaining = math.max(0, math.floor(lockUntil - CurTime()))
 		return false, (def.name or id) .. " is on cooldown for " .. tostring(remaining) .. "s"
 	end
+
 	origin = origin or Vector(0, 0, 0)
+
+	-- Compute effective radius once and pass to environment context
+	local eff_radius = self:ComputeEffectiveRadius(origin)
 
 	-- Space validation: ensure sufficient effective radius
 	if (def.min_radius or 0) > 0 then
-		local eff = self:ComputeEffectiveRadius(origin)
-		if eff < def.min_radius then
-			return false, "Not enough space (radius " .. tostring(math.floor(eff)) .. " < required " .. tostring(def.min_radius) .. ")"
+		if eff_radius < def.min_radius then
+			return false, "Not enough space (radius " .. tostring(math.floor(eff_radius)) .. " < required " .. tostring(def.min_radius) .. ")"
 		end
 	end
 
@@ -176,6 +182,7 @@ function Envs:Start(id, origin, owner)
 		owner = IsValid(owner) and owner or game.GetWorld(),
 		started = CurTime(),
 		expires = CurTime() + def.lifetime,
+		effective_radius = eff_radius,
 		spawned = {},
 		timers = {},
 		-- convenience
