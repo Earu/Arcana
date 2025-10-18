@@ -77,13 +77,13 @@ end
 hook.Add("InitPostEntity", "Arcana_Testing", function()
 	local PLY = FindMetaTable("Player")
 
-	applyFallback(PLY, "GetCoins", function() return 2e6 end)
-	applyFallback(PLY, "TakeCoins", function() end)
-	applyFallback(PLY, "GiveCoins", function() end)
+	applyFallback(PLY, "GetCoins", function(amount) return 2e6 end)
+	applyFallback(PLY, "TakeCoins", function(amount, reason) end)
+	applyFallback(PLY, "GiveCoins", function(amount, reason) end)
 
-	applyFallback(PLY, "GetItemCount", function() return 2e6 end)
-	applyFallback(PLY, "TakeItem", function() end)
-	applyFallback(PLY, "GiveItem", function() end)
+	applyFallback(PLY, "GetItemCount", function(itemClass) return 2e6 end)
+	applyFallback(PLY, "TakeItem", function(itemClass, amount, reason) end)
+	applyFallback(PLY, "GiveItem", function(itemClass, amount, reason) end)
 end)
 
 if SERVER then
