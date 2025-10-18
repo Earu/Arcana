@@ -4,7 +4,7 @@ ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Magical Mushroom"
 ENT.Author = "Arcana"
-ENT.Spawnable = true
+ENT.Spawnable = false
 ENT.Category = "Arcana"
 ENT.RenderGroup = RENDERGROUP_BOTH
 
@@ -228,19 +228,6 @@ if CLIENT then
 	end
 
 	function ENT:DrawTranslucent()
-		local s = math.max(1, self:GetMushroomScale() or 4)
-		local pos = self:GetPos() + (OFFSET_MUSHROOM_M * (s / 2.2)) + (OFFSET_MUSHROOM_S * (s / 2.2))
-		local dl = DynamicLight(self:EntIndex())
-		if dl then
-			dl.pos = pos
-			dl.r = 120
-			dl.g = 255
-			dl.b = 140
-			dl.brightness = self.IdleLightBrightness or 2
-			dl.Decay = 600
-			dl.Size = 200
-			dl.DieTime = CurTime() + 0.1
-		end
 	end
 
 	-- LSD-like trip client effects
@@ -262,6 +249,7 @@ if CLIENT then
 
 	local function tripFrac()
 		if not TRIP.active then return 0 end
+
 		local now = CurTime()
 		local ttotal = math.max(0.001, (TRIP.endTime or 0) - (TRIP.start or 0))
 		local tcur = math.Clamp(now - (TRIP.start or 0), 0, ttotal)
@@ -273,6 +261,7 @@ if CLIENT then
 	-- Screen-space color shift & wobble (intensified)
 	hook.Add("RenderScreenspaceEffects", "Arcana_MushroomTrip", function()
 		if not TRIP.active then return end
+
 		local f = tripFrac()
 		if f <= 0 then return end
 
@@ -305,8 +294,10 @@ if CLIENT then
 	-- View sway (intensified)
 	hook.Add("CalcView", "Arcana_MushroomTripView", function(ply, origin, angles, fov)
 		if not TRIP.active then return end
+
 		local f = tripFrac()
 		if f <= 0 then return end
+
 		local t = CurTime()
 		local ang = Angle(angles)
 		ang:RotateAroundAxis(ang:Forward(), math.sin(t * 0.9) * 4.0 * f)
