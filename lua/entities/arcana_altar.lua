@@ -635,16 +635,26 @@ if CLIENT then
 					end
 
 					infoIcon.tooltip = tooltip
+
 					-- Register for cleanup
 					frame._arcanaTooltips[tooltip] = true
 					updateTooltipPos(tooltip)
+
 					-- Update position if mouse moves
 					local hookName = "ArcanaTooltipPos_" .. tostring(tooltip)
-
 					hook.Add("Think", hookName, function()
 						if not IsValid(tooltip) then
 							hook.Remove("Think", hookName)
 
+							return
+						end
+
+						if not IsValid(infoIcon) then
+							if IsValid(tooltip) then
+								tooltip:Remove()
+							end
+
+							hook.Remove("Think", hookName)
 							return
 						end
 

@@ -1338,6 +1338,7 @@ if CLIENT then
 
 		rebuild = function()
 			scroll:Clear()
+
 			-- Determine currently applied enchantments on the contained weapon entity
 			local appliedSet = {}
 			local appliedCount = 0
@@ -1374,146 +1375,170 @@ if CLIENT then
 				if show then
 					visible[enchId] = true
 					local row = vgui.Create("DButton", scroll)
-				row:Dock(TOP)
-				row:SetTall(64)
-				row:DockMargin(0, 0, 0, 8)
-				row:SetText("")
-				row._id = enchId
-				row._applied = appliedSet[enchId] and true or false
-				row._selected = (not row._applied) and (selected[enchId] and true or false) or false
-				row.Paint = function(pnl, w, h)
-					local isApplied = pnl._applied
-					local bg
-					if isApplied then
-						bg = Color(36, 54, 64, 235) -- frosty blue for applied
-					elseif pnl._selected then
-						bg = Color(58, 44, 32, 235)
-					else
-						bg = Color(46, 36, 26, 235)
-					end
-					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
-					local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and textBright) or gold
-					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
-					draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, textBright)
-					if isApplied then
-						draw.SimpleText("Already applied", "Arcana_AncientSmall", w - 12, 10, Color(180, 220, 255, 255), TEXT_ALIGN_RIGHT)
-					end
-				end
-				row.DoClick = function(pnl)
-					if pnl._applied then
-						surface.PlaySound("buttons/button8.wav")
-						return
-					end
-					local newState = not pnl._selected
-					-- Enforce cap: appliedCount + (#selected on) + (newState and 1 or 0) <= 3
-					local selCount = 0
-					for _, on in pairs(selected) do
-						if on then
-							selCount = selCount + 1
+					row:Dock(TOP)
+					row:SetTall(64)
+					row:DockMargin(0, 0, 0, 8)
+					row:SetText("")
+					row._id = enchId
+					row._applied = appliedSet[enchId] and true or false
+					row._selected = (not row._applied) and (selected[enchId] and true or false) or false
+					row.Paint = function(pnl, w, h)
+						local isApplied = pnl._applied
+						local bg
+						if isApplied then
+							bg = Color(36, 54, 64, 235) -- frosty blue for applied
+						elseif pnl._selected then
+							bg = Color(58, 44, 32, 235)
+						else
+							bg = Color(46, 36, 26, 235)
+						end
+						Arcana_FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
+						local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and textBright) or gold
+						Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
+						draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, textBright)
+						if isApplied then
+							draw.SimpleText("Already applied", "Arcana_AncientSmall", w - 12, 10, Color(180, 220, 255, 255), TEXT_ALIGN_RIGHT)
 						end
 					end
-					if newState and (appliedCount + selCount + 1) > 3 then
-						surface.PlaySound("buttons/button8.wav")
-						return
-					end
-					pnl._selected = newState
-					selected[enchId] = pnl._selected or nil
-					computeTotals()
-					topBars:InvalidateLayout(true)
-					topBars:InvalidateParent(true)
-					refreshButtons()
-					pnl:InvalidateLayout(true)
-				end
-				-- Info tooltip icon
-				local infoIcon = vgui.Create("DPanel", row)
-				infoIcon:SetSize(20, 20)
-				infoIcon:SetCursor("hand")
-				infoIcon.Paint = function(pnl, w, h)
-					surface.SetDrawColor(gold)
-					local cx, cy, r = w * 0.5, h * 0.5, 8
-					local seg = 16
-					for i = 0, seg - 1 do
-						local a1 = (i / seg) * math.pi * 2
-						local a2 = ((i + 1) / seg) * math.pi * 2
-						surface.DrawLine(cx + math.cos(a1) * r, cy + math.sin(a1) * r, cx + math.cos(a2) * r, cy + math.sin(a2) * r)
-					end
-					draw.SimpleText("i", "Arcana_Ancient", cx, cy, gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				end
-				-- Tooltip behavior
-				infoIcon.OnCursorEntered = function()
-					if IsValid(infoIcon.tooltip) then return end
-					local tooltip = vgui.Create("DLabel")
-					tooltip:SetSize(320, 64)
-					tooltip:SetWrap(true)
-					tooltip:SetText(ench.description or "No description available")
-					tooltip:SetFont("Arcana_AncientSmall")
-					tooltip:SetTextColor(textBright)
-					tooltip:SetDrawOnTop(true)
-					tooltip:SetMouseInputEnabled(false)
-					tooltip:SetKeyboardInputEnabled(false)
-					tooltip.Paint = function(pnl, w, h)
-						surface.DisableClipping(true)
-						Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
-						Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
-						surface.DisableClipping(false)
-					end
-					infoIcon.tooltip = tooltip
-					local function updateTooltipPos()
-						if not IsValid(tooltip) then return end
-						local x, y = gui.MousePos()
-						tooltip:SetPos(x + 15, y - 30)
-					end
-					updateTooltipPos()
-					hook.Add("Think", "ArcanaTooltipPos_" .. tostring(tooltip), function()
-						if not IsValid(tooltip) then
-							hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
+
+					row.DoClick = function(pnl)
+						if pnl._applied then
+							surface.PlaySound("buttons/button8.wav")
 							return
 						end
-						updateTooltipPos()
-					end)
-				end
-				infoIcon.OnCursorExited = function()
-					local t = infoIcon.tooltip
-					if IsValid(t) then
-						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(t))
-						t:Remove()
-						infoIcon.tooltip = nil
-					end
-				end
-				-- Plain cost text under the name
-				local costLbl = vgui.Create("DLabel", row)
-				costLbl:SetFont("Arcana_AncientSmall")
-				costLbl:SetTextColor(Color(180, 170, 150, 255))
-				local parts = {}
-				local coinAmt = tonumber(ench.cost_coins or 0) or 0
-				if coinAmt > 0 then
-					parts[#parts + 1] = ("x" .. string.Comma(coinAmt) .. " coins")
-				end
-				for _, it2 in ipairs(ench.cost_items or {}) do
-					local name = tostring(it2.name or "item")
-					local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
-					local pretty = name
-					if _G.msitems and _G.msitems.GetInventoryInfo then
-						local info = _G.msitems.GetInventoryInfo(name)
-						if info and info.name then
-							pretty = string.lower(info.name)
+
+						local newState = not pnl._selected
+
+						-- Enforce cap: appliedCount + (#selected on) + (newState and 1 or 0) <= 3
+						local selCount = 0
+						for _, on in pairs(selected) do
+							if on then
+								selCount = selCount + 1
+							end
 						end
-					elseif name == "mana_crystal_shard" then
-						pretty = "crystal shards"
+
+						if newState and (appliedCount + selCount + 1) > 3 then
+							surface.PlaySound("buttons/button8.wav")
+							return
+						end
+
+						pnl._selected = newState
+						selected[enchId] = pnl._selected or nil
+						computeTotals()
+						topBars:InvalidateLayout(true)
+						topBars:InvalidateParent(true)
+						refreshButtons()
+						pnl:InvalidateLayout(true)
 					end
-					parts[#parts + 1] = (string.Comma(amt) .. " " .. pretty)
-				end
-				costLbl:SetText(table.concat(parts, " | "))
-				costLbl:SizeToContents()
-				row.PerformLayout = function(pnl, w, h)
-					-- Position info icon right after the enchant name
-					surface.SetFont("Arcana_AncientLarge")
-					local nameW, _ = surface.GetTextSize(ench.name or enchId)
-					local nameX = 36
-					infoIcon:SetPos(nameX + nameW + 8, 10)
-					-- Costs under the name
-					costLbl:SetPos(nameX, h - 24)
-				end
+
+					-- Info tooltip icon
+					local infoIcon = vgui.Create("DPanel", row)
+					infoIcon:SetSize(20, 20)
+					infoIcon:SetCursor("hand")
+					infoIcon.Paint = function(pnl, w, h)
+						surface.SetDrawColor(gold)
+						local cx, cy, r = w * 0.5, h * 0.5, 8
+						local seg = 16
+						for i = 0, seg - 1 do
+							local a1 = (i / seg) * math.pi * 2
+							local a2 = ((i + 1) / seg) * math.pi * 2
+							surface.DrawLine(cx + math.cos(a1) * r, cy + math.sin(a1) * r, cx + math.cos(a2) * r, cy + math.sin(a2) * r)
+						end
+						draw.SimpleText("i", "Arcana_Ancient", cx, cy, gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					end
+
+					-- Tooltip behavior
+					infoIcon.OnCursorEntered = function()
+						if IsValid(infoIcon.tooltip) then return end
+
+						local tooltip = vgui.Create("DLabel")
+						tooltip:SetSize(320, 64)
+						tooltip:SetWrap(true)
+						tooltip:SetText(ench.description or "No description available")
+						tooltip:SetFont("Arcana_AncientSmall")
+						tooltip:SetTextColor(textBright)
+						tooltip:SetDrawOnTop(true)
+						tooltip:SetMouseInputEnabled(false)
+						tooltip:SetKeyboardInputEnabled(false)
+						tooltip.Paint = function(pnl, w, h)
+							surface.DisableClipping(true)
+							Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
+							Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
+							surface.DisableClipping(false)
+						end
+
+						infoIcon.tooltip = tooltip
+						local function updateTooltipPos()
+							if not IsValid(tooltip) then return end
+							local x, y = gui.MousePos()
+							tooltip:SetPos(x + 15, y - 30)
+						end
+
+						updateTooltipPos()
+						hook.Add("Think", "ArcanaTooltipPos_" .. tostring(tooltip), function()
+							if not IsValid(tooltip) then
+								hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
+								return
+							end
+
+							if not IsValid(infoIcon) then
+								if IsValid(tooltip) then
+									tooltip:Remove()
+								end
+
+								hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
+								return
+							end
+
+							updateTooltipPos()
+						end)
+					end
+
+					infoIcon.OnCursorExited = function()
+						local t = infoIcon.tooltip
+						if IsValid(t) then
+							hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(t))
+							t:Remove()
+							infoIcon.tooltip = nil
+						end
+					end
+
+					-- Plain cost text under the name
+					local costLbl = vgui.Create("DLabel", row)
+					costLbl:SetFont("Arcana_AncientSmall")
+					costLbl:SetTextColor(Color(180, 170, 150, 255))
+					local parts = {}
+					local coinAmt = tonumber(ench.cost_coins or 0) or 0
+					if coinAmt > 0 then
+						parts[#parts + 1] = ("x" .. string.Comma(coinAmt) .. " coins")
+					end
+
+					for _, it2 in ipairs(ench.cost_items or {}) do
+						local name = tostring(it2.name or "item")
+						local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+						local pretty = name
+						if _G.msitems and _G.msitems.GetInventoryInfo then
+							local info = _G.msitems.GetInventoryInfo(name)
+							if info and info.name then
+								pretty = string.lower(info.name)
+							end
+						elseif name == "mana_crystal_shard" then
+							pretty = "crystal shards"
+						end
+						parts[#parts + 1] = (string.Comma(amt) .. " " .. pretty)
+					end
+
+					costLbl:SetText(table.concat(parts, " | "))
+					costLbl:SizeToContents()
+					row.PerformLayout = function(pnl, w, h)
+						-- Position info icon right after the enchant name
+						surface.SetFont("Arcana_AncientLarge")
+						local nameW, _ = surface.GetTextSize(ench.name or enchId)
+						local nameX = 36
+						infoIcon:SetPos(nameX + nameW + 8, 10)
+						-- Costs under the name
+						costLbl:SetPos(nameX, h - 24)
+					end
 				end
 			end
 
