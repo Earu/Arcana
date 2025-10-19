@@ -1139,6 +1139,7 @@ if CLIENT then
 				end
 
 				infoIcon.tooltip = tooltip
+
 				-- Register for cleanup on frame close
 				frame._arcanaTooltips[tooltip] = true
 
@@ -1156,6 +1157,15 @@ if CLIENT then
 					if not IsValid(tooltip) then
 						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
 
+						return
+					end
+
+					if not IsValid(infoIcon) then
+						if IsValid(tooltip) then
+							tooltip:Remove()
+						end
+
+						hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(tooltip))
 						return
 					end
 
