@@ -168,6 +168,7 @@ local function spawnForest(ctx)
 
 					freeze(log)
 					table.insert(entities, log)
+					if ctx.spawned then table.insert(ctx.spawned, log) end
 				end
 			else
 				mdl = deadTrees[math.random(#deadTrees)]
@@ -203,6 +204,8 @@ local function spawnForest(ctx)
 
 		freeze(tree)
 		table.insert(entities, tree)
+		if ctx.spawned then table.insert(ctx.spawned, tree) end
+
 		return true
 	end
 
