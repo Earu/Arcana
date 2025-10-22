@@ -321,10 +321,7 @@ local function spawnMushroomHotspot(ctx)
 	return { entities = entities }
 end
 
-local fairyGroveModels = {
-	"models/props_foliage/urban_tree_giant01_medium.mdl",
-	"models/props_foliage/urban_tree_giant01_small.mdl",
-}
+local FAIRY_GROVE_TREE =  "models/props_foliage/oak_tree01.mdl"
 local function spawnFairyGrove(ctx)
 	-- Scale grove size using precomputed effective radius
 	local effRadius = tonumber(ctx.effective_radius or 0) or 0
@@ -349,8 +346,8 @@ local function spawnFairyGrove(ctx)
 	local tree = ents.Create("prop_physics")
 	if IsValid(tree) then
 		tree:SetPos(center)
-		tree:SetModel(fairyGroveModels[math.random(#fairyGroveModels)])
-		tree:SetModelScale(4, 0.5)
+		tree:SetModel(FAIRY_GROVE_TREE)
+		tree:SetModelScale(1, 0.5)
 		tree:SetAngles(Angle(0, math.random(0, 360), 0))
 		tree:Spawn()
 		tree:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
