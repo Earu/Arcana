@@ -5,7 +5,7 @@ local SOUL_GRACE_SECS = 8
 local savedHooks = {}
 local function stashHooks(eventNames)
 	local hooks = hook.GetTable()
-	for _, eventName in ipairs(eventNames) do
+	for _, eventName in pairs(eventNames) do
 		local tbl = hooks[eventName]
 		if not tbl then continue end
 
@@ -18,12 +18,14 @@ local function stashHooks(eventNames)
 end
 
 local function popHooks(eventNames)
-	for _, eventName in ipairs(eventNames) do
+	for _, eventName in pairs(eventNames) do
 		if not savedHooks[eventName] then continue end
 
 		for hookName, hookCallback in pairs(savedHooks[eventName]) do
 			hook.Add(eventName, hookName, hookCallback)
+			savedHooks[eventName][hookName] = nil
 		end
+		savedHooks[eventName] = nil
 	end
 end
 
@@ -465,6 +467,15 @@ if CLIENT then
 		if not isInSoulMode() then return end
 
 		render.WorldMaterialOverride(WORLD_MAT)
+	end)
+
+	hook.Add("HUDShouldDraw", Tag, function(name)
+		if LocalPlayer():Alive() then return end
+
+		-- Block the red death overlay
+		if name == "CHudDamageIndicator" then
+			return false
+		end
 	end)
 
 	local function setupHooks()
