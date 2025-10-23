@@ -352,7 +352,9 @@ if CLIENT then
 	function ENT:DrawTranslucent()
 		render.SuppressEngineLighting(true)
 		render.SetLightingMode(2)
+		render.SetColorModulation(1, 1, 1)
 		self:DrawModel()
+		render.SetColorModulation(1, 1, 1)
 		render.SetLightingMode(0)
 		render.SuppressEngineLighting(false)
 

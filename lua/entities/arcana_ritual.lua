@@ -300,7 +300,10 @@ if CLIENT then
 
 	function ENT:Draw()
 		render.SetLightingMode(2)
+		local col = self:GetColor()
+		render.SetColorModulation(math.max(0.75, col.r / 255 * 2), math.max(0.75, col.g / 255 * 2), math.max(0.75, col.b / 255 * 2))
 		self:DrawModel()
+		render.SetColorModulation(1, 1, 1)
 		render.SetLightingMode(0)
 	end
 
