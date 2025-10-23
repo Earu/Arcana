@@ -56,13 +56,9 @@ if CLIENT then
 		end
 
 		render.SetLightingMode(2)
-		render.MaterialOverride(SHINY_MAT)
-		render.SetColorModulation(COLOR.r / 255, COLOR.g / 255, COLOR.b / 255)
-
+		render.SetColorModulation(math.max(0.75, COLOR.r / 255 * 2), math.max(0.75, COLOR.g / 255 * 2), math.max(0.75, COLOR.b / 255 * 2))
 		ent:DrawModel()
-
 		render.SetColorModulation(1, 1, 1)
-		render.MaterialOverride()
 		render.SetLightingMode(0)
 
 		local dl = DynamicLight(ent:EntIndex())

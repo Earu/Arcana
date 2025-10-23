@@ -138,7 +138,9 @@ if CLIENT then
 
 	function ENT:Draw()
 		render.SetLightingMode(2)
+		render.SetColorModulation(ARCANE_COLOR.r / 255, ARCANE_COLOR.g / 255, ARCANE_COLOR.b / 255)
 		self:DrawModel()
+		render.SetColorModulation(1, 1, 1)
 		render.SetLightingMode(0)
 
 		local dlight = DynamicLight(self:EntIndex())
