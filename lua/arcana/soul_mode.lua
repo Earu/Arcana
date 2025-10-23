@@ -470,7 +470,9 @@ if CLIENT then
 	end)
 
 	hook.Add("HUDShouldDraw", Tag, function(name)
-		if LocalPlayer():Alive() then return end
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+		if ply:Alive() then return end
 
 		-- Block the red death overlay
 		if name == "CHudDamageIndicator" then
