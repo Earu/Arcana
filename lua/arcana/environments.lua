@@ -116,29 +116,38 @@ function Envs:Stop(reason)
 	return true
 end
 
--- Weighted shuffle of POIs; returns up to k unique items
+-- Weighted selection of POIs with per-POI max instances; returns up to k items (with repeats allowed up to it.max)
 local function chooseWeightedUnique(items, k)
 	local pool = {}
 	for _, it in ipairs(items) do
 		local w = math.max(0, tonumber(it.weight or it.chance or 1) or 1)
-		if w > 0 then table.insert(pool, {ref = it, w = w}) end
+		local m = math.max(0, tonumber(it.max or 1) or 1)
+		if w > 0 and m > 0 then table.insert(pool, {ref = it, w = w, remaining = m}) end
 	end
 
 	local chosen = {}
-	for _ = 1, math.min(k, #pool) do
+	for _ = 1, math.max(0, tonumber(k or 0) or 0) do
+		-- compute total weight over items that still have remaining quota
 		local sum = 0
-		for _, p in ipairs(pool) do sum = sum + p.w end
+		for _, p in ipairs(pool) do if (p.remaining or 0) > 0 then sum = sum + p.w end end
 		if sum <= 0 then break end
 		local r = math.Rand(0, sum)
 		local acc = 0
 		local pickIndex = nil
 		for i, p in ipairs(pool) do
-			acc = acc + p.w
-			if r <= acc then pickIndex = i break end
+			if (p.remaining or 0) > 0 then
+				acc = acc + p.w
+				if r <= acc then pickIndex = i break end
+			end
 		end
-		if not pickIndex then pickIndex = 1 end
-		local picked = table.remove(pool, pickIndex)
+		if not pickIndex then break end
+		local picked = pool[pickIndex]
 		chosen[#chosen + 1] = picked.ref
+		picked.remaining = (picked.remaining or 0) - 1
+		if picked.remaining <= 0 then
+			-- remove exhausted entry from pool to keep iteration tighter
+			table.remove(pool, pickIndex)
+		end
 	end
 
 	return chosen
