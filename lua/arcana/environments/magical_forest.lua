@@ -408,6 +408,198 @@ local function spawnFairyGrove(ctx)
 	return { entities = entities, timers = timersOut }
 end
 
+if SERVER then
+	util.AddNetworkString("Arcana_GraveyardCircle")
+end
+
+local function spawnGraveyard(ctx)
+	local entities = {}
+	local timersOut = {}
+
+	-- Scale graveyard size using precomputed effective radius
+	local effRadius = tonumber(ctx.effective_radius or 0) or 0
+	local forestRange = math.Clamp(math.floor(effRadius * 0.9), 1500, FOREST_RANGE)
+
+	local centerTrace = traceGrassNear(ctx.origin, forestRange) or util.TraceLine({
+		start = ctx.origin + Vector(0, 0, 1000),
+		endpos = ctx.origin - Vector(0, 0, 2000),
+		mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY)
+	})
+
+	if not centerTrace.Hit or not ACCEPTABLE_SURFACE_TYPES[centerTrace.MatType] or not util.IsInWorld(centerTrace.HitPos) then
+		return { entities = entities, timers = timersOut }
+	end
+
+	local center = centerTrace.HitPos + Vector(0, 0, 2)
+
+	-- Centerpiece models
+	local centerModels = {
+		"models/props_c17/gravestone_statue001a.mdl",
+		"models/props_c17/gravestone_cross001a.mdl",
+	}
+
+	-- Surrounding grave models
+	local graveModels = {
+		"models/props_c17/gravestone002a.mdl",
+		"models/props_c17/gravestone003a.mdl",
+		"models/props_c17/gravestone004a.mdl",
+		"models/props_c17/gravestone001a.mdl",
+	}
+
+	-- Place center stone
+	local cstone = ents.Create("prop_physics")
+	if IsValid(cstone) then
+		local ang = slopeAlignedAngle(centerTrace.HitNormal)
+		cstone:SetPos(center + Vector(0, 0, 100))
+		cstone:SetAngles(ang)
+		cstone:SetModel(centerModels[math.random(#centerModels)])
+		cstone:Spawn()
+		cstone:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		if cstone.CPPISetOwner then cstone:CPPISetOwner(ctx.owner) end
+		cstone:DropToFloor()
+
+		freeze(cstone)
+		table.insert(entities, cstone)
+		if ctx.spawned then table.insert(ctx.spawned, cstone) end
+	end
+
+	-- Place graves in rings around the center
+	local densityFactor = (forestRange / FOREST_RANGE) ^ 2
+	local rScale = math.sqrt(math.max(0.25, forestRange / FOREST_RANGE))
+	local ringInner = math.floor(320 * rScale)
+	local ringOuter = math.floor(640 * rScale)
+	local baseCount = math.random(12, 22)
+	local graveCount = math.Clamp(math.floor(baseCount * math.max(0.6, densityFactor)), 10, 28)
+	local placed = {}
+	local minDist = math.floor(120 * rScale)
+	local minDistSq = minDist * minDist
+	local function tooClose(pos)
+		for _, p in ipairs(placed) do
+			if p:DistToSqr(pos) < minDistSq then return true end
+		end
+
+		return false
+	end
+
+	local graves = {}
+	local maxAttempts = graveCount * 24
+	local attempts = 0
+	while #graves < graveCount and attempts < maxAttempts do
+		attempts = attempts + 1
+		local a = math.Rand(0, math.pi * 2)
+		local r = math.Rand(ringInner, ringOuter)
+		local off = Vector(math.cos(a) * r, math.sin(a) * r, 64)
+		local cand = cstone:GetPos() + off
+		if tooClose(cand) then continue end
+
+		local tr = util.TraceLine({
+			start = cand + Vector(0, 0, 1000),
+			endpos = cand - Vector(0, 0, 2000),
+			mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY)
+		})
+
+		if not tr.Hit or not ACCEPTABLE_SURFACE_TYPES[tr.MatType] or not util.IsInWorld(tr.HitPos) then continue end
+
+		local up = tr.HitNormal
+		local fwd = (center - tr.HitPos)
+
+		if fwd:LengthSqr() < 1 then fwd = Vector(1, 0, 0) end
+		fwd:Normalize()
+
+		local ang = angleFromForwardUp(fwd, up)
+		local g = ents.Create("prop_physics")
+		if IsValid(g) then
+			g:SetPos(tr.HitPos + up * 64)
+			g:SetAngles(ang)
+			g:SetModel(graveModels[math.random(#graveModels)])
+			g:Spawn()
+			g:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+
+			if g.CPPISetOwner then g:CPPISetOwner(ctx.owner) end
+			g:DropToFloor()
+
+			freeze(g)
+			table.insert(entities, g)
+
+			if ctx.spawned then table.insert(ctx.spawned, g) end
+			table.insert(placed, tr.HitPos)
+			table.insert(graves, { ent = g, pos = tr.HitPos, up = up, ang = ang })
+		end
+	end
+
+	-- Proximity-based skeleton summoning
+	if #graves > 0 then
+		local timerName = "Arcana_Env_Graveyard_" .. tostring(IsValid(ctx.owner) and ctx.owner:SteamID64() or "world") .. "_" .. tostring(center.x) .. "_" .. tostring(center.y)
+		table.insert(timersOut, timerName)
+		local nextSummon = 0
+		local activeSkeletons = {}
+		local function broadcastCircle(pos, ang, size, duration)
+			net.Start("Arcana_GraveyardCircle", true)
+			net.WriteVector(pos)
+			net.WriteAngle(ang)
+			net.WriteFloat(size or 48)
+			net.WriteFloat(duration or 1.2)
+			net.Broadcast()
+		end
+
+		timer.Create(timerName, 0.35, 0, function()
+			if Arcane.Environments.Active ~= ctx then timer.Remove(timerName) return end
+			-- Cull invalid skeleton refs
+			local alive = {}
+			for _, s in ipairs(activeSkeletons) do if IsValid(s) then alive[#alive + 1] = s end end
+			activeSkeletons = alive
+
+			local now = CurTime()
+			if now < nextSummon then return end
+
+			-- Check for nearby players
+			local triggerRadius = math.floor(900 * rScale)
+			local anyNear = false
+			for _, ply in ipairs(player.GetAll()) do
+				if IsValid(ply) and ply:Alive() and ply:GetPos():DistToSqr(center) <= (triggerRadius * triggerRadius) then
+					anyNear = true
+					break
+				end
+			end
+
+			if not anyNear then return end
+
+			-- Cap active skeletons per graveyard
+			if #activeSkeletons >= 3 then
+				nextSummon = now + math.Rand(2.5, 4.0)
+				return
+			end
+
+			-- Choose a grave to summon from
+			local g = graves[math.random(#graves)]
+			if not (g and IsValid(g.ent)) then return end
+			local forward = g.ang:Forward()
+			local summonPos = g.pos + forward * 42 + g.up * 2
+			local summonAng = Angle(0, g.ang.y, 0)
+
+			-- Show deep purple activation circle, then spawn
+			broadcastCircle(summonPos, Angle(0, 0, 0), 52, 1.2)
+			timer.Simple(1.0, function()
+				if Arcane.Environments.Active ~= ctx then return end
+
+				local sk = ents.Create("arcana_skeleton")
+				if not IsValid(sk) then return end
+
+				sk:SetPos(summonPos)
+				sk:SetAngles(summonAng)
+				sk:Spawn()
+				if sk.CPPISetOwner then sk:CPPISetOwner(ctx.owner) end
+
+				table.insert(activeSkeletons, sk)
+			end)
+
+			nextSummon = now + math.Rand(4.5, 7.0)
+		end)
+	end
+
+	return { entities = entities, timers = timersOut }
+end
+
 Envs:RegisterEnvironment({
 	id = "magical_forest",
 	name = "Magical Forest",
@@ -419,10 +611,11 @@ Envs:RegisterEnvironment({
 		return spawnForest(ctx)
 	end,
 	poi_min = 2,
-	poi_max = 2,
+	poi_max = 6,
 	pois = {
-		{ id = "mushroom_hotspot", weight = 100, spawn = spawnMushroomHotspot },
-		{ id = "fairy_grove", weight = 100, spawn = spawnFairyGrove },
+		{ id = "mushroom_hotspot", weight = 100, spawn = spawnMushroomHotspot, max = 2 },
+		{ id = "fairy_grove", weight = 100, spawn = spawnFairyGrove, max = 1 },
+		{ id = "graveyard", weight = 50, spawn = spawnGraveyard, max = 3 },
 	},
 })
 
@@ -458,5 +651,19 @@ if CLIENT then
 		render.FogColor(74, 102, 92)
 
 		return true
+	end)
+
+	-- Client-side summoning circle for graveyard skeleton spawns
+	net.Receive("Arcana_GraveyardCircle", function()
+		local pos = net.ReadVector()
+		local ang = net.ReadAngle()
+		local size = net.ReadFloat() or 52
+		local duration = net.ReadFloat() or 1.2
+		if not _G.MagicCircle then return end
+		local color = Color(110, 40, 200, 255) -- deep purple
+		local circle = MagicCircle.CreateMagicCircle(pos + Vector(0, 0, 0.5), ang, color, 3, size, duration, 2)
+		if circle and circle.StartEvolving then
+			circle:StartEvolving(duration, true)
+		end
 	end)
 end
