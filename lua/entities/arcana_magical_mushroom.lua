@@ -115,10 +115,12 @@ if SERVER then
 			if math.Rand(0, 1) <= 0.45 then
 				local ent = ents.Create("arcana_solidified_spores")
 				if IsValid(ent) then
-					local pos = self:GetPos() + VectorRand():GetNormalized() * math.Rand(10, 36) + Vector(0, 0, 18)
+					local pos = self:GetPos() + VectorRand():GetNormalized() * math.Rand(42, 128) + Vector(0, 0, 18)
 					ent:SetPos(pos)
 					ent:Spawn()
 					if ent.CPPISetOwner then ent:CPPISetOwner(self:CPPIGetOwner() or self) end
+
+					constraint.NoCollide(ent, self, 0, 0)
 
 					local ed = EffectData()
 					ed:SetOrigin(ent:WorldSpaceCenter())
