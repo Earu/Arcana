@@ -436,7 +436,7 @@ if CLIENT then
 
 		local origin = active.origin or Vector(0, 0, 0)
 		local eff = tonumber(active.effective_radius or 0) or 0
-		local forestRange = math.floor(eff * 0.6)
+		local forestRange = math.floor(eff * 0.9)
 		local fadeWidth = 250
 
 		local p = ply:GetPos()
