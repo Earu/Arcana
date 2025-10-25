@@ -10,6 +10,33 @@ Envs.Registered = Envs.Registered or {}
 Envs.Active = Envs.Active or nil -- { id=..., origin=Vector, owner=Player, started=CurTime(), expires=CurTime()+lifetime, spawned={entities...}, timers={...} }
 Envs.LockUntilById = Envs.LockUntilById or {} -- cooldown per environment id
 
+-- Networking for environment state
+if SERVER then
+	util.AddNetworkString("Arcana_EnvStart")
+	util.AddNetworkString("Arcana_EnvStop")
+
+	local function sendEnvStart(ctx, rcpt)
+		net.Start("Arcana_EnvStart")
+		net.WriteString(tostring(ctx.id or ""))
+		net.WriteVector(ctx.origin or Vector(0, 0, 0))
+		net.WriteFloat(tonumber(ctx.started or CurTime()) or CurTime())
+		net.WriteFloat(tonumber(ctx.expires or (CurTime() + 1)) or (CurTime() + 1))
+		net.WriteFloat(tonumber(ctx.effective_radius or 0) or 0)
+		if rcpt then
+			net.Send(rcpt)
+		else
+			net.Broadcast()
+		end
+	end
+
+	hook.Remove("PlayerInitialSpawn", "Arcana_EnvSyncOnJoin")
+	hook.Add("PlayerInitialSpawn", "Arcana_EnvSyncOnJoin", function(ply)
+		local ctx = Envs.Active
+		if not ctx then return end
+		sendEnvStart(ctx, ply)
+	end)
+end
+
 -- Utility: safe remove entity list
 local function safeRemoveAll(list)
 	if not istable(list) then return end
@@ -75,6 +102,14 @@ function Envs:Stop(reason)
 	-- Optional: notify owner
 	if SERVER and IsValid(env.owner) and env.owner.ChatPrint then
 		env.owner:ChatPrint("The environment fades" .. (reason and (": " .. tostring(reason)) or "."))
+	end
+
+	-- Broadcast stop to clients so they can clear client-side state/effects
+	if SERVER then
+		net.Start("Arcana_EnvStop")
+		net.WriteString(tostring(env.id or ""))
+		net.WriteString(reason or "unknown reason")
+		net.Broadcast()
 	end
 
 	return true
@@ -150,102 +185,158 @@ end
 
 -- Public API: Start an environment by id at origin
 -- Returns true on success, false and reason on failure
-function Envs:Start(id, origin, owner)
-	if not SERVER then return false, "Server only" end
-	if self:IsActive() then return false, "An environment is already active" end
+-- Start can be invoked on both realms. On the server it performs spawning and networking;
+-- on the client it only mirrors state for client-side effects.
+function Envs:Start(id, origin, owner, opts)
+    if SERVER then
+        if self:IsActive() then return false, "An environment is already active" end
 
-	local def = self.Registered[id]
-	if not def then return false, "Unknown environment" end
+		local def = self.Registered[id]
+		if not def then return false, "Unknown environment" end
 
-	local lockUntil = tonumber(self.LockUntilById[id] or 0) or 0
-	if CurTime() < lockUntil then
-		local remaining = math.max(0, math.floor(lockUntil - CurTime()))
-		return false, (def.name or id) .. " is on cooldown for " .. tostring(remaining) .. "s"
-	end
-
-	origin = origin or Vector(0, 0, 0)
-
-	-- Compute effective radius once and pass to environment context
-	local eff_radius = self:ComputeEffectiveRadius(origin)
-
-	-- Space validation: ensure sufficient effective radius
-	if (def.min_radius or 0) > 0 then
-		if eff_radius < def.min_radius then
-			return false, "Not enough space (radius " .. tostring(math.floor(eff_radius)) .. " < required " .. tostring(def.min_radius) .. ")"
+		local lockUntil = tonumber(self.LockUntilById[id] or 0) or 0
+		if CurTime() < lockUntil then
+			local remaining = math.max(0, math.floor(lockUntil - CurTime()))
+			return false, (def.name or id) .. " is on cooldown for " .. tostring(remaining) .. "s"
 		end
-	end
 
-	local ctx = {
-		id = id,
-		name = def.name,
-		origin = origin,
-		owner = IsValid(owner) and owner or game.GetWorld(),
-		started = CurTime(),
-		expires = CurTime() + def.lifetime,
-		effective_radius = eff_radius,
-		spawned = {},
-		timers = {},
-		-- convenience
-		def = def,
-	}
+		origin = origin or Vector(0, 0, 0)
 
-	self.Active = ctx
+		-- Compute effective radius once and pass to environment context
+		local eff_radius = self:ComputeEffectiveRadius(origin)
 
-	-- Apply cooldown lock immediately upon successful start (mirrors prior ritual behavior)
-	if (def.lock_duration or 0) > 0 then
-		self.LockUntilById[id] = CurTime() + def.lock_duration
-	end
-
-	-- Base spawn
-	if isfunction(def.spawn_base) then
-		local ok, res = pcall(def.spawn_base, ctx)
-		if not ok then
-			self:Stop("base spawn failed")
-			return false, "Base spawn failed"
+		-- Space validation: ensure sufficient effective radius
+		if (def.min_radius or 0) > 0 then
+			if eff_radius < def.min_radius then
+				return false, "Not enough space (radius " .. tostring(math.floor(eff_radius)) .. " < required " .. tostring(def.min_radius) .. ")"
+			end
 		end
-		if istable(res) then
-			if istable(res.entities) then for _, e in ipairs(res.entities) do if IsValid(e) then table.insert(ctx.spawned, e) end end end
-			if istable(res.timers) then for _, t in ipairs(res.timers) do table.insert(ctx.timers, t) end end
-		end
-	end
 
-	-- POIs selection and spawn
-	local candidates = {}
-	for _, poi in ipairs(def.pois) do
-		local can = true
-		if isfunction(poi.can_spawn) then
-			local ok, ret = pcall(poi.can_spawn, ctx)
-			can = ok and ret ~= false
-		end
-		if can then table.insert(candidates, poi) end
-	end
+		local ctx = {
+			id = id,
+			name = def.name,
+			origin = origin,
+			owner = IsValid(owner) and owner or game.GetWorld(),
+			started = CurTime(),
+			expires = CurTime() + def.lifetime,
+			effective_radius = eff_radius,
+			spawned = {},
+			timers = {},
+			-- convenience
+			def = def,
+		}
 
-	local need = math.random(def.poi_min, def.poi_max)
-	local picks = chooseWeightedUnique(candidates, need)
-	for _, poi in ipairs(picks) do
-		if isfunction(poi.spawn) then
-			local ok, res = pcall(poi.spawn, ctx)
-			if ok and istable(res) then
+			self.Active = ctx
+
+			-- Notify clients of environment start
+			net.Start("Arcana_EnvStart")
+			net.WriteString(tostring(ctx.id or ""))
+			net.WriteVector(ctx.origin or Vector(0, 0, 0))
+			net.WriteFloat(tonumber(ctx.started or CurTime()) or CurTime())
+			net.WriteFloat(tonumber(ctx.expires or (CurTime() + 1)) or (CurTime() + 1))
+			net.WriteFloat(tonumber(ctx.effective_radius or 0) or 0)
+			net.Broadcast()
+
+		-- Apply cooldown lock immediately upon successful start (mirrors prior ritual behavior)
+		if (def.lock_duration or 0) > 0 then
+			self.LockUntilById[id] = CurTime() + def.lock_duration
+		end
+
+		-- Base spawn
+		if isfunction(def.spawn_base) then
+			local ok, res = pcall(def.spawn_base, ctx)
+			if not ok then
+				self:Stop("base spawn failed")
+				return false, "Base spawn failed"
+			end
+			if istable(res) then
 				if istable(res.entities) then for _, e in ipairs(res.entities) do if IsValid(e) then table.insert(ctx.spawned, e) end end end
 				if istable(res.timers) then for _, t in ipairs(res.timers) do table.insert(ctx.timers, t) end end
 			end
 		end
-	end
 
-	-- Auto-expire
-	local tname = "Arcana_EnvExpire_" .. tostring(id)
-	ctx.timers[#ctx.timers + 1] = tname
-	timer.Create(tname, math.max(1, def.lifetime), 1, function()
-		if Envs.Active == ctx then Envs:Stop("time elapsed") end
-	end)
+		-- POIs selection and spawn
+		local candidates = {}
+		for _, poi in ipairs(def.pois) do
+			local can = true
+			if isfunction(poi.can_spawn) then
+				local ok, ret = pcall(poi.can_spawn, ctx)
+				can = ok and ret ~= false
+			end
+			if can then table.insert(candidates, poi) end
+		end
 
-	-- Map cleanup safety
-	hook.Remove("PostCleanupMap", "Arcana_EnvReset")
-	hook.Add("PostCleanupMap", "Arcana_EnvReset", function()
-		if Envs:IsActive() then Envs:Stop("map cleanup") end
-	end)
+		local need = math.random(def.poi_min, def.poi_max)
+		local picks = chooseWeightedUnique(candidates, need)
+		for _, poi in ipairs(picks) do
+			if isfunction(poi.spawn) then
+				local ok, res = pcall(poi.spawn, ctx)
+				if ok and istable(res) then
+					if istable(res.entities) then for _, e in ipairs(res.entities) do if IsValid(e) then table.insert(ctx.spawned, e) end end end
+					if istable(res.timers) then for _, t in ipairs(res.timers) do table.insert(ctx.timers, t) end end
+				end
+			end
+		end
 
-	return true
+		-- Auto-expire
+		local tname = "Arcana_EnvExpire_" .. tostring(id)
+		ctx.timers[#ctx.timers + 1] = tname
+		timer.Create(tname, math.max(1, def.lifetime), 1, function()
+			if Envs.Active == ctx then Envs:Stop("time elapsed") end
+		end)
+
+		-- Map cleanup safety
+		hook.Remove("PostCleanupMap", "Arcana_EnvReset")
+		hook.Add("PostCleanupMap", "Arcana_EnvReset", function()
+			if Envs:IsActive() then Envs:Stop("map cleanup") end
+		end)
+
+        return true
+    else
+        -- CLIENT: mirror state from server (opts may carry computed values)
+        local started = (istable(opts) and tonumber(opts.started)) or CurTime()
+        local expires = (istable(opts) and tonumber(opts.expires)) or (CurTime() + 1)
+        local effr = (istable(opts) and tonumber(opts.effective_radius)) or self:ComputeEffectiveRadius(origin or Vector(0, 0, 0))
+
+        local ctx = {
+            id = id,
+            name = self.Registered[id] and (self.Registered[id].name or id) or id,
+            origin = origin or Vector(0, 0, 0),
+            owner = IsValid(owner) and owner or LocalPlayer(),
+            started = started,
+            expires = expires,
+            effective_radius = effr,
+            spawned = {},
+            timers = {},
+            def = self.Registered[id],
+        }
+
+        self.Active = ctx
+        return true
+    end
+end
+
+if CLIENT then
+    -- Receive environment start/stop and invoke the same Start/Stop API on client
+    net.Receive("Arcana_EnvStart", function()
+        local id = net.ReadString() or ""
+        local origin = net.ReadVector() or Vector(0, 0, 0)
+        local started = net.ReadFloat() or CurTime()
+        local expires = net.ReadFloat() or (CurTime() + 1)
+        local effr = net.ReadFloat() or 0
+
+        Envs:Start(id, origin, LocalPlayer(), {
+            started = started,
+            expires = expires,
+            effective_radius = effr,
+        })
+    end)
+
+    net.Receive("Arcana_EnvStop", function()
+        local _ = net.ReadString() or ""
+		local reason = net.ReadString() or "unknown reason"
+        if Envs.Active then Envs:Stop(reason) end
+    end)
 end
 
 return Envs
