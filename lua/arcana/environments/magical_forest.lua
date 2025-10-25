@@ -414,6 +414,7 @@ Envs:RegisterEnvironment({
 	lifetime = 60 * 60,
 	lock_duration = 60 * 60,
 	min_radius = 2500,
+	max_radius = FOREST_RANGE,
 	spawn_base = function(ctx)
 		return spawnForest(ctx)
 	end,

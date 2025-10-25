@@ -74,6 +74,7 @@ function Envs:RegisterEnvironment(def)
 	def.lifetime = tonumber(def.lifetime or 3600) or 3600
 	def.lock_duration = tonumber(def.lock_duration or 0) or 0 -- seconds to prevent immediate re-cast/start
 	def.min_radius = tonumber(def.min_radius or 0) or 0 -- minimum effective radius required to allow spawn
+	def.max_radius = tonumber(def.max_radius or 0) or 32768 -- maximum effective radius allowed to spawn
 	def.poi_min = math.max(0, tonumber(def.poi_min or 0) or 0)
 	def.poi_max = math.max(def.poi_min, tonumber(def.poi_max or def.poi_min) or def.poi_min)
 	def.pois = istable(def.pois) and def.pois or {}
@@ -204,6 +205,9 @@ function Envs:Start(id, origin, owner, opts)
 
 		-- Compute effective radius once and pass to environment context
 		local eff_radius = self:ComputeEffectiveRadius(origin)
+		if def.max_radius and eff_radius > def.max_radius then
+			eff_radius = def.max_radius
+		end
 
 		-- Space validation: ensure sufficient effective radius
 		if (def.min_radius or 0) > 0 then
