@@ -25,8 +25,9 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
-	util.AddNetworkString("Arcana_Mushroom_TripStart")
-	util.AddNetworkString("Arcana_Mushroom_TripEnd")
+	resource.AddFile("models/props_swamp/shroom_ref_01.mdl")
+	resource.AddFile("materials/models/props_swamp/shroom_diffuse.vmt")
+	resource.AddFile("materials/models/props_swamp/shroom_diffuse.vtf")
 
 	function ENT:Initialize()
 		-- Use a solid physics model and render the mushroom clientside
@@ -51,7 +52,7 @@ if SERVER then
 		self:SetPos(self:GetPos() + Vector(0, 0, -mins.z))
 
 		self._nextUse = 0
-		self._nextSpore = 0
+		self._nextSporeDrop = CurTime() + math.Rand(60, 180)
 	end
 
 	function ENT:SpawnFunction(ply, tr, classname)
@@ -87,9 +88,9 @@ if SERVER then
 		ply._arcanaNextMushroomTrip = CurTime() + self.TripCooldown
 
 		local dur = self.TripCooldown
-		net.Start("Arcana_Mushroom_TripStart")
-		net.WriteFloat(dur)
-		net.Send(ply)
+		if Arcane and Arcane.Status and Arcane.Status.SporeHigh and Arcane.Status.SporeHigh.Apply then
+			Arcane.Status.SporeHigh.Apply(ply, { duration = dur, intensity = 1.0 })
+		end
 
 		self:EmitSound("ambient/levels/canals/windchime2.wav", 70, 120)
 		self:SetGlowStrength(1.6)
@@ -103,7 +104,31 @@ if SERVER then
 		ed:SetOrigin(self:WorldSpaceCenter())
 		util.Effect("cball_bounce", ed, true, true)
 
-		SafeRemoveEntity(self)
+		-- Do not remove; keep mushroom in world
+	end
+
+	-- Periodic random spore drops
+	function ENT:Think()
+		local now = CurTime()
+		if now >= (self._nextSporeDrop or 0) then
+			self._nextSporeDrop = now + math.Rand(90, 180)
+			if math.Rand(0, 1) <= 0.45 then
+				local ent = ents.Create("arcana_solidified_spores")
+				if IsValid(ent) then
+					local pos = self:GetPos() + VectorRand():GetNormalized() * math.Rand(10, 36) + Vector(0, 0, 18)
+					ent:SetPos(pos)
+					ent:Spawn()
+					if ent.CPPISetOwner then ent:CPPISetOwner(self:CPPIGetOwner() or self) end
+
+					local ed = EffectData()
+					ed:SetOrigin(ent:WorldSpaceCenter())
+					util.Effect("cball_bounce", ed, true, true)
+				end
+			end
+		end
+
+		self:NextThink(CurTime() + 1)
+		return true
 	end
 end
 
@@ -226,98 +251,4 @@ if CLIENT then
 			self._mdl:DrawModel()
 		end
 	end
-
-	function ENT:DrawTranslucent()
-	end
-
-	-- LSD-like trip client effects
-	local TRIP = {}
-
-	net.Receive("Arcana_Mushroom_TripStart", function()
-		local dur = net.ReadFloat() or 12
-		TRIP.endTime = CurTime() + dur
-		TRIP.active = true
-		TRIP.start = CurTime()
-
-		-- Subtle ambient tone & DSP
-		local lp = LocalPlayer()
-		if IsValid(lp) then
-			lp:EmitSound("ambient/levels/citadel/weapon_disintegrate3.wav", 70, 160, 0.6)
-			lp:SetDSP(33, true) -- stronger hall reverb
-		end
-	end)
-
-	local function tripFrac()
-		if not TRIP.active then return 0 end
-
-		local now = CurTime()
-		local ttotal = math.max(0.001, (TRIP.endTime or 0) - (TRIP.start or 0))
-		local tcur = math.Clamp(now - (TRIP.start or 0), 0, ttotal)
-		local rise = math.Clamp(tcur / math.min(4, ttotal * 0.25), 0, 1)
-		local fall = math.Clamp((TRIP.endTime - now) / math.min(4, ttotal * 0.25), 0, 1)
-		return math.min(rise, fall)
-	end
-
-	-- Screen-space color shift & wobble (intensified)
-	hook.Add("RenderScreenspaceEffects", "Arcana_MushroomTrip", function()
-		if not TRIP.active then return end
-
-		local f = tripFrac()
-		if f <= 0 then return end
-
-		local ct = CurTime()
-		local sinA = math.sin(ct * 1.2)
-		local sinB = math.sin(ct * 2.4)
-		local sinC = math.sin(ct * 4.8)
-		local mult = f * 1.0
-
-		DrawColorModify({
-			["$pp_colour_addr"] = 0.08 * mult + 0.04 * sinA * mult,
-			["$pp_colour_addg"] = 0.06 * mult + 0.04 * sinB * mult,
-			["$pp_colour_addb"] = 0.14 * mult + 0.06 * sinC * mult,
-			["$pp_colour_brightness"] = 0.06 * mult,
-			["$pp_colour_contrast"] = 1.1 + 0.6 * mult,
-			["$pp_colour_colour"] = 1.8 + 1.6 * mult,
-			["$pp_colour_mulr"] = 0.3 * mult,
-			["$pp_colour_mulg"] = 0.2 * mult,
-			["$pp_colour_mulb"] = 0.4 * mult
-		})
-
-		-- vision wobble via sharpen, bloom, edge high-pass and motion blur
-		DrawSharpen(1.2 + 2.0 * mult, 1.2 + 1.0 * mult)
-		DrawBloom(0.35, 2.5 + 3.5 * mult, 8 + 8 * math.abs(sinA) * mult, 8 + 8 * math.abs(sinB) * mult, 2.0 + 2.0 * mult, 1, 0.9, 0.9, 1)
-		DrawSobel(0.2 + 1.6 * mult)
-		DrawMotionBlur(0.15 + 0.25 * mult, 0.9, 0.08 + 0.10 * mult)
-		DrawToyTown(6 + math.floor(10 * mult), ScrH() * 0.5)
-	end)
-
-	-- View sway (intensified)
-	hook.Add("CalcView", "Arcana_MushroomTripView", function(ply, origin, angles, fov)
-		if not TRIP.active then return end
-
-		local f = tripFrac()
-		if f <= 0 then return end
-
-		local t = CurTime()
-		local ang = Angle(angles)
-		ang:RotateAroundAxis(ang:Forward(), math.sin(t * 0.9) * 4.0 * f)
-		ang:RotateAroundAxis(ang:Right(), math.sin(t * 1.8) * 3.0 * f)
-		ang:RotateAroundAxis(ang:Up(), math.sin(t * 0.6) * 2.0 * f)
-		local off = angles:Forward() * math.sin(t * 1.3) * 3.0 * f
-		off = off + angles:Right() * math.sin(t * 0.7) * 2.0 * f
-		off = off + angles:Up() * math.sin(t * 1.9) * 2.0 * f
-		local newFov = fov + math.sin(t * 0.9) * 10.0 * f
-		return {origin = origin + off, angles = ang, fov = newFov}
-	end)
-
-	-- End condition
-	hook.Add("Think", "Arcana_MushroomTripTimer", function()
-		if TRIP.active and CurTime() >= (TRIP.endTime or 0) then
-			TRIP.active = false
-			local lp = LocalPlayer()
-			if IsValid(lp) then
-				lp:SetDSP(0, false)
-			end
-		end
-	end)
 end
