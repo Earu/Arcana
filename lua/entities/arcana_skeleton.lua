@@ -53,6 +53,7 @@ local FOOTSTEP_MIN_SPEED = 90
 function ENT:Initialize()
 	if SERVER then
 		self:SetModel(SKELETON_MODEL)
+		self:SetBloodColor(DONT_BLEED) -- skeleton doesn't bleed
 		if self.loco then
 			self.loco:SetAcceleration(1200)
 			self.loco:SetDeceleration(1400)
