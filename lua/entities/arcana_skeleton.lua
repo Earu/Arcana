@@ -2,7 +2,7 @@ AddCSLuaFile()
 
 ENT.Type = "nextbot"
 ENT.Base = "base_nextbot"
-ENT.PrintName = "Arcana Skeleton"
+ENT.PrintName = "Skeleton"
 ENT.Category = "Arcana"
 ENT.Spawnable = true
 ENT.AdminOnly = false
