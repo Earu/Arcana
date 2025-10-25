@@ -94,8 +94,13 @@ if CLIENT then
     })
 
     function ENT:Initialize()
-        self:SetModel(SPORE_MODEL) -- for physics
-        self:SetColor(SPORE_COLOR)
+        self._mdl = ClientsideModel("models/props_hive/larval_essence.mdl", RENDERGROUP_BOTH)
+        self._mdl:SetColor(SPORE_COLOR)
+        self._mdl:SetModelScale(1, 0)
+        self._mdl:SetPos(self:GetPos())
+        self._mdl:SetAngles(self:GetAngles())
+        self._mdl:SetParent(self)
+
         self._fxEmitter = ParticleEmitter(self:GetPos(), false)
         self._fxNext = 0
     end
@@ -105,6 +110,9 @@ if CLIENT then
             self._fxEmitter:Finish()
             self._fxEmitter = nil
         end
+
+        SafeRemoveEntity(self._mdl)
+        self._mdl = nil
     end
 
     function ENT:Think()
@@ -143,7 +151,16 @@ if CLIENT then
     end
 
     function ENT:Draw()
-        self:DrawModel()
+        if not IsValid(self._mdl) then
+            self._mdl = ClientsideModel("models/props_hive/larval_essence.mdl", RENDERGROUP_BOTH)
+            self._mdl:SetColor(SPORE_COLOR)
+            self._mdl:SetModelScale(1, 0)
+            self._mdl:SetPos(self:GetPos())
+            self._mdl:SetAngles(self:GetAngles())
+            self._mdl:SetParent(self)
+        end
+
+        self._mdl:DrawModel()
 
         -- extra glow layers
         local pos = self:WorldSpaceCenter()
