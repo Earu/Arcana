@@ -381,6 +381,9 @@ local function spawnFairyGrove(ctx)
 		if f.CPPISetOwner then f:CPPISetOwner(ctx.owner) end
 		table.insert(entities, f)
 
+		f:SetNWBool("Arcana_FairyVendor", true)
+		f:SetNWInt("Arcana_FairyVendorPrice", 2500)
+
 		local tname = timerPrefix .. tostring(f:EntIndex())
 		table.insert(timersOut, tname)
 
