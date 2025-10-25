@@ -14,6 +14,7 @@ ITEM.Inventory = {
 
 if SERVER then
 	function ITEM:Initialize()
+		self:AllowOption("Eat", "Eat")
 		self:SetModel("models/Gibs/HGIBS.mdl")
 		self:SetColor(COLOR)
 		self:PhysicsInit(SOLID_VPHYSICS)
@@ -22,8 +23,21 @@ if SERVER then
 		self:PhysWake()
 	end
 
+	function ITEM:PlayEatSound(ply)
+		timer.Create("msitems.Eat_"..ply:EntIndex(), 0.5, 3, function()
+			if ply:IsValid() then
+				ply:EmitSound("physics/flesh/flesh_squishy_impact_hard" .. math.random(1,2) .. ".wav", 72, math.random(75,85), 0.8)
+			end
+		end)
+		timer.Simple(2.1, function()
+			if ply:IsValid() then
+				ply:EmitSound("npc/barnacle/barnacle_gulp" .. math.random(1,2) .. ".wav", 72, math.random(80,90), 0.8)
+			end
+		end)
+	end
+
 	-- Consume from inventory to get high
-	function ITEM:OnUse(ply)
+	function ITEM:Eat(ply)
 		if not IsValid(ply) or not ply:IsPlayer() then return end
 
 		-- Apply SporeHigh status for 45s
@@ -31,8 +45,8 @@ if SERVER then
 			Arcane.Status.SporeHigh.Apply(ply, { duration = 45, intensity = 0.25 })
 		end
 
-		-- Remove one item from inventory when used
-		if ply.TakeItem then ply:TakeItem("solidified_spores", 1, "eaten") end
+		self:PlayEatSound(ply)
+		self:Remove()
 	end
 end
 
@@ -69,6 +83,7 @@ if CLIENT then
 		self:SetModel(self.WorldModel)
 		self:SetColor(COLOR)
 		self:AddBackpackOption()
+		self:AddSimpleOption("Eat", "Eat", LocalPlayer())
 
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
 		self._fxNext = 0
