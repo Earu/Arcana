@@ -1,5 +1,4 @@
 -- Magical Forest environment definition
-if not SERVER then return end
 
 local Envs = Arcane.Environments
 local ACCEPTABLE_SURFACE_TYPES = {
@@ -426,4 +425,37 @@ Envs:RegisterEnvironment({
 	},
 })
 
+if CLIENT then
+	hook.Add("SetupWorldFog", "Arcana_MagicalForest_Fog", function()
+		local active = Envs and Envs.Active
+		if not active or active.id ~= "magical_forest" then return end
 
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+
+		local origin = active.origin or Vector(0, 0, 0)
+		local eff = tonumber(active.effective_radius or 0) or 0
+		local forestRange = math.floor(eff * 0.6)
+		local fadeWidth = 250
+
+		local p = ply:GetPos()
+		local dx = p.x - origin.x
+		local dy = p.y - origin.y
+		local d2d = math.sqrt(dx * dx + dy * dy)
+
+		local t
+		local toEdge = d2d - forestRange
+		t = 1 - math.Clamp(toEdge / fadeWidth, 0, 1)
+		t = math.Clamp(t, 0, 1) ^ 0.7
+
+		render.FogMode(MATERIAL_FOG_LINEAR)
+		local fogStart = 0
+		local fogEnd = math.floor(Lerp(t, 4500, 900))
+		render.FogStart(fogStart)
+		render.FogEnd(fogEnd)
+		render.FogMaxDensity(Lerp(t, 0, 1))
+		render.FogColor(74, 102, 92)
+
+		return true
+	end)
+end
