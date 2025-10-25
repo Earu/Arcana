@@ -11,6 +11,7 @@ end
 -- options: duration (45), intensity (1.0)
 function SporeHigh.Apply(target, options)
     if not IsValid(target) then return end
+
     options = options or {}
     local duration = tonumber(options.duration) or 45
     local intensity = tonumber(options.intensity) or 1.0
@@ -52,21 +53,27 @@ if CLIENT then
 
     local function frac()
         if not active then return 0 end
+
         local now = CurTime()
         if now >= endTime then return 0 end
+
         local total = math.max(0.001, endTime - startTime)
         local tcur = math.Clamp(now - startTime, 0, total)
         local rise = math.Clamp(tcur / math.min(4, total * 0.25), 0, 1)
         local fall = math.Clamp((endTime - now) / math.min(4, total * 0.25), 0, 1)
+
         return math.min(rise, fall)
     end
 
     hook.Add("RenderScreenspaceEffects", "Arcana_SporeHigh_SSE", function()
         if not active then return end
+
         local f = frac()
         if f <= 0 then return end
+
         local ct = CurTime()
         local m = f * mult
+
         DrawColorModify({
             ["$pp_colour_addr"] = 0.05 * m + 0.03 * math.sin(ct * 1.0) * m,
             ["$pp_colour_addg"] = 0.08 * m + 0.04 * math.sin(ct * 1.7) * m,
@@ -78,6 +85,7 @@ if CLIENT then
             ["$pp_colour_mulg"] = 0.2 * m,
             ["$pp_colour_mulb"] = 0.3 * m
         })
+
         DrawSharpen(0.8 * m, 1.0 * m)
         DrawBloom(0.25, 1.8 + 2.2 * m, 6 + 6 * m, 6 + 6 * m, 1.5 + 1.5 * m, 1, 0.9, 1.0, 0.9)
         DrawSobel(0.15 + 1.2 * m)
@@ -86,14 +94,17 @@ if CLIENT then
 
     hook.Add("CalcView", "Arcana_SporeHigh_View", function(ply, origin, angles, fov)
         if not active then return end
+
         local f = frac()
         if f <= 0 then return end
+
         local t = CurTime()
         local m = f * mult
         local ang = Angle(angles)
         ang:RotateAroundAxis(ang:Forward(), math.sin(t * 0.7) * 3.0 * m)
         ang:RotateAroundAxis(ang:Right(), math.sin(t * 1.4) * 2.5 * m)
         ang:RotateAroundAxis(ang:Up(), math.sin(t * 0.5) * 1.6 * m)
+
         local off = angles:Forward() * math.sin(t * 1.1) * 2.0 * m
         off = off + angles:Right() * math.sin(t * 0.6) * 1.6 * m
         off = off + angles:Up() * math.sin(t * 1.6) * 1.8 * m

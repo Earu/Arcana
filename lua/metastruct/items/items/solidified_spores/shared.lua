@@ -28,7 +28,7 @@ if SERVER then
 
 		-- Apply SporeHigh status for 45s
 		if Arcane and Arcane.Status and Arcane.Status.SporeHigh and Arcane.Status.SporeHigh.Apply then
-			Arcane.Status.SporeHigh.Apply(ply, { duration = 45 })
+			Arcane.Status.SporeHigh.Apply(ply, { duration = 45, intensity = 0.25 })
 		end
 
 		-- Remove one item from inventory when used
