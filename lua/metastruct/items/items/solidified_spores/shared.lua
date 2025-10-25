@@ -1,0 +1,97 @@
+msitems.StartItem("solidified_spores")
+
+local COLOR = Color(120, 200, 120)
+
+ITEM.State = "entity"
+ITEM.WorldModel = "models/props_hive/larval_essence.mdl"
+ITEM.EquipSound = "ui/item_helmet_pickup.wav"
+ITEM.DontReturnToInventory = true
+
+ITEM.Inventory = {
+	name = "Solidified Spores",
+	info = "A softly glowing cluster of condensed mushroom spores."
+}
+
+if SERVER then
+	function ITEM:Initialize()
+		self:SetModel("models/Gibs/HGIBS.mdl")
+		self:SetColor(COLOR)
+		self:PhysicsInit(SOLID_VPHYSICS)
+		self:SetMoveType(MOVETYPE_VPHYSICS)
+		self:SetSolid(SOLID_VPHYSICS)
+		self:PhysWake()
+	end
+
+	-- Consume from inventory to get high
+	function ITEM:OnUse(ply)
+		if not IsValid(ply) or not ply:IsPlayer() then return end
+
+		-- Apply SporeHigh status for 45s
+		if Arcane and Arcane.Status and Arcane.Status.SporeHigh and Arcane.Status.SporeHigh.Apply then
+			Arcane.Status.SporeHigh.Apply(ply, { duration = 45 })
+		end
+
+		-- Remove one item from inventory when used
+		if ply.TakeItem then ply:TakeItem("solidified_spores", 1, "eaten") end
+	end
+end
+
+if CLIENT then
+	local MAX_RENDER_DIST = 1500 * 1500
+	local function drawOverride(ent)
+		if EyePos():DistToSqr(ent:GetPos()) <= MAX_RENDER_DIST then
+			local now = CurTime()
+			ent._fxEmitter = ent._fxEmitter or ParticleEmitter(ent:GetPos(), false)
+			if now >= (ent._fxNext or 0) and ent._fxEmitter then
+				ent._fxNext = now + 0.12
+				local origin = ent:WorldSpaceCenter()
+				local p = ent._fxEmitter:Add("sprites/light_glow02_add", origin + VectorRand() * math.Rand(1, 6))
+				if p then
+					p:SetStartAlpha(150)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(2, 4))
+					p:SetEndSize(0)
+					p:SetDieTime(math.Rand(0.5, 0.8))
+					p:SetVelocity(Vector(0, 0, math.Rand(8, 16)))
+					p:SetAirResistance(40)
+					p:SetGravity(Vector(0, 0, 0))
+					p:SetRoll(math.Rand(-180, 180))
+					p:SetRollDelta(math.Rand(-1, 1))
+					p:SetColor(COLOR.r, COLOR.g, COLOR.b)
+				end
+			end
+		end
+
+		ent:DrawModel()
+	end
+
+	function ITEM:Initialize()
+		self:SetModel(self.WorldModel)
+		self:SetColor(COLOR)
+		self:AddBackpackOption()
+
+		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
+		self._fxNext = 0
+
+		function self:RenderOverride()
+			drawOverride(self)
+		end
+	end
+
+	function ITEM:OnRemove()
+		if self._fxEmitter then
+			self._fxEmitter:Finish()
+			self._fxEmitter = nil
+		end
+	end
+
+	function ITEM:DrawInInventory(panel, ent)
+		drawOverride(ent)
+	end
+
+	function ITEM:DrawInInventoryIcon(image, ent)
+		drawOverride(ent)
+	end
+end
+
+msitems.EndItem()
