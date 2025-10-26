@@ -64,6 +64,8 @@ function ENT:Initialize()
 
 		-- Ensure a sensible human hull/collision so nav works and it doesn't float
 		self:SetSolid(SOLID_BBOX)
+		-- Explicit collision bounds so VPhysics objects and vehicles collide properly
+		self:SetCollisionBounds(Vector(-13, -13, 0), Vector(13, 13, 72))
 		self:SetHealth(120)
 		self:SetMaxHealth(120)
 		self:SetCollisionGroup(COLLISION_GROUP_NPC)
@@ -341,6 +343,51 @@ function ENT:TryMelee(target)
 			end
 		end
 	end)
+end
+
+-- Apply contact damage when hit by physics props or vehicles
+function ENT:OnContact(other)
+    if not IsValid(other) then return end
+
+    local now = CurTime()
+    if now < (self._nextImpactDamage or 0) then return end
+
+    local impactSpeed = 0
+    local mass = 0
+    local attacker = other
+    local inflictor = other
+
+    if other:IsVehicle() then
+        impactSpeed = other:GetVelocity():Length()
+        mass = 800 -- approximate effective mass for vehicles
+        local driver = other:GetDriver()
+        if IsValid(driver) then attacker = driver end
+    else
+        local phys = other:GetPhysicsObject()
+        if IsValid(phys) then
+            impactSpeed = (phys:GetVelocity() - self:GetVelocity()):Length()
+            mass = phys:GetMass()
+        end
+    end
+
+    if impactSpeed <= 0 or mass <= 0 then return end
+
+    -- Ignore glancing or slow touches
+    if impactSpeed < 140 then return end
+
+    -- Scale damage by momentum with sane clamps
+    local damage = math.Clamp((impactSpeed * mass) / 500, 8, 120)
+
+    local dmg = DamageInfo()
+    dmg:SetDamage(damage)
+    dmg:SetDamageType(other:IsVehicle() and DMG_VEHICLE or DMG_CRUSH)
+    dmg:SetAttacker(IsValid(attacker) and attacker or other)
+    dmg:SetInflictor(IsValid(inflictor) and inflictor or other)
+
+    self:TakeDamageInfo(dmg)
+
+    -- brief cooldown to prevent multiple rapid applications from the same contact
+    self._nextImpactDamage = now + 0.1
 end
 
 function ENT:OnTraceAttack(dmg, dir, tr)
