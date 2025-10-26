@@ -366,6 +366,8 @@ function ENT:OnContact(other)
         local driver = other:GetDriver()
         if IsValid(driver) then attacker = driver end
     else
+		if other:IsPlayer() or other:IsNPC() or other:IsNextBot() then return end
+
         local phys = other:GetPhysicsObject()
         if IsValid(phys) then
             impactSpeed = (phys:GetVelocity() - self:GetVelocity()):Length()
