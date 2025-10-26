@@ -28,8 +28,6 @@ if SERVER then
         local phys = self:GetPhysicsObject()
         if IsValid(phys) then
             phys:Wake()
-            phys:SetMaterial("gmod_ice")
-            phys:SetBuoyancyRatio(0.2)
         end
 
         SafeRemoveEntityDelayed(self, 300) -- 5 minutes
