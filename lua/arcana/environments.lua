@@ -118,54 +118,30 @@ end
 
 -- Selection honoring per-item min/max counts; returns up to k picks (repeats allowed up to it.max).
 -- Strategy: satisfy each item's min first (round-robin), then fill randomly up to remaining capacity.
-local function choosePointsOfInterest(items, k)
-    local target = math.max(0, math.floor(tonumber(k or 0) or 0))
-    if target == 0 then return {} end
+local function choosePointsOfInterest(poiDefs, maxCount)
+	local chosen = {}
+	local allocation = {}
+	for _, poiDef in ipairs(poiDefs) do
+		allocation[poiDef.id] = 0
+		if (poiDef.min or 0) > 0 then
+			for i = 1, poiDef.min do
+				table.insert(chosen, poiDef)
+				allocation[poiDef.id] = allocation[poiDef.id] + 1
+			end
+		end
+	end
 
-    -- Build pool with min/max constraints and allocation counters
-    local pool = {}
-    for _, it in ipairs(items) do
-        local minCount = math.max(0, math.floor(tonumber(it.min or 0) or 0))
-        local maxCount = math.max(minCount, math.max(0, math.floor(tonumber(it.max or 1) or 1)))
-        if maxCount > 0 then
-            table.insert(pool, { ref = it, min = minCount, max = maxCount, allocated = 0 })
-        end
-    end
+	local remaining = maxCount - #chosen
+	if remaining <= 0 then return chosen end
 
-    if #pool == 0 then return {} end
-
-    local chosen = {}
-
-    -- Phase 1: allocate to meet minima in a fair round-robin manner
-    local madeProgress = true
-    while #chosen < target and madeProgress do
-        madeProgress = false
-        for _, p in ipairs(pool) do
-            if #chosen >= target then break end
-
-            if p.allocated < p.min and p.allocated < p.max then
-                chosen[#chosen + 1] = p.ref
-                p.allocated = p.allocated + 1
-                madeProgress = true
-            end
-        end
-    end
-
-    if #chosen >= target then return chosen end
-
-    -- Phase 2: fill remaining slots randomly among entries with remaining capacity
-    while #chosen < target do
-        local candidates = {}
-        for _, p in ipairs(pool) do
-            if p.allocated < p.max then candidates[#candidates + 1] = p end
-        end
-
-        if #candidates == 0 then break end
-
-        local pick = candidates[math.random(1, #candidates)]
-        pick.allocated = pick.allocated + 1
-        chosen[#chosen + 1] = pick.ref
-    end
+	while remaining > 0 do
+		local poiDef = poiDefs[math.random(1, #poiDefs)]
+		if allocation[poiDef.id] < (poiDef.max or 0) then
+			table.insert(chosen, poiDef)
+			allocation[poiDef.id] = allocation[poiDef.id] + 1
+			remaining = remaining - 1
+		end
+	end
 
     return chosen
 end
@@ -231,7 +207,7 @@ function Envs:Start(id, origin, owner, opts)
 
 		-- Compute effective radius once and pass to environment context
 		local eff_radius = self:ComputeEffectiveRadius(origin)
-		if def.max_radius and eff_radius > def.max_radius then
+		if eff_radius > def.max_radius then
 			eff_radius = def.max_radius
 		end
 
@@ -296,7 +272,7 @@ function Envs:Start(id, origin, owner, opts)
 			if can then table.insert(candidates, poi) end
 		end
 
-        local need = math.random(def.poi_min, def.poi_max)
+        local need = math.ceil(def.poi_max * (eff_radius / def.max_radius))
         local picks = choosePointsOfInterest(candidates, need)
 		for _, poi in ipairs(picks) do
 			if isfunction(poi.spawn) then
