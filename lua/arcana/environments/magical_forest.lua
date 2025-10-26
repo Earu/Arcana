@@ -69,6 +69,11 @@ local function freeze(ent)
 	if IsValid(phys) then phys:EnableMotion(false) end
 end
 
+local function setOwner(ent, owner)
+	if not IsValid(owner) then return end
+	if ent.CPPISetOwner then ent:CPPISetOwner(owner) end
+end
+
 local FOREST_RANGE = 8000
 local TREE_COUNT = 600
 local TREE_LOG_COUNT = 3
@@ -163,7 +168,7 @@ local function spawnForest(ctx)
 					log:SetAngles(logAng)
 					log:Spawn()
 					log:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-					if log.CPPISetOwner then log:CPPISetOwner(ctx.owner) end
+					setOwner(log, ctx.owner)
 
 					freeze(log)
 					table.insert(entities, log)
@@ -194,7 +199,7 @@ local function spawnForest(ctx)
 		tree:Spawn()
 		tree:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 
-		if tree.CPPISetOwner then tree:CPPISetOwner(ctx.owner) end
+		setOwner(tree, ctx.owner)
 
 		if not isFallenTreeModel(mdl) then
 			tree:DropToFloor()
@@ -312,7 +317,7 @@ local function spawnMushroomHotspot(ctx)
 		m:SetPos(pos + Vector(0, 0, 2))
 		m:SetAngles(Angle(0, math.random(0, 360), 0))
 		m:Spawn()
-		if m.CPPISetOwner then m:CPPISetOwner(ctx.owner) end
+		setOwner(m, ctx.owner)
 
 		table.insert(entities, m)
 	end
@@ -350,7 +355,7 @@ local function spawnFairyGrove(ctx)
 		tree:SetAngles(Angle(0, math.random(0, 360), 0))
 		tree:Spawn()
 		tree:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-		if tree.CPPISetOwner then tree:CPPISetOwner(ctx.owner) end
+		setOwner(tree, ctx.owner)
 		tree:DropToFloor()
 		tree:SetPos(tree:GetPos() - Vector(0, 0, 20 * tree:GetModelScale()))
 
@@ -377,7 +382,7 @@ local function spawnFairyGrove(ctx)
 
 		f:SetPos(pos)
 		f:Spawn()
-		if f.CPPISetOwner then f:CPPISetOwner(ctx.owner) end
+		setOwner(f, ctx.owner)
 		table.insert(entities, f)
 
 		f:SetNWBool("Arcana_FairyVendor", true)
@@ -455,7 +460,7 @@ local function spawnGraveyard(ctx)
 		cstone:SetModel(centerModels[math.random(#centerModels)])
 		cstone:Spawn()
 		cstone:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-		if cstone.CPPISetOwner then cstone:CPPISetOwner(ctx.owner) end
+		setOwner(cstone, ctx.owner)
 		cstone:DropToFloor()
 
 		freeze(cstone)
@@ -515,7 +520,7 @@ local function spawnGraveyard(ctx)
 			g:Spawn()
 			g:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 
-			if g.CPPISetOwner then g:CPPISetOwner(ctx.owner) end
+			setOwner(g, ctx.owner)
 			g:DropToFloor()
 
 			freeze(g)
@@ -588,7 +593,7 @@ local function spawnGraveyard(ctx)
 				sk:SetPos(summonPos)
 				sk:SetAngles(summonAng)
 				sk:Spawn()
-				if sk.CPPISetOwner then sk:CPPISetOwner(ctx.owner) end
+				setOwner(sk, ctx.owner)
 
 				table.insert(activeSkeletons, sk)
 			end)
