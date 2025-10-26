@@ -4,7 +4,7 @@ ENT.Type = "nextbot"
 ENT.Base = "base_nextbot"
 ENT.PrintName = "Skeleton"
 ENT.Category = "Arcana"
-ENT.Spawnable = true
+ENT.Spawnable = false
 ENT.AdminOnly = false
 
 local SKELETON_MODEL = "models/player/skeleton.mdl"
@@ -47,7 +47,7 @@ local MELEE_COOLDOWN = 0.9
 local MELEE_DAMAGE = 20
 local MOVE_SPEED = 220
 local TURN_RATE = 420 -- deg/sec
-local XP_REWARD = 25
+local XP_REWARD = 35
 local FOOTSTEP_MIN_SPEED = 90
 
 function ENT:Initialize()
