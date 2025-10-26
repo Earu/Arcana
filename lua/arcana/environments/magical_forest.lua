@@ -642,6 +642,10 @@ if CLIENT then
 		local dy = p.y - origin.y
 		local d2d = math.sqrt(dx * dx + dy * dy)
 
+		-- If the player is within the forest range and above the origin, don't apply fog
+		local dz = p.z - origin.z
+		if d2d <= forestRange and dz > 1000 then return end
+
 		local t
 		local toEdge = d2d - forestRange
 		t = 1 - math.Clamp(toEdge / fadeWidth, 0, 1)
