@@ -370,7 +370,9 @@ function ENT:OnContact(other)
 
         local phys = other:GetPhysicsObject()
         if IsValid(phys) then
-            impactSpeed = (phys:GetVelocity() - self:GetVelocity()):Length()
+            -- Use the other's own speed only so the skeleton doesn't damage itself by running into static props
+            local otherVel = phys:GetVelocity()
+            impactSpeed = otherVel:Length()
             mass = phys:GetMass()
         end
     end
