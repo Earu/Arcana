@@ -381,7 +381,7 @@ local function spawnFairyGrove(ctx)
 		table.insert(entities, f)
 
 		f:SetNWBool("Arcana_FairyVendor", true)
-		f:SetNWInt("Arcana_FairyVendorPrice", 2500)
+		f:SetNWInt("Arcana_FairyVendorPrice", 6000)
 
 		local tname = timerPrefix .. tostring(f:EntIndex())
 		table.insert(timersOut, tname)
