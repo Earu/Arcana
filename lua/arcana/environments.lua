@@ -62,7 +62,7 @@ end
 --   poi_min = 1,
 --   poi_max = 3,
 --   pois = {
---     { id="mushroom_hotspot", weight=100, can_spawn=function(ctx) return true end, spawn=function(ctx) ... end },
+--     { id="mushroom_hotspot", min=0, max=2, can_spawn=function(ctx) return true end, spawn=function(ctx) ... end },
 --     ...
 --   }
 -- }
@@ -116,41 +116,58 @@ function Envs:Stop(reason)
 	return true
 end
 
--- Weighted selection of POIs with per-POI max instances; returns up to k items (with repeats allowed up to it.max)
-local function chooseWeightedUnique(items, k)
-	local pool = {}
-	for _, it in ipairs(items) do
-		local w = math.max(0, tonumber(it.weight or it.chance or 1) or 1)
-		local m = math.max(0, tonumber(it.max or 1) or 1)
-		if w > 0 and m > 0 then table.insert(pool, {ref = it, w = w, remaining = m}) end
-	end
+-- Selection honoring per-item min/max counts; returns up to k picks (repeats allowed up to it.max).
+-- Strategy: satisfy each item's min first (round-robin), then fill randomly up to remaining capacity.
+local function choosePointsOfInterest(items, k)
+    local target = math.max(0, math.floor(tonumber(k or 0) or 0))
+    if target == 0 then return {} end
 
-	local chosen = {}
-	for _ = 1, math.max(0, tonumber(k or 0) or 0) do
-		-- compute total weight over items that still have remaining quota
-		local sum = 0
-		for _, p in ipairs(pool) do if (p.remaining or 0) > 0 then sum = sum + p.w end end
-		if sum <= 0 then break end
-		local r = math.Rand(0, sum)
-		local acc = 0
-		local pickIndex = nil
-		for i, p in ipairs(pool) do
-			if (p.remaining or 0) > 0 then
-				acc = acc + p.w
-				if r <= acc then pickIndex = i break end
-			end
-		end
-		if not pickIndex then break end
-		local picked = pool[pickIndex]
-		chosen[#chosen + 1] = picked.ref
-		picked.remaining = (picked.remaining or 0) - 1
-		if picked.remaining <= 0 then
-			-- remove exhausted entry from pool to keep iteration tighter
-			table.remove(pool, pickIndex)
-		end
-	end
+    -- Build pool with min/max constraints and allocation counters
+    local pool = {}
+    for _, it in ipairs(items) do
+        local minCount = math.max(0, math.floor(tonumber(it.min or 0) or 0))
+        local maxCount = math.max(minCount, math.max(0, math.floor(tonumber(it.max or 1) or 1)))
+        if maxCount > 0 then
+            table.insert(pool, { ref = it, min = minCount, max = maxCount, allocated = 0 })
+        end
+    end
 
-	return chosen
+    if #pool == 0 then return {} end
+
+    local chosen = {}
+
+    -- Phase 1: allocate to meet minima in a fair round-robin manner
+    local madeProgress = true
+    while #chosen < target and madeProgress do
+        madeProgress = false
+        for _, p in ipairs(pool) do
+            if #chosen >= target then break end
+
+            if p.allocated < p.min and p.allocated < p.max then
+                chosen[#chosen + 1] = p.ref
+                p.allocated = p.allocated + 1
+                madeProgress = true
+            end
+        end
+    end
+
+    if #chosen >= target then return chosen end
+
+    -- Phase 2: fill remaining slots randomly among entries with remaining capacity
+    while #chosen < target do
+        local candidates = {}
+        for _, p in ipairs(pool) do
+            if p.allocated < p.max then candidates[#candidates + 1] = p end
+        end
+
+        if #candidates == 0 then break end
+
+        local pick = candidates[math.random(1, #candidates)]
+        pick.allocated = pick.allocated + 1
+        chosen[#chosen + 1] = pick.ref
+    end
+
+    return chosen
 end
 
 -- Compute effective horizontal radius available around origin by sampling along a vertical line
@@ -279,8 +296,8 @@ function Envs:Start(id, origin, owner, opts)
 			if can then table.insert(candidates, poi) end
 		end
 
-		local need = math.random(def.poi_min, def.poi_max)
-		local picks = chooseWeightedUnique(candidates, need)
+        local need = math.random(def.poi_min, def.poi_max)
+        local picks = choosePointsOfInterest(candidates, need)
 		for _, poi in ipairs(picks) do
 			if isfunction(poi.spawn) then
 				local ok, res = pcall(poi.spawn, ctx)

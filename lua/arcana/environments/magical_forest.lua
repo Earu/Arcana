@@ -618,9 +618,9 @@ Envs:RegisterEnvironment({
 	poi_min = 2,
 	poi_max = 6,
 	pois = {
-		{ id = "mushroom_hotspot", weight = 100, spawn = spawnMushroomHotspot, max = 2 },
-		{ id = "fairy_grove", weight = 100, spawn = spawnFairyGrove, max = 1 },
-		{ id = "graveyard", weight = 50, spawn = spawnGraveyard, max = 3 },
+		{ id = "mushroom_hotspot", spawn = spawnMushroomHotspot, max = 2, min = 1 },
+		{ id = "fairy_grove", spawn = spawnFairyGrove, max = 1, min = 1 },
+		{ id = "graveyard", spawn = spawnGraveyard, max = 3, min = 0 },
 	},
 })
 
