@@ -8,7 +8,8 @@ ENT.Spawnable = false
 ENT.AdminOnly = false
 
 local SKELETON_MODEL = "models/player/skeleton.mdl"
-local SWORD_MODEL = "models/props/de_cbble/old_weapons/double_sword.mdl"
+local SWORD_MODEL = "models/weapons/c_models/c_scout_sword/c_scout_sword.mdl"
+local SWORD_MATERIAL = "models/props_c17/metalladder002"
 local SWORD_BONE = "ValveBiped.Bip01_R_Hand"
 local SWORD_POS_OFFSET = Vector(4, 0, -2)
 local SWORD_ANG_OFFSET = Angle(0, 90, 0)
@@ -30,6 +31,7 @@ end
 
 if SERVER then
 	resource.AddFile("sound/arcana/skeleton/death.ogg")
+	resource.AddFile(SWORD_MODEL)
 end
 
 -- Death gib models (server)
@@ -111,6 +113,7 @@ function ENT:EquipSword()
 	local sword = ents.Create("prop_dynamic")
 	if not IsValid(sword) then return end
 	sword:SetModel(SWORD_MODEL)
+	sword:SetMaterial(SWORD_MATERIAL)
 	sword:SetModelScale(1.25, 0)
 	sword:SetMoveType(MOVETYPE_NONE)
 	sword:SetSolid(SOLID_NONE)
