@@ -644,7 +644,7 @@ if CLIENT then
 
 		-- If the player is within the forest range and above the origin, don't apply fog
 		local dz = p.z - origin.z
-		if d2d <= forestRange and dz > 1000 then return end
+		if d2d <= forestRange and dz > 3000 then return end
 
 		local t
 		local toEdge = d2d - forestRange
