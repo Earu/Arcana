@@ -463,6 +463,7 @@ function ENT:OnRemove()
 	end
 end
 
+local DRAW_DISTANCE = 1500 * 1500
 function ENT:Think()
 	if SERVER then
 		if not IsValid(self._sword) then
@@ -483,7 +484,7 @@ function ENT:Think()
 		end
 	end
 
-	if CLIENT then
+	if CLIENT and EyePos():DistToSqr(self:GetPos()) <= DRAW_DISTANCE then
 		-- Update emitter position
 		if not self._emitter then
 			self._emitter = ParticleEmitter(self:GetPos())
@@ -521,6 +522,8 @@ if CLIENT then
 	-- Translucent pass for glowing eyes and wisps
 	function ENT:Draw()
 		self:DrawModel()
+
+		if EyePos():DistToSqr(self:GetPos()) > DRAW_DISTANCE then return end
 
 		-- Eyes at the head bone based on its local axes
 		local headId = self._headBone or self:LookupBone("ValveBiped.Bip01_Head1")
