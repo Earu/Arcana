@@ -76,7 +76,16 @@ if CLIENT then
 			end
 		end
 
-		ent:DrawModel()
+        if not IsValid(ent._mdl) then
+            ent._mdl = ClientsideModel("models/props_hive/larval_essence.mdl", RENDERGROUP_BOTH)
+            ent._mdl:SetColor(COLOR)
+            ent._mdl:SetModelScale(1, 0)
+            ent._mdl:SetPos(ent:GetPos())
+            ent._mdl:SetAngles(ent:GetAngles())
+            ent._mdl:SetParent(ent)
+        end
+
+		ent._mdl:DrawModel()
 	end
 
 	function ITEM:Initialize()
@@ -98,6 +107,9 @@ if CLIENT then
 			self._fxEmitter:Finish()
 			self._fxEmitter = nil
 		end
+
+		SafeRemoveEntity(self._mdl)
+		self._mdl = nil
 	end
 
 	function ITEM:DrawInInventory(panel, ent)
