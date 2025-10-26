@@ -11,8 +11,8 @@ local SKELETON_MODEL = "models/player/skeleton.mdl"
 local SWORD_MODEL = "models/weapons/c_models/c_scout_sword/c_scout_sword.mdl"
 local SWORD_MATERIAL = "models/props_c17/metalladder002"
 local SWORD_BONE = "ValveBiped.Bip01_R_Hand"
-local SWORD_POS_OFFSET = Vector(4, 0, -2)
-local SWORD_ANG_OFFSET = Angle(0, 90, 0)
+local SWORD_POS_OFFSET = Vector(4, 0, 5)
+local SWORD_ANG_OFFSET = Angle(0, 0, -180)
 local SWORD_REFRESH_INTERVAL = 1.0
 
 -- Visuals (client)
@@ -114,7 +114,7 @@ function ENT:EquipSword()
 	if not IsValid(sword) then return end
 	sword:SetModel(SWORD_MODEL)
 	sword:SetMaterial(SWORD_MATERIAL)
-	sword:SetModelScale(1.25, 0)
+	sword:SetModelScale(1, 0)
 	sword:SetMoveType(MOVETYPE_NONE)
 	sword:SetSolid(SOLID_NONE)
 	sword:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
