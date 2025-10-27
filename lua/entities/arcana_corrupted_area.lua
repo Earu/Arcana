@@ -9,8 +9,6 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.PhysgunDisabled = true
 ENT.ms_notouch = true
 
-require("shader_to_gma")
-
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "Radius")
 	self:NetworkVar("Float", 1, "Intensity")
@@ -25,9 +23,6 @@ function ENT:UpdateTransmitState()
 end
 
 if SERVER then
-	resource.AddShader("arcana_crystal_surface_vs30")
-	resource.AddShader("arcana_crystal_surface_ps30")
-
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
 		self:SetMoveType(MOVETYPE_NONE)

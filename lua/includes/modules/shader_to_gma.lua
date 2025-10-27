@@ -40,8 +40,8 @@ if SERVER then
 		return (s or "") .. "\0"
 	end
 
-	local function readGameFile(path)
-		local f = file.Open(path, "rb", "MOD")
+	local function readGameFile(path, realm)
+		local f = file.Open(path, "rb", realm)
 		if not f then return nil end
 		local data = f:Read(f:Size())
 		f:Close()
@@ -61,16 +61,18 @@ if SERVER then
 	local function createGMA(files, meta)
 		meta = meta or {}
 		if not istable(files) or #files == 0 then return false, "no files" end
+
 		-- Prepare entries
 		local entries = {}
 		local fileDatas = {}
 
 		for i = 1, #files do
-			local p = lowerFixPath(files[i])
-			local data = readGameFile(p)
-			if not data then return false, "missing GAME file: " .. p end
-			local crc = crc32_num(data)
+			local p = lowerFixPath(files[i].path)
+			local realm = files[i].realm
+			local data = readGameFile(p, realm)
+			if not data then return false, "missing " .. realm .. " file: " .. p end
 
+			local crc = crc32_num(data)
 			entries[#entries + 1] = {
 				id = i,
 				path = p,
@@ -83,6 +85,7 @@ if SERVER then
 
 		-- Build header + directory + data in memory
 		local chunks = {}
+
 		-- Header
 		chunks[#chunks + 1] = "GMAD" -- magic
 		chunks[#chunks + 1] = u8(3) -- version 3
@@ -126,19 +129,23 @@ if SERVER then
 
 	function resource.AddShader(shaderName)
 		local path = "shaders/fxc/" .. shaderName .. ".vcs"
-
+		local realm = "MOD"
 		if not file.Exists(path, "MOD") then
-			ErrorNoHalt("Missing shader file: " .. path .. "\n")
-			return
+			if not file.Exists(path, "GAME") then
+				ErrorNoHalt("Missing shader file: " .. path .. " (MOD and GAME)\n")
+				return
+			else
+				realm = "GAME"
+			end
 		end
 
-		shaderFiles[shaderName] = path
+		shaderFiles[shaderName] = { path = path, realm = realm }
 
 		-- clean up possible broken shader references
-		for existingShaderName, existingShaderPath in pairs(shaderFiles) do
+		for existingShaderName, existingShaderData in pairs(shaderFiles) do
 			if existingShaderName == shaderName then continue end
 
-			if not file.Exists(existingShaderPath, "MOD") then
+			if not file.Exists(existingShaderData.path, existingShaderData.realm) then
 				shaderFiles[existingShaderName] = nil
 			end
 		end
@@ -153,7 +160,6 @@ if SERVER then
 	end
 
 	local justSpawned = {}
-
 	hook.Add("PlayerInitialSpawn", "shader_to_gma", function(ply)
 		justSpawned[ply] = true
 	end)
