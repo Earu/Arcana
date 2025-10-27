@@ -17,14 +17,6 @@ ENT.SizePulse = 1
 ENT.Blink = math.huge
 
 if CLIENT then
-	local function DrawFairySunbeams()
-		local fairies = ents.FindByClass("arcana_fairy")
-		local count = #fairies
-		for key, ent in ipairs(fairies) do
-			ent:DrawSunbeams(ent:GetPos(), 0.05/count, 0.025)
-		end
-	end
-
 	local function VectorRandSphere()
 		return Angle(math.Rand(-180,180), math.Rand(-180,180), math.Rand(-180,180)):Up()
 	end
@@ -172,10 +164,6 @@ if CLIENT then
 		self.Size = (tonumber(util.CRC(self:EntIndex()))%100/100) + 0.5
 
 		self.pixvis = util.GetPixelVisibleHandle()
-
-		if render.SupportsPixelShaders_2_0() then
-			hook.Add("RenderScreenspaceEffects", "arcana_fairy_sunbeams", DrawFairySunbeams)
-		end
 	end
 
 	function ENT:InitWings()
@@ -190,10 +178,14 @@ if CLIENT then
 		self.brightwing:SetNoDraw(true)
 	end
 
+	local MAX_RENDER_DIST = 1500 * 1500
 	function ENT:DrawTranslucent()
 		self:CalcAngles()
 
-		self:DrawParticles()
+		if EyePos():DistToSqr(self:GetPos()) <= MAX_RENDER_DIST then
+			self:DrawParticles()
+		end
+
 		self:DrawWings(0)
 		self:DrawSprites()
 	end
@@ -350,51 +342,37 @@ if CLIENT then
 		end
 	end
 
-	function ENT:DrawSunbeams(pos, mult, siz)
-		local ply = LocalPlayer()
-		local eye = EyePos()
-
-		self.Visibility = util.PixelVisible(self:GetPos(), self.Size * 4, self.pixvis)
-
-		if self.Visibility > 0 then
-			local spos = pos:ToScreen()
-			DrawSunbeams(
-				0.25,
-				math.Clamp(mult * (math.Clamp(EyeVector():DotProduct((pos - eye):GetNormalized()) - 0.5, 0, 1) * 2) ^ 5, 0, 1),
-				siz,
-				spos.x / ScrW(),
-				spos.y / ScrH()
-			)
-		end
-	end
-
 	function ENT:DrawParticles()
-		local particle = self.Emitter:Add("particle/fire", self:GetPos() + (VectorRandSphere() * self.Size * 4 * math.random()))
-		local mult = math.Clamp((self:GetVelocity():Length() * 0.1), 0, 1)
+		if not self.next_particle or self.next_particle <= CurTime() then
+			self.next_particle = CurTime() + 0.1
 
-		particle:SetDieTime(math.Rand(0.5, 2)*self.SizePulse*5)
-		particle:SetColor(self.Color.r, self.Color.g, self.Color.b)
+			local particle = self.Emitter:Add("particle/fire", self:GetPos() + (VectorRandSphere() * self.Size * 4 * math.random()))
+			local mult = math.Clamp((self:GetVelocity():Length() * 0.1), 0, 1)
+
+			particle:SetDieTime(math.Rand(0.5, 2)*self.SizePulse*5)
+			particle:SetColor(self.Color.r, self.Color.g, self.Color.b)
 
 
-		if self.Hurting then
-			particle:SetGravity(physenv.GetGravity())
-			particle:SetVelocity((self:GetVelocity() * 0.1) + (VectorRandSphere() * math.random(20, 30)))
-			particle:SetAirResistance(math.Rand(1,3))
-		else
-			particle:SetAirResistance(math.Rand(5,15)*10)
-			particle:SetVelocity((self:GetVelocity() * 0.1) + (VectorRandSphere() * math.random(2, 5))*(self.SizePulse^5))
-			particle:SetGravity(VectorRand() + physenv.GetGravity():GetNormalized() * (math.random() > 0.9 and 10 or 1))
+			if self.Hurting then
+				particle:SetGravity(physenv.GetGravity())
+				particle:SetVelocity((self:GetVelocity() * 0.1) + (VectorRandSphere() * math.random(20, 30)))
+				particle:SetAirResistance(math.Rand(1,3))
+			else
+				particle:SetAirResistance(math.Rand(5,15)*10)
+				particle:SetVelocity((self:GetVelocity() * 0.1) + (VectorRandSphere() * math.random(2, 5))*(self.SizePulse^5))
+				particle:SetGravity(VectorRand() + physenv.GetGravity():GetNormalized() * (math.random() > 0.9 and 10 or 1))
+			end
+
+			particle:SetStartAlpha(0)
+			particle:SetEndAlpha(255)
+
+			particle:SetStartSize(math.Rand(1, self.Size*8)/3)
+			particle:SetEndSize(0)
+
+			particle:SetCollide(true)
+			particle:SetRoll(math.random())
+			particle:SetBounce(0.8)
 		end
-
-		particle:SetStartAlpha(0)
-		particle:SetEndAlpha(255)
-
-		particle:SetStartSize(math.Rand(1, self.Size*8)/3)
-		particle:SetEndSize(0)
-
-		particle:SetCollide(true)
-		particle:SetRoll(math.random())
-		particle:SetBounce(0.8)
 
 		self.Emitter:Draw()
 	end
