@@ -365,7 +365,7 @@ local function spawnFairyGrove(ctx)
 
 	-- Spawn fairies that flutter around the tree
 	local densityFactor = (forestRange / FOREST_RANGE) ^ 2
-	local fairyCount = math.Clamp(math.floor(6 + 12 * densityFactor), 6, 16)
+	local fairyCount = math.floor(3 + 4 * densityFactor)
 	local rScale = math.sqrt(math.max(0.25, forestRange / FOREST_RANGE))
 	local orbitRadius = math.floor(800 * rScale)
 

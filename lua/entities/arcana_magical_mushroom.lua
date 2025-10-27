@@ -201,8 +201,11 @@ if CLIENT then
 		return true
 	end
 
+	local MAX_RENDER_DIST = 1500 * 1500
 	function ENT:_SpawnSpores()
 		if not self._emitter then return end
+		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
+
 		local top = worldTop(self) + (OFFSET_MUSHROOM_M * (self:GetMushroomScale() / 2.2))
 		local col = self.IdleGlowColor or Color(110, 200, 130)
 		-- bright spore motes (greenish)
