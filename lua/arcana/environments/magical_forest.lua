@@ -213,7 +213,7 @@ local function spawnForest(ctx)
 		return true
 	end
 
-	timer.Create(timerName, 0.1, 0, function()
+	timer.Create(timerName, 0.01, 0, function()
 		local placed = false
 		local tries = 0
 		while (not placed) and attempts < maxAttempts and tries < attemptsPerTick do
