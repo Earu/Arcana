@@ -708,7 +708,7 @@ if CLIENT then
 		render.FogStart(fogStart)
 		render.FogEnd(fogEnd)
 		render.FogMaxDensity(Lerp(t, 0, 1))
-		render.FogColor(curFogColor)
+		render.FogColor(curFogColor:Unpack())
 
 		return true
 	end)
