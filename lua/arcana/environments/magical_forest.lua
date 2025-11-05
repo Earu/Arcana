@@ -100,12 +100,10 @@ local snowTrees = {
 }
 
 local sandTrees = {
-	"models/props_foliage/tree_deciduous_01a-lod.mdl",
 	"models/props_foliage/tree_deciduous_01a.mdl",
 	"models/props_foliage/tree_deciduous_02a.mdl",
 	"models/props_foliage/tree_deciduous_03a.mdl",
 	"models/props_foliage/tree_deciduous_03b.mdl",
-	"models/props_foliage/tree_poplar_01.mdl",
 }
 
 local trees = {
