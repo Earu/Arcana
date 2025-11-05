@@ -4,6 +4,8 @@ local Envs = Arcane.Environments
 local ACCEPTABLE_SURFACE_TYPES = {
 	[MAT_GRASS] = true,
 	[MAT_DIRT] = true,
+	[MAT_SAND] = true,
+	[MAT_SNOW] = true,
 }
 
 -- Helpers borrowed from the ritual logic and kept local to this file
@@ -89,6 +91,19 @@ local deadTrees = {
 	"models/props_foliage/fallentree_dry02.mdl",
 }
 
+local snowTrees = {
+	"models/props_foliage/tree_pine_01.mdl",
+	"models/props_foliage/tree_pine_02.mdl",
+	"models/props_foliage/tree_pine_03.mdl"
+}
+
+local sandTrees = {
+	"models/props_foliage/tree_dead01.mdl",
+	"models/props_foliage/tree_dead02.mdl",
+	"models/props_foliage/tree_dead03.mdl",
+	"models/props_foliage/tree_dead04.mdl",
+}
+
 local trees = {
 	"models/props_foliage/tree_pine04.mdl",
 	"models/props_foliage/tree_pine05.mdl",
@@ -139,8 +154,15 @@ local function spawnForest(ctx)
 		if not treeTrace.Hit or not ACCEPTABLE_SURFACE_TYPES[treeTrace.MatType] then return false end
 		if not util.IsInWorld(treeTrace.HitPos) then return false end
 
+		local treeModels = trees
+		if treeTrace.MatType == MAT_SNOW then
+			treeModels = snowTrees
+		elseif treeTrace.MatType == MAT_SAND then
+			treeModels = sandTrees
+		end
+
 		-- Decide model first so we can early-exit without creating a dangling entity
-		local mdl = trees[math.random(#trees)]
+		local mdl = treeModels[math.random(#treeModels)]
 		if math.random() <= 0.25 then
 			if math.random() <= 0.25 then
 				mdl = treeStump
@@ -625,6 +647,13 @@ Envs:RegisterEnvironment({
 })
 
 if CLIENT then
+	local SNOW_FOG_COLOR = Color(92, 106, 117)
+	local SAND_FOG_COLOR = Color(158, 123, 42)
+	local GRASS_FOG_COLOR = Color(74, 102, 92)
+	local SURFACE_CHECK_OFFSET = Vector(0, 0, 2000)
+
+	local nextSurfaceCheck = 0
+	local curFogColor = GRASS_FOG_COLOR
 	hook.Add("SetupWorldFog", "Arcana_MagicalForest_Fog", function()
 		local active = Envs and Envs.Active
 		if not active or active.id ~= "magical_forest" then return end
@@ -651,13 +680,35 @@ if CLIENT then
 		t = 1 - math.Clamp(toEdge / fadeWidth, 0, 1)
 		t = math.Clamp(t, 0, 1) ^ 0.7
 
+		-- Check the surface type every second and update the fog color accordingly
+		if nextSurfaceCheck < CurTime() then
+			nextSurfaceCheck = CurTime() + 1
+			local tr = util.TraceLine({
+				start = p,
+				endpos = p - SURFACE_CHECK_OFFSET,
+				mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY),
+				filter = { ply }
+			})
+
+			if tr.Hit and ACCEPTABLE_SURFACE_TYPES[tr.MatType] then
+				local matType = tr.MatType
+				if matType == MAT_SNOW then
+					curFogColor = SNOW_FOG_COLOR
+				elseif matType == MAT_SAND then
+					curFogColor = SAND_FOG_COLOR
+				end
+			else
+				curFogColor = GRASS_FOG_COLOR
+			end
+		end
+
 		render.FogMode(MATERIAL_FOG_LINEAR)
 		local fogStart = 0
 		local fogEnd = math.floor(Lerp(t, 4500, 900))
 		render.FogStart(fogStart)
 		render.FogEnd(fogEnd)
 		render.FogMaxDensity(Lerp(t, 0, 1))
-		render.FogColor(74, 102, 92)
+		render.FogColor(curFogColor)
 
 		return true
 	end)
