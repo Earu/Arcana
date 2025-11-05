@@ -1,3 +1,10 @@
+local ACCEPTABLE_SURFACE_TYPES = {
+	[MAT_GRASS] = true,
+	[MAT_DIRT] = true,
+	[MAT_SAND] = true,
+	[MAT_SNOW] = true,
+}
+
 Arcane:RegisterRitualSpell({
 	id = "ritual_magical_forest",
 	name = "Ritual: Magical Forest",
@@ -17,7 +24,7 @@ Arcane:RegisterRitualSpell({
 	},
 	can_cast = function(caster)
 		local tr = caster:GetEyeTrace()
-		if not tr.Hit or tr.MatType ~= MAT_GRASS then return false, "This ritual may only be cast on grass terrain." end
+		if not tr.Hit or not ACCEPTABLE_SURFACE_TYPES[tr.MatType] then return false, "This ritual may only be cast on grass, dirt, sand, or snow terrain." end
 
 		return true
 	end,
