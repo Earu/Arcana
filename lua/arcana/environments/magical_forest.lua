@@ -4,7 +4,6 @@ local Envs = Arcane.Environments
 local ACCEPTABLE_SURFACE_TYPES = {
 	[MAT_GRASS] = true,
 	[MAT_DIRT] = true,
-	[MAT_SAND] = true,
 	[MAT_SNOW] = true,
 }
 
@@ -99,13 +98,6 @@ local snowTrees = {
 	"models/props_foliage/tree_pine_tall_02.mdl",
 }
 
-local sandTrees = {
-	"models/props_foliage/tree_deciduous_01a.mdl",
-	"models/props_foliage/tree_deciduous_02a.mdl",
-	"models/props_foliage/tree_deciduous_03a.mdl",
-	"models/props_foliage/tree_deciduous_03b.mdl",
-}
-
 local trees = {
 	"models/props_foliage/tree_pine04.mdl",
 	"models/props_foliage/tree_pine05.mdl",
@@ -159,8 +151,6 @@ local function spawnForest(ctx)
 		local treeModels = trees
 		if treeTrace.MatType == MAT_SNOW then
 			treeModels = snowTrees
-		elseif treeTrace.MatType == MAT_SAND then
-			treeModels = sandTrees
 		end
 
 		-- Decide model first so we can early-exit without creating a dangling entity
@@ -650,7 +640,6 @@ Envs:RegisterEnvironment({
 
 if CLIENT then
 	local SNOW_FOG_COLOR = Color(92, 106, 117)
-	local SAND_FOG_COLOR = Color(158, 123, 42)
 	local GRASS_FOG_COLOR = Color(74, 102, 92)
 	local SURFACE_CHECK_OFFSET = Vector(0, 0, 2000)
 
@@ -696,8 +685,6 @@ if CLIENT then
 				local matType = tr.MatType
 				if matType == MAT_SNOW then
 					curFogColor = SNOW_FOG_COLOR
-				elseif matType == MAT_SAND then
-					curFogColor = SAND_FOG_COLOR
 				else
 					curFogColor = GRASS_FOG_COLOR
 				end
