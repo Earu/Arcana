@@ -94,14 +94,18 @@ local deadTrees = {
 local snowTrees = {
 	"models/props_foliage/tree_pine_01.mdl",
 	"models/props_foliage/tree_pine_02.mdl",
-	"models/props_foliage/tree_pine_03.mdl"
+	"models/props_foliage/tree_pine_03.mdl",
+	"models/props_foliage/tree_pine_tall_01.mdl",
+	"models/props_foliage/tree_pine_tall_02.mdl",
 }
 
 local sandTrees = {
-	"models/props_foliage/tree_dead01.mdl",
-	"models/props_foliage/tree_dead02.mdl",
-	"models/props_foliage/tree_dead03.mdl",
-	"models/props_foliage/tree_dead04.mdl",
+	"models/props_foliage/tree_deciduous_01a-lod.mdl",
+	"models/props_foliage/tree_deciduous_01a.mdl",
+	"models/props_foliage/tree_deciduous_02a.mdl",
+	"models/props_foliage/tree_deciduous_03a.mdl",
+	"models/props_foliage/tree_deciduous_03b.mdl",
+	"models/props_foliage/tree_poplar_01.mdl",
 }
 
 local trees = {
