@@ -690,12 +690,14 @@ if CLIENT then
 				filter = { ply }
 			})
 
-			if tr.Hit and ACCEPTABLE_SURFACE_TYPES[tr.MatType] then
+			if ACCEPTABLE_SURFACE_TYPES[tr.MatType] then
 				local matType = tr.MatType
 				if matType == MAT_SNOW then
 					curFogColor = SNOW_FOG_COLOR
 				elseif matType == MAT_SAND then
 					curFogColor = SAND_FOG_COLOR
+				else
+					curFogColor = GRASS_FOG_COLOR
 				end
 			else
 				curFogColor = GRASS_FOG_COLOR
