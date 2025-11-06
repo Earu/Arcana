@@ -491,6 +491,7 @@ local function drawUnlockAnnouncement(scrW, scrH)
 	local y = math.floor(scrH * 0.16)
 	local textCol = Color(textBright.r, textBright.g, textBright.b, alpha)
 	local subCol = Color(paleGold.r, paleGold.g, paleGold.b, alpha)
+
 	-- Hex background + frame + subtle flourish
 	drawHexFill(x, y, panelW, panelH, alpha)
 	drawHexFrame(x, y, panelW, panelH, alpha)

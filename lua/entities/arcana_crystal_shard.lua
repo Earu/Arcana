@@ -263,6 +263,7 @@ if CLIENT then
 		end
 	end
 
+	local VECTOR_ZERO = Vector(0, 0, 0)
 	function ENT:Think()
 		if self._fxEmitter then
 			self._fxEmitter:SetPos(self:GetPos())
@@ -289,7 +290,7 @@ if CLIENT then
 					p:SetDieTime(math.Rand(0.4, 0.7))
 					p:SetVelocity(Vector(0, 0, math.Rand(8, 18)))
 					p:SetAirResistance(40)
-					p:SetGravity(Vector(0, 0, 0))
+					p:SetGravity(VECTOR_ZERO)
 					p:SetRoll(math.Rand(-180, 180))
 					p:SetRollDelta(math.Rand(-1, 1))
 					p:SetColor(c.r, c.g, c.b)

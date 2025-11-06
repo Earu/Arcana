@@ -351,6 +351,7 @@ if CLIENT then
 		self._intensityScale = sp
 	end
 
+	local VECTOR_ZERO = Vector(0, 0, 0)
 	function ENT:_DrawSphere(on_draw)
 		if not IsValid(self) then return end
 
@@ -384,7 +385,7 @@ if CLIENT then
 			matrix:SetTranslation(world_pos)
 			matrix:SetScale(Vector(radius, radius, radius))
 			cam.PushModelMatrix(matrix)
-			render.DrawSphere(Vector(0, 0, 0), 1, 24, 24)
+			render.DrawSphere(VECTOR_ZERO, 1, 24, 24)
 			cam.PopModelMatrix()
 
 			render.SetStencilCompareFunction(STENCIL_EQUAL)

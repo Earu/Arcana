@@ -108,6 +108,7 @@ if SERVER then
 	end
 
 	-- Periodic random spore drops
+	local SPORE_OFFSET = Vector(0, 0, 100)
 	function ENT:Think()
 		local now = CurTime()
 		if now >= (self._nextSporeDrop or 0) then
@@ -115,7 +116,7 @@ if SERVER then
 			if math.Rand(0, 1) <= 0.45 then
 				local ent = ents.Create("arcana_solidified_spores")
 				if IsValid(ent) then
-					local pos = self:GetPos() + VectorRand():GetNormalized() * math.Rand(80, 140) + Vector(0, 0, 100)
+					local pos = self:GetPos() + VectorRand():GetNormalized() * math.Rand(80, 140) + SPORE_OFFSET
 					ent:SetPos(pos)
 					ent:Spawn()
 					if ent.CPPISetOwner then ent:CPPISetOwner(self:CPPIGetOwner() or self) end

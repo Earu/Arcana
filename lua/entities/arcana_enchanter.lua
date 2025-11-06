@@ -479,6 +479,7 @@ if CLIENT then
 	end
 
 	-- Particle burst: fast upward particles around enchanter outline on each attempt
+	local VECTOR_UP = Vector(0, 0, 1)
 	net.Receive("Arcana_Enchanter_ParticleBurst", function()
 		local ent = net.ReadEntity()
 		if not IsValid(ent) then return end
@@ -491,7 +492,7 @@ if CLIENT then
 		local emitter = ParticleEmitter(ent:WorldSpaceCenter(), false)
 		if not emitter then return end
 
-		local up = Vector(0,0,1)
+		local up = VECTOR_UP
 		local life = 0.30
 		local colR, colG, colB = 222, 198, 120
 
