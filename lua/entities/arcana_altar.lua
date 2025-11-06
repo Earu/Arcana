@@ -272,13 +272,14 @@ if CLIENT then
 	end
 
 	-- Removed ground magic circle to reduce visual noise
+	local BAND_CIRCLE_COLOR = Color(222, 198, 120, 255)
 	local function ensureBands(self)
 		if not BandCircle or not BandCircle.Create then return end
 		if self._band and self._band.IsActive and self._band:IsActive() then return end -- keep following in Think; nothing to do here
 		-- Position a bit above the pillar top
 		local top = self:GetPos() + self:GetUp() * (self:OBBMaxs().z + 30)
 		local ang = self:GetAngles()
-		self._band = BandCircle.Create(top, ang, Color(222, 198, 120, 255), math.max(40, self:GetAuraSize() * 0.35))
+		self._band = BandCircle.Create(top, ang, BAND_CIRCLE_COLOR, math.max(40, self:GetAuraSize() * 0.35))
 		if not self._band then return end
 		-- Three fast rotating bands on different axes
 		local baseR = math.max(24, self:GetAuraSize() * 0.18)
@@ -627,9 +628,10 @@ if CLIENT then
 					tooltip:SetMouseInputEnabled(false)
 					tooltip:SetKeyboardInputEnabled(false)
 
+					local TOOLTIP_BG_COLOR = Color(26, 20, 14, 245)
 					tooltip.Paint = function(pnl, w, h)
 						surface.DisableClipping(true)
-						Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
+						Arcana_FillDecoPanel(-10, 0, w, h, TOOLTIP_BG_COLOR, 8)
 						Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
 						surface.DisableClipping(false)
 					end
@@ -675,8 +677,9 @@ if CLIENT then
 				infoIcon.OnCursorEntered = createTooltip
 				infoIcon.OnCursorExited = destroyTooltip
 
+				local ROW_BG_COLOR = Color(46, 36, 26, 235)
 				row.Paint = function(pnl, w, h)
-					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, Color(46, 36, 26, 235), 8)
+					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, ROW_BG_COLOR, 8)
 					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
 					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, textBright)
 					local sub = string.format("Lvl %d  Cost %d KP", sp.level_required or 1, sp.knowledge_cost or 1)
@@ -709,10 +712,12 @@ if CLIENT then
 
 				updateEnabled()
 
+				local BTN_BG_COLOR = Color(46, 36, 26, 235)
+				local BTN_BG_COLOR_HOVER = Color(58, 44, 32, 235)
 				btn.Paint = function(pnl, w, h)
 					local enabled = pnl:IsEnabled()
 					local hovered = enabled and pnl:IsHovered()
-					local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+					local bgCol = hovered and BTN_BG_COLOR_HOVER or BTN_BG_COLOR
 					surface.DisableClipping(true)
 					Arcana_FillDecoPanel(0, 0, w, h, bgCol, 8)
 					Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
@@ -767,17 +772,22 @@ if CLIENT then
 		end
 	end)
 
+	local COLOR_GLOW = Color(255, 230, 160, 230)
+	local TOP_OFFSET = Vector(0, 0, 10)
 	function ENT:DrawTranslucent()
 		-- glowy core above the pillar
 		if not self._glowMat then return end
+
 		local pos = getOrbPos(self)
 		local t = CurTime()
 		local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
 		local size = 48 + 24 * pulse
 		render.SetMaterial(self._glowMat)
-		render.DrawSprite(pos, size, size, Color(255, 230, 160, 230))
+		render.DrawSprite(pos, size, size, COLOR_GLOW)
+
 		-- Lightweight glyph particles rising like sparks around the pillar top
 		surface.SetFont("MagicCircle_Medium")
+
 		-- local _, charH = surface.GetTextSize("A")
 		local ply = LocalPlayer()
 		local topAng = self:GetAngles()
@@ -789,10 +799,12 @@ if CLIENT then
 
 		topAng:RotateAroundAxis(topAng:Right(), -90)
 		topAng:RotateAroundAxis(topAng:Up(), 90)
+
 		-- ensure the font and color will show up clearly
 		surface.SetFont("MagicCircle_Medium")
-		local baseTop = self:GetPos() + Vector(0, 0, 10)
+		local baseTop = self:GetPos() + TOP_OFFSET
 		if not self._glyphParticles then return end
+
 		draw.NoTexture()
 
 		for _, p in ipairs(self._glyphParticles) do

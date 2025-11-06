@@ -312,6 +312,8 @@ if CLIENT then
 		return center + dir * radius
 	end
 
+	local VECTOR_ZERO = Vector(0, 0, 0)
+	local COLOR_WHITE = Color(255, 255, 255)
 	function ENT:_SpawnAbsorbParticles()
 		if not self._fxEmitter then return end
 
@@ -319,7 +321,7 @@ if CLIENT then
 		local radius = math.max(48, (self:GetAbsorbRadius() or 300) * 0.6)
 		local rate = self:GetAbsorbRate() or 10
 		local num = math.Clamp(math.floor(2 + rate * 0.25), 3, 10)
-		local col = self:GetColor() or Color(255, 255, 255)
+		local col = self:GetColor() or COLOR_WHITE
 		for i = 1, num do
 			local pos = randomPointAround(center, radius)
 			pos.z = pos.z + math.Rand(-radius * 0.25, radius * 0.25)
@@ -334,7 +336,7 @@ if CLIENT then
 				local vel = (center - pos):GetNormalized() * math.Rand(80, 160)
 				p:SetVelocity(vel)
 				p:SetAirResistance(60)
-				p:SetGravity(Vector(0, 0, 0))
+				p:SetGravity(VECTOR_ZERO)
 				p:SetRoll(math.Rand(-180, 180))
 				p:SetRollDelta(math.Rand(-1.2, 1.2))
 				p:SetColor(col.r, col.g, col.b)
@@ -364,6 +366,7 @@ if CLIENT then
 	local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
 	local render_MaterialOverride = _G.render.MaterialOverride
 	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
+	local DYNAMIC_LIGHT_OFFSET = Vector(0, 0, 50)
 	function ENT:Draw()
 		local distSqr = EyePos():DistToSqr(self:GetPos())
 		local dist = math.sqrt(distSqr)
@@ -436,7 +439,7 @@ if CLIENT then
 			local curColor = self:GetColor()
 			local dl = DynamicLight(self:EntIndex())
 			if dl then
-				dl.pos = self:GetPos() + Vector(0, 0, 50)
+				dl.pos = self:GetPos() + DYNAMIC_LIGHT_OFFSET
 				dl.r = curColor.r
 				dl.g = curColor.g
 				dl.b = curColor.b

@@ -46,6 +46,11 @@ local Angle = _G.Angle
 local Vector = _G.Vector
 local Color = _G.Color
 
+local COLOR_WHITE = Color(255, 255, 255, 255)
+local VECTOR_ZERO = Vector(0, 0, 0)
+local VECTOR_X1 = Vector(1, 0, 0)
+local ANGLE_ZERO = Angle(0, 0, 0)
+
 local function getRTBuildPasses()
 	return 4
 end
@@ -223,14 +228,14 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.breaking = false
 	ring.breakStart = 0
 	ring.breakDuration = 0
-	ring.breakOffset = Vector(0, 0, 0) -- local space: x=fwd, y=right, z=up
-	ring.breakVelocity = Vector(0, 0, 0) -- local space units/sec
+	ring.breakOffset = VECTOR_ZERO -- local space: x=fwd, y=right, z=up
+	ring.breakVelocity = VECTOR_ZERO -- local space units/sec
 	ring.breakSpinBoost = 0 -- extra deg/sec
 	ring.removed = false
 	-- Ejection control
 	ring.breakDelay = 0
 	ring.ejectStarted = false
-	ring.ejectDirXY = Vector(1, 0, 0) -- in-plane direction
+	ring.ejectDirXY = VECTOR_X1 -- in-plane direction
 	ring.breakRemoveDistance = 0 -- world units threshold to remove
 	ring.ejectSoundPlayed = false
 
@@ -264,7 +269,7 @@ function Ring:Update(deltaTime)
 
 	-- Optional per-axis spinning for band rings or specialty rings
 	if self.axisSpin then
-		self.axisAngles = self.axisAngles or Angle(0, 0, 0)
+		self.axisAngles = self.axisAngles or ANGLE_ZERO
 		self.axisAngles.p = (self.axisAngles.p + (self.axisSpin.p or 0) * deltaTime) % 360
 		self.axisAngles.y = (self.axisAngles.y + (self.axisSpin.y or 0) * deltaTime) % 360
 		self.axisAngles.r = (self.axisAngles.r + (self.axisSpin.r or 0) * deltaTime) % 360
@@ -295,7 +300,7 @@ function Ring:Update(deltaTime)
 
 				if not self.ejectSoundPlayed then
 					local pitch = 115 + math_random(-8, 12)
-					sound.Play(MAGIC_EJECT_SOUNDS[math_random(1, #MAGIC_EJECT_SOUNDS)], self._lastDrawCenter or Vector(0, 0, 0), 70, pitch, 0.6)
+					sound.Play(MAGIC_EJECT_SOUNDS[math_random(1, #MAGIC_EJECT_SOUNDS)], self._lastDrawCenter or VECTOR_ZERO, 70, pitch, 0.6)
 					self.ejectSoundPlayed = true
 				end
 			end
@@ -305,14 +310,14 @@ function Ring:Update(deltaTime)
 
 		-- Stronger, directed acceleration outward
 		local accel = 320 + math_random() * 240
-		local dir = self.ejectDirXY or Vector(1, 0, 0)
+		local dir = self.ejectDirXY or VECTOR_X1
 		-- Normalize in-plane dir
 		local len = math.sqrt(dir.x * dir.x + dir.y * dir.y)
 
 		if len > 0 then
 			dir = Vector(dir.x / len, dir.y / len, 0)
 		else
-			dir = Vector(1, 0, 0)
+			dir = VECTOR_X1
 		end
 
 		self.breakVelocity.x = (self.breakVelocity.x or 0) + dir.x * accel * deltaTime
@@ -347,7 +352,7 @@ function Ring:Draw(centerPos, angles, color, time)
 
 	-- Apply breakdown offset in local ring plane (non-band rings)
 	if self.breaking and not self.removed and self.type ~= RING_TYPES.BAND_RING then
-		local off = self.breakOffset or Vector(0, 0, 0)
+		local off = self.breakOffset or VECTOR_ZERO
 		local oriented = Angle(angles.p, angles.y, angles.r)
 		local f = oriented:Forward()
 		local r = oriented:Right()
@@ -985,8 +990,8 @@ end
 function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	local circle = setmetatable({}, MagicCircle)
 	-- Core properties
-	circle.position = pos or Vector(0, 0, 0)
-	circle.angles = ang or Angle(0, 0, 0)
+	circle.position = pos or VECTOR_ZERO
+	circle.angles = ang or ANGLE_ZERO
 	circle.color = color or Color(255, 100, 255, 255)
 	circle.intensity = math_max(1, intensity or 3)
 	circle.size = math_max(10, size or 100)
@@ -1167,7 +1172,7 @@ function MagicCircle:Draw()
 
 	for i = 1, math.min(count, maxToDraw) do
 		local ring = self.rings[i]
-		local baseCol = self.color or Color(255, 255, 255, 255)
+		local baseCol = self.color or COLOR_WHITE
 		local a = math_floor((baseCol.a or 255) * fadeMul)
 
 		if a > 0 then
@@ -1207,8 +1212,8 @@ function MagicCircle:StartBreakdown(duration)
 			r.breaking = true
 			r.breakStart = CurTime()
 			r.breakDuration = d * (0.7 + math_random() * 0.6)
-			r.breakOffset = Vector(0, 0, 0)
-			r.breakVelocity = Vector(0, 0, 0)
+			r.breakOffset = VECTOR_ZERO
+			r.breakVelocity = VECTOR_ZERO
 			r.breakSpinBoost = 360 + math_random() * 360
 			-- Spread ejections: set per-ring delay and evenly distributed directions
 			r.breakDelay = (idx - 1) * (d / math_max(1, num)) * 0.5
@@ -1430,8 +1435,8 @@ BandCircle.__index = BandCircle
 
 function BandCircle.new(pos, ang, color, size)
 	local bc = setmetatable({}, BandCircle)
-	bc.position = pos or Vector(0, 0, 0)
-	bc.angles = ang or Angle(0, 0, 0)
+	bc.position = pos or VECTOR_ZERO
+	bc.angles = ang or ANGLE_ZERO
 	bc.color = color or Color(255, 150, 255, 255)
 	bc.size = math_max(10, size or 80)
 	bc.rings = {}
@@ -1523,7 +1528,7 @@ function BandCircle:Draw()
 	table_sort(ordered, function(a, b) return (a.radius or 0) > (b.radius or 0) end)
 
 	for _, r in ipairs(ordered) do
-		local baseCol = self.color or Color(255, 255, 255, 255)
+		local baseCol = self.color or COLOR_WHITE
 		local a = math_floor((baseCol.a or 255) * fadeMul)
 
 		if a > 0 then

@@ -433,18 +433,21 @@ if CLIENT then
 		return out
 	end
 
+	local COLOR_CHIP_BG = Color(20, 20, 28, 180)
+	local COLOR_CHIP_FRAME = Color(160, 140, 110, 220)
 	local function drawChip(x, y, txt, font, bgCol, frameCol)
 		surface.SetFont(font or "Arcana_AncientSmall")
 		local tw, th = surface.GetTextSize(txt)
 		local padX, padY = 6, 2
 		local w, h = tw + padX * 2, th + padY * 2
-		FillDeco(x, y, w, h, bgCol or Color(20, 20, 28, 180), 6)
-		DrawDecoFrame(x, y, w, h, frameCol or Color(160, 140, 110, 220), 6)
+		FillDeco(x, y, w, h, bgCol or COLOR_CHIP_BG, 6)
+		DrawDecoFrame(x, y, w, h, frameCol or COLOR_CHIP_FRAME, 6)
 		draw.SimpleText(txt, font or "Arcana_AncientSmall", x + padX, y + padY - 1, textBright)
 		return w, h
 	end
 
 	-- Fit a model into a DModelPanel based on its bounding box
+	local DIRECTION_DEFAULT = Vector(1, 1, 0.5)
 	local function FitModelPanel(mp)
 		if not IsValid(mp) then return end
 
@@ -463,10 +466,7 @@ if CLIENT then
 		if tanHalf <= 0 then tanHalf = 0.5 end
 
 		local dist = (radius / tanHalf) * 1.25
-		local dir = Vector(1, 1, 0.5)
-
-		dir:Normalize()
-
+		local dir = DIRECTION_DEFAULT:GetNormalized()
 		local camPos = center + dir * dist
 		mp:SetFOV(fov)
 		mp:SetCamPos(camPos)
@@ -531,16 +531,25 @@ if CLIENT then
 
 		local cards = {}
 
+		local COLOR_DECO_BG = Color(24, 24, 36, 120)
+		local COLOR_EMPTY_TEXT = Color(200, 190, 170)
+		local COLOR_COST_TEXT = Color(210, 200, 185)
+		local COLOR_GOLD = Color(198, 160, 74, 255)
+		local COLOR_SUBTEXT = Color(170, 160, 140)
+		local COLOR_BUTTON_BG = Color(46, 36, 26, 235)
+		local COLOR_BUTTON_BG_HOVER = Color(58, 44, 32, 235)
+		local COLOR_BUTTON_FRAME_DISABLED = Color(140, 120, 90, 255)
+		local COLOR_BUTTON_TEXT_DISABLED = Color(200, 190, 170, 255)
 		local function buildSlot(parent, it, slotIndex)
 			local card = vgui.Create("DPanel", parent)
 			card.Paint = function(pnl, w, h)
-				FillDeco(2, 2, w - 4, h - 4, Color(24, 24, 36, 120), 8)
+				FillDeco(2, 2, w - 4, h - 4, COLOR_DECO_BG, 8)
 				DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
 				if it then
 					local title = (it.name or it.print or it.class or "Weapon")
 					drawTruncatedText("Arcana_AncientLarge", title, 10, 8, textBright, w - 20)
 				else
-					draw.SimpleText("EMPTY", "Arcana_AncientLarge", w * 0.5, h * 0.5, Color(200, 190, 170), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					draw.SimpleText("EMPTY", "Arcana_AncientLarge", w * 0.5, h * 0.5, COLOR_EMPTY_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 			end
 
@@ -556,7 +565,7 @@ if CLIENT then
 				if Arcane and Arcane.RenderEnchantBandsForEntity then
 					local count = self._EnchantCount or 3
 					local ply = LocalPlayer()
-					local col = ply.GetWeaponColor and ply:GetWeaponColor():ToColor() or Color(198, 160, 74, 255)
+					local col = ply.GetWeaponColor and ply:GetWeaponColor():ToColor() or COLOR_GOLD
 					local style = "axis"
 
 					Arcane:RenderEnchantBandsForEntity(ent, count, col, style)
@@ -565,7 +574,7 @@ if CLIENT then
 
 			local sub = vgui.Create("DLabel", card)
 			sub:SetFont("Arcana_AncientSmall")
-			sub:SetTextColor(Color(170, 160, 140))
+			sub:SetTextColor(COLOR_SUBTEXT)
 			sub:SetText("")
 
 			local enchList = vgui.Create("DPanel", card)
@@ -577,7 +586,7 @@ if CLIENT then
 				surface.SetFont("Arcana_AncientSmall")
 				local y = 0
 				for _, name in ipairs(pnl.names or {}) do
-					draw.SimpleText("- " .. name, "Arcana_AncientSmall", 0, y, Color(210, 200, 185))
+					draw.SimpleText("- " .. name, "Arcana_AncientSmall", 0, y, COLOR_COST_TEXT)
 					y = y + 16
 					if y > h - 16 then break end
 				end
@@ -588,11 +597,11 @@ if CLIENT then
 			summon.Paint = function(pnl, w, h)
 				local enabled = pnl:IsEnabled()
 				local hovered = enabled and pnl:IsHovered()
-				local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+				local bgCol = hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG
 				FillDeco(0, 0, w, h, bgCol, 8)
-				local frameCol = enabled and gold or Color(140, 120, 90, 255)
+				local frameCol = enabled and gold or COLOR_BUTTON_FRAME_DISABLED
 				DrawDecoFrame(0, 0, w, h, frameCol, 8)
-				local txtCol = enabled and textBright or Color(200, 190, 170, 255)
+				local txtCol = enabled and textBright or COLOR_BUTTON_TEXT_DISABLED
 				draw.SimpleText(it and "Summon" or "Imprint", "Arcana_Ancient", w * 0.5, h * 0.5, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
@@ -614,9 +623,9 @@ if CLIENT then
 			costPanel.Paint = function(pnl, w, h)
 				if not it then return end
 
-				draw.SimpleText("Costs", "Arcana_AncientSmall", 0, 0, Color(170, 160, 140))
-				draw.SimpleText("- " .. string.Comma(tonumber(VAULT_CFG.SUMMON_COINS) or 0) .. " coins", "Arcana_AncientSmall", 0, 16, Color(210, 200, 185))
-				draw.SimpleText("- " .. string.Comma(tonumber(VAULT_CFG.SUMMON_SHARDS) or 0) .. " shards", "Arcana_AncientSmall", 0, 32, Color(210, 200, 185))
+				draw.SimpleText("Costs", "Arcana_AncientSmall", 0, 0, COLOR_SUBTEXT)
+				draw.SimpleText("- " .. string.Comma(tonumber(VAULT_CFG.SUMMON_COINS) or 0) .. " coins", "Arcana_AncientSmall", 0, 16, COLOR_COST_TEXT)
+				draw.SimpleText("- " .. string.Comma(tonumber(VAULT_CFG.SUMMON_SHARDS) or 0) .. " shards", "Arcana_AncientSmall", 0, 32, COLOR_COST_TEXT)
 			end
 
 			-- Small delete cross at top-right for filled slots
@@ -726,18 +735,18 @@ if CLIENT then
 		imprintBtn.Paint = function(pnl, w, h)
 			local enabled = pnl:IsEnabled()
 			local hovered = enabled and pnl:IsHovered()
-			local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+			local bgCol = hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG
 			FillDeco(0, 0, w, h, bgCol, 8)
-			local frameCol = enabled and gold or Color(140, 120, 90, 255)
+			local frameCol = enabled and gold or COLOR_BUTTON_FRAME_DISABLED
 			DrawDecoFrame(0, 0, w, h, frameCol, 8)
-			local txtCol = enabled and textBright or Color(200, 190, 170, 255)
+			local txtCol = enabled and textBright or COLOR_BUTTON_TEXT_DISABLED
 			draw.SimpleText("Imprint Current Weapon", "Arcana_AncientLarge", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local sub = "Cost: " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
 			surface.SetFont("Arcana_AncientSmall")
 			local tw, th = surface.GetTextSize(sub)
 
 			-- Draw a smaller, tighter subtext closer to center line
-			draw.SimpleText(sub, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 6, Color(170, 160, 140), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(sub, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 6, COLOR_SUBTEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 		-- Enable/disable imprint based on weapon presence, vault space and affordability
 		imprintBtn.Think = function(pnl)

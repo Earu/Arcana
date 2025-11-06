@@ -6,6 +6,9 @@ ENT.Category = "Arcana"
 ENT.Spawnable = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 
+local VECTOR_ABOVE_ORB = Vector(0, 0, 100)
+local VECTOR_DOWN = Vector(0, 0, 256)
+
 -- Server-only runtime
 if SERVER then
 	util.AddNetworkString("Arcana_Ritual_Update")
@@ -197,11 +200,11 @@ if SERVER then
 	function ENT:PhysicsSimulate(phys, dt)
 		if not IsValid(phys) then return end
 		phys:Wake()
-		local start = self:GetPos() + Vector(0, 0, 100)
+		local start = self:GetPos() + VECTOR_ABOVE_ORB
 
 		local tr = util.TraceLine({
 			start = start,
-			endpos = start - Vector(0, 0, 256),
+			endpos = start - VECTOR_DOWN,
 			mask = MASK_SOLID,
 			filter = self,
 		})
@@ -317,12 +320,14 @@ if CLIENT then
 		end
 	end
 
+	local VECTOR_SLIGHTLY_ABOVE = Vector(0, 0, 2)
+	local TEXT_OFFSET = Vector(0, 0, 24)
 	function ENT:DrawTranslucent()
 		local color = self:GetColor()
 
 		-- Create and maintain a static magic circle under the orb
 		if not self._circle then
-			local pos = self:GetPos() + Vector(0, 0, 2)
+			local pos = self:GetPos() + VECTOR_SLIGHTLY_ABOVE
 			local ang = Angle(0, 180, 180)
 			self._circle = MagicCircle.new(pos, ang, color, 100, 100, 2)
 			MagicCircleManager:Add(self._circle)
@@ -330,13 +335,13 @@ if CLIENT then
 
 		if self._circle then
 			local tr = util.TraceLine({
-				start = self:GetPos() + Vector(0, 0, 100),
-				endpos = self:GetPos() - Vector(0, 0, 256),
+				start = self:GetPos() + VECTOR_ABOVE_ORB,
+				endpos = self:GetPos() - VECTOR_DOWN,
 				mask = MASK_SOLID,
 				filter = self,
 			})
 
-			self._circle.position = tr.HitPos + Vector(0, 0, 2)
+			self._circle.position = tr.HitPos + VECTOR_SLIGHTLY_ABOVE
 			self._circle.angles = Angle(0, 180, 180)
 		end
 
@@ -442,10 +447,12 @@ if CLIENT then
 
 		local data = ritualState[self]
 		if not data then return end
-		local pos = self:WorldSpaceCenter() + Vector(0, 0, 24)
+
+		local pos = self:WorldSpaceCenter() + TEXT_OFFSET
 		local ang = LocalPlayer():EyeAngles()
 		ang:RotateAroundAxis(ang:Right(), 90)
 		ang:RotateAroundAxis(ang:Up(), -90)
+
 		cam.Start3D2D(pos, ang, 0.06)
 		surface.SetDrawColor(decoPanel)
 		surface.DrawRect(-180, -90, 360, 180)

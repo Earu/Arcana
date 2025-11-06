@@ -126,6 +126,11 @@ if CLIENT then
 		"ἨριφάειςΤρῶεςἵστετοκλυτόν",
 	}
 
+	local VECTOR_UP = Vector(0, 0, 1)
+	local VECTOR_RIGHT = Vector(1, 0, 0)
+	local VECTOR_ZERO = Vector(0, 0, 0)
+	local COLOR_WHITE = Color(255, 255, 255)
+
 	local function pickGlyph(idx)
 		local phrase = GLYPH_PHRASES[(idx % #GLYPH_PHRASES) + 1]
 		local len = (utf8 and utf8.len and utf8.len(phrase)) or #phrase
@@ -146,7 +151,7 @@ if CLIENT then
 		if not IsValid(ent) then return ent:WorldSpaceCenter() end
 		local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
 		local axis = math.random(1, 3)
-		local pos = Vector(0, 0, 0)
+		local pos = VECTOR_ZERO
 		if axis == 1 then
 			pos.x = (math.random(0, 1) == 1) and maxs.x or mins.x
 			pos.y = math.Rand(mins.y, maxs.y)
@@ -185,16 +190,16 @@ if CLIENT then
 				if dist > 2 then
 					dir:Normalize()
 
-					local up = Vector(0, 0, 1)
+					local up = VECTOR_UP
 					local right = dir:Cross(up)
-					if right:LengthSqr() < 0.01 then right = Vector(1, 0, 0) end
+					if right:LengthSqr() < 0.01 then right = VECTOR_RIGHT end
 
 					right:Normalize()
 
 					local mid = (fromPos + toPos) * 0.5
 					local curveAmt = math.Clamp(dist * 0.25, 20, 160)
 					local ctrl = mid + right * math.Rand(-curveAmt, curveAmt)
-					local baseColor = fromEnt:GetColor() or Color(255, 255, 255)
+					local baseColor = fromEnt:GetColor() or COLOR_WHITE
 					local countGlyphs = math.Clamp(math.floor(8 + dist * 0.02), 5, 50)
 					for gi = 1, countGlyphs do
 						local speed = math.Rand(120, 220)
