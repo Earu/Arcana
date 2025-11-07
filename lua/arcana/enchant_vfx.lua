@@ -5,11 +5,6 @@ if SERVER then return end
 
 local ActiveVFXByEnt = ActiveVFXByEnt or {}
 local RESCAN_INTERVAL = 0.50
-local VECTOR_UP = Vector(0, 0, 1)
-local VECTOR_RIGHT = Vector(1, 0, 0)
-local VECTOR_FORWARD = Vector(0, 1, 0)
-local DEFAULT_PHYSGUN_COLOR = Color(120, 200, 255, 255)
-local COLOR_GOLD = Color(255, 200, 100, 255)
 local lastRescan = 0
 
 local function safeJSONToTable(json)
@@ -45,7 +40,7 @@ end
 
 -- When aligning Up to a chosen axis, use an optional reference forward to stabilize yaw
 local function getSecondLongestAxisVector(wep, axis, lenX, lenY, lenZ)
-    if not IsValid(wep) then return VECTOR_RIGHT end
+    if not IsValid(wep) then return Vector(1, 0, 0) end
     if axis == "x" then
         if lenY >= lenZ then return wep:GetRight() else return wep:GetUp() end
     elseif axis == "y" then
@@ -65,7 +60,7 @@ local function buildOrientedAnglesForAxis(axisDir, owner, refForward)
         -- Derive a stable right vector from owner's eye forward projected onto plane orthogonal to Up
         local ref = owner:EyeAngles():Forward()
         right = (ref - up * ref:Dot(up))
-        if right:LengthSqr() < 1e-4 then right = VECTOR_RIGHT end
+        if right:LengthSqr() < 1e-4 then right = Vector(1, 0, 0) end
         right:Normalize()
         forward = right:Cross(up)
     else
@@ -73,8 +68,8 @@ local function buildOrientedAnglesForAxis(axisDir, owner, refForward)
             forward = (refForward - up * refForward:Dot(up))
         end
         if (not forward) or forward:LengthSqr() < 1e-4 then
-            forward = up:Cross(VECTOR_UP)
-            if forward:LengthSqr() < 1e-4 then forward = up:Cross(VECTOR_RIGHT) end
+            forward = up:Cross(Vector(0, 0, 1))
+            if forward:LengthSqr() < 1e-4 then forward = up:Cross(Vector(1, 0, 0)) end
         end
         forward:Normalize()
         right = forward:Cross(up)
@@ -222,15 +217,15 @@ end
 
 -- Build angles given desired Up and Right vectors (orthonormalized)
 local function anglesFromUpRight(up, right)
-    up = (isvector(up) and up or VECTOR_UP)
-    right = (isvector(right) and right or VECTOR_RIGHT)
-    if up:LengthSqr() < 1e-6 then up = VECTOR_UP end
+    up = (isvector(up) and up or Vector(0, 0, 1))
+    right = (isvector(right) and right or Vector(1, 0, 0))
+    if up:LengthSqr() < 1e-6 then up = Vector(0, 0, 1) end
     -- Gram-Schmidt: make right orthogonal to up
     right = right - up * right:Dot(up)
-    if right:LengthSqr() < 1e-6 then right = VECTOR_RIGHT - up * up.x end
+    if right:LengthSqr() < 1e-6 then right = Vector(1, 0, 0) - up * up.x end
     right:Normalize()
     local forward = right:Cross(up)
-    if forward:LengthSqr() < 1e-6 then forward = VECTOR_FORWARD end
+    if forward:LengthSqr() < 1e-6 then forward = Vector(0, 1, 0) end
     forward:Normalize()
     local ang = forward:Angle()
     -- Adjust roll so computed Right matches target Right
@@ -255,7 +250,6 @@ local function getMuzzleAttachmentFull(ent)
             if att then return att end
         end
     end
-
     return nil
 end
 
@@ -270,21 +264,17 @@ local function getPhysgunColorFor(wep)
             return col
         end
     end
-
     if IsValid(wep) and wep._ArcanaLastPhysColor then
         return wep._ArcanaLastPhysColor
     end
-
-    return DEFAULT_PHYSGUN_COLOR
+    return Color(120, 200, 255, 255)
 end
 
 local function createBandsForWeapon(wep, count, style)
 	if not _G.BandCircle then return nil end
 	if count <= 0 then return nil end
-
 	local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
 	style = style or "axis"
-
 	local ang
 	if style == "orbital" then
 		ang = Angle(0, 0, 0)
@@ -294,7 +284,6 @@ local function createBandsForWeapon(wep, count, style)
 		local refFwd = getSecondLongestAxisVector(wep, axis, lenX, lenY, lenZ)
 		ang = buildOrientedAnglesForAxis(upAxis, nil, refFwd)
 	end
-
 	local pos = wep:WorldSpaceCenter()
 	local col = getPhysgunColorFor(wep)
 	local bc = BandCircle.Create(pos, ang, col, 80, 0) -- not animated; we manage lifetime
@@ -440,7 +429,6 @@ local function rescanWeapons()
 	end
 end
 
-
 hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 	for wep, st in pairs(ActiveVFXByEnt) do
 		if not (st and st.bc) then continue end
@@ -488,7 +476,7 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 					end
 				else
 					local fwd = (rang and rang:Forward()) or owner:EyeAngles():Forward()
-					if fwd:LengthSqr() < 1e-4 then fwd = VECTOR_RIGHT end
+					if fwd:LengthSqr() < 1e-4 then fwd = Vector(1, 0, 0) end
 					dir = fwd:GetNormalized()
 					pos = rpos + dir * ((tonumber(longest) or 20) * 0.35)
 				end
@@ -521,7 +509,8 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 		else
 			desiredStyle = "axis"
 		end
-		local upAxis = (desiredStyle == "orbital") and VECTOR_UP or dir
+
+		local upAxis = (desiredStyle == "orbital") and Vector(0, 0, 1) or dir
 		local refFwd
 		if desiredStyle == "axis" then
 			local a, _, _, lx, ly, lz = longestAxisInfo(wep)
@@ -529,6 +518,7 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
 		else
 			refFwd = wep:GetForward()
 		end
+
 		local ang = buildOrientedAnglesForAxis(upAxis, owner, refFwd)
 		st.bc.position = pos
 		st.bc.angles = ang
@@ -726,13 +716,13 @@ function Arcane:RenderEnchantBandsForEntity(ent, count, color, style)
     style = style or "axis"
 
     local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(ent)
-    local upAxis = (style == "orbital") and VECTOR_UP
+    local upAxis = (style == "orbital") and Vector(0, 0, 1)
         or ((axis == "x" and ent:GetForward()) or (axis == "y" and ent:GetRight()) or ent:GetUp())
     local refFwd = (style == "axis") and getSecondLongestAxisVector(ent, axis, lenX, lenY, lenZ) or ent:GetForward()
     local ang = buildOrientedAnglesForAxis(upAxis, nil, refFwd)
 
     local pos = ent:WorldSpaceCenter()
-    local col = color or COLOR_GOLD
+    local col = color or Color(198, 160, 74, 255)
     local bc = BandCircle.Create(pos, ang, col, 80, 0)
     if not bc then return end
 

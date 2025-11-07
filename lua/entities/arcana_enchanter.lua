@@ -849,6 +849,22 @@ if CLIENT then
 		return Arcane and Arcane.RegisteredEnchantments or {}
 	end
 
+	local HL2_MODELS = {
+		weapon_357 = "models/weapons/w_357.mdl",
+		weapon_ar2 = "models/weapons/w_irifle.mdl",
+		weapon_bugbait = "models/weapons/w_bugbait.mdl",
+		weapon_crossbow = "models/weapons/w_crossbow.mdl",
+		weapon_crowbar = "models/weapons/w_crowbar.mdl",
+		weapon_frag = "models/weapons/w_grenade.mdl",
+		weapon_physcannon = "models/weapons/w_physics.mdl",
+		weapon_pistol = "models/weapons/w_pistol.mdl",
+		weapon_rpg = "models/weapons/w_rocket_launcher.mdl",
+		weapon_shotgun = "models/weapons/w_shotgun.mdl",
+		weapon_slam = "models/weapons/w_slam.mdl",
+		weapon_smg = "models/weapons/w_smg1.mdl",
+		weapon_stunstick = "models/weapons/w_stunbaton.mdl",
+	}
+
 	local function OpenEnchanterMenu(machine)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
@@ -1250,7 +1266,7 @@ if CLIENT then
 
 			modelPanel:SetVisible(true)
 			local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
-			local model = (swep and (swep.WorldModel or swep.ViewModel)) or "models/weapons/w_pistol.mdl"
+			local model = (swep and (swep.WorldModel or swep.ViewModel)) or HL2_MODELS[cls] or "models/weapons/w_pistol.mdl"
 			local nice = (swep and (swep.PrintName or swep.Printname)) or cls
 			modelPanel:SetModel(model)
 			nameLabel:SetText(nice)

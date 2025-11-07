@@ -24,6 +24,22 @@ local VAULT_CFG = {
 	SUMMON_SHARDS = 5,
 }
 
+local HL2_MODELS = {
+	weapon_357 = "models/weapons/w_357.mdl",
+	weapon_ar2 = "models/weapons/w_irifle.mdl",
+	weapon_bugbait = "models/weapons/w_bugbait.mdl",
+	weapon_crossbow = "models/weapons/w_crossbow.mdl",
+	weapon_crowbar = "models/weapons/w_crowbar.mdl",
+	weapon_frag = "models/weapons/w_grenade.mdl",
+	weapon_physcannon = "models/weapons/w_physics.mdl",
+	weapon_pistol = "models/weapons/w_pistol.mdl",
+	weapon_rpg = "models/weapons/w_rocket_launcher.mdl",
+	weapon_shotgun = "models/weapons/w_shotgun.mdl",
+	weapon_slam = "models/weapons/w_slam.mdl",
+	weapon_smg = "models/weapons/w_smg1.mdl",
+	weapon_stunstick = "models/weapons/w_stunbaton.mdl",
+}
+
 -- Utility: fetch enchantment ids from a weapon entity, stable order
 local function collectEnchantIds(wep)
 	local set = Arcane and Arcane.GetEntityEnchantments and Arcane:GetEntityEnchantments(wep) or {}
@@ -662,7 +678,7 @@ if CLIENT then
 			if it then
 				local cls = it.class or ""
 				local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
-				local mdl = (swep and (swep.WorldModel or swep.ViewModel)) or "models/weapons/w_pistol.mdl"
+				local mdl = (swep and (swep.WorldModel or swep.ViewModel)) or HL2_MODELS[cls] or "models/weapons/w_pistol.mdl"
 				model:SetModel(mdl)
 				FitModelPanel(model)
 				model._EnchantCount = math.max(1, #(it.enchant_ids or {}))
