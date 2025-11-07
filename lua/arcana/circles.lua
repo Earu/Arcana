@@ -5,6 +5,7 @@ local render_PopRenderTarget = _G.render.PopRenderTarget
 local render_Clear = _G.render.Clear
 local render_SetColorModulation = _G.render.SetColorModulation
 local render_SetBlend = _G.render.SetBlend
+local render_SetLightingMode = _G.render.SetLightingMode
 local GetRenderTarget = _G.GetRenderTarget
 local CreateMaterial = _G.CreateMaterial
 local cam_Start3D2D = _G.cam.Start3D2D
@@ -228,14 +229,14 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.breaking = false
 	ring.breakStart = 0
 	ring.breakDuration = 0
-	ring.breakOffset = VECTOR_ZERO -- local space: x=fwd, y=right, z=up
-	ring.breakVelocity = VECTOR_ZERO -- local space units/sec
+	ring.breakOffset = Vector(0, 0, 0) -- local space: x=fwd, y=right, z=up
+	ring.breakVelocity = Vector(0, 0, 0) -- local space units/sec
 	ring.breakSpinBoost = 0 -- extra deg/sec
 	ring.removed = false
 	-- Ejection control
 	ring.breakDelay = 0
 	ring.ejectStarted = false
-	ring.ejectDirXY = VECTOR_X1 -- in-plane direction
+	ring.ejectDirXY = Vector(1, 0, 0) -- in-plane direction
 	ring.breakRemoveDistance = 0 -- world units threshold to remove
 	ring.ejectSoundPlayed = false
 
@@ -269,7 +270,7 @@ function Ring:Update(deltaTime)
 
 	-- Optional per-axis spinning for band rings or specialty rings
 	if self.axisSpin then
-		self.axisAngles = self.axisAngles or ANGLE_ZERO
+		self.axisAngles = self.axisAngles or Angle(0, 0, 0)
 		self.axisAngles.p = (self.axisAngles.p + (self.axisSpin.p or 0) * deltaTime) % 360
 		self.axisAngles.y = (self.axisAngles.y + (self.axisSpin.y or 0) * deltaTime) % 360
 		self.axisAngles.r = (self.axisAngles.r + (self.axisSpin.r or 0) * deltaTime) % 360
@@ -774,9 +775,11 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	end
 
 	render_SetMaterial(self.bandMat)
-	render_SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
+	render_SetColorModulation(color.r / 255 * 3, color.g / 255 * 3, color.b / 255 * 3)
 	render_SetBlend((color.a or 255) / 255)
+	render_SetLightingMode(2)
 	self.bandMesh:Draw()
+	render_SetLightingMode(0)
 	render_SetColorModulation(1, 1, 1)
 	render_SetBlend(1)
 	cam_PopModelMatrix()
@@ -990,8 +993,8 @@ end
 function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	local circle = setmetatable({}, MagicCircle)
 	-- Core properties
-	circle.position = pos or VECTOR_ZERO
-	circle.angles = ang or ANGLE_ZERO
+	circle.position = pos or Vector(0, 0, 0)
+	circle.angles = ang or Angle(0, 0, 0)
 	circle.color = color or Color(255, 100, 255, 255)
 	circle.intensity = math_max(1, intensity or 3)
 	circle.size = math_max(10, size or 100)
@@ -1212,8 +1215,8 @@ function MagicCircle:StartBreakdown(duration)
 			r.breaking = true
 			r.breakStart = CurTime()
 			r.breakDuration = d * (0.7 + math_random() * 0.6)
-			r.breakOffset = VECTOR_ZERO
-			r.breakVelocity = VECTOR_ZERO
+			r.breakOffset = Vector(0, 0, 0)
+			r.breakVelocity = Vector(0, 0, 0)
 			r.breakSpinBoost = 360 + math_random() * 360
 			-- Spread ejections: set per-ring delay and evenly distributed directions
 			r.breakDelay = (idx - 1) * (d / math_max(1, num)) * 0.5
@@ -1435,8 +1438,8 @@ BandCircle.__index = BandCircle
 
 function BandCircle.new(pos, ang, color, size)
 	local bc = setmetatable({}, BandCircle)
-	bc.position = pos or VECTOR_ZERO
-	bc.angles = ang or ANGLE_ZERO
+	bc.position = pos or Vector(0, 0, 0)
+	bc.angles = ang or Angle(0, 0, 0)
 	bc.color = color or Color(255, 150, 255, 255)
 	bc.size = math_max(10, size or 80)
 	bc.rings = {}
