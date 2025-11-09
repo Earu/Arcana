@@ -15,7 +15,7 @@ local SKULL_MODEL = "models/Gibs/HGIBS.mdl"
 local EYE_COLOR = Color(160, 60, 255, 255)
 local FLAME_COLOR = Color(110, 40, 200, 220)
 local SMOKE_COLOR = Color(80, 40, 140, 180)
-local EYE_SIZE = 10
+local EYE_SIZE = 30
 
 if CLIENT then
 	local matGlow = Material("sprites/light_glow02_add")
