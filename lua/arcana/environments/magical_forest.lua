@@ -601,10 +601,11 @@ local function spawnGraveyard(ctx)
 			timer.Simple(1.0, function()
 				if Arcane.Environments.Active ~= ctx then return end
 
-				local sk = ents.Create("arcana_skeleton")
+				local isFlamingSkull = math.random() > 0.15
+				local sk = isFlamingSkull and ents.Create("arcana_flaming_skull") or ents.Create("arcana_skeleton")
 				if not IsValid(sk) then return end
 
-				sk:SetPos(summonPos)
+				sk:SetPos(isFlamingSkull and summonPos + Vector(0, 0, 100) or summonPos)
 				sk:SetAngles(summonAng)
 				sk:Spawn()
 				setOwner(sk, ctx.owner)
