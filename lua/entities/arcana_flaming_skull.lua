@@ -35,7 +35,7 @@ end
 -- Tuning
 local CHASE_RANGE = 2500
 local FIRE_RANGE = 1800
-local FIRE_COOLDOWN = 2.5
+local FIRE_COOLDOWN = 4
 local FIRE_INTERVAL = 2.0
 local PROJECTILE_SPEED = 580
 local HOVER_HEIGHT = 180
