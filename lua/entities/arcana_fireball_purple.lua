@@ -111,7 +111,7 @@ if SERVER then
 
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.FireballRadius, self.FireballDamage, DMG_BLAST, true, true)
+		Arcane:BlastDamage(IsValid(owner) and owner or self, self, pos, self.FireballRadius, self.FireballDamage, DMG_BLAST, true, true)
 
 		for _, v in ipairs(ents.FindInSphere(pos, self.FireballRadius)) do
 			if IsValid(v) and (v:IsPlayer() or v:IsNPC()) then
