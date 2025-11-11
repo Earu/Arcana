@@ -57,6 +57,7 @@ function ENT:Initialize()
 
 		self:SetHealth(80)
 		self:SetMaxHealth(80)
+		self:Activate()
 
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
@@ -239,7 +240,7 @@ function ENT:OnTakeDamage(dmginfo)
 
 		-- Fire explosion effect
 		local ed = EffectData()
-		ed:SetOrigin(origin)
+		ed:SetOrigin(self:GetPos())
 		ed:SetScale(2)
 		util.Effect("Explosion", ed, true, true)
 
