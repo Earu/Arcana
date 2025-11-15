@@ -90,19 +90,20 @@ if SERVER then
 
 			vel = vel * 5
 			local phys = ent:GetPhysicsObject()
-
-			phys:ComputeShadowControl({
-				secondstoarrive = 0.9,
-				pos = phys:GetPos() + vel,
-				angle = ply:EyeAngles(),
-				maxangular = 5000,
-				maxangulardamp = 10000,
-				maxspeed = 1000000,
-				maxspeeddamp = 10000,
-				dampfactor = 0.05,
-				teleportdistance = 200,
-				deltatime = FrameTime(),
-			})
+			if IsValid(phys) then
+				phys:ComputeShadowControl({
+					secondstoarrive = 0.9,
+					pos = phys:GetPos() + vel,
+					angle = ply:EyeAngles(),
+					maxangular = 5000,
+					maxangulardamp = 10000,
+					maxspeed = 1000000,
+					maxspeeddamp = 10000,
+					dampfactor = 0.05,
+					teleportdistance = 200,
+					deltatime = FrameTime(),
+				})
+			end
 
 			local rag = ply:GetRagdollEntity()
 			rag = rag and rag:IsValid() and rag or nil
@@ -110,6 +111,8 @@ if SERVER then
 			if rag then
 				for i = 0, rag:GetPhysicsObjectCount() - 1 do
 					local phys = rag:GetPhysicsObjectNum(i)
+					if not IsValid(phys) then continue end
+
 					phys:AddVelocity((ply:GetPos() - phys:GetPos()):GetNormalized() * 0.1)
 				end
 			end
