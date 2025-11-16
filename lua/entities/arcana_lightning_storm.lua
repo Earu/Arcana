@@ -26,9 +26,9 @@ function ENT:Initialize()
 		self:SetNWInt("Radius", 2000) -- Increased radius for larger cloud area
 		self:SetNWInt("CloudHeight", 400) -- Height of the cloud
 		self:SetNWInt("Damage", 1000) -- Damage per lightning strike
-		self:SetNWFloat("MinStrikeInterval", 2) -- Minimum time between strikes
-		self:SetNWFloat("MaxStrikeInterval", 8) -- Maximum time between strikes
-		self:SetNWFloat("DarknessIntensity", 0.25) -- How dark it gets under the cloud (0-1)
+		self:SetNWFloat("MinStrikeInterval", 0.5) -- Minimum time between strikes
+		self:SetNWFloat("MaxStrikeInterval", 3) -- Maximum time between strikes
+		self:SetNWFloat("DarknessIntensity", 0.4) -- How dark it gets under the cloud (0-1)
 		-- Start the lightning strikes with random interval
 		self:SetNextStrikeTime()
 		-- Create the cloud effect
@@ -113,22 +113,19 @@ function ENT:CreateLightningStrike()
 		end
 	end
 
-	for _, npc in ipairs(ents.FindByClass("npc_*")) do
-		local alive = ((npc.Health and npc:Health() > 0) or not npc.Health)
-		if alive and npc:GetPos():Distance(cloudCenter) <= radius then
-			-- Check if NPC is outdoors
-			local tr = util.TraceLine({
-				start = Vector(npc:GetPos().x, npc:GetPos().y, cloudCenter.z),
-				endpos = npc:EyePos(),
-				filter = { self }
-			})
+	for _, ent in ipairs(ents.FindInSphere(cloudCenter, radius)) do
+		-- Check if NPC is outdoors
+		local tr = util.TraceLine({
+			start = Vector(npc:GetPos().x, npc:GetPos().y, cloudCenter.z),
+			endpos = npc:EyePos(),
+			filter = { self }
+		})
 
-			if tr.Fraction >= 0.9 then
-				table.insert(targetableEntities, {
-					pos = npc:GetPos(),
-					ent = npc
-				})
-			end
+		if tr.Fraction >= 0.9 then
+			table.insert(targetableEntities, {
+				pos = npc:GetPos(),
+				ent = npc
+			})
 		end
 	end
 
