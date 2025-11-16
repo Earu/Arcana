@@ -23,7 +23,7 @@ SWEP.Secondary.Automatic = true
 SWEP.Secondary.Ammo = "none"
 SWEP.HoldType = "fist"
 
-local PHX_PRIMARY_COOLDOWN = 0.6
+local PHX_PRIMARY_COOLDOWN = 0.8
 local PHX_SECONDARY_TICK = 0.1
 
 function SWEP:Initialize()
@@ -64,6 +64,7 @@ function SWEP:PrimaryAttack()
             if IsValid(ent) then
                 ent:SetPos(basePos + dir * 24 + Vector(0, 0, 8))
                 ent:SetSpellOwner(owner)
+                ent.FireballDamage = 95 -- Reduced damage for Phoenix mode
                 ent:Spawn()
                 ent:LaunchTowards(dir)
             end
@@ -87,7 +88,7 @@ function SWEP:SecondaryAttack()
         local forward = owner:EyeAngles():Forward()
         local cosHalfAngle = math.cos(math.rad(35))
         local maxRange = 1100
-        local baseDamage = 10
+        local baseDamage = 8
         local igniteTime = 2
         for _, ent in ipairs(ents.FindInSphere(origin, maxRange)) do
             if not IsValid(ent) or ent == owner then continue end
@@ -102,7 +103,6 @@ function SWEP:SecondaryAttack()
                 dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
                 dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
                 dmg:SetInflictor(IsValid(owner) and owner or game.GetWorld())
-                dmg:SetDamagePosition(ent:WorldSpaceCenter())
                 ent:TakeDamageInfo(dmg)
                 if ent.Ignite then ent:Ignite(igniteTime, 0) end
             else

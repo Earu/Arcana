@@ -42,7 +42,7 @@ end
 -- Apply shock damage in a radius and optionally chain to a few nearby targets
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
-	local baseDamage = 60
+	local baseDamage = 75
 	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, false, true)
 
 	-- Chain to up to 3 nearby living targets
@@ -70,11 +70,10 @@ local function applyLightningDamage(attacker, hitPos, normal)
 			end
 
 			local dmg = DamageInfo()
-			dmg:SetDamage(24)
+			dmg:SetDamage(28)
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
 			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 			dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-			dmg:SetDamagePosition(tpos)
 			tgt:TakeDamageInfo(dmg)
 		end)
 	end
@@ -87,9 +86,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 2,
 	knowledge_cost = 2,
-	cooldown = 6.0,
+	cooldown = 5.5,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 25,
+	cost_amount = 30,
 	cast_time = 1.0,
 	range = 1500,
 	icon = "icon16/weather_lightning.png",

@@ -5,9 +5,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,
-	cooldown = 4.0,
+	cooldown = 3.5,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 15,
+	cost_amount = 18,
 	cast_time = 0.8,
 	range = 1000,
 	icon = "icon16/brick.png",
@@ -18,6 +18,7 @@ Arcane:RegisterSpell({
 		local count = 8
 		local start = (ctx and ctx.circlePos or caster:GetShootPos()) + Vector(0, 0, 18)
 		local dir = caster:GetAimVector()
+		local pebbleDamage = 25
 
 		for i = 1, count do
 			local pebble = ents.Create("prop_physics")
@@ -30,6 +31,26 @@ Arcane:RegisterSpell({
 			if pebble.CPPISetOwner then
 				pebble:CPPISetOwner(caster)
 			end
+
+			-- Store owner for damage dealing
+			pebble._ArcanaStoneOwner = caster
+			pebble._ArcanaStoneHit = false
+			pebble._ArcanaStoneDamage = pebbleDamage
+
+			-- Add collision callback for direct damage
+			pebble:AddCallback("PhysicsCollide", function(ent, data)
+				if ent._ArcanaStoneHit then return end
+				local hitEnt = data.HitEntity
+				if IsValid(hitEnt) and (hitEnt:IsPlayer() or hitEnt:IsNPC()) then
+					ent._ArcanaStoneHit = true
+					local dmg = DamageInfo()
+					dmg:SetDamage(ent._ArcanaStoneDamage or pebbleDamage)
+					dmg:SetDamageType(DMG_CLUB)
+					dmg:SetAttacker(IsValid(ent._ArcanaStoneOwner) and ent._ArcanaStoneOwner or game.GetWorld())
+					dmg:SetInflictor(ent)
+					hitEnt:TakeDamageInfo(dmg)
+				end
+			end)
 
 			local phys = pebble:GetPhysicsObject()
 

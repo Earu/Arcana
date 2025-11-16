@@ -9,7 +9,7 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 12,
 	knowledge_cost = 3,
-	cooldown = 7.5,
+	cooldown = 3.0,
 	cost_type = Arcane.COST_TYPES.COINS,
 	cost_amount = 120,
 	cast_time = 0.8,
@@ -24,7 +24,7 @@ Arcane:RegisterSpell({
 		local dir = caster:GetAimVector()
 		local maxDist = 2000
 		local penetrations = 4
-		local damagePerHit = 55
+		local damagePerHit = 65
 		local falloff = 0.8
 		local traveled = 0
 
@@ -61,12 +61,11 @@ Arcane:RegisterSpell({
 				dmg:SetDamageType(bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM))
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetDamagePosition(hitPos)
 				hitEnt:TakeDamageInfo(dmg)
 			end
 
 			-- Small splash along the lance for feedback
-			Arcane:BlastDamage(caster, caster, hitPos, 80, 18, DMG_DISSOLVE, false, true)
+			Arcane:BlastDamage(caster, caster, hitPos, 100, 18, DMG_DISSOLVE, false, true)
 
 			-- Prepare for next penetration
 			table.insert(filter, hitEnt or tr.Entity)

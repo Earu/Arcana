@@ -244,7 +244,7 @@ if SERVER then
 			dmg:SetDamageType(DMG_ENERGYBEAM)
 			dmg:SetAttacker(self)
 			dmg:SetInflictor(self)
-			--dmg:SetDamagePosition(hitPos)
+
 			local takeDamageInfo = tr.Entity.ForceTakeDamageInfo or tr.Entity.TakeDamageInfo
 			takeDamageInfo(tr.Entity, dmg)
 		end

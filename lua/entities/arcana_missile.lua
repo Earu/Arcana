@@ -7,7 +7,7 @@ ENT.AdminSpawnable = false
 
 -- Tunables
 ENT.MissileSpeed = 600
-ENT.MissileDamage = 22
+ENT.MissileDamage = 45
 ENT.MaxLifetime = 5
 ENT.ProximityRadius = 28
 
@@ -111,11 +111,10 @@ if SERVER then
 		if not ent:IsPlayer() or ent:IsNPC() then return end
 
 		local dmg = DamageInfo()
-		dmg:SetDamage(self.MissileDamage or 22)
+		dmg:SetDamage(self.MissileDamage or 45)
 		dmg:SetDamageType(bit.bor(DMG_ENERGYBEAM, DMG_DISSOLVE))
 		dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 		dmg:SetInflictor(self)
-		dmg:SetDamagePosition(ent:WorldSpaceCenter())
 		ent:TakeDamageInfo(dmg)
 
 		local ed = EffectData()

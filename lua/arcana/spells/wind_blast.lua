@@ -6,9 +6,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 10,
 	knowledge_cost = 3,
-	cooldown = 9.0,
+	cooldown = 8.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 60,
+	cost_amount = 50,
 	cast_time = 0.7,
 	range = 0,
 	icon = "icon16/flag_white.png",
@@ -23,6 +23,7 @@ Arcane:RegisterSpell({
 		local strengthPlayer = 2000
 		local strengthProp = 100000
 		local upBoost = 500
+		local baseDamage = 55
 
 		-- Simple ring VFX via existing frost-style ring but recolored using wind sounds
 		local ed = EffectData()
@@ -43,6 +44,14 @@ Arcane:RegisterSpell({
 			-- Reduced falloff so the push feels impactful at range
 			local falloff = 0.75 + 0.25 * (1 - math.Clamp(dist / radius, 0, 1))
 			if ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then
+				-- Deal damage
+				local dmg = DamageInfo()
+				dmg:SetDamage(baseDamage * falloff)
+				dmg:SetDamageType(DMG_SONIC)
+				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
+				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+				ent:TakeDamageInfo(dmg)
+
 				local vel = dir * (strengthPlayer * falloff) + Vector(0, 0, upBoost)
 				if ent.SetGroundEntity then ent:SetGroundEntity(NULL) end
 				if ent.SetVelocity then ent:SetVelocity(vel) end

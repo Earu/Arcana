@@ -8,7 +8,7 @@ Arcane:RegisterSpell({
 	knowledge_cost = 3,
 	cooldown = 6.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 35,
+	cost_amount = 40,
 	cast_time = 0.7,
 	range = 900,
 	icon = "icon16/fire.png",
@@ -20,7 +20,7 @@ Arcane:RegisterSpell({
 		local forward = caster:GetAimVector()
 		local cosHalfAngle = math.cos(math.rad(45))
 		local maxRange = 900
-		local baseDamage = 34
+		local baseDamage = 48
 		local igniteTime = 6
 
 		for _, ent in ipairs(ents.FindInSphere(origin, maxRange)) do
@@ -41,7 +41,6 @@ Arcane:RegisterSpell({
 				dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetDamagePosition(ent:WorldSpaceCenter())
 				ent:TakeDamageInfo(dmg)
 
 				if ent.Ignite then

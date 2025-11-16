@@ -192,7 +192,6 @@ Arcane:RegisterSpell({
 					dmg:SetDamageType(DMG_CLUB)
 					dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 					dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-					dmg:SetDamagePosition(ec)
 					e:TakeDamageInfo(dmg)
 					if e.SetVelocity then
 						e:SetVelocity(up * 760)
@@ -239,7 +238,6 @@ Arcane:RegisterSpell({
 					dmg:SetDamageType(DMG_CLUB)
 					dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 					dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-					dmg:SetDamagePosition(c)
 					ent:TakeDamageInfo(dmg)
 
 					-- Strong outward/upward impulse
@@ -319,7 +317,6 @@ Arcane:RegisterSpell({
 								dmg:SetDamageType(DMG_CLUB)
 								dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 								dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-								dmg:SetDamagePosition(ec)
 								e:TakeDamageInfo(dmg)
 								if e.SetVelocity then
 									e:SetVelocity(up * 720)
@@ -434,7 +431,6 @@ Arcane:RegisterSpell({
 					dmg:SetDamageType(DMG_CLUB)
 					dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 					dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-					dmg:SetDamagePosition(ent:WorldSpaceCenter())
 					ent:TakeDamageInfo(dmg)
 					if ent.SetVelocity then
 						ent:SetVelocity(Vector(0, 0, 120))

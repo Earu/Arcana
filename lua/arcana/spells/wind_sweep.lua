@@ -5,9 +5,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,
-	cooldown = 5.0,
+	cooldown = 4.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 10,
+	cost_amount = 12,
 	cast_time = 0.6,
 	range = 500,
 	icon = "icon16/flag_white.png",
@@ -20,6 +20,7 @@ Arcane:RegisterSpell({
 		local cone = math.cos(math.rad(30))
 		local strength = 1500
 		local radius = 400
+		local baseDamage = 40
 
 		for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
 			if ent ~= caster and IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
@@ -27,6 +28,14 @@ Arcane:RegisterSpell({
 
 				if dir:Dot(forward) >= cone then
 					if ent:IsPlayer() or ent:IsNPC() then
+						-- Deal damage
+						local dmg = DamageInfo()
+						dmg:SetDamage(baseDamage)
+						dmg:SetDamageType(DMG_SONIC)
+						dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
+						dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+						ent:TakeDamageInfo(dmg)
+
 						ent:SetVelocity(forward * strength + Vector(0, 0, 120))
 						ent:SetGroundEntity(NULL)
 					else

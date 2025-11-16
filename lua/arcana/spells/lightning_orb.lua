@@ -7,7 +7,7 @@ Arcane:RegisterSpell({
 	knowledge_cost = 3,
 	cooldown = 10.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 200,
+	cost_amount = 160,
 	cast_time = 1.2,
 	range = 1400,
 	icon = "icon16/weather_lightning.png",

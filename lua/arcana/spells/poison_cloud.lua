@@ -60,9 +60,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 6,
 	knowledge_cost = 3,
-	cooldown = 10.0,
+	cooldown = 12.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 25,
+	cost_amount = 35,
 	cast_time = 1.0,
 	range = 900,
 	icon = "icon16/bug.png",
@@ -73,7 +73,7 @@ Arcane:RegisterSpell({
 		local duration = 12
 		local tickInterval = 0.5
 		local radius = 220
-		local perTickDamage = 5
+		local perTickDamage = 8
 		local slowRefresh = 1.2
 		local pos
 
@@ -187,7 +187,6 @@ Arcane:RegisterSpell({
 					dmg:SetDamageType(DMG_POISON)
 					dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 					dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-					dmg:SetDamagePosition(ent:WorldSpaceCenter())
 					ent:TakeDamageInfo(dmg)
 
 					if ent:IsPlayer() then
