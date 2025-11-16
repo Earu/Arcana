@@ -95,13 +95,13 @@ function ENT:CreateLightningStrike()
 	local targetableEntities = {}
 
 	for _, ply in ipairs(players) do
-		if IsValid(ply) and ply:Alive() and ply:GetPos():Distance(cloudCenter) <= radius then
+		if ply:Alive() and ply:GetPos():Distance(cloudCenter) <= radius then
 			-- Check if player is outdoors (not under a roof)
-			local trace = {}
-			trace.start = Vector(ply:GetPos().x, ply:GetPos().y, cloudCenter.z)
-			trace.endpos = ply:GetPos()
-			trace.filter = self
-			local tr = util.TraceLine(trace)
+			local tr = util.TraceLine({
+				start = Vector(ply:GetPos().x, ply:GetPos().y, cloudCenter.z),
+				endpos = ply:EyePos(),
+				filter = { self }
+			})
 
 			-- No significant obstacles between cloud and player
 			if tr.Fraction >= 0.9 then
@@ -114,38 +114,19 @@ function ENT:CreateLightningStrike()
 	end
 
 	for _, npc in ipairs(ents.FindByClass("npc_*")) do
-		if IsValid(npc) and npc:Health() > 0 and npc:GetPos():Distance(cloudCenter) <= radius then
+		local alive = ((npc.Health and npc:Health() > 0) or not npc.Health)
+		if alive and npc:GetPos():Distance(cloudCenter) <= radius then
 			-- Check if NPC is outdoors
-			local trace = {}
-			trace.start = Vector(npc:GetPos().x, npc:GetPos().y, cloudCenter.z)
-			trace.endpos = npc:GetPos()
-			trace.filter = self
-			local tr = util.TraceLine(trace)
+			local tr = util.TraceLine({
+				start = Vector(npc:GetPos().x, npc:GetPos().y, cloudCenter.z),
+				endpos = npc:EyePos(),
+				filter = { self }
+			})
 
 			if tr.Fraction >= 0.9 then
 				table.insert(targetableEntities, {
 					pos = npc:GetPos(),
 					ent = npc
-				})
-			end
-		end
-	end
-
-	local entities = ents.FindInSphere(cloudCenter, radius)
-
-	for _, ent in ipairs(entities) do
-		if IsValid(ent) and ent ~= self and ent:GetClass() ~= "player" and not string.match(ent:GetClass(), "npc_") then
-			-- Check if entity is outdoors
-			local trace = {}
-			trace.start = Vector(ent:GetPos().x, ent:GetPos().y, cloudCenter.z)
-			trace.endpos = ent:GetPos()
-			trace.filter = self
-			local tr = util.TraceLine(trace)
-
-			if tr.Fraction >= 0.9 then
-				table.insert(targetableEntities, {
-					pos = ent:GetPos(),
-					ent = ent
 				})
 			end
 		end
@@ -162,6 +143,7 @@ function ENT:CreateLightningStrike()
 		local angle = math.random(0, 360)
 		local distance = math.random(0, radius)
 		local randomPos = cloudCenter + Vector(math.cos(math.rad(angle)) * distance, math.sin(math.rad(angle)) * distance, 0)
+
 		-- Trace down to find ground
 		local trace = {}
 		trace.start = Vector(randomPos.x, randomPos.y, cloudCenter.z)
@@ -179,10 +161,12 @@ function ENT:CreateLightningStrike()
 		-- Random origin point within the cloud for the lightning to start from
 		local cloudHeight = self:GetNWInt("CloudHeight")
 		local lightningOrigin = cloudCenter + Vector(math.random(-radius * 0.3, radius * 0.3), math.random(-radius * 0.3, radius * 0.3), math.random(cloudHeight * 0.6, cloudHeight * 0.9))
+
 		-- Network the position to clients for additional light effects
 		self:SetNWVector("LastStrikePos", targetPos)
 		self:SetNWFloat("LastStrikeTime", CurTime())
 		self:SetNWVector("LastStrikeOrigin", lightningOrigin)
+
 		-- Create the lightning effect
 		local lightning = EffectData()
 		lightning:SetEntity(self)
@@ -191,6 +175,7 @@ function ENT:CreateLightningStrike()
 		lightning:SetScale(1)
 		lightning:SetMagnitude(5)
 		util.Effect("lightning_strike", lightning)
+
 		-- Create flash effect at strike point
 		local lightEffectData = EffectData()
 		lightEffectData:SetOrigin(targetPos)
