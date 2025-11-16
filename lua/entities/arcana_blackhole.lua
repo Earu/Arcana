@@ -66,12 +66,16 @@ function ENT:Think()
 						ent:SetGroundEntity(NULL)
 					end
 
-					-- If too close to center, remove/kill the entity
-					if distance < 200 and (ent:IsPlayer() or ent:IsNPC()) then
+					-- Scaled damage based on distance from center
+					if (ent:IsPlayer() or ent:IsNPC()) and distance < 400 then
+						-- Damage scales from 120/tick at center to 20% at edge (400 units)
+						local distanceFactor = math.Clamp(1 - (distance / 400), 0, 1)
+						local tickDamage = 120 * (0.2 + 0.8 * distanceFactor)
+
 						local dmg = DamageInfo()
-						dmg:SetDamage(2e6)
-						dmg:SetDamageType(DMG_BLAST)
-						dmg:SetAttacker(self.CPPIGetOwner and IsValid(self.CPPIGetOwner()) and self.CPPIGetOwner() or self)
+						dmg:SetDamage(tickDamage)
+						dmg:SetDamageType(DMG_DISSOLVE)
+						dmg:SetAttacker(self.CPPIGetOwner and IsValid(self:CPPIGetOwner()) and self:CPPIGetOwner() or self)
 						dmg:SetInflictor(self)
 						ent:TakeDamageInfo(dmg)
 					end

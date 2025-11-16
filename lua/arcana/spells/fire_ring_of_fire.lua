@@ -27,7 +27,7 @@ Arcane:RegisterSpell({
 		local duration = 0.8
 		local steps = 8
 		local bandWidth = 120 -- thickness of the ring shell that applies effects
-		local baseDamage = 18
+		local baseDamage = 28
 		local igniteTime = 4
 		local pushPlayer = 220
 		local pushProp = 16000
@@ -77,7 +77,6 @@ Arcane:RegisterSpell({
 					if isActor then
 						local dmg = DamageInfo()
 						dmg:SetDamage(baseDamage)
-						dmg:SetDamagePosition(c)
 						dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
 						dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 						dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())

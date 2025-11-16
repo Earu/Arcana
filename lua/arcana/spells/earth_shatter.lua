@@ -10,9 +10,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 17,
 	knowledge_cost = 4,
-	cooldown = 16.0,
+	cooldown = 13.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 240,
+	cost_amount = 180,
 	cast_time = 0.9,
 	range = 0,
 	icon = "icon16/brick.png",
@@ -28,7 +28,7 @@ Arcane:RegisterSpell({
 		if not SERVER then return true end
 		local pos = caster:WorldSpaceCenter()
 		local radius = 520
-		local baseDamage = 90
+		local baseDamage = 180
 		local pushPlayer = 420
 		local pushProp = 36000
 
@@ -133,7 +133,6 @@ Arcane:RegisterSpell({
 				dmg:SetDamageType(DMG_CLUB)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetDamagePosition(ent:WorldSpaceCenter())
 				ent:TakeDamageInfo(dmg)
 				-- Pop upward slightly then out
 				if ent.SetVelocity then

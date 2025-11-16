@@ -9,9 +9,9 @@ Arcane:RegisterSpell({
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 16,
 	knowledge_cost = 3,
-	cooldown = 14.0,
+	cooldown = 11.0,
 	cost_type = Arcane.COST_TYPES.COINS,
-	cost_amount = 180,
+	cost_amount = 120,
 	cast_time = 0.9,
 	range = 0,
 	icon = "icon16/weather_snow.png",
@@ -27,7 +27,7 @@ Arcane:RegisterSpell({
 		if not SERVER then return true end
 		local pos = caster:WorldSpaceCenter()
 		local radius = 360
-		local baseDamage = 45
+		local baseDamage = 145
 		local slowMult = 0.5
 		local slowDuration = 3.5
 

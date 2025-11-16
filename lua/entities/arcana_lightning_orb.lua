@@ -7,10 +7,10 @@ ENT.AdminSpawnable = false
 -- Tunables
 ENT.OrbSpeed = 300
 ENT.OrbRadius = 300
-ENT.OrbTickDamage = 12
+ENT.OrbTickDamage = 15
 ENT.OrbTickInterval = 0.25
 ENT.OrbMaxTargetsPerTick = 6
-ENT.OrbExplodeDamage = 55
+ENT.OrbExplodeDamage = 85
 ENT.OrbExplodeRadius = 400
 ENT.MaxLifetime = 6
 
@@ -177,7 +177,7 @@ if SERVER then
 
 		for _, tgt in ipairs(targets) do
 			local dmg = DamageInfo()
-			dmg:SetDamage(self.OrbTickDamage or 12)
+			dmg:SetDamage(self.OrbTickDamage or 15)
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
 			dmg:SetAttacker(IsValid(owner) and owner or self)
 			dmg:SetInflictor(self)
@@ -203,7 +203,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 55, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), false, true)
+		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), false, true)
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)

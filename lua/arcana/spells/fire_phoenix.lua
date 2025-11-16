@@ -4,7 +4,7 @@ if SERVER then
     util.AddNetworkString("Arcana_Phoenix_Stop")
 end
 
-local PHX_DURATION = 30.0
+local PHX_DURATION = 24.0
 local PHX_SPEED = 1200
 local PHX_TURN_RATE = 360 -- degrees per second target turn rate for the bird model
 local PHX_WEAPON = "arcana_phoenix"
@@ -201,7 +201,7 @@ end
 Arcane:RegisterSpell({
 	id = "phoenix",
 	name = "Phoenix",
-	description = "Transform into a blazing phoenix for 30s. Fly swiftly, unleash fireball salvos (LMB) and deadly firebreath (RMB).",
+	description = "Transform into a blazing phoenix for 24s. Fly swiftly, unleash fireball salvos (LMB) and deadly firebreath (RMB).",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = 20,
 	knowledge_cost = 5,

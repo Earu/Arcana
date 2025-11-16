@@ -235,7 +235,6 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 		dmgInfo:SetDamageType(DMG_DISSOLVE)
 		dmgInfo:SetAttacker(self)
 		dmgInfo:SetInflictor(self)
-		dmgInfo:SetDamagePosition(strikePos)
 		targetEnt:Ignite(1, damageRadius)
 
 		if targetEnt.ForceTakeDamageInfo then
@@ -253,7 +252,7 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 	end
 
 	-- Deal AOE damage to surrounding entities
-	util.BlastDamageInfo(DamageInfo(), strikePos, damageRadius, damage)
+	util.BlastDamage(self, self, strikePos, damageRadius, damage)
 
 	-- Find all entities for physics effects and fire
 	for _, ent in pairs(ents.FindInSphere(strikePos, damageRadius)) do
@@ -261,9 +260,9 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 			-- Calculate damage based on distance
 			local distance = ent:GetPos():Distance(strikePos)
 			local scaledDamage = damage * (1 - distance / damageRadius)
+
 			-- Apply force to physics objects
 			local phys = ent:GetPhysicsObject()
-
 			if IsValid(phys) then
 				local direction = (ent:GetPos() - strikePos):GetNormalized()
 				phys:ApplyForceCenter(direction * scaledDamage * 500)
