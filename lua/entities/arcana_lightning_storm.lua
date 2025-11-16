@@ -116,15 +116,15 @@ function ENT:CreateLightningStrike()
 	for _, ent in ipairs(ents.FindInSphere(cloudCenter, radius)) do
 		-- Check if NPC is outdoors
 		local tr = util.TraceLine({
-			start = Vector(npc:GetPos().x, npc:GetPos().y, cloudCenter.z),
-			endpos = npc:EyePos(),
+			start = Vector(ent:GetPos().x, ent:GetPos().y, cloudCenter.z),
+			endpos = ent:EyePos(),
 			filter = { self }
 		})
 
 		if tr.Fraction >= 0.9 then
 			table.insert(targetableEntities, {
-				pos = npc:GetPos(),
-				ent = npc
+				pos = ent:GetPos(),
+				ent = ent
 			})
 		end
 	end
