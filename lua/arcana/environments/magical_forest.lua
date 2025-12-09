@@ -640,15 +640,19 @@ Envs:RegisterEnvironment({
 })
 
 if CLIENT then
-	local SNOW_FOG_COLOR = Color(92, 106, 117)
-	local GRASS_FOG_COLOR = Color(74, 102, 92)
-	local SURFACE_CHECK_OFFSET = Vector(0, 0, 2000)
+	local FOG_COLOR =  Color(74, 102, 92)
+	local volumetricFogActive = false
 
-	local nextSurfaceCheck = 0
-	local curFogColor = GRASS_FOG_COLOR
-	hook.Add("SetupWorldFog", "Arcana_MagicalForest_Fog", function()
+	-- Update volumetric fog parameters based on player position and environment
+	local function UpdateVolumetricFog()
 		local active = Envs and Envs.Active
-		if not active or active.id ~= "magical_forest" then return end
+		if not active or active.id ~= "magical_forest" then
+			if volumetricFogActive then
+				Arcane.VolumetricFog.RemoveVolume("magical_forest")
+				volumetricFogActive = false
+			end
+			return
+		end
 
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
@@ -656,54 +660,35 @@ if CLIENT then
 		local origin = active.origin or Vector(0, 0, 0)
 		local eff = tonumber(active.effective_radius or 0) or 0
 		local forestRange = math.floor(eff * 0.9)
-		local fadeWidth = 250
 
-		local p = ply:GetPos()
-		local dx = p.x - origin.x
-		local dy = p.y - origin.y
-		local d2d = math.sqrt(dx * dx + dy * dy)
+		-- Create or update volumetric fog volume
+		local volumeHeight = math.max(1000, forestRange * 0.5)
+		local fogParams = {
+			pos = origin,
+			aabb = Vector(forestRange * 2, forestRange * 2, 2500),
+			density = 0.25,
+			fogstart = 0,
+			fogend = 0,
+			color = FOG_COLOR,
+			edgefade = forestRange * 0.4,
+			noisesize = 4000,
+			noisemininfluence = 1,
+			noisemaxinfluence = 1,
+			scrollx = 0,
+			scrolly = 0,
+			scrollz = 0,
+			enabled = ply:Alive(),
+		}
 
-		-- If the player is within the forest range and above the origin, don't apply fog
-		local dz = p.z - origin.z
-		if d2d <= eff and (dz > 3000 or dz < -1000) then return end
-
-		local t
-		local toEdge = d2d - forestRange
-		t = 1 - math.Clamp(toEdge / fadeWidth, 0, 1)
-		t = math.Clamp(t, 0, 1) ^ 0.7
-
-		-- Check the surface type every second and update the fog color accordingly
-		if nextSurfaceCheck < CurTime() then
-			nextSurfaceCheck = CurTime() + 1
-			local tr = util.TraceLine({
-				start = p,
-				endpos = p - SURFACE_CHECK_OFFSET,
-				mask = bit.bor(MASK_WATER, MASK_SOLID_BRUSHONLY),
-				filter = { ply }
-			})
-
-			if ACCEPTABLE_SURFACE_TYPES[tr.MatType] then
-				local matType = tr.MatType
-				if matType == MAT_SNOW then
-					curFogColor = SNOW_FOG_COLOR
-				else
-					curFogColor = GRASS_FOG_COLOR
-				end
-			else
-				curFogColor = GRASS_FOG_COLOR
-			end
+		if not volumetricFogActive then
+			Arcane.VolumetricFog.RegisterVolume("magical_forest", fogParams)
+			volumetricFogActive = true
+		else
+			Arcane.VolumetricFog.UpdateVolume("magical_forest", fogParams)
 		end
+	end
 
-		render.FogMode(MATERIAL_FOG_LINEAR)
-		local fogStart = 0
-		local fogEnd = math.floor(Lerp(t, 4500, 900))
-		render.FogStart(fogStart)
-		render.FogEnd(fogEnd)
-		render.FogMaxDensity(Lerp(t, 0, 1))
-		render.FogColor(curFogColor:Unpack())
-
-		return true
-	end)
+	hook.Add("Think", "Arcana_MagicalForest_VolumetricFog", UpdateVolumetricFog)
 
 	-- Client-side summoning circle for graveyard skeleton spawns
 	net.Receive("Arcana_GraveyardCircle", function()
