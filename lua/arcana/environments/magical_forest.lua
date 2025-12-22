@@ -689,7 +689,7 @@ if CLIENT then
 	end
 
 	-- disable volumetric fog for now until we figure out a fix
-	--hook.Add("Think", "Arcana_MagicalForest_VolumetricFog", UpdateVolumetricFog)
+	hook.Add("Think", "Arcana_MagicalForest_VolumetricFog", UpdateVolumetricFog)
 
 	-- Client-side summoning circle for graveyard skeleton spawns
 	net.Receive("Arcana_GraveyardCircle", function()
