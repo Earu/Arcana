@@ -51,7 +51,7 @@ else
 end
 
 -- Active fog volumes
-local active_volumes = {}
+local activeVolumes = {}
 
 -- Draw a volumetric fog volume with 3D noise
 -- @param pos Vector - Center position of the fog volume
@@ -121,7 +121,7 @@ end
 -- @param id String - Unique identifier for this fog volume
 -- @param params Table - Fog parameters
 function Arcane.VolumetricFog.RegisterVolume(id, params)
-	active_volumes[id] = {
+	activeVolumes[id] = {
 		pos = params.pos or Vector(0, 0, 0),
 		aabb = params.aabb or Vector(1000, 1000, 500),
 		density = params.density or 0.4,
@@ -143,33 +143,37 @@ end
 -- @param id String - Volume identifier
 -- @param params Table - Parameters to update
 function Arcane.VolumetricFog.UpdateVolume(id, params)
-	if not active_volumes[id] then return end
+	if not activeVolumes[id] then return end
 
 	for k, v in pairs(params) do
-		active_volumes[id][k] = v
+		activeVolumes[id][k] = v
 	end
 end
 
 -- Remove a fog volume
 -- @param id String - Volume identifier
 function Arcane.VolumetricFog.RemoveVolume(id)
-	active_volumes[id] = nil
+	activeVolumes[id] = nil
 end
 
 -- Clear all fog volumes
 function Arcane.VolumetricFog.ClearAll()
-	active_volumes = {}
+	activeVolumes = {}
 end
 
 -- Get a fog volume
 -- @param id String - Volume identifier
 function Arcane.VolumetricFog.GetVolume(id)
-	return active_volumes[id]
+	return activeVolumes[id]
 end
 
 -- Render all active fog volumes
-hook.Add("PostDrawTranslucentRenderables", "Arcana_VolumetricFog", function()
-	for id, vol in pairs(active_volumes) do
+local hasGShader = file.Exists("materials/pp/wp_reconstruction.vmt", "GAME")
+local hasNoiseTexture = file.Exists("materials/arcana/mercfog3dnoise.vtf", "GAME")
+hook.Add("PostDrawOpaqueRenderables", "Arcana_VolumetricFog", function()
+	if not hasGShader or not hasNoiseTexture then return end
+
+	for id, vol in pairs(activeVolumes) do
 		if vol.enabled then
 			Arcane.VolumetricFog.Draw3DNoise(
 				vol.pos,
