@@ -5,7 +5,7 @@ ENT.PrintName = "Corrupted Wisp (Heavy)"
 ENT.Category = "Arcana"
 ENT.Spawnable = false
 ENT.AdminOnly = false
-ENT.RenderGroup = RENDERGROUP_BOTH
+ENT.RenderGroup = RENDERGROUP_TRANSLUCENT
 ENT.PhysgunDisabled = true
 
 function ENT:SetupDataTables()

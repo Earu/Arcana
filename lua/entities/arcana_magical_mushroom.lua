@@ -6,7 +6,7 @@ ENT.PrintName = "Magical Mushroom"
 ENT.Author = "Arcana"
 ENT.Spawnable = false
 ENT.Category = "Arcana"
-ENT.RenderGroup = RENDERGROUP_BOTH
+ENT.RenderGroup = RENDERGROUP_OPAQUE
 
 -- Tunables
 ENT.IdleGlowColor = Color(110, 200, 130)

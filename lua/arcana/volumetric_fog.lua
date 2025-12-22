@@ -170,7 +170,7 @@ end
 -- Render all active fog volumes
 local hasGShader = file.Exists("materials/pp/wp_reconstruction.vmt", "GAME")
 local hasNoiseTexture = file.Exists("materials/arcana/mercfog3dnoise.vtf", "GAME")
-hook.Add("PostDrawOpaqueRenderables", "Arcana_VolumetricFog", function()
+hook.Add("PreDrawTranslucentRenderables", "Arcana_VolumetricFog", function()
 	if not hasGShader or not hasNoiseTexture then return end
 
 	for id, vol in pairs(activeVolumes) do
