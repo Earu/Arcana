@@ -3,6 +3,7 @@ ENT.Base = "base_anim"
 ENT.PrintName = "Arcane Missile"
 ENT.Author = "Earu"
 ENT.Spawnable = false
+ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.AdminSpawnable = false
 
 -- Tunables

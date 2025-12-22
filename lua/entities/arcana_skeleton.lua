@@ -6,6 +6,7 @@ ENT.PrintName = "Skeleton"
 ENT.Category = "Arcana"
 ENT.Spawnable = false
 ENT.AdminOnly = false
+ENT.RenderGroup = RENDERGROUP_BOTH
 
 local SKELETON_MODEL = "models/player/skeleton.mdl"
 local SWORD_MODEL = "models/weapons/c_models/c_scout_sword/c_scout_sword.mdl"
