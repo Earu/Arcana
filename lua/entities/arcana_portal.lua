@@ -3,6 +3,7 @@ ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Arcana Portal"
 ENT.Spawnable = false
+ENT.RenderGroup = RENDERGROUP_TRANSLUCENT
 ENT.AdminSpawnable = false
 ENT.DefaultRadius = 64
 

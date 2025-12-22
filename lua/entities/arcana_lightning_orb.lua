@@ -3,6 +3,7 @@ ENT.Base = "base_anim"
 ENT.PrintName = "Lightning Orb"
 ENT.Author = "Arcana"
 ENT.Spawnable = false
+ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.AdminSpawnable = false
 -- Tunables
 ENT.OrbSpeed = 300
