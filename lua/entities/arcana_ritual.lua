@@ -4,7 +4,7 @@ ENT.Base = "base_anim"
 ENT.PrintName = "Ritual"
 ENT.Category = "Arcana"
 ENT.Spawnable = false
-ENT.RenderGroup = RENDERGROUP_BOTH
+ENT.RenderGroup = RENDERGROUP_TRANSLUCENT
 
 local VECTOR_ABOVE_ORB = Vector(0, 0, 100)
 local VECTOR_DOWN = Vector(0, 0, 256)
