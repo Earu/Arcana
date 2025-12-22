@@ -144,7 +144,7 @@ if CLIENT then
 		self._sfxLoop = nil
 
 		-- Client-only mushroom visual model
-		self._mdl = ClientsideModel(CLIENT_MUSHROOM_MODEL, RENDERGROUP_BOTH)
+		self._mdl = ClientsideModel(CLIENT_MUSHROOM_MODEL, RENDERGROUP_OPAQUE)
 	end
 
 	function ENT:OnRemove()
