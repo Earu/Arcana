@@ -247,6 +247,17 @@ end
 function ENT:RunBehaviour()
 	self:SetAnimState("walk")
 	while true do
+		-- sanity check
+		if self:Health() <= 0 then
+			local dmg = DamageInfo()
+			dmg:SetDamage(self:Health())
+			dmg:SetDamageType(DMG_SLASH)
+			dmg:SetAttacker(self)
+			dmg:SetInflictor(self)
+			self:OnKilled(dmg)
+			return
+		end
+
 		local tgt = self:AcquireTarget()
 		if IsValid(tgt) then
 			self:ChaseTarget(tgt)
