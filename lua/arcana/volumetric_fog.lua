@@ -14,6 +14,10 @@ Arcane.VolumetricFog = Arcane.VolumetricFog or {}
 
 local mat_SetFloat = FindMetaTable("IMaterial").SetFloat
 local mat_SetMatrix = FindMetaTable("IMaterial").SetMatrix
+local render_OverrideBlend = _G.render.OverrideBlend
+local render_DrawScreenQuad = _G.render.DrawScreenQuad
+local render_SetMaterial = _G.render.SetMaterial
+local BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD = _G.BLEND_ONE, _G.BLEND_ONE_MINUS_SRC_ALPHA, _G.BLENDFUNC_ADD, _G.BLEND_ONE, _G.BLEND_ONE_MINUS_SRC_ALPHA, _G.BLENDFUNC_ADD
 local emtx = {0, 0, 0, 0}
 
 -- Material reference
@@ -73,12 +77,6 @@ function Arcane.VolumetricFog.Draw3DNoise(pos, aabb, density, fogstart, fogend, 
 	local mat = FOG_MAT
 	local ep = LocalPlayer():EyePos()
 
-	-- Convert Color to Vector if needed
-	local colorVec = color
-	if IsColor(color) then
-		colorVec = Vector(color.r / 255, color.g / 255, color.b / 255)
-	end
-
 	-- Eye position
 	mat_SetFloat(mat, "$c0_x", ep.x)
 	mat_SetFloat(mat, "$c0_y", ep.y)
@@ -86,9 +84,9 @@ function Arcane.VolumetricFog.Draw3DNoise(pos, aabb, density, fogstart, fogend, 
 	mat_SetFloat(mat, "$c0_w", edgefade)
 
 	-- Fog color and density
-	mat_SetFloat(mat, "$c1_x", colorVec.x)
-	mat_SetFloat(mat, "$c1_y", colorVec.y)
-	mat_SetFloat(mat, "$c1_z", colorVec.z)
+	mat_SetFloat(mat, "$c1_x", color.x)
+	mat_SetFloat(mat, "$c1_y", color.y)
+	mat_SetFloat(mat, "$c1_z", color.z)
 	mat_SetFloat(mat, "$c1_w", density)
 
 	-- Volume size (half extents)
@@ -111,23 +109,25 @@ function Arcane.VolumetricFog.Draw3DNoise(pos, aabb, density, fogstart, fogend, 
 		emtx
 	}))
 
-	render.SetMaterial(mat)
-	render.OverrideBlend(true, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD)
-	render.DrawScreenQuad()
-	render.OverrideBlend(false)
+	render_SetMaterial(mat)
+	render_OverrideBlend(true, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD)
+	render_DrawScreenQuad()
+	render_OverrideBlend(false)
 end
 
 -- Register a fog volume
 -- @param id String - Unique identifier for this fog volume
 -- @param params Table - Fog parameters
 function Arcane.VolumetricFog.RegisterVolume(id, params)
+	local rgb = params.color or Color(153, 179, 204) -- Default bluish fog
+	local colorVec = Vector(rgb.r / 255, rgb.g / 255, rgb.b / 255)
 	activeVolumes[id] = {
 		pos = params.pos or Vector(0, 0, 0),
 		aabb = params.aabb or Vector(1000, 1000, 500),
 		density = params.density or 0.4,
 		fogstart = params.fogstart or 0,
 		fogend = params.fogend or 100,
-		color = params.color or Color(153, 179, 204), -- Default bluish fog
+		color = colorVec,
 		edgefade = params.edgefade or 30,
 		noisesize = params.noisesize or 1000,
 		noisemininfluence = params.noisemininfluence or 0,
