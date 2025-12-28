@@ -663,24 +663,24 @@ if CLIENT then
 
 		-- Create or update volumetric fog volume
 		local volumeHeight = math.max(1000, forestRange * 0.5)
-		local fogParams = {
-			pos = origin,
-			aabb = Vector(forestRange * 2, forestRange * 2, 2500),
-			density = 0.25,
-			fogstart = 0,
-			fogend = 0,
-			color = FOG_COLOR,
-			edgefade = forestRange * 0.4,
-			noisesize = 4000,
-			noisemininfluence = 1,
-			noisemaxinfluence = 1,
-			scrollx = 0,
-			scrolly = 0,
-			scrollz = 0,
-			enabled = ply:Alive(),
-		}
+		local fogParams = {}
+		fogParams.enabled = ply:Alive()
 
 		if not volumetricFogActive then
+			fogParams.pos = origin
+			fogParams.aabb = Vector(forestRange * 2, forestRange * 2, 2500)
+			fogParams.density = 0.25
+			fogParams.fogstart = 0
+			fogParams.fogend = 0
+			fogParams.color = FOG_COLOR
+			fogParams.edgefade = forestRange * 0.4
+			fogParams.noisesize = 4000
+			fogParams.noisemininfluence = 1
+			fogParams.noisemaxinfluence = 1
+			fogParams.scrollx = 0
+			fogParams.scrolly = 0
+			fogParams.scrollz = 0
+
 			Arcane.VolumetricFog.RegisterVolume("magical_forest", fogParams)
 			volumetricFogActive = true
 		else

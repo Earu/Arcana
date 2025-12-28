@@ -17,7 +17,7 @@ local mat_SetMatrix = FindMetaTable("IMaterial").SetMatrix
 local render_OverrideBlend = _G.render.OverrideBlend
 local render_DrawScreenQuad = _G.render.DrawScreenQuad
 local render_SetMaterial = _G.render.SetMaterial
-local BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD, BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD = _G.BLEND_ONE, _G.BLEND_ONE_MINUS_SRC_ALPHA, _G.BLENDFUNC_ADD, _G.BLEND_ONE, _G.BLEND_ONE_MINUS_SRC_ALPHA, _G.BLENDFUNC_ADD
+local BLEND_ONE, BLEND_ONE_MINUS_SRC_ALPHA, BLENDFUNC_ADD = _G.BLEND_ONE, _G.BLEND_ONE_MINUS_SRC_ALPHA, _G.BLENDFUNC_ADD
 local emtx = {0, 0, 0, 0}
 
 -- Material reference
@@ -63,7 +63,7 @@ local activeVolumes = {}
 -- @param density Number - Fog density (0-3)
 -- @param fogstart Number - Distance at which fog starts
 -- @param fogend Number - Distance at which fog ends
--- @param color Color or Vector - Fog color (RGB 0-255 for Color, 0-1 for Vector)
+-- @param color Vector - Fog color (0-1)
 -- @param edgefade Number - Edge fade distance
 -- @param noisesize Number - Size of the noise pattern
 -- @param noisemininfluence Number - Minimum noise influence (0-1)
@@ -144,6 +144,12 @@ end
 -- @param params Table - Parameters to update
 function Arcane.VolumetricFog.UpdateVolume(id, params)
 	if not activeVolumes[id] then return end
+
+	if params.color then
+		local rgb = params.color
+		rgb = Color(rgb.r / 255, rgb.g / 255, rgb.b / 255)
+		params.color = Vector(rgb.r / 255, rgb.g / 255, rgb.b / 255)
+	end
 
 	for k, v in pairs(params) do
 		activeVolumes[id][k] = v
