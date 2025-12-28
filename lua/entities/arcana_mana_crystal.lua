@@ -366,6 +366,7 @@ if CLIENT then
 	local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
 	local render_MaterialOverride = _G.render.MaterialOverride
 	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
+	local render_SetBlend = _G.render.SetBlend
 	local DYNAMIC_LIGHT_OFFSET = Vector(0, 0, 50)
 	function ENT:Draw()
 		local distSqr = EyePos():DistToSqr(self:GetPos())
@@ -380,14 +381,15 @@ if CLIENT then
 			if isFar then
 				self:DrawModel()
 			else
+				render_UpdateScreenEffectTexture()
 				render_OverrideDepthEnable(true, true) -- no Z write
 
 				-- draw base model underneath at a low alpha to unify color
 				local baseUnderAlpha = 0.9 * fade
 				if baseUnderAlpha > 0 then
-					render.SetBlend(baseUnderAlpha)
+					render_SetBlend(baseUnderAlpha)
 					self:DrawModel()
-					render.SetBlend(1)
+					render_SetBlend(1)
 				end
 
 				-- draw refractive passes with distance-based fade
@@ -396,7 +398,6 @@ if CLIENT then
 				local perPassOpacity = (1 / PASSES) * fade
 
 				-- start from current screen
-				render_UpdateScreenEffectTexture()
 				local scr = render_GetScreenEffectTexture()
 				SHADER_MAT:SetTexture("$basetexture", scr)
 				SHADER_MAT:SetFloat("$c2_x", RealTime())
@@ -426,9 +427,9 @@ if CLIENT then
 
 				-- crossfade in the base model as shader fades out
 				if fade < 1 then
-					render.SetBlend(1 - fade)
+					render_SetBlend(1 - fade)
 					self:DrawModel()
-					render.SetBlend(1)
+					render_SetBlend(1)
 				end
 			end
 		else
