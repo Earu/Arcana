@@ -398,16 +398,24 @@ if CLIENT then
 	end
 
 	local SHADER_MAT = Material("effects/water_warp01")
+	local CVAR_DRAW_CORRUPTION = CreateConVar("arcana_draw_corruption", "1", FCVAR_ARCHIVE, "Draw the corruption effect")
+
 	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
 	local render_SetMaterial = _G.render.SetMaterial
 	local render_DrawScreenQuad = _G.render.DrawScreenQuad
 	local DrawColorModify = _G.DrawColorModify
+	local mat_SetFloat = FindMetaTable("IMaterial").SetFloat
+	local mat_SetInt = FindMetaTable("IMaterial").SetInt
+	local math_Clamp = _G.math.Clamp
+	local math_max = _G.math.max
 	function ENT:_DrawCorruption()
+		if not CVAR_DRAW_CORRUPTION:GetBool() then return end
+
 		self:_DrawSphere(function()
-			local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
-			local s0 = math.Clamp((k - 0.5) / 1.5, 0, 1)
+			local k = math_Clamp(self:GetIntensity() or 1, 0, 2)
+			local s0 = math_Clamp((k - 0.5) / 1.5, 0, 1)
 			local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
-			local s = math.Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
+			local s = math_Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
 
 			-- Compute post-process values from s: moderate contrast, clear desaturation, slight darken
 			local cm = {
@@ -416,7 +424,7 @@ if CLIENT then
 				["$pp_colour_addb"] = 0,
 				["$pp_colour_brightness"] = -0.04 * s,
 				["$pp_colour_contrast"] = 1 + 1.0 * s,
-				["$pp_colour_colour"] = math.max(0, 1 - 1.1 * s),
+				["$pp_colour_colour"] = math_max(0, 1 - 1.1 * s),
 				["$pp_colour_mulr"] = 0,
 				["$pp_colour_mulg"] = 0,
 				["$pp_colour_mulb"] = 0,
@@ -424,10 +432,11 @@ if CLIENT then
 
 			DrawColorModify(cm)
 
-			SHADER_MAT:SetFloat("$envmap", 0)
-			SHADER_MAT:SetFloat("$envmaptint", 0 )
-			SHADER_MAT:SetInt("$ignorez", 1)
-			SHADER_MAT:SetFloat("$refractamount", 0.05 * s)
+			mat_SetFloat(SHADER_MAT, "$envmap", 0)
+			mat_SetFloat(SHADER_MAT, "$envmaptint", 0 )
+			mat_SetInt(SHADER_MAT, "$ignorez", 1)
+			mat_SetFloat(SHADER_MAT, "$refractamount", 0.05 * s)
+
 			render_UpdateScreenEffectTexture()
 			render_SetMaterial(SHADER_MAT)
 			render_DrawScreenQuad(true)
