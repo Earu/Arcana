@@ -173,10 +173,13 @@ function Arcane.VolumetricFog.GetVolume(id)
 	return activeVolumes[id]
 end
 
+local CVAR_DRAW_VOLUMETRIC_FOG = CreateConVar("arcana_draw_volumetric_fog", "1", FCVAR_ARCHIVE, "Draw the volumetric fog effect")
+
 -- Render all active fog volumes
 local hasGShader = file.Exists("materials/pp/wp_reconstruction.vmt", "GAME")
 local hasNoiseTexture = file.Exists("materials/arcana/mercfog3dnoise.vtf", "GAME")
 hook.Add("PostDrawReconstruction", "Arcana_VolumetricFog", function(isDrawingDepth, isDrawSkybox, isDraw3DSkybox)
+	if not CVAR_DRAW_VOLUMETRIC_FOG:GetBool() then return end
 	if not hasGShader or not hasNoiseTexture then return end
 
 	for id, vol in pairs(activeVolumes) do
