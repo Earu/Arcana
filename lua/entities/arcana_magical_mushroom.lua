@@ -119,7 +119,6 @@ if SERVER then
 					local pos = self:GetPos() + VectorRand():GetNormalized() * math.Rand(80, 140) + SPORE_OFFSET
 					ent:SetPos(pos)
 					ent:Spawn()
-					if ent.CPPISetOwner then ent:CPPISetOwner(self:CPPIGetOwner() or self) end
 
 					constraint.NoCollide(ent, self, 0, 0)
 
