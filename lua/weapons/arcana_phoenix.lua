@@ -4,7 +4,7 @@ if SERVER then
 end
 
 SWEP.PrintName = "Phoenix Talons"
-SWEP.Author = "Arcana"
+SWEP.Author = "Earu"
 SWEP.Instructions = "LMB: Fireball salvo | RMB: Flamethrower"
 SWEP.Spawnable = false
 SWEP.AdminOnly = false
