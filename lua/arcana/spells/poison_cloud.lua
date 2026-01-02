@@ -1,14 +1,3 @@
-local function getAimPointWithinRange(ply, maxRange)
-	local tr = ply:GetEyeTrace()
-	local hitPos = tr.HitPos or (ply:GetShootPos() + ply:GetAimVector() * maxRange)
-
-	if hitPos:DistToSqr(ply:GetPos()) > (maxRange * maxRange) then
-		hitPos = ply:GetShootPos() + ply:GetAimVector() * maxRange
-	end
-
-	return hitPos
-end
-
 local function applyOrRefreshPoisonSlow(ply, duration)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 
@@ -70,22 +59,18 @@ Arcane:RegisterSpell({
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
+
 		local duration = 12
 		local tickInterval = 0.5
 		local radius = 220
 		local perTickDamage = 8
 		local slowRefresh = 1.2
-		local pos
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local pos = (ctx.circlePos or srcEnt:WorldSpaceCenter()) + Vector(0, 0, 8)
 
-		if ctx and ctx.circlePos then
-			pos = ctx.circlePos
-		else
-			pos = getAimPointWithinRange(caster, 900)
-		end
-
-		pos = pos + Vector(0, 0, 8)
 		local cloud = ents.Create("prop_physics")
 		if not IsValid(cloud) then return false end
+
 		cloud:SetModel("models/props_junk/garbage_glassbottle002a.mdl")
 		cloud:SetPos(pos)
 		cloud:Spawn()
@@ -97,7 +82,6 @@ Arcane:RegisterSpell({
 		end
 
 		local phys = cloud:GetPhysicsObject()
-
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableMotion(false)

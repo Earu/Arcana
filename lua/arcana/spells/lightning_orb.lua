@@ -14,19 +14,15 @@ Arcane:RegisterSpell({
 	is_projectile = true,
 	has_target = true,
 	cast_anim = "forward",
-	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot cast while in a vehicle" end
-
-		return true
-	end,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local startPos
 
-		if ctx and ctx.circlePos then
-			startPos = ctx.circlePos + caster:GetForward() * 8
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local startPos
+		if ctx.circlePos then
+			startPos = ctx.circlePos + srcEnt:GetForward() * 8
 		else
-			startPos = caster:WorldSpaceCenter() + caster:GetForward() * 28
+			startPos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 28
 		end
 
 		local ent = ents.Create("arcana_lightning_orb")
@@ -41,11 +37,11 @@ Arcane:RegisterSpell({
 		end
 
 		if ent.LaunchTowards then
-			ent:LaunchTowards(caster:GetAimVector())
+			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 		end
 
 		-- Brief casting VFX on the caster
-		Arcane:SendAttachBandVFX(caster, Color(170, 210, 255, 255), 26, 0.8, {
+		Arcane:SendAttachBandVFX(srcEnt, Color(170, 210, 255, 255), 26, 0.8, {
 			{
 				radius = 20,
 				height = 6,
@@ -58,7 +54,7 @@ Arcane:RegisterSpell({
 			},
 		})
 
-		caster:EmitSound("ambient/energy/zap" .. math.random(1, 9) .. ".wav", 75, math.random(110, 130))
+		srcEnt:EmitSound("ambient/energy/zap" .. math.random(1, 9) .. ".wav", 75, math.random(110, 130))
 
 		return true
 	end

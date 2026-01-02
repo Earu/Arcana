@@ -20,21 +20,20 @@ Arcane:RegisterSpell({
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local startPos = caster:GetShootPos()
-		local dir = caster:GetAimVector()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local startPos = (srcEnt.EyePos and srcEnt:EyePos() or srcEnt:WorldSpaceCenter())
+		local dir = srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward()
 		local maxDist = 2000
 		local penetrations = 4
 		local damagePerHit = 65
 		local falloff = 0.8
 		local traveled = 0
-
-		local filter = {caster}
-
+		local filter = {srcEnt, caster}
 		local segments = {}
 
 		for i = 1, penetrations do
 			local segStart = startPos
-
 			local tr = util.TraceLine({
 				start = startPos,
 				endpos = startPos + dir * (maxDist - traveled),
@@ -60,12 +59,12 @@ Arcane:RegisterSpell({
 				dmg:SetDamage(damagePerHit)
 				dmg:SetDamageType(bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM))
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
 				hitEnt:TakeDamageInfo(dmg)
 			end
 
 			-- Small splash along the lance for feedback
-			Arcane:BlastDamage(caster, caster, hitPos, 100, 18, DMG_DISSOLVE, false, true)
+			Arcane:BlastDamage(caster, srcEnt, hitPos, 100, 18, DMG_DISSOLVE, false, true)
 
 			-- Prepare for next penetration
 			table.insert(filter, hitEnt or tr.Entity)
@@ -77,7 +76,6 @@ Arcane:RegisterSpell({
 		-- Broadcast beam segments for client visuals
 		if #segments > 0 then
 			net.Start("Arcana_SpearBeam", true)
-			net.WriteEntity(caster)
 			net.WriteUInt(#segments, 8)
 
 			for i = 1, #segments do
@@ -182,7 +180,6 @@ if CLIENT then
 	end)
 
 	net.Receive("Arcana_SpearBeam", function()
-		local _ = net.ReadEntity()
 		local count = net.ReadUInt(8)
 		local col = Color(180, 120, 255)
 		local segments = {}

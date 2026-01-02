@@ -22,7 +22,9 @@ Arcane:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
-		local origin = caster:WorldSpaceCenter()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local origin = srcEnt:WorldSpaceCenter()
 		local maxRadius = 620
 		local duration = 0.8
 		local steps = 8
@@ -41,7 +43,7 @@ Arcane:RegisterSpell({
 		net.Broadcast()
 
 		-- Audio/impact
-		caster:EmitSound("ambient/fire/gascan_ignite1.wav", 75, 100)
+		srcEnt:EmitSound("ambient/fire/gascan_ignite1.wav", 75, 100)
 		sound.Play("ambient/fire/mtov_flame2.wav", origin, 70, 100)
 		util.ScreenShake(origin, 4, 40, 0.4, 512)
 
@@ -49,6 +51,7 @@ Arcane:RegisterSpell({
 			local t = (i / steps) * duration
 			timer.Simple(t, function()
 				if not IsValid(caster) then return end
+
 				local r = (i / steps) * maxRadius
 				local inner = math.max(0, r - bandWidth * 0.5)
 				local outer = r + bandWidth * 0.5
@@ -116,6 +119,7 @@ if CLIENT then
 		local pos = net.ReadVector()
 		local radius = net.ReadFloat() or 600
 		local life = net.ReadFloat() or 0.8
+
 		-- Expanding particle ring: spawn bursts around the circumference over time
 		local steps = 14
 		local points = 28

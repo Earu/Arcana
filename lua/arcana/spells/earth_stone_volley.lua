@@ -15,9 +15,11 @@ Arcane:RegisterSpell({
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
 		local count = 8
-		local start = (ctx and ctx.circlePos or caster:GetShootPos()) + Vector(0, 0, 18)
-		local dir = caster:GetAimVector()
+		local start = (ctx and ctx.circlePos) or (srcEnt.EyePos and srcEnt:EyePos() or srcEnt:WorldSpaceCenter()) + Vector(0, 0, 18)
+		local dir = srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward()
 		local pebbleDamage = 25
 
 		for i = 1, count do
@@ -53,7 +55,6 @@ Arcane:RegisterSpell({
 			end)
 
 			local phys = pebble:GetPhysicsObject()
-
 			if IsValid(phys) then
 				phys:SetVelocity(dir * 2000 + VectorRand() * 40)
 				phys:AddAngleVelocity(VectorRand() * 200)

@@ -14,6 +14,7 @@ Arcane:RegisterSpell({
 	cast_anim = "becon",
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
+
 		local duration = 20
 		local perTick = 5
 		local id = "Arcana_Regeneration_" .. caster:SteamID64()
@@ -31,7 +32,6 @@ Arcane:RegisterSpell({
 
 		-- Subtle VFX band
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
-
 		Arcane:SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
 			{
 				radius = r * 0.9,

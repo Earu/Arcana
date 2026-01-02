@@ -19,11 +19,6 @@ Arcane:RegisterSpell({
 	icon = "icon16/arrow_up.png",
 	has_target = false,
 	cast_anim = "forward",
-	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot use Wind Dash while in a vehicle" end
-
-		return true
-	end,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 

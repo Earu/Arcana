@@ -16,20 +16,25 @@ Arcane:RegisterSpell({
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local origin = (ctx and ctx.circlePos) or caster:GetShootPos()
-		local forward = caster:GetAimVector()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local origin = (ctx and ctx.circlePos) or (srcEnt.EyePos and srcEnt:EyePos() or srcEnt:WorldSpaceCenter())
+		local forward = srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward()
 		local cosHalfAngle = math.cos(math.rad(45))
 		local maxRange = 900
 		local baseDamage = 48
 		local igniteTime = 6
 
 		for _, ent in ipairs(ents.FindInSphere(origin, maxRange)) do
-			if not IsValid(ent) or ent == caster then continue end
+			if not IsValid(ent) or ent == srcEnt then continue end
+
 			local toTarget = (ent:WorldSpaceCenter() - origin)
 			local dist = toTarget:Length()
 			if dist > maxRange then continue end
+
 			local dir = toTarget:GetNormalized()
 			if dir:Dot(forward) < cosHalfAngle then continue end
+
 			-- Scale damage by angle tightness and distance within the cone
 			local angleFactor = math.Clamp((dir:Dot(forward) - cosHalfAngle) / (1 - cosHalfAngle), 0, 1)
 			local distanceFactor = 1 - math.Clamp(dist / maxRange, 0, 1) * 0.4 -- 1 near, 0.6 far
@@ -40,7 +45,7 @@ Arcane:RegisterSpell({
 				dmg:SetDamage(finalDamage)
 				dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
 				ent:TakeDamageInfo(dmg)
 
 				if ent.Ignite then
@@ -53,7 +58,6 @@ Arcane:RegisterSpell({
 				end
 			else
 				local phys = ent:GetPhysicsObject()
-
 				if IsValid(phys) then
 					phys:ApplyForceCenter(forward * (700 * phys:GetMass()))
 				end
@@ -76,14 +80,14 @@ if CLIENT then
 
 		local function spawnWaveVisuals()
 			if not IsValid(caster) then return end
-			local origin
-			local forward = caster:GetAimVector()
 
+			local origin
+			local forward = caster.GetAimVector and caster:GetAimVector() or caster:GetForward()
 			if forwardLike then
 				local maxs = caster:OBBMaxs()
 				origin = caster:GetPos() + caster:GetForward() * maxs.x * 1.5 + caster:GetUp() * maxs.z / 2
 			else
-				origin = caster:GetShootPos()
+				origin = caster.GetShootPos and caster:EyePos() or caster:WorldSpaceCenter()
 			end
 
 			local maxRange = 900

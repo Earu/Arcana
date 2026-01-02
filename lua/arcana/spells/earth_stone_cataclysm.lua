@@ -20,17 +20,14 @@ Arcane:RegisterSpell({
 	is_projectile = false,
 	has_target = true,
 	cast_anim = "forward",
-	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot cast while in a vehicle" end
-
-		return true
-	end,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
-		local tr = caster:GetEyeTrace()
-		local center = (tr and tr.HitPos) or (caster:GetPos() + Vector(0, 0, 2))
-		local normal = (tr and tr.HitNormal) or Vector(0, 0, 1)
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local center, normal = Arcane:ResolveGroundTarget(srcEnt, 1000)
+		center = center or (srcEnt:GetPos() + Vector(0, 0, 2))
+		normal = normal or Vector(0, 0, 1)
 		local baseRadius = 1040
 		local bandWidth = 160
 		local duration = 20
@@ -591,33 +588,16 @@ if CLIENT then
 	end)
 
 	-- Casting-time magic circle at aimed ground, like blackhole
-	hook.Add("Arcana_BeginCastingVisuals", "Arcana_StoneCataclysm_Circle", function(caster, spellId, castTime, _forwardLike)
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_StoneCataclysm_Circle", function(caster, spellId, castTime)
 		if spellId ~= "stone_cataclysm" then return end
-		if not MagicCircle then return end
-		if not IsValid(caster) then return end
 
-		local tr = caster:GetEyeTrace()
-		local pos = (tr and tr.HitPos) or (caster:GetPos() + Vector(0, 0, 2))
-		local ang = Angle(0, 0, 0)
-		local size = 360
-		local intensity = 80
-		local circle = MagicCircle.CreateMagicCircle(pos, ang, Color(120, 90, 40, 255), intensity, size, castTime, 2)
-		if not circle then return end
-
-		if circle.StartEvolving then circle:StartEvolving(castTime, true) end
-		local hookName = "Arcana_SC_CircleFollow_" .. tostring(circle)
-		local endTime = CurTime() + castTime + 0.05
-		hook.Add("Think", hookName, function()
-			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
-				hook.Remove("Think", hookName)
-				return
+		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+			color = Color(120, 90, 40, 255),
+			size = 360,
+			intensity = 80,
+			positionResolver = function(c)
+				return Arcane:ResolveGroundTarget(c, 1000)
 			end
-
-			local tr2 = caster:GetEyeTrace()
-			if tr2 and tr2.HitPos then
-				circle.position = tr2.HitPos + Vector(0, 0, 0.5)
-				circle.angles = Angle(0, 0, 0)
-			end
-		end)
+		})
 	end)
 end

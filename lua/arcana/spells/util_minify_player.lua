@@ -32,8 +32,15 @@ Arcane:RegisterSpell({
 	has_target = true,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local target = caster:GetEyeTrace().Entity
 
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local tr = srcEnt.GetEyeTrace and srcEnt:GetEyeTrace() or util.TraceLine({
+			start = srcEnt:WorldSpaceCenter(),
+			endpos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 1000,
+			filter = {srcEnt, caster}
+		})
+
+		local target = tr.Entity
 		if not target or not target:IsPlayer() then
 			target = caster
 		end

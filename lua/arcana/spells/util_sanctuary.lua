@@ -17,8 +17,16 @@ Arcane:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
-		local tr = caster:GetEyeTrace()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local tr = srcEnt.GetEyeTrace and srcEnt:GetEyeTrace() or util.TraceLine({
+			start = srcEnt:WorldSpaceCenter(),
+			endpos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 1000,
+			filter = {srcEnt, caster}
+		})
+
 		if not tr or not tr.Hit then return false end
+
 		local center = tr.HitPos + Vector(0, 0, 2)
 		local duration = 18
 		local tick = 1.0
@@ -32,6 +40,7 @@ Arcane:RegisterSpell({
 		anchor:SetPos(center)
 		anchor:SetAngles(Angle(0, 0, 0))
 		anchor:Spawn()
+
 		-- Make visually invisible without hiding for client effects
 		anchor:DrawShadow(false)
 		anchor:SetRenderMode(RENDERMODE_TRANSCOLOR)
