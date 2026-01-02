@@ -215,7 +215,6 @@ Arcane:RegisterSpell({
 	has_target = false,
 	cast_anim = "forward",
 	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot use Phoenix in a vehicle" end
 		if isPhoenixActive(caster) then return false, "Already in Phoenix" end
 		return true
 	end,

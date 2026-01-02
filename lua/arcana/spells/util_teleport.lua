@@ -112,7 +112,6 @@ Arcane:RegisterSpell({
 	has_target = false,
 	cast_anim = "becon",
 	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot teleport while in a vehicle" end
 		local ok, reason = hook.Run("CanPlyTeleport", caster)
 		if ok == false then return false, reason or "Something is preventing teleporting" end
 
@@ -160,36 +159,14 @@ if CLIENT then
 	-- Show a small targeting circle at the prospective landing spot while casting
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "teleport" then return end
-		if not MagicCircle then return end
-		local pos = findSafeTeleportDestination(caster) or (caster:GetPos() + Vector(0, 0, 2))
-		if not pos then return end
-		local ang = Angle(0, 0, 0)
-		local color = Color(140, 200, 255, 255)
-		local size = 18
-		local intensity = 3
-		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
-		if not circle then return end
 
-		if circle.StartEvolving then
-			circle:StartEvolving(castTime, true)
-		end
-
-		local hookName = "Arcana_TP_CircleFollow_" .. tostring(circle)
-		local endTime = CurTime() + castTime + 0.05
-
-		hook.Add("Think", hookName, function()
-			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
-				hook.Remove("Think", hookName)
-
-				return
+		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+			color = Color(140, 200, 255, 255),
+			size = 18,
+			intensity = 3,
+			positionResolver = function(c)
+				return findSafeTeleportDestination(c)
 			end
-
-			local p = findSafeTeleportDestination(caster)
-
-			if p then
-				circle.position = p + Vector(0, 0, 0.5)
-				circle.angles = Angle(0, 0, 0)
-			end
-		end)
+		})
 	end)
 end

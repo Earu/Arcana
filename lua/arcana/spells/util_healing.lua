@@ -14,13 +14,23 @@ Arcane:RegisterSpell({
 	has_target = true,
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)
-		local target = caster:GetEyeTrace().Entity
+		if not IsValid(caster) then return false end
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local tr = srcEnt.GetEyeTrace and srcEnt:GetEyeTrace() or util.TraceLine({
+			start = srcEnt:WorldSpaceCenter(),
+			endpos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 1000,
+			filter = {srcEnt, caster}
+		})
+
+		local target = tr.Entity
 		if not IsValid(target) or not target:IsPlayer() or not target:Alive() then return false end
 		if target:Health() >= target:GetMaxHealth() then return false end
 		if not SERVER then return true end
+
 		-- Apply healing
 		target:SetHealth(math.min(target:GetMaxHealth(), target:Health() + 40))
-		-- Beautiful healing aura effect
+
 		local healColor = Color(120, 255, 140, 255) -- Golden healing light
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
 

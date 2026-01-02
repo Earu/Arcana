@@ -19,14 +19,11 @@ Arcane:RegisterSpell({
 	is_projectile = false,
 	has_target = false,
 	cast_anim = "becon",
-	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot cast while in a vehicle" end
-
-		return true
-	end,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local pos = caster:WorldSpaceCenter()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local pos = srcEnt:WorldSpaceCenter()
 		local radius = 520
 		local baseDamage = 180
 		local pushPlayer = 420
@@ -38,7 +35,7 @@ Arcane:RegisterSpell({
 		util.Effect("ThumperDust", ed, true, true)
 		util.Effect("cball_explode", ed, true, true)
 		util.ScreenShake(pos, 8, 80, 0.5, 800)
-		caster:EmitSound("physics/concrete/concrete_break2.wav", 80, 95)
+		srcEnt:EmitSound("physics/concrete/concrete_break2.wav", 80, 95)
 		sound.Play("ambient/materials/rock_impact_hard2.wav", pos, 80, 100)
 		-- Tell clients to render expanding earthy rings + dust/debris
 		net.Start("Arcana_EarthShatter_VFX", true)
@@ -120,7 +117,8 @@ Arcane:RegisterSpell({
 		-- Damage and knockback
 		for _, ent in ipairs(ents.FindInSphere(pos, radius)) do
 			if not IsValid(ent) then continue end
-			if ent == caster then continue end
+			if ent == srcEnt then continue end
+
 			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
 			local to = ent:WorldSpaceCenter() - pos
 			local dist = to:Length()
@@ -132,7 +130,7 @@ Arcane:RegisterSpell({
 				dmg:SetDamage(math.floor(baseDamage * fall))
 				dmg:SetDamageType(DMG_CLUB)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
 				ent:TakeDamageInfo(dmg)
 				-- Pop upward slightly then out
 				if ent.SetVelocity then
@@ -140,7 +138,6 @@ Arcane:RegisterSpell({
 				end
 			else
 				local phys = ent:GetPhysicsObject()
-
 				if IsValid(phys) then
 					phys:Wake()
 					phys:ApplyForceCenter(dir * (pushProp * fall) + Vector(0, 0, 14000))

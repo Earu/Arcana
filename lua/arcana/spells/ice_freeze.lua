@@ -18,18 +18,20 @@ Arcane:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
-		local startPos
 
-		if ctx and ctx.circlePos then
-			startPos = ctx.circlePos + caster:GetForward() * 6
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local startPos
+		if ctx.circlePos then
+			startPos = ctx.circlePos + srcEnt:GetForward() * 6
 		else
-			startPos = caster:WorldSpaceCenter() + caster:GetForward() * 20
+			startPos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 20
 		end
 
 		local ent = ents.Create("arcana_ice_bolt")
 		if not IsValid(ent) then return false end
+
 		ent:SetPos(startPos)
-		ent:SetAngles(caster:GetAimVector():Angle())
+		ent:SetAngles(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward():Angle())
 		ent:Spawn()
 		ent:SetOwner(caster)
 
@@ -42,11 +44,11 @@ Arcane:RegisterSpell({
 		end
 
 		if ent.LaunchTowards then
-			ent:LaunchTowards(caster:GetAimVector())
+			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 		end
 
 		-- Subtle cast SFX
-		sound.Play("weapons/physcannon/energy_sing_flyby1.wav", startPos, 65, 220)
+		srcEnt:EmitSound("weapons/physcannon/energy_sing_flyby1.wav", 65, 220)
 
 		return true
 	end,

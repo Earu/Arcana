@@ -15,12 +15,13 @@ Arcane:RegisterSpell({
 	has_target = true,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local startPos
 
-		if ctx and ctx.circlePos then
-			startPos = ctx.circlePos + caster:GetForward() * 5
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local startPos
+		if ctx.circlePos then
+			startPos = ctx.circlePos + srcEnt:GetForward() * 5
 		else
-			startPos = caster:WorldSpaceCenter() + caster:GetForward() * 25
+			startPos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 25
 		end
 
 		local ent = ents.Create("arcana_fireball")
@@ -38,7 +39,7 @@ Arcane:RegisterSpell({
 		end
 
 		if ent.LaunchTowards then
-			ent:LaunchTowards(caster:GetAimVector())
+			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 		end
 
 		Arcane:SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {

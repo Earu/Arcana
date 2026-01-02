@@ -18,21 +18,18 @@ Arcane:RegisterSpell({
 	is_projectile = false,
 	has_target = false,
 	cast_anim = "becon",
-	can_cast = function(caster)
-		if caster:InVehicle() then return false, "Cannot cast while in a vehicle" end
-
-		return true
-	end,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local pos = caster:WorldSpaceCenter()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local pos = srcEnt:WorldSpaceCenter()
 		local radius = 360
 		local baseDamage = 145
 		local slowMult = 0.5
 		local slowDuration = 3.5
 
 		-- VFX: bands around caster
-		Arcane:SendAttachBandVFX(caster, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
+		Arcane:SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
 			{
 				radius = radius * 0.35,
 				height = 18,
@@ -68,16 +65,15 @@ Arcane:RegisterSpell({
 			dmg:SetDamage(baseDamage)
 			dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 			dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
-			dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+			dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
 			ent:TakeDamageInfo(dmg)
+
 			-- Knockback
 			local pushDir = (ent:WorldSpaceCenter() - pos):GetNormalized()
-
 			if ent:IsPlayer() then
 				ent:SetVelocity(pushDir * 220)
 			else
 				local phys = ent:GetPhysicsObject()
-
 				if IsValid(phys) then
 					phys:ApplyForceCenter(pushDir * 20000)
 				end
@@ -97,11 +93,13 @@ Arcane:RegisterSpell({
 		ed:SetOrigin(pos)
 		util.Effect("GlassImpact", ed, true, true)
 		util.ScreenShake(pos, 4, 60, 0.25, 512)
-		caster:EmitSound("physics/glass/glass_impact_bullet1.wav", 75, 120)
-		caster:EmitSound("ambient/levels/canals/windchime2.wav", 70, 140)
+
+		srcEnt:EmitSound("physics/glass/glass_impact_bullet1.wav", 75, 120)
+		srcEnt:EmitSound("ambient/levels/canals/windchime2.wav", 70, 140)
+
 		-- Tell clients to render a frosty shock ring
 		net.Start("Arcana_FrostNovaBurst", true)
-		net.WriteEntity(caster)
+		net.WriteEntity(srcEnt)
 		net.WriteFloat(radius)
 		net.Broadcast()
 
@@ -110,8 +108,6 @@ Arcane:RegisterSpell({
 })
 
 if CLIENT then
-	-- Customize the casting circle during channel
-	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FrostNova_Circle", function(caster, spellId, castTime, forwardLike) end)
 	-- One-shot frosty shock ring at cast moment
 	local matGlow = Material("sprites/light_glow02_add")
 	local matRing = Material("effects/select_ring")

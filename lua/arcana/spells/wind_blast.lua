@@ -18,7 +18,9 @@ Arcane:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
-		local origin = caster:WorldSpaceCenter()
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local origin = srcEnt:WorldSpaceCenter()
 		local radius = 720
 		local strengthPlayer = 2000
 		local strengthProp = 100000
@@ -29,13 +31,13 @@ Arcane:RegisterSpell({
 		local ed = EffectData()
 		ed:SetOrigin(origin)
 		util.Effect("cball_explode", ed, true, true)
-		caster:EmitSound("ambient/wind/wind_hit1.wav", 75, 120)
+		srcEnt:EmitSound("ambient/wind/wind_hit1.wav", 75, 120)
 		sound.Play("ambient/levels/labs/teleport_mechanism_winddown2.wav", origin, 70, 140)
 		util.ScreenShake(origin, 7, 80, 0.3, 700)
 
 		for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
 			if not IsValid(ent) then continue end
-			if ent == caster then continue end
+			if ent == srcEnt then continue end
 
 			local c = ent:WorldSpaceCenter()
 			local dir = (c - origin):GetNormalized()
@@ -49,7 +51,7 @@ Arcane:RegisterSpell({
 				dmg:SetDamage(baseDamage * falloff)
 				dmg:SetDamageType(DMG_SONIC)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
-				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
+				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
 				ent:TakeDamageInfo(dmg)
 
 				local vel = dir * (strengthPlayer * falloff) + Vector(0, 0, upBoost)

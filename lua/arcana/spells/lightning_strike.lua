@@ -1,9 +1,3 @@
-local function resolveStrikeGround(ply)
-	local tr = ply:GetEyeTrace()
-
-	return tr.HitPos, tr.HitNormal
-end
-
 local function spawnTeslaBurst(pos)
 	local tesla = ents.Create("point_tesla")
 	if not IsValid(tesla) then return end
@@ -95,7 +89,7 @@ Arcane:RegisterSpell({
 	has_target = true,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local targetPos = resolveStrikeGround(caster)
+		local targetPos = Arcane:ResolveGroundTarget(caster, 1500)
 
 		-- Perform 1 strong strike and 2 lighter offset strikes for style
 		local strikes = {
@@ -149,36 +143,14 @@ if CLIENT then
 	-- Custom moving magic circle for lightning_strike that follows the player's aim on the ground
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "lightning_strike" then return end
-		if not MagicCircle then return end
-		local color = Color(170, 200, 255, 255)
-		local pos = resolveStrikeGround(caster, 1500) or (caster:GetPos() + Vector(0, 0, 2))
-		local ang = Angle(0, 0, 0)
-		local size = 26
-		local intensity = 4
-		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
-		if not circle then return end
 
-		if circle.StartEvolving then
-			circle:StartEvolving(castTime, true)
-		end
-
-		-- Follow the ground position under the caster's aim until cast ends
-		local hookName = "Arcana_LS_CircleFollow_" .. tostring(circle)
-		local endTime = CurTime() + castTime + 0.05
-
-		hook.Add("Think", hookName, function()
-			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
-				hook.Remove("Think", hookName)
-
-				return
+		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+			color = Color(170, 200, 255, 255),
+			size = 26,
+			intensity = 4,
+			positionResolver = function(c)
+				return Arcane:ResolveGroundTarget(c, 1500)
 			end
-
-			local gpos = resolveStrikeGround(caster, 1500)
-
-			if gpos then
-				circle.position = gpos + Vector(0, 0, 0.5)
-				circle.angles = Angle(0, 0, 0)
-			end
-		end)
+		})
 	end)
 end

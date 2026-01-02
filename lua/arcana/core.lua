@@ -755,7 +755,7 @@ function Arcane:StartCasting(ply, spellId)
 				ctxSize = 30
 			end
 
-			self:CastSpell(ply, spellId, nil, {
+			self:CastSpell(ply, spellId, spell.has_target, {
 				circlePos = ctxPos,
 				circleAng = ctxAng,
 				circleSize = ctxSize,
@@ -902,13 +902,21 @@ function Arcane:RegisterRitualSpell(opts)
 		return true
 	end
 
-	local function ritualCast(caster)
+	local function ritualCast(caster, _, _, ctx)
 		if CLIENT then return true end
 		if not IsValid(caster) then return false end
-		local eye = caster:EyeAngles()
-		local pos = caster:GetEyeTrace().HitPos
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local eye = srcEnt.EyeAngles and srcEnt:EyeAngles() or srcEnt:GetAngles()
+		local pos = srcEnt.GetEyeTrace and srcEnt:GetEyeTrace().HitPos or util.TraceLine({
+			start = srcEnt:WorldSpaceCenter(),
+			endpos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 1000,
+			filter = {srcEnt, caster}
+		}).HitPos
+
 		local ent = ents.Create("arcana_ritual")
 		if not IsValid(ent) then return false end
+
 		ent:SetPos(pos)
 		ent:SetAngles(Angle(0, eye.y, 0))
 
@@ -1356,19 +1364,44 @@ if CLIENT then
 		local handled = runHook("BeginCastingVisuals", caster, spellId, castTime, forwardLike)
 		if handled == true then return end
 
-		local pos = caster:GetPos() + Vector(0, 0, 2)
-		local ang = Angle(0, 180, 180)
-		local size = 60
+		local isSpellCaster = caster:GetClass() == "arcana_spell_caster"
+		local pos, ang, size
 
-		if forwardLike then
-			local maxs = caster:OBBMaxs()
-			pos = caster:GetPos() + caster:GetForward() * maxs.x * 1.5 + caster:GetUp() * maxs.z / 2
-			ang = caster:EyeAngles()
-			ang:RotateAroundAxis(ang:Right(), 90)
-			size = 30
+		if isSpellCaster then
+			-- Spell caster entity positioning
+			pos = caster:GetPos() + caster:GetUp() * 15
+			ang = caster:GetAngles()
+			size = 40
+
+			if forwardLike then
+				pos = caster:GetPos() + caster:GetForward() * 30 + caster:GetUp() * 15
+				ang = caster:GetAngles()
+				ang:RotateAroundAxis(ang:Right(), 90)
+				size = 30
+			end
+		else
+			-- Player positioning
+			pos = caster:GetPos() + Vector(0, 0, 2)
+			ang = Angle(0, 180, 180)
+			size = 60
+
+			if forwardLike then
+				local maxs = caster:OBBMaxs()
+				pos = caster:GetPos() + caster:GetForward() * maxs.x * 1.5 + caster:GetUp() * maxs.z / 2
+				ang = caster:EyeAngles()
+				ang:RotateAroundAxis(ang:Right(), 90)
+				size = 30
+			end
 		end
 
-		local color = caster.GetWeaponColor and caster:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
+		local color
+		if isSpellCaster then
+			local owner = caster:CPPIGetOwner and caster:CPPIGetOwner() or caster:GetOwner and caster:GetOwner()
+			color = IsValid(owner) and owner.GetWeaponColor and owner:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
+		else
+			color = caster.GetWeaponColor and caster:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
+		end
+
 		local intensity = 3
 
 		if isstring(spellId) and #spellId > 0 then
@@ -1403,16 +1436,33 @@ if CLIENT then
 			end
 
 			-- Update circle position/orientation to follow current caster transform
-			local newPos = caster:GetPos() + Vector(0, 0, 2)
-			local newAng = Angle(0, 180, 180)
-			local newSize = size
+			local newPos, newAng, newSize
 
-			if forwardLike then
-				local maxsF = caster:OBBMaxs()
-				newPos = caster:GetPos() + caster:GetForward() * maxsF.x * 1.5 + caster:GetUp() * maxsF.z / 2
-				newAng = caster:EyeAngles()
-				newAng:RotateAroundAxis(newAng:Right(), 90)
-				newSize = 30
+			if isSpellCaster then
+				-- Spell caster entity positioning
+				newPos = caster:GetPos() + caster:GetUp() * 15
+				newAng = caster:GetAngles()
+				newSize = 40
+
+				if forwardLike then
+					newPos = caster:GetPos() + caster:GetForward() * 30 + caster:GetUp() * 15
+					newAng = caster:GetAngles()
+					newAng:RotateAroundAxis(newAng:Right(), 90)
+					newSize = 30
+				end
+			else
+				-- Player positioning
+				newPos = caster:GetPos() + Vector(0, 0, 2)
+				newAng = Angle(0, 180, 180)
+				newSize = size
+
+				if forwardLike then
+					local maxsF = caster:OBBMaxs()
+					newPos = caster:GetPos() + caster:GetForward() * maxsF.x * 1.5 + caster:GetUp() * maxsF.z / 2
+					newAng = caster:EyeAngles()
+					newAng:RotateAroundAxis(newAng:Right(), 90)
+					newSize = 30
+				end
 			end
 
 			c.position = newPos
@@ -1421,11 +1471,12 @@ if CLIENT then
 		end)
 	end)
 
-	-- On spell failure, break down the tracked circle for the caster
+	-- On spell failure, break down the tracked circle for the caster (works for both players and entities)
 	net.Receive("Arcane_SpellFailed", function()
 		local caster = net.ReadEntity()
 		local castTime = net.ReadFloat() or 0
 		if not IsValid(caster) then return end
+
 		local circle = caster._ArcanaCastingCircle
 
 		if circle and circle.StartBreakdown then
@@ -1638,6 +1689,75 @@ end
 -- Public helper to sync a weapon's applied enchantment IDs to clients via NWString
 function Arcane:SyncWeaponEnchantNW(wep)
 	return syncWeaponEnchantNW(wep)
+end
+
+-- Common position resolver for ground-targeted spells
+-- Works with both players (GetEyeTrace) and entities (util.TraceLine fallback)
+function Arcane:ResolveGroundTarget(caster, maxRange)
+	if not IsValid(caster) then return nil end
+
+	maxRange = maxRange or 1000
+
+	if caster.GetEyeTrace then
+		local tr = caster:GetEyeTrace()
+		return tr.HitPos, tr.HitNormal
+	else
+		local tr = util.TraceLine({
+			start = caster:WorldSpaceCenter(),
+			endpos = caster:WorldSpaceCenter() + caster:GetForward() * maxRange,
+			filter = {caster}
+		})
+
+		return tr.HitPos, tr.HitNormal
+	end
+end
+
+-- Helper to create a ground-following magic circle during spell casting (CLIENT)
+-- Used by spells that want custom casting circle visuals that follow the caster's aim
+if CLIENT then
+	function Arcane:CreateFollowingCastCircle(caster, spellId, castTime, options)
+		if not IsValid(caster) then return false end
+		if not MagicCircle then return false end
+
+		local opts = options or {}
+		local color = opts.color or Color(150, 100, 255, 255)
+		local size = opts.size or 100
+		local intensity = opts.intensity or 4
+		local positionResolver = opts.positionResolver or function(c)
+			return Arcane:ResolveGroundTarget(c)
+		end
+
+		-- Get initial position
+		local pos = positionResolver(caster)
+		if not pos then return false end
+
+		local ang = Angle(0, 0, 0)
+		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
+		if not circle then return false end
+
+		if circle.StartEvolving then
+			circle:StartEvolving(castTime, true)
+		end
+
+		-- Follow the caster's aim position until cast ends
+		local hookName = "Arcana_FollowCastCircle_" .. spellId .. "_" .. tostring(circle)
+		local endTime = CurTime() + castTime + 0.05
+
+		hook.Add("Think", hookName, function()
+			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
+				hook.Remove("Think", hookName)
+				return
+			end
+
+			local newPos = positionResolver(caster)
+			if newPos then
+				circle.position = newPos + Vector(0, 0, 0.5)
+				circle.angles = Angle(0, 0, 0)
+			end
+		end)
+
+		return true
+	end
 end
 
 -- Cleanup: when a weapon entity is removed, ensure all enchantments detach their hooks
