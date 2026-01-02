@@ -48,6 +48,7 @@ if SERVER then
 	end)
 
 	hook.Add("Move", Tag, function(ply, mv)
+		if ply:GetInfoNum("arcana_soul_mode_enabled", 1) ~= 1 then return end
 		if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
 		local ent = ply:GetNW2Entity("Arcana_SoulEnt")
 		if not ent:IsValid() then return end
@@ -123,6 +124,7 @@ if SERVER then
 
 	hook.Add("PlayerDeathThink", Tag, function(ply)
 		if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
+		if ply:GetInfoNum("arcana_soul_mode_enabled", 1) ~= 1 then return end
 
 		if ply.ArcanaSoulSpawnPos then
 			local rag = ply:GetRagdollEntity()
@@ -168,9 +170,12 @@ if SERVER then
 end
 
 if CLIENT then
+	local CVAR_SOUL = CreateClientConVar("arcana_soul_mode_enabled", "1", true, true, "Enable or disable soul mode visuals and transformation (0 = disabled, 1 = enabled)", 0, 1)
+
 	hook.Add("EntityEmitSound", Tag, function(data)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
+		if not CVAR_SOUL:GetBool() then return end
 
 		if not ply:Alive() then
 			if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
@@ -258,6 +263,11 @@ if CLIENT then
 	hook.Add("PostDrawTranslucentRenderables", Tag .. "_SoulRunes3D", function(bDepth, bSky)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
+
+		if not CVAR_SOUL:GetBool() then
+			clearRunes()
+			return
+		end
 
 		-- Only during soul mode
 		if ply:Alive() then
@@ -356,6 +366,8 @@ if CLIENT then
 
 	local COLOR_BLACK = Color(0, 0, 0, 255)
 	hook.Add("RenderScreenspaceEffects", Tag, function()
+		if not CVAR_SOUL:GetBool() then return end
+
 		for _, ply in ipairs(player.GetAll()) do
 			if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then continue end
 
@@ -456,6 +468,7 @@ if CLIENT then
 	local function isInSoulMode()
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return false end
+		if not CVAR_SOUL:GetBool() then return false end
 
 		local soulEnt = ply:GetNW2Entity("Arcana_SoulEnt")
 		return IsValid(soulEnt)
@@ -475,6 +488,7 @@ if CLIENT then
 	hook.Add("HUDShouldDraw", Tag, function(name)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
+		if not CVAR_SOUL:GetBool() then return end
 		if ply:Alive() then return end
 
 		-- Block the red death overlay
@@ -515,6 +529,8 @@ if CLIENT then
 		end)
 
 		hook.Add("CalcView", Tag, function(ply)
+			if not CVAR_SOUL:GetBool() then return end
+
 			if not ply:Alive() then
 				if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
 
