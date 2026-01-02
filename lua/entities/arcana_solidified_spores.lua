@@ -3,7 +3,7 @@ AddCSLuaFile()
 ENT.Type = "anim"
 ENT.Base = "base_gmodentity"
 ENT.PrintName = "Solidified Spores"
-ENT.Author = "Arcana"
+ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.AdminOnly = false
 ENT.Category = "Arcana"

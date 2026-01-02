@@ -3,7 +3,7 @@ AddCSLuaFile()
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Magical Mushroom"
-ENT.Author = "Arcana"
+ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.Category = "Arcana"
 ENT.RenderGroup = RENDERGROUP_OPAQUE

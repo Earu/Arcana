@@ -1,7 +1,7 @@
 ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Lightning Orb"
-ENT.Author = "Arcana"
+ENT.Author = "Earu"
 ENT.Spawnable = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.AdminSpawnable = false
