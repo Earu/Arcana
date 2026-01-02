@@ -170,7 +170,7 @@ if SERVER then
 end
 
 if CLIENT then
-	local CVAR_SOUL = CreateClientConVar("arcana_soul_mode_enabled", "1", true, true, "Enable or disable soul mode visuals and transformation (0 = disabled, 1 = enabled)", 0, 1)
+	local CVAR_SOUL = CreateClientConVar("arcana_soul_mode", "1", true, true, "Enable or disable soul mode visuals and transformation (0 = disabled, 1 = enabled)", 0, 1)
 
 	hook.Add("EntityEmitSound", Tag, function(data)
 		local ply = LocalPlayer()
