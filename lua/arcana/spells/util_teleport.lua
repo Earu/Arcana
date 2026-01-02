@@ -165,7 +165,11 @@ if CLIENT then
 			size = 18,
 			intensity = 3,
 			positionResolver = function(c)
-				return findSafeTeleportDestination(c)
+				if c:IsPlayer() then
+					return findSafeTeleportDestination(c)
+				else
+					return Arcane:ResolveGroundTarget(c, 1000)
+				end
 			end
 		})
 	end)
