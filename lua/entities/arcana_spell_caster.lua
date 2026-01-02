@@ -341,37 +341,62 @@ if SERVER then
 end
 
 if CLIENT then
+	local LINE_COLOR = Color(0, 255, 0, 255)
 	function ENT:Draw()
 		self:DrawModel()
 
-		-- Draw spell name above entity when casting
-		if self:GetIsCasting() then
-			local spellId = self:GetCurrentSpell()
-			local spell = Arcane.RegisteredSpells[spellId]
+		-- Draw direction indicator and spell info for owner with physgun
+		local ply = LocalPlayer()
+		local owner = self:CPPIGetOwner() or self:GetOwner()
+		local isOwner = IsValid(owner) and owner == ply
 
-			if spell then
-				local pos = self:GetPos() + self:GetUp() * 30
-				local ang = EyeAngles()
+		if isOwner then
+			local wep = ply:GetActiveWeapon()
+			if IsValid(wep) and wep:GetClass() == "weapon_physgun" then
+				-- Draw direction line
+				local startPos = self:WorldSpaceCenter()
+				local endPos = util.TraceLine({
+					start = startPos,
+					endpos = startPos + self:GetForward() * 1000,
+					mask = MASK_SOLID_BRUSHONLY
+				}).HitPos
+
+				render.DrawLine(startPos, endPos, LINE_COLOR, true)
+
+				local spellId = self:GetCurrentSpell()
+				if spellId == "" then spellId = "None" end
+
+				-- Position text alongside the line, oriented in the same direction
+				local textPos = startPos + self:GetForward() * 40
+				local ang = self:GetAngles()
 				ang:RotateAroundAxis(ang:Forward(), 90)
-				ang:RotateAroundAxis(ang:Right(), 90)
+				--ang:RotateAroundAxis(ang:Right(), 90)
 
-				cam.Start3D2D(pos, ang, 0.1)
+				cam.Start3D2D(textPos, ang, 0.1)
 					draw.SimpleTextOutlined(
-						"Casting: " .. spell.name,
-						"DermaDefault",
+						"Spell: " .. spellId,
+						"DermaLarge",
 						0, 0,
-						Color(150, 100, 255),
-						TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
+						LINE_COLOR,
+						TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER,
 						1,
 						Color(0, 0, 0)
 					)
+				cam.End3D2D()
 
-					-- Progress bar
-					local progress = self:GetCastProgress()
-					local barWidth = 200
-					local barHeight = 10
-					draw.RoundedBox(4, -barWidth/2, 20, barWidth, barHeight, Color(0, 0, 0, 200))
-					draw.RoundedBox(4, -barWidth/2, 20, barWidth * progress, barHeight, Color(147, 112, 219, 255))
+				ang = self:GetAngles()
+				ang:RotateAroundAxis(ang:Forward(), -90)
+				ang:RotateAroundAxis(ang:Up(), 180)
+				cam.Start3D2D(textPos, ang, 0.1)
+					draw.SimpleTextOutlined(
+						"Spell: " .. spellId,
+						"DermaLarge",
+						0, 0,
+						LINE_COLOR,
+						TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER,
+						1,
+						Color(0, 0, 0)
+					)
 				cam.End3D2D()
 			end
 		end
