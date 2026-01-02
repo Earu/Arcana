@@ -1396,7 +1396,7 @@ if CLIENT then
 
 		local color
 		if isSpellCaster then
-			local owner = caster:CPPIGetOwner and caster:CPPIGetOwner() or caster:GetOwner and caster:GetOwner()
+			local owner = (caster.CPPIGetOwner and caster:CPPIGetOwner()) or (caster.GetOwner and caster:GetOwner())
 			color = IsValid(owner) and owner.GetWeaponColor and owner:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
 		else
 			color = caster.GetWeaponColor and caster:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
