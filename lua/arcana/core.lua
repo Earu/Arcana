@@ -1827,7 +1827,7 @@ if SERVER then
 
 			-- Check if damage taken is less than 50% of intended damage relative to health
 			local damageRatio = actualDamageTaken / healthBefore
-			local intendedRatio = damageAmount / healthBefore
+			local intendedRatio = damageAmount / math.min(healthBefore, 255) -- clamp to 255 to mark players with 9999 health
 
 			-- If actual damage is less than 50% of what was intended
 			if damageRatio < (intendedRatio * 0.5) then
