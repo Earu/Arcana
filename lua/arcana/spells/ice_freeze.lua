@@ -31,7 +31,7 @@ Arcane:RegisterSpell({
 		if not IsValid(ent) then return false end
 
 		ent:SetPos(startPos)
-		ent:SetAngles(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward():Angle())
+		ent:SetAngles(srcEnt.GetAimVector and srcEnt:GetAimVector():Angle() or srcEnt:GetForward():Angle())
 		ent:Spawn()
 		ent:SetOwner(caster)
 
