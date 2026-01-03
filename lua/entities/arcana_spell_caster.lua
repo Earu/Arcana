@@ -25,6 +25,7 @@ if SERVER then
 
 	function ENT:Initialize()
 		self:SetModel("models/hunter/blocks/cube025x025x025.mdl")
+		self:SetMaterial("arcana/pattern")
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)

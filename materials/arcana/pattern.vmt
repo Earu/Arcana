@@ -1,0 +1,5 @@
+"VertexLitGeneric"
+{
+	"$basetexture" "arcana/pattern"
+	"$surfaceprop" "metal"
+}
