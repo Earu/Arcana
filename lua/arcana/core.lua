@@ -1370,6 +1370,7 @@ if CLIENT then
 		if isSpellCaster then
 			pos = caster:WorldSpaceCenter() + caster:GetForward() * 30
 			ang = caster:GetAngles()
+			ang:RotateAroundAxis(ang:Up(), 90)
 			ang:RotateAroundAxis(ang:Right(), 90)
 			size = 30
 		else
@@ -1389,7 +1390,7 @@ if CLIENT then
 
 		local color
 		if isSpellCaster then
-			local owner = (caster.CPPIGetOwner and caster:CPPIGetOwner()) or (caster.GetOwner and caster:GetOwner())
+			local owner = (caster.CPPIGetOwner and caster:CPPIGetOwner()) or (caster:GetNWEntity("FallbackOwner"))
 			color = IsValid(owner) and owner.GetWeaponColor and owner:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
 		else
 			color = caster.GetWeaponColor and caster:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
@@ -1402,13 +1403,13 @@ if CLIENT then
 		end
 
 		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
-
 		if circle and circle.StartEvolving then
 			circle:StartEvolving(castTime, true)
 		end
 
 		-- Track as the current casting circle for this caster
 		caster._ArcanaCastingCircle = circle
+
 		-- While casting, continuously follow the caster so visuals stay attached
 		local followHook = "Arcane_FollowCasting_" .. tostring(caster)
 		hook.Remove("Think", followHook)
@@ -1433,16 +1434,11 @@ if CLIENT then
 
 			if isSpellCaster then
 				-- Spell caster entity positioning
-				newPos = caster:GetPos() + caster:GetUp() * 15
+				newPos = caster:WorldSpaceCenter() + caster:GetForward() * 30
 				newAng = caster:GetAngles()
-				newSize = 40
-
-				if forwardLike then
-					newPos = caster:GetPos() + caster:GetForward() * 30 + caster:GetUp() * 15
-					newAng = caster:GetAngles()
-					newAng:RotateAroundAxis(newAng:Right(), 90)
-					newSize = 30
-				end
+				newAng:RotateAroundAxis(newAng:Right(), 90)
+				newAng:RotateAroundAxis(newAng:Up(), 90)
+				newSize = 30
 			else
 				-- Player positioning
 				newPos = caster:GetPos() + Vector(0, 0, 2)
