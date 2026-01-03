@@ -19,8 +19,11 @@ end
 
 if SERVER then
 	util.AddNetworkString("Arcana_OpenAltarMenu")
+
 	resource.AddFile("materials/entities/arcana_altar.png")
 	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
+	resource.AddFile("models/arcana_obelisk/arcana_obelisk_bottom.mdl")
+	resource.AddFile("models/arcana_obelisk/arcana_obelisk_top.mdl")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
@@ -30,24 +33,68 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
-		local phys = self:GetPhysicsObject()
 
+		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableMotion(false)
 		end
 
+		-- Start motion controller for shadow control
+		self:StartMotionController()
+		self.ShadowParams = {}
+		self._floatHeight = 100
+		self._bobAmount = 5
+		self._bobSpeed = 0.5
+
 		self._nextUse = 0
+	end
+
+	local TRACE_OFFSET = Vector(0, 0, 100)
+	function ENT:PhysicsSimulate(phys, deltatime)
+		if not IsValid(phys) then return end
+
+		phys:Wake()
+
+		-- Trace down to find ground
+		local currentPos = self.PositionOverride or self:GetPos()
+		local tr = util.TraceLine({
+			start = currentPos,
+			endpos = currentPos - TRACE_OFFSET,
+			mask = MASK_SOLID,
+			filter = self,
+		})
+
+		-- Calculate target position from ground
+		local floatPos = tr.HitPos + Vector(0, 0, 100 + 5 * math.sin(CurTime()))
+		local targetAng = self:GetAngles()
+		targetAng.p = 0
+		targetAng.r = 0
+
+		-- Set shadow parameters
+		self.ShadowParams.secondstoarrive = 0.1
+		self.ShadowParams.pos = floatPos
+		self.ShadowParams.angle = targetAng
+		self.ShadowParams.maxangular = 5000
+		self.ShadowParams.maxangulardamp = 10000
+		self.ShadowParams.maxspeed = 100000
+		self.ShadowParams.maxspeeddamp = 10000
+		self.ShadowParams.dampfactor = 0.8
+		self.ShadowParams.teleportdistance = 0
+		self.ShadowParams.delta = deltatime
+
+		phys:ComputeShadowControl(self.ShadowParams)
 	end
 
 	function ENT:SpawnFunction(ply, tr, classname)
 		if not tr or not tr.Hit then return end
+
 		local pos = tr.HitPos + tr.HitNormal * 4
 		local ent = ents.Create(classname or "arcana_altar")
 		if not IsValid(ent) then return end
-		ent:SetPos(pos)
-		local ang = Angle(0, ply:EyeAngles().y, 0)
-		ent:SetAngles(ang)
+
+		ent:SetPos(pos + Vector(0, 0, 100))
+		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
 		ent:Spawn()
 		ent:Activate()
 
@@ -193,6 +240,47 @@ if CLIENT then
 		self._ambient = nil
 		self._ambientTargetVol = 0
 		self:PrepareGlyphParticles()
+
+		-- Create clientside obelisk props
+		self:CreateObeliskProps()
+
+		-- Animation state
+		self._spinDuration = 24
+		self._mergeDuration = 2
+		self._mergedDuration = 5
+
+		self._animStartTime = CurTime()
+		self._animCycleTime = self._spinDuration + self._mergeDuration + self._mergedDuration -- Total cycle: 16s spin + 16s merge + 5s stay merged
+	end
+
+	function ENT:CreateObeliskProps()
+		-- Clean up existing props if any
+		if IsValid(self._obeliskTop) then
+			self._obeliskTop:Remove()
+		end
+
+		if IsValid(self._obeliskBottom) then
+			self._obeliskBottom:Remove()
+		end
+
+		local obeliskColor = Color(255, 255, 255, 255) --Color(161, 164, 255, 255)
+
+		-- Create bottom part
+		self._obeliskBottom = ClientsideModel("models/arcana_obelisk/arcana_obelisk_bottom.mdl")
+		if IsValid(self._obeliskBottom) then
+			self._obeliskBottom:SetPos(self:GetPos())
+			self._obeliskBottom:SetAngles(self:GetAngles())
+			self._obeliskBottom:SetMaterial("models/props_foliage/coastrock02")
+		end
+
+		-- Create top part
+		self._obeliskTop = ClientsideModel("models/arcana_obelisk/arcana_obelisk_top.mdl")
+		if IsValid(self._obeliskTop) then
+			self._obeliskTop:SetPos(self:GetPos())
+			self._obeliskTop:SetAngles(self:GetAngles())
+			self._obeliskTop:SetMaterial("models/props_foliage/coastrock02")
+
+		end
 	end
 
 	-- Particle-style glyphs rising around the pillar (random XY spawn per glyph)
@@ -205,10 +293,12 @@ if CLIENT then
 		local r = math.Rand(rMin, rMax)
 		local baseX = math.cos(ang) * r
 		local baseY = math.sin(ang) * r
+
 		-- Diverse speeds and travel distances
 		local speed = math.random(30, 200)
 		local travel = math.random(220, 900)
 		local life = travel / speed
+
 		-- Minor horizontal drift and a gentle orbit to keep it lively
 		local driftX = math.Rand(-14, 14)
 		local driftY = math.Rand(-14, 14)
@@ -240,6 +330,120 @@ if CLIENT then
 		self._glyphParticles[#self._glyphParticles + 1] = particle
 	end
 
+	function ENT:UpdateObeliskAnimation()
+		-- Ensure props exist
+		if not IsValid(self._obeliskTop) or not IsValid(self._obeliskBottom) then
+			self:CreateObeliskProps()
+			return
+		end
+
+		local now = CurTime()
+		local cycleTime = self._animCycleTime
+		local spinDur = self._spinDuration
+		local mergeDur = self._mergeDuration
+		local mergedDur = self._mergedDuration
+		local startTime = self._animStartTime or now
+
+		-- Calculate time in current cycle
+		local elapsed = (now - startTime) % cycleTime
+
+		local basePos = self:GetPos()
+		local baseAng = self:GetAngles()
+		local upVec = self:GetUp()
+
+		local verticalSeparation = 30 -- Units to separate vertically
+
+		if elapsed < spinDur then
+			-- Spinning phase with vertical separation
+			local spinFrac = elapsed / spinDur
+			local spinAngle = spinFrac * 360 * 2 -- 2 full rotations during spin phase (faster)
+
+			-- Ease in/out for vertical separation (smooth movement)
+			local separationEase
+			if spinFrac < 0.1 then
+				-- Ease out when separating (10% of spin time)
+				local t = spinFrac / 0.1
+				separationEase = 1 - math.pow(1 - t, 3)
+			else
+				-- Stay fully separated for the rest of spin
+				separationEase = 1
+			end
+
+			local separation = verticalSeparation * separationEase
+
+			-- Bottom spins clockwise and moves down (rotate around entity's up axis)
+			local bottomAng = Angle(baseAng.p, baseAng.y, baseAng.r)
+			bottomAng:RotateAroundAxis(upVec, spinAngle)
+			local bottomPos = basePos - upVec * separation
+			self._obeliskBottom:SetPos(bottomPos)
+			self._obeliskBottom:SetAngles(bottomAng)
+
+			-- Top spins counter-clockwise and moves up (rotate around entity's up axis)
+			local topAng = Angle(baseAng.p, baseAng.y, baseAng.r)
+			topAng:RotateAroundAxis(upVec, -spinAngle)
+			local topPos = basePos + upVec * separation
+			self._obeliskTop:SetPos(topPos)
+			self._obeliskTop:SetAngles(topAng)
+		elseif elapsed < spinDur + mergeDur then
+			-- Merging phase
+			local mergeElapsed = elapsed - spinDur
+			local mergeFrac = mergeElapsed / mergeDur
+
+			-- Split merge into two phases: angle alignment (first 50%), then position merge (last 50%)
+			local finalSpinAngle = 360 * 2
+
+			if mergeFrac < 0.5 then
+				-- Phase 1: Align angles while staying separated
+				local alignFrac = mergeFrac / 0.5
+				-- Ease in-out for smooth angle alignment
+				local eased = alignFrac < 0.5
+					and 2 * alignFrac * alignFrac
+					or 1 - math.pow(-2 * alignFrac + 2, 2) / 2
+
+				-- Bottom rotates from its final spin position to aligned (rotate around entity's up axis)
+				local bottomAngle = finalSpinAngle * (1 - eased)
+				local bottomAng = Angle(baseAng.p, baseAng.y, baseAng.r)
+				bottomAng:RotateAroundAxis(upVec, bottomAngle)
+				local bottomPos = basePos - upVec * verticalSeparation
+				self._obeliskBottom:SetPos(bottomPos)
+				self._obeliskBottom:SetAngles(bottomAng)
+
+				-- Top rotates from its final spin position to aligned (rotate around entity's up axis)
+				local topAngle = finalSpinAngle * (1 - eased)
+				local topAng = Angle(baseAng.p, baseAng.y, baseAng.r)
+				topAng:RotateAroundAxis(upVec, -topAngle)
+				local topPos = basePos + upVec * verticalSeparation
+				self._obeliskTop:SetPos(topPos)
+				self._obeliskTop:SetAngles(topAng)
+			else
+				-- Phase 2: Move together while keeping angles aligned
+				local moveFrac = (mergeFrac - 0.5) / 0.5
+				-- Ease in-out for smooth position merge
+				local eased = moveFrac < 0.5
+					and 2 * moveFrac * moveFrac
+					or 1 - math.pow(-2 * moveFrac + 2, 2) / 2
+
+				-- Both parts are angle-aligned, now merge positions
+				local currentSeparation = verticalSeparation * (1 - eased)
+
+				local bottomPos = basePos - upVec * currentSeparation
+				self._obeliskBottom:SetPos(bottomPos)
+				self._obeliskBottom:SetAngles(baseAng)
+
+				local topPos = basePos + upVec * currentSeparation
+				self._obeliskTop:SetPos(topPos)
+				self._obeliskTop:SetAngles(baseAng)
+			end
+		else
+			-- Merged phase - both parts aligned and stay together for 5s
+			self._obeliskBottom:SetPos(basePos)
+			self._obeliskBottom:SetAngles(baseAng)
+
+			self._obeliskTop:SetPos(basePos)
+			self._obeliskTop:SetAngles(baseAng)
+		end
+	end
+
 	function ENT:PrepareGlyphParticles()
 		self._glyphParticles = {}
 		self._glyphSpawnRate = 20 -- particles per second target
@@ -265,10 +469,27 @@ if CLIENT then
 			self._ambient:Stop()
 			self._ambient = nil
 		end
+
+		-- Clean up clientside obelisk props
+		if IsValid(self._obeliskTop) then
+			self._obeliskTop:Remove()
+			self._obeliskTop = nil
+		end
+
+		if IsValid(self._obeliskBottom) then
+			self._obeliskBottom:Remove()
+			self._obeliskBottom = nil
+		end
 	end
 
 	function ENT:Draw()
-		self:DrawModel()
+		-- Don't draw the base model, we use clientside obelisk props instead
+		-- self:DrawModel()
+	end
+
+	local function getOrbPos(self)
+		-- Calculate orb position at the merge point between the two separated parts
+		return self:GetPos()
 	end
 
 	-- Removed ground magic circle to reduce visual noise
@@ -276,43 +497,67 @@ if CLIENT then
 	local function ensureBands(self)
 		if not BandCircle or not BandCircle.Create then return end
 		if self._band and self._band.IsActive and self._band:IsActive() then return end -- keep following in Think; nothing to do here
-		-- Position a bit above the pillar top
-		local top = self:GetPos() + self:GetUp() * (self:OBBMaxs().z + 30)
+
+		-- Position at the merge point (center between separated parts)
+		local top = getOrbPos(self)
 		local ang = self:GetAngles()
 		self._band = BandCircle.Create(top, ang, BAND_CIRCLE_COLOR, math.max(40, self:GetAuraSize() * 0.35))
 		if not self._band then return end
+
 		-- Three fast rotating bands on different axes
 		local baseR = math.max(24, self:GetAuraSize() * 0.18)
 
-		self._band:AddBand(baseR * 0.90, 6, {
+		self._band:AddBand(baseR * 0.90 / 2, 6, {
 			p = 0,
 			y = 120,
 			r = 0
 		}, 2)
 
-		self._band:AddBand(baseR * 1.10, 6, {
+		self._band:AddBand(baseR * 1.10 / 2, 6, {
 			p = 80,
 			y = 0,
 			r = 0
 		}, 2)
 
-		self._band:AddBand(baseR * 1.35, 6, {
+		self._band:AddBand(baseR * 1.35 / 2, 6, {
 			p = 0,
 			y = 0,
 			r = 140
 		}, 2)
 	end
 
-	local function getOrbPos(self)
-		return self:GetPos() + self:GetUp() * (self:OBBMaxs().z + 30)
+	local function shouldShowOrb(self)
+		-- Only show orb when parts are separated
+		local now = CurTime()
+		local cycleTime = self._animCycleTime or 37
+		local spinDur = self._spinDuration or 16
+		local mergeDur = self._mergeDuration or 16
+		local startTime = self._animStartTime or now
+
+		local elapsed = (now - startTime) % cycleTime
+
+		-- Show orb during spinning phase and first half of merge (while still separated)
+		if elapsed < spinDur then
+			-- During spin - check if separated
+			local spinFrac = elapsed / spinDur
+			return spinFrac >= 0.01 -- Show almost immediately when separation starts
+		elseif elapsed < spinDur + mergeDur then
+			-- During merge - show during most of it, hide near the very end
+			local mergeElapsed = elapsed - spinDur
+			local mergeFrac = mergeElapsed / mergeDur
+			return mergeFrac < 0.75 -- Hide later in the merge (was 0.5)
+		else
+			-- During merged phase - don't show
+			return false
+		end
 	end
 
 	function ENT:Think()
 		local now = CurTime()
 		self._lastThink = now
+
 		-- Ensure/drive ambient loop only for the core-spawned altar
 		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
-
 		if isCore then
 			if not self._ambient then
 				self._ambient = CreateSound(self, "arcana/altar_ambient_stereo.ogg")
@@ -354,39 +599,60 @@ if CLIENT then
 			end
 		end
 
-		ensureBands(self)
+		-- Update obelisk animation
+		self:UpdateObeliskAnimation()
 
-		if self._band and self._band.IsActive and self._band:IsActive() then
-			local top = getOrbPos(self)
-			self._band.position = top
-			self._band.angles = self:GetAngles()
-		end
+		-- Only show bands and light when orb is visible (parts are separated)
+		local showOrb = shouldShowOrb(self)
+		if showOrb then
+			ensureBands(self)
 
-		-- Dynamic light at exact orb sprite position
-		local dl = DynamicLight(self:EntIndex())
+			if self._band and self._band.IsActive and self._band:IsActive() then
+				local top = getOrbPos(self)
+				self._band.position = top
+				self._band.angles = self:GetAngles()
+			end
 
-		if dl then
-			local orbPos = getOrbPos(self)
-			dl.pos = orbPos
-			dl.r = 255
-			dl.g = 220
-			dl.b = 140
-			dl.brightness = 5
-			dl.Decay = 800
-			dl.Size = self:GetAuraSize() * 2
-			dl.DieTime = now + 0.1
+			-- Dynamic light at exact orb sprite position
+			local dl = DynamicLight(self:EntIndex())
+
+			if dl then
+				local orbPos = getOrbPos(self)
+				dl.pos = orbPos
+				dl.r = 255
+				dl.g = 220
+				dl.b = 140
+				dl.brightness = 5
+				dl.Decay = 800
+				dl.Size = self:GetAuraSize() * 2
+				dl.DieTime = now + 0.1
+			end
+		else
+			-- Remove bands when orb should be hidden
+			if self._band and self._band.Remove then
+				self._band:Remove()
+				self._band = nil
+			end
 		end
 
 		-- Update glyph particles (spawn/update/expire)
+		-- Only spawn particles when obelisk is separated (not merged)
+		local showOrb = shouldShowOrb(self)
 		local dt = FrameTime() > 0 and FrameTime() or 0.05
-		self._glyphSpawnAccumulator = (self._glyphSpawnAccumulator or 0) + (self._glyphSpawnRate or 120) * dt
-		local toSpawn = math.floor(self._glyphSpawnAccumulator)
-		self._glyphSpawnAccumulator = self._glyphSpawnAccumulator - toSpawn
 
-		if self._glyphParticles and #self._glyphParticles < (self._glyphMaxParticles or 160) then
-			for i = 1, math.min(toSpawn, (self._glyphMaxParticles or 160) - #self._glyphParticles) do
-				self:_SpawnGlyphParticle()
+		if showOrb then
+			self._glyphSpawnAccumulator = (self._glyphSpawnAccumulator or 0) + (self._glyphSpawnRate or 120) * dt
+			local toSpawn = math.floor(self._glyphSpawnAccumulator)
+			self._glyphSpawnAccumulator = self._glyphSpawnAccumulator - toSpawn
+
+			if self._glyphParticles and #self._glyphParticles < (self._glyphMaxParticles or 160) then
+				for i = 1, math.min(toSpawn, (self._glyphMaxParticles or 160) - #self._glyphParticles) do
+					self:_SpawnGlyphParticle()
+				end
 			end
+		else
+			-- Reset accumulator when merged so it doesn't build up
+			self._glyphSpawnAccumulator = 0
 		end
 
 		-- advance and cull
@@ -775,15 +1041,19 @@ if CLIENT then
 	local COLOR_GLOW = Color(255, 230, 160, 230)
 	local TOP_OFFSET = Vector(0, 0, 10)
 	function ENT:DrawTranslucent()
-		-- glowy core above the pillar
+		-- glowy core at the merge point (only when parts are separated)
 		if not self._glowMat then return end
 
-		local pos = getOrbPos(self)
 		local t = CurTime()
-		local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
-		local size = 48 + 24 * pulse
-		render.SetMaterial(self._glowMat)
-		render.DrawSprite(pos, size, size, COLOR_GLOW)
+
+		-- Only draw orb when parts are separated
+		if shouldShowOrb(self) then
+			local pos = getOrbPos(self)
+			local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
+			local size = 128 + 64 * pulse
+			render.SetMaterial(self._glowMat)
+			render.DrawSprite(pos, size, size, COLOR_GLOW)
+		end
 
 		-- Lightweight glyph particles rising like sparks around the pillar top
 		surface.SetFont("MagicCircle_Medium")

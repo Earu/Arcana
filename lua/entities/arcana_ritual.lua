@@ -6,7 +6,7 @@ ENT.Category = "Arcana"
 ENT.Spawnable = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 
-local VECTOR_ABOVE_ORB = Vector(0, 0, 100)
+local VECTOR_ABOVE_ORB = Vector(0, 0, 0)
 local VECTOR_DOWN = Vector(0, 0, 256)
 
 -- Server-only runtime
