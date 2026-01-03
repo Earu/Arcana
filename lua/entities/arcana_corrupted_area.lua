@@ -483,4 +483,168 @@ if CLIENT then
 
 	function ENT:OnRemove()
 	end
+
+	-- HUD status message for players inside corruption
+	local corruptionCache = {
+		inCorruption = false,
+		lastUpdate = 0,
+	}
+
+	function ENT:UpdateCorruptionStatus()
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+
+		local intensity = self:GetIntensity() or 0
+		if intensity < 0.5 then return end -- Not visible
+
+		local plyPos = ply:GetPos()
+		local center = self:GetPos()
+		local radius = self:GetRadius() or 500
+		local dist = plyPos:Distance(center)
+
+		if dist <= radius then
+			corruptionCache.inCorruption = true
+		end
+	end
+
+	local statusColors = {
+		decoPanel = Color(32, 24, 18, 235),
+		gold = Color(198, 160, 74, 255),
+		paleGold = Color(222, 198, 120, 255),
+		textBright = Color(236, 230, 220, 255),
+		textDanger = Color(220, 100, 90, 255),
+	}
+
+	local HEX_ACCENT_COLOR = Color(236, 230, 220, 60)
+	local HEX_MAIN_COLOR = Color(statusColors.gold.r, statusColors.gold.g, statusColors.gold.b, 140)
+	local function drawStatusHexFrame(x, y, w, h)
+		local m = math.max(6, math.floor(h * 0.35))
+		local cy = y + h * 0.5
+		local p1 = {x = x + m, y = y}
+		local p2 = {x = x + w - m, y = y}
+		local p3 = {x = x + w, y = cy}
+		local p4 = {x = x + w - m, y = y + h}
+		local p5 = {x = x + m, y = y + h}
+		local p6 = {x = x, y = cy}
+
+		local function drawEdge(aPt, bPt, col)
+			surface.SetDrawColor(col)
+			surface.DrawLine(aPt.x, aPt.y, bPt.x, bPt.y)
+		end
+
+		drawEdge(p1, p2, HEX_MAIN_COLOR)
+		drawEdge(p2, p3, HEX_MAIN_COLOR)
+		drawEdge(p3, p4, HEX_MAIN_COLOR)
+		drawEdge(p4, p5, HEX_MAIN_COLOR)
+		drawEdge(p5, p6, HEX_MAIN_COLOR)
+		drawEdge(p6, p1, HEX_MAIN_COLOR)
+		drawEdge(p1, p2, HEX_ACCENT_COLOR)
+		drawEdge(p2, p3, HEX_ACCENT_COLOR)
+		drawEdge(p3, p4, HEX_ACCENT_COLOR)
+		drawEdge(p4, p5, HEX_ACCENT_COLOR)
+		drawEdge(p5, p6, HEX_ACCENT_COLOR)
+		drawEdge(p6, p1, HEX_ACCENT_COLOR)
+	end
+
+	local function drawStatusHexFill(x, y, w, h)
+		local m = math.max(6, math.floor(h * 0.35))
+		local inset = 1
+		local cy = y + h * 0.5
+		local pts = {
+			{x = x + m + inset, y = y + inset},
+			{x = x + w - m - inset, y = y + inset},
+			{x = x + w - inset, y = cy},
+			{x = x + w - m - inset, y = y + h - inset},
+			{x = x + m + inset, y = y + h - inset},
+			{x = x + inset, y = cy},
+		}
+
+		draw.NoTexture()
+		surface.SetDrawColor(20, 16, 12, 200)
+		surface.DrawPoly(pts)
+	end
+
+	local FLORISH_COLOR = Color(statusColors.gold.r, statusColors.gold.g, statusColors.gold.b, 80)
+	local function drawStatusFlourish(cx, lineY, w)
+		local lineLen = math.min(70, w * 0.22)
+		local lineGap = math.min(14, w * 0.03)
+		surface.SetDrawColor(FLORISH_COLOR)
+		surface.DrawLine(cx - lineLen - lineGap, lineY, cx - lineGap, lineY)
+		surface.DrawLine(cx + lineGap, lineY, cx + lineLen + lineGap, lineY)
+
+		-- diamond
+		draw.NoTexture()
+		surface.SetDrawColor(statusColors.gold.r, statusColors.gold.g, statusColors.gold.b, 110)
+		local d = 5
+		local pts = {
+			{x = cx, y = lineY - d},
+			{x = cx + d, y = lineY},
+			{x = cx, y = lineY + d},
+			{x = cx - d, y = lineY},
+		}
+		surface.DrawPoly(pts)
+
+		-- inner diamond
+		surface.SetDrawColor(236, 230, 220, 60)
+		local d2 = 2
+		local pts2 = {
+			{x = cx, y = lineY - d2},
+			{x = cx + d2, y = lineY},
+			{x = cx, y = lineY + d2},
+			{x = cx - d2, y = lineY},
+		}
+		surface.DrawPoly(pts2)
+	end
+
+	-- Periodic update hook (runs less frequently than HUDPaint)
+	hook.Add("Think", "Arcana_UpdateCorruptionStatus", function()
+		local now = CurTime()
+		if now - corruptionCache.lastUpdate < 1 then return end
+
+		corruptionCache.lastUpdate = now
+		corruptionCache.inCorruption = false
+
+		-- Let each entity update the status
+		for _, ent in ipairs(ents.FindByClass("arcana_corrupted_area")) do
+			if IsValid(ent) and ent.UpdateCorruptionStatus then
+				ent:UpdateCorruptionStatus()
+			end
+		end
+	end)
+
+	local TEXT_STATUS_COLOR = Color(0, 0, 0, 200)
+	hook.Add("HUDPaint", "Arcana_CorruptionStatus", function()
+		if not corruptionCache.inCorruption then return end
+
+		local scrW, scrH = ScrW(), ScrH()
+		local scale = math.min(1, scrH / 1080)
+		local panelW = math.floor(math.min(scrW * 0.5, 600) * scale)
+		local panelH = math.floor(56 * scale)
+		local x = math.floor((scrW - panelW) * 0.5)
+		local y = math.floor(24 * scale)
+
+		local titleY = 8
+		local subtitleY = 34
+
+		-- Draw hex panel
+		drawStatusHexFill(x, y, panelW, panelH)
+		drawStatusHexFrame(x, y, panelW, panelH)
+
+		-- Draw flourish centered between the two text lines
+		local centerX = x + panelW * 0.5
+		local centerY = y + math.floor((titleY + subtitleY) * 0.5) + 10
+		drawStatusFlourish(centerX, centerY, panelW)
+
+		-- Title
+		local title = string.upper("Corrupted Area")
+
+		-- Draw with subtle shadow
+		draw.SimpleText(title, "Arcana_Ancient", centerX + 1, y + titleY + 1, TEXT_STATUS_COLOR, TEXT_ALIGN_CENTER)
+		draw.SimpleText(title, "Arcana_Ancient", centerX, y + titleY, statusColors.textDanger, TEXT_ALIGN_CENTER)
+
+		-- Subtext about ritual
+		local ritualText = "Use the Purification ritual to cleanse"
+		draw.SimpleText(ritualText, "Arcana_AncientSmall", centerX + 1, y + subtitleY + 1, TEXT_STATUS_COLOR, TEXT_ALIGN_CENTER)
+		draw.SimpleText(ritualText, "Arcana_AncientSmall", centerX, y + subtitleY, statusColors.textBright, TEXT_ALIGN_CENTER)
+	end)
 end
