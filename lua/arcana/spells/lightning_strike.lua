@@ -89,7 +89,9 @@ Arcane:RegisterSpell({
 	has_target = true,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
-		local targetPos = Arcane:ResolveGroundTarget(caster, 1500)
+
+		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local targetPos = Arcane:ResolveGroundTarget(srcEnt, 1500)
 
 		-- Perform 1 strong strike and 2 lighter offset strikes for style
 		local strikes = {
