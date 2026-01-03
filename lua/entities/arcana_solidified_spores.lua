@@ -92,13 +92,6 @@ if CLIENT then
     })
 
     function ENT:Initialize()
-        self._mdl = ClientsideModel("models/props_hive/larval_essence.mdl", RENDERGROUP_BOTH)
-        self._mdl:SetColor(SPORE_COLOR)
-        self._mdl:SetModelScale(1, 0)
-        self._mdl:SetPos(self:GetPos())
-        self._mdl:SetAngles(self:GetAngles())
-        self._mdl:SetParent(self)
-
         self._fxEmitter = ParticleEmitter(self:GetPos(), false)
         self._fxNext = 0
     end
