@@ -634,7 +634,7 @@ if CLIENT then
 
 	-- Update volumetric fog parameters based on player position and environment
 	local function UpdateVolumetricFog()
-		local active = Envs and Envs.Active
+		--[[local active = Envs and Envs.Active
 		if not active or active.id ~= "magical_forest" then
 			if volumetricFogActive then
 				Arcane.VolumetricFog.RemoveVolume("magical_forest")
@@ -674,7 +674,7 @@ if CLIENT then
 			volumetricFogActive = true
 		else
 			Arcane.VolumetricFog.UpdateVolume("magical_forest", fogParams)
-		end
+		end]]
 	end
 
 	-- disable volumetric fog for now until we figure out a fix
