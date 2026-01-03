@@ -16,7 +16,7 @@ end
 
 function ENT:UpdateTransmitState()
 	if self:GetIntensity() == 0 then
-		return TRANSMIT_NEVER
+		return TRANSMIT_PVS
 	end
 
 	return TRANSMIT_ALWAYS
