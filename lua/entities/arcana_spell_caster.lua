@@ -59,6 +59,22 @@ if SERVER then
 		end
 	end
 
+	function ENT:SpawnFunction(ply, tr, className)
+		if not tr.Hit then return end
+
+		local spawnPos = tr.HitPos + tr.HitNormal * 16
+
+		local ent = ents.Create(className)
+		if not IsValid(ent) then return end
+
+		ent:SetNWEntity("FallbackOwner", ply)
+		ent:SetPos(spawnPos)
+		ent:Spawn()
+		ent:Activate()
+
+		return ent
+	end
+
 	function ENT:GetEntityCooldown(spellId)
 		local cooldownTime = self.SpellCooldowns[spellId] or 0
 		return math.max(0, cooldownTime - CurTime())
@@ -118,7 +134,9 @@ if SERVER then
 	end
 
 	function ENT:StartCastingSpell(spellId)
-		local owner = self:CPPIGetOwner() or self:GetOwner()
+		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
+		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return false end
 
 		local canCast, reason = self:CanCastSpellForOwner(owner, spellId)
 		if not canCast then
@@ -315,10 +333,11 @@ if SERVER then
 			local spellId = self:GetActiveSpellID()
 
 			if spellId == "" then
-				local owner = self:CPPIGetOwner() or self:GetOwner()
-				if IsValid(owner) and owner:IsPlayer() then
-					Arcane:SendErrorNotification(owner, "Spell Caster: No spell ID provided")
-				end
+				local owner = self.CPPIGetOwner and self:CPPIGetOwner()
+				if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
+				if not IsValid(owner) then return end
+
+				Arcane:SendErrorNotification(owner, "Spell Caster: No spell ID provided")
 				return
 			end
 
@@ -380,7 +399,9 @@ if SERVER then
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_spell_caster" then return end
 
 		-- Check ownership
-		local owner = ent:CPPIGetOwner() or ent:GetOwner()
+		local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
+		if not IsValid(owner) then owner = ent:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return end
 		if owner ~= ply then return end
 
 		spellId = string.lower(string.Trim(spellId))
@@ -393,7 +414,9 @@ if SERVER then
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_spell_caster" then return end
 
 		-- Check ownership
-		local owner = ent:CPPIGetOwner() or ent:GetOwner()
+		local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
+		if not IsValid(owner) then owner = ent:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return end
 		if owner ~= ply then return end
 
 		local spellId = ent:GetActiveSpellID()
@@ -504,7 +527,9 @@ if CLIENT then
 		local ply = LocalPlayer()
 		if not IsValid(ply) or not IsValid(caster) then return end
 
-		local owner = caster:CPPIGetOwner() or caster:GetOwner()
+		local owner = caster.CPPIGetOwner and caster:CPPIGetOwner()
+		if not IsValid(owner) then owner = caster:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return end
 		if owner ~= ply then
 			Arcane:Print("❌ You don't own this Spell Caster")
 			return
@@ -747,8 +772,10 @@ if CLIENT then
 
 		-- Draw direction indicator and spell info for owner with physgun
 		local ply = LocalPlayer()
-		local owner = self:CPPIGetOwner() or self:GetOwner()
-		local isOwner = IsValid(owner) and owner == ply
+		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
+		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return end
+		if owner ~= ply then return end
 
 		if isOwner then
 			local wep = ply:GetActiveWeapon()
