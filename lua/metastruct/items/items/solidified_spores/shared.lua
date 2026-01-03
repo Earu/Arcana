@@ -78,6 +78,8 @@ if CLIENT then
 
         if not IsValid(ent._mdl) then
             ent._mdl = ClientsideModel("models/props_hive/larval_essence.mdl", RENDERGROUP_BOTH)
+            if not IsValid(ent._mdl) then return end
+
             ent._mdl:SetColor(COLOR)
             ent._mdl:SetModelScale(1, 0)
             ent._mdl:SetPos(ent:GetPos())

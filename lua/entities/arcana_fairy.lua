@@ -118,6 +118,7 @@ if CLIENT then
 	local wing_mdl = Model("models/arcana/fairy/wing.mdl")
 	local function CreateEntity(mdl)
 		local ent = ClientsideModel(mdl)
+		if not IsValid(ent) then return end
 
 		ent:SetMaterial("models/arcana/fairy/wing")
 
