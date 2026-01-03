@@ -15,6 +15,8 @@ if SERVER then
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
 	resource.AddFile("sound/arcana/arcane_3.ogg")
+
+	resource.AddFile("materials/arcana/pattern.vmt")
 end
 
 include("arcana/core.lua")
