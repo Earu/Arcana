@@ -180,7 +180,7 @@ if SERVER then
 		net.Broadcast()
 
 		-- Schedule spell execution
-		timer.Simple(castTime, function()
+		timer.Simple(castTime + 0.1, function()
 			if not IsValid(self) then return end
 
 			self:SetIsCasting(false)
