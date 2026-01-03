@@ -109,7 +109,7 @@ if SERVER then
 
 		local owner = self:GetSpellOwner()
 		if ent == owner then return end
-		if not ent:IsPlayer() or ent:IsNPC() then return end
+		if not ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then return end
 
 		local dmg = DamageInfo()
 		dmg:SetDamage(self.MissileDamage or 45)

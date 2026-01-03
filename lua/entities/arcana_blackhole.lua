@@ -60,14 +60,14 @@ function ENT:Think()
 					end
 
 					-- For players and NPCs
-					if ent:IsPlayer() or ent:IsNPC() then
+					if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
 						local velocity = direction * pullStrength * 0.5
 						ent:SetVelocity(velocity)
 						ent:SetGroundEntity(NULL)
 					end
 
 					-- Scaled damage based on distance from center
-					if (ent:IsPlayer() or ent:IsNPC()) and distance < 400 then
+					if (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) and distance < 400 then
 						-- Damage scales from 120/tick at center to 20% at edge (400 units)
 						local distanceFactor = math.Clamp(1 - (distance / 400), 0, 1)
 						local tickDamage = 120 * (0.2 + 0.8 * distanceFactor)

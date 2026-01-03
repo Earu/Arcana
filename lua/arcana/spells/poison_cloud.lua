@@ -165,7 +165,7 @@ Arcane:RegisterSpell({
 			for _, ent in ipairs(ents.FindInSphere(cloud:GetPos(), radius)) do
 				if not IsValid(ent) or ent == caster then continue end
 
-				if ent:IsPlayer() or ent:IsNPC() then
+				if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
 					local dmg = DamageInfo()
 					dmg:SetDamage(perTickDamage)
 					dmg:SetDamageType(DMG_POISON)
