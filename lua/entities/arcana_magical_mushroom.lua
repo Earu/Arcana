@@ -249,6 +249,10 @@ if CLIENT then
 	function ENT:Draw()
 		-- Draw the client mushroom aligned to physics cube
 		local s = math.max(1, self:GetMushroomScale() or 4)
+		if not IsValid(self._mdl) then
+			self._mdl = ClientsideModel(CLIENT_MUSHROOM_MODEL, RENDERGROUP_OPAQUE)
+		end
+
 		if IsValid(self._mdl) then
 			self._mdl:SetModelScale(s, 0)
 			self._mdl:SetPos(self:GetPos() - OFFSET_MUSHROOM_L)
