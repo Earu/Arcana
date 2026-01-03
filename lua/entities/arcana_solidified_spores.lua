@@ -144,6 +144,8 @@ if CLIENT then
     function ENT:Draw()
         if not IsValid(self._mdl) then
             self._mdl = ClientsideModel("models/props_hive/larval_essence.mdl", RENDERGROUP_BOTH)
+            if not IsValid(self._mdl) then return end
+
             self._mdl:SetColor(SPORE_COLOR)
             self._mdl:SetModelScale(1, 0)
             self._mdl:SetPos(self:GetPos())

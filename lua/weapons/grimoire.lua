@@ -301,8 +301,10 @@ if CLIENT then
 	---------------------------------------------------------------------------
 	function SWEP:EnsureViewModelBook()
 		if IsValid(self.VMBook) then return end
+
 		self.VMBook = ClientsideModel(self.WorldModel)
 		if not IsValid(self.VMBook) then return end
+
 		self.VMBook:SetNoDraw(true)
 	end
 
