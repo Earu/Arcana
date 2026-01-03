@@ -86,7 +86,6 @@ if SERVER then
 
 	function ENT:CanCastSpellForOwner(owner, spellId)
 		if not IsValid(owner) then return false, "No owner set" end
-		if not owner:Alive() then return false, "Owner is dead" end
 
 		local spell = Arcane.RegisteredSpells[spellId]
 		if not spell then return false, "Spell not found" end
@@ -166,16 +165,12 @@ if SERVER then
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
 
 		-- Use entity's position and orientation for casting circle
-		local pos = self:GetPos() + self:GetUp() * 15
+		local pos = self:GetPos() + self:GetForward() * 30
 		local ang = self:GetAngles()
-		local size = 40
+		ang:RotateAroundAxis(ang:Up(), 90)
+		ang:RotateAroundAxis(ang:Right(), 90)
+		local size = 30
 
-		if forwardLike then
-			pos = self:GetPos() + self:GetForward() * 30 + self:GetUp() * 15
-			ang = self:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), 90)
-			size = 30
-		end
 
 		net.Start("Arcane_BeginCasting", true)
 		net.WriteEntity(self)
@@ -196,8 +191,12 @@ if SERVER then
 			end
 
 			-- Re-validate before casting
-			local canExecute, _ = self:CanCastSpellForOwner(owner, spellId)
+			local canExecute, reason = self:CanCastSpellForOwner(owner, spellId)
 			if not canExecute then
+				if IsValid(owner) and owner:IsPlayer() then
+					Arcane:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
+				end
+
 				net.Start("Arcane_SpellFailed", true)
 				net.WriteEntity(self)
 				net.WriteFloat(castTime)
@@ -251,17 +250,11 @@ if SERVER then
 		-- Set entity-specific cooldown (not owner's cooldown)
 		self.SpellCooldowns[spellId] = CurTime() + spell.cooldown
 
-		-- Recompute casting position at execution time
-		pos = self:GetPos() + self:GetUp() * 15
+		pos = self:GetPos() + self:GetForward() * 30
 		ang = self:GetAngles()
-		size = 40
-
-		if forwardLike then
-			pos = self:GetPos() + self:GetForward() * 30 + self:GetUp() * 15
-			ang = self:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), 90)
-			size = 30
-		end
+		ang:RotateAroundAxis(ang:Up(), 90)
+		ang:RotateAroundAxis(ang:Right(), 90)
+		size = 30
 
 		-- Cast spell with entity's context
 		local context = {
