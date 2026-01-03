@@ -25,11 +25,11 @@ Arcane:RegisterSpell({
 		local baseDamage = 40
 
 		for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
-			if ent ~= srcEnt and IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
+			if ent ~= srcEnt and IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
 				local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
 
 				if dir:Dot(forward) >= cone then
-					if ent:IsPlayer() or ent:IsNPC() then
+					if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
 						-- Deal damage
 						local dmg = DamageInfo()
 						dmg:SetDamage(baseDamage)

@@ -63,7 +63,7 @@ if SERVER then
 	local function shouldTeleportEntity(ent)
 		if not IsValid(ent) then return false end
 		if ent:IsPlayer() then return ent:Alive() end
-		if ent:IsNPC() then return true end
+		if ent:IsNPC() or ent:IsNextBot() then return true end
 		if ent:GetMoveType() == MOVETYPE_VPHYSICS then return true end
 		if ent:GetClass() == "arcana_portal" then return false end
 
@@ -127,7 +127,7 @@ if SERVER then
 			ent:SetEyeAngles(destAng)
 			ent:SetLocalVelocity(vel)
 			ent:EmitSound(TELEPORT_SOUND, 70, 100)
-		elseif ent:IsNPC() then
+		elseif ent:IsNPC() or ent:IsNextBot() then
 			ent:SetPos(exitPos)
 			ent:SetAngles(destAng)
 			ent:EmitSound(TELEPORT_SOUND, 70, 95)
