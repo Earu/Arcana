@@ -1620,10 +1620,11 @@ if SERVER then
 		local ent = ents.Create("arcana_altar")
 		if not IsValid(ent) then return end
 
-		ent:SetPos(pos)
+		ent:SetPos(pos + Vector(0, 0, 100))
 		ent:Spawn()
 		ent:Activate()
 		ent.ms_notouch = true
+		ent.PositionOverride = pos + Vector(0, 0, 100)
 
 		-- Mark this altar so clients can treat it as the core-spawned one (for ambient loop, etc.)
 		ent:SetNWBool("ArcanaCoreSpawned", true)
