@@ -350,8 +350,7 @@ function ENT:TryMelee(target)
 					dmg:SetDamageType(DMG_SLASH)
 					dmg:SetAttacker(self)
 					dmg:SetInflictor(IsValid(self._sword) and self._sword or self)
-					local takeDamageInfo = ent.ForceTakeDamageInfo or ent.TakeDamageInfo
-					takeDamageInfo(ent, dmg)
+					Arcane:TakeDamageInfo(ent, dmg)
 
 					self:EmitSound("weapons/knife/knife_hit1.wav", 70, math.random(95,105), 0.7)
 				end
@@ -430,7 +429,7 @@ end
 function ENT:OnKilled(dmginfo)
 	local killer = dmginfo:GetAttacker()
 	if not (IsValid(killer) and killer:IsPlayer()) then killer = self._lastHurtBy end
-	if IsValid(killer) and killer:IsPlayer() and _G.Arcane and Arcane.GiveXP then
+	if IsValid(killer) and killer:IsPlayer() and not Arcane:IsPotentialCheater(killer) then
 		Arcane:GiveXP(killer, XP_REWARD, "Skeleton defeated")
 	end
 

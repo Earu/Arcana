@@ -37,7 +37,7 @@ end
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
 	local baseDamage = 75
-	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, false, true)
+	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
 
 	-- Chain to up to 3 nearby living targets
 	local candidates = {}
@@ -129,7 +129,7 @@ Arcane:RegisterSpell({
 				if s.power >= 1.0 then
 					applyLightningDamage(caster, targetPos + s.offset, normal)
 				else
-					Arcane:BlastDamage(caster, caster, targetPos + s.offset, 120, 30, DMG_SHOCK, false, true)
+					Arcane:BlastDamage(caster, caster, targetPos + s.offset, 120, 30, DMG_SHOCK, true)
 				end
 			end)
 		end

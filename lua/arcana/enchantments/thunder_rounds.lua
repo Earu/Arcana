@@ -38,7 +38,7 @@ end
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
 	local baseDamage = 60
-	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, false, true)
+	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
 
 	local candidates = {}
 	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do

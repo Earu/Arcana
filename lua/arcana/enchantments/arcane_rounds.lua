@@ -60,7 +60,7 @@ local function fireArcaneSpear(caster, origin, dir)
 		end
 
 		-- Small splash along the lance for feedback
-		Arcane:BlastDamage(caster, caster, hitPos, 80, 18, DMG_DISSOLVE, false, true)
+		Arcane:BlastDamage(caster, caster, hitPos, 80, 18, DMG_DISSOLVE, true)
 
 		-- Prepare for next penetration
 		table.insert(filter, hitEnt or tr.Entity)
