@@ -102,7 +102,7 @@ if SERVER then
 				killer = self._lastHurtBy
 			end
 
-			if IsValid(killer) and killer:IsPlayer() and Arcane and Arcane.GiveXP then
+			if IsValid(killer) and killer:IsPlayer() and not Arcane:IsPotentialCheater(killer) then
 				Arcane:GiveXP(killer, HEAVY_WISP_XP, "Heavy wisp destroyed")
 			end
 
@@ -118,8 +118,10 @@ if SERVER then
 		for _, ent in ipairs(ents.FindInSphere(center, r)) do
 			if not IsValid(ent) then continue end
 			if ent:IsPlayer() and not ent:Alive() then continue end
+
 			local isTarget = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
 			if not isTarget then continue end
+
 			local d2 = center:DistToSqr(ent:GetPos())
 			if d2 < bestD2 then best, bestD2 = ent, d2 end
 		end

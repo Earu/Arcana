@@ -204,7 +204,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), false, true)
+		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), true)
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)

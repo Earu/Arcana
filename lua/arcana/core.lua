@@ -771,15 +771,16 @@ end
 -- XP and Leveling System
 function Arcane:GiveXP(ply, amount, reason)
 	if not IsValid(ply) or amount <= 0 then return false end
+
 	local data = self:GetPlayerData(ply)
 	local oldLevel = data.level
 	data.xp = data.xp + amount
+	reason = reason or "Unknown"
 
 	runHook("PlayerGainedXP", ply, amount, reason)
 
 	-- Check for level up
 	local newLevel = self:CalculateLevel(data.xp)
-
 	if newLevel > oldLevel then
 		self:LevelUp(ply, oldLevel, newLevel)
 	end
@@ -789,7 +790,7 @@ function Arcane:GiveXP(ply, amount, reason)
 		net.Start("Arcane_XPUpdate")
 		net.WriteUInt(data.xp, 32)
 		net.WriteUInt(data.level, 16)
-		net.WriteString(reason or "Unknown")
+		net.WriteString(reason)
 		net.Send(ply)
 	end
 
@@ -1765,41 +1766,158 @@ if SERVER then
 		end
 		ent.ArcanaEnchantments = nil
 	end)
-end
 
--- Custom BlastDamage that prefers ForceTakeDamageInfo when available
-function Arcane:BlastDamage(attacker, inflictor, center, radius, baseDamage, damageType, force, ignoreAttacker)
-	attacker = IsValid(attacker) and attacker or game.GetWorld()
-	inflictor = IsValid(inflictor) and inflictor or attacker
-	radius = math.max(1, tonumber(radius) or 0)
-	baseDamage = math.max(0, tonumber(baseDamage) or 0)
-	damageType = damageType or DMG_BLAST
-	force = force or false
+	-- Custom BlastDamage that prefers ForceTakeDamageInfo when available
+	function Arcane:BlastDamage(attacker, inflictor, center, radius, baseDamage, damageType, ignoreAttacker, onChecked)
+		attacker = IsValid(attacker) and attacker or game.GetWorld()
+		inflictor = IsValid(inflictor) and inflictor or attacker
+		radius = math.max(1, tonumber(radius) or 0)
+		baseDamage = math.max(0, tonumber(baseDamage) or 0)
+		damageType = damageType or DMG_BLAST
+		force = force or false
 
-	for _, ent in ipairs(ents.FindInSphere(center, radius)) do
-		if not IsValid(ent) or ent == inflictor then continue end
-		if ignoreAttacker and ent == attacker then continue end
-		if ent:IsPlayer() and not ent:Alive() then continue end
+		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
+			if not IsValid(ent) or ent == inflictor then continue end
+			if ignoreAttacker and ent == attacker then continue end
+			if ent:IsPlayer() and not ent:Alive() then continue end
 
-		-- Compute linear falloff
-		local dist = ent:WorldSpaceCenter():Distance(center)
-		local frac = 1 - (dist / radius)
-		if frac <= 0 then continue end
+			-- Compute linear falloff
+			local dist = ent:WorldSpaceCenter():Distance(center)
+			local frac = 1 - (dist / radius)
+			if frac <= 0 then continue end
 
-		local dmgAmt = baseDamage * frac
-		if dmgAmt <= 0 then continue end
+			local dmgAmt = baseDamage * frac
+			if dmgAmt <= 0 then continue end
 
-		local dmg = DamageInfo()
-		dmg:SetDamage(dmgAmt)
-		dmg:SetDamageType(damageType)
-		dmg:SetAttacker(attacker)
-		dmg:SetInflictor(inflictor)
-		dmg:SetDamagePosition(ent:WorldSpaceCenter())
-
-		local takeDamageInfo = force and ent.ForceTakeDamageInfo or ent.TakeDamageInfo
-		if isfunction(takeDamageInfo) then
-			takeDamageInfo(ent, dmg)
+			local dmg = DamageInfo()
+			dmg:SetDamage(dmgAmt)
+			dmg:SetDamageType(damageType)
+			dmg:SetAttacker(attacker)
+			dmg:SetInflictor(inflictor)
+			dmg:SetDamagePosition(ent:WorldSpaceCenter())
+			Arcane:TakeDamageInfo(ent, dmg, onChecked)
 		end
+	end
+
+	-- Wrapper that detects invulnerability
+	function Arcane:TakeDamageInfo(ent, dmginfo, onChecked)
+		if not IsValid(ent) or not ent:IsPlayer() then
+			return ent:TakeDamageInfo(dmginfo)
+		end
+
+		-- Record health before damage
+		local healthBefore = ent:Health()
+		local damageAmount = dmginfo:GetDamage()
+
+		-- Call original damage function
+		ent:TakeDamageInfo(dmginfo)
+
+		-- Schedule check after a very short delay
+		timer.Simple(0.01, function()
+			if not IsValid(ent) or not ent:Alive() then return end
+
+			local healthAfter = ent:Health()
+			local actualDamageTaken = healthBefore - healthAfter
+
+			-- Check if no damage was taken
+			if actualDamageTaken <= 0 then
+				ent.ArcanaInvulnerable = true
+				return
+			end
+
+			-- Check if damage taken is less than 50% of intended damage relative to health
+			local damageRatio = actualDamageTaken / healthBefore
+			local intendedRatio = damageAmount / healthBefore
+
+			-- If actual damage is less than 50% of what was intended
+			if damageRatio < (intendedRatio * 0.5) then
+				ent.ArcanaInvulnerable = true
+				return
+			end
+
+			-- Neither condition met - unmark if previously marked
+			if ent.ArcanaInvulnerable then
+				ent.ArcanaInvulnerable = nil
+			end
+
+			if isfunction(onChecked) then
+				onChecked(ent, healthBefore, healthAfter, damageAmount, actualDamageTaken)
+			end
+		end)
+	end
+
+	local BAD_ENT_CLASSES = {
+		gmod_wire_teleporter = true,
+		starfall_processor = true,
+		gmod_wire_expression2 = true,
+	}
+
+	local badEntities = {}
+	local function assignBadEntity(ent)
+		if not IsValid(ent) then return end
+		if not BAD_ENT_CLASSES[ent:GetClass()] then return end
+		if not ent.CPPIGetOwner then return end
+
+		local owner = ent:CPPIGetOwner()
+		if not IsValid(owner) then return end
+
+		badEntities[owner] = (badEntities[owner] or 0) + 1
+
+		local timerName = "Arcana_BadEntityCheck_Timer_" .. tostring(owner)
+		timer.Remove(timerName)
+	end
+
+	local function removeBadEntity(ent)
+		if not IsValid(ent) then return end
+		if not BAD_ENT_CLASSES[ent:GetClass()] then return end
+		if not ent.CPPIGetOwner then return end
+
+		local owner = ent:CPPIGetOwner()
+		if not IsValid(owner) then return end
+		if not badEntities[owner] then return end
+
+		badEntities[owner] = math.max(0, (badEntities[owner] or 0) - 1)
+
+		local timerName = "Arcana_BadEntityCheck_Timer_" .. tostring(owner)
+		timer.Create(timerName, 60, 1, function()
+			timer.Remove(timerName)
+
+			if IsValid(owner) and badEntities[owner] == 0 then
+				badEntities[owner] = nil
+			end
+		end)
+	end
+
+	hook.Add("OnEntityCreated", "Arcana_BadEntityCheck", function(ent)
+		if not BAD_ENT_CLASSES[ent:GetClass()] then return end
+		if not ent.CPPIGetOwner then return end
+
+		timer.Simple(0.1, function()
+			assignBadEntity(ent)
+		end)
+	end)
+
+	hook.Add("EntityRemoved", "Arcana_BadEntityCheck", removeBadEntity)
+
+	hook.Add("PlayerInitialSpawn", "Arcana_BadEntityCheck", function(ply)
+		for className in pairs(BAD_ENT_CLASSES) do
+			for _, ent in ipairs(ents.FindByClass(className)) do
+				assignBadEntity(ent)
+			end
+		end
+	end)
+
+	hook.Add("PlayerDisconnected", "Arcana_BadEntityCheck", function(ply)
+		if badEntities[ply] then
+			badEntities[ply] = nil
+		end
+	end)
+
+	function Arcane:IsPotentialCheater(ply)
+		if not IsValid(ply) then return true end
+		if ply.ArcanaInvulnerable then return true end
+		if badEntities[ply] and badEntities[ply] > 0 then return true end
+		return false
 	end
 end
 

@@ -112,7 +112,7 @@ if SERVER then
 				killer = self._lastHurtBy
 			end
 
-			if IsValid(killer) and killer:IsPlayer() then
+			if IsValid(killer) and killer:IsPlayer() and not Arcane:IsPotentialCheater(killer) then
 				Arcane:GiveXP(killer, WISP_XP, "Wisp destroyed")
 			end
 
@@ -244,9 +244,7 @@ if SERVER then
 			dmg:SetDamageType(DMG_ENERGYBEAM)
 			dmg:SetAttacker(self)
 			dmg:SetInflictor(self)
-
-			local takeDamageInfo = tr.Entity.ForceTakeDamageInfo or tr.Entity.TakeDamageInfo
-			takeDamageInfo(tr.Entity, dmg)
+			Arcane:TakeDamageInfo(tr.Entity, dmg)
 		end
 
 		-- Tesla sparks along the path (short-lived)

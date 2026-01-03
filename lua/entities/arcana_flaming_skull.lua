@@ -234,7 +234,7 @@ function ENT:OnTakeDamage(dmginfo)
 			killer = self._lastHurtBy
 		end
 
-		if IsValid(killer) and killer:IsPlayer() and Arcane and Arcane.GiveXP then
+		if IsValid(killer) and killer:IsPlayer() and not Arcane:IsPotentialCheater(killer) then
 			Arcane:GiveXP(killer, XP_REWARD, "Flaming Skull defeated")
 		end
 

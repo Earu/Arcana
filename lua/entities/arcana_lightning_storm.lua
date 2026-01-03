@@ -218,12 +218,7 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 		dmgInfo:SetAttacker(self)
 		dmgInfo:SetInflictor(self)
 		targetEnt:Ignite(1, damageRadius)
-
-		if targetEnt.ForceTakeDamageInfo then
-			targetEnt:ForceTakeDamageInfo(dmgInfo)
-		else
-			targetEnt:TakeDamageInfo(dmgInfo)
-		end
+		Arcane:TakeDamageInfo(targetEnt, dmgInfo)
 
 		-- Apply force if it's a physics object
 		local phys = targetEnt:GetPhysicsObject()
