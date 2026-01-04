@@ -661,7 +661,7 @@ end
 if SERVER then
 	function Arcane:SendErrorNotification(ply, msg)
 		if not IsValid(ply) then return end
-		ply:EmitSound("buttons/button8.wav", 100, 120)
+		--ply:EmitSound("buttons/button8.wav", 100, 120)
 		net.Start("Arcane_ErrorNotification")
 		net.WriteString(msg)
 		net.Send(ply)
