@@ -88,7 +88,7 @@ if SERVER then
 		if not IsValid(owner) then return false, "No owner set" end
 
 		local spell = Arcane.RegisteredSpells[spellId]
-		if not spell then return false, "Spell not found" end
+		if not spell then return false, "Spell not found (" .. spellId .. ")" end
 
 		-- Check if currently casting
 		if self.CastingUntil > CurTime() then
@@ -97,14 +97,14 @@ if SERVER then
 
 		-- Check entity-specific cooldown (not owner's cooldown)
 		if self:IsOnEntityCooldown(spellId) then
-			return false, "Spell on cooldown"
+			return false, "Spell on cooldown (" .. spellId .. ")"
 		end
 
 		local data = Arcane:GetPlayerData(owner)
 
 		-- Check if owner has spell unlocked
 		if not data.unlocked_spells[spellId] then
-			return false, "Owner hasn't unlocked this spell"
+			return false, "Owner hasn't unlocked this spell (" .. spellId .. ")"
 		end
 
 		-- Check if owner can afford the spell (we'll consume resources later)
