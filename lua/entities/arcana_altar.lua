@@ -44,13 +44,11 @@ if SERVER then
 		self:StartMotionController()
 		self.ShadowParams = {}
 		self._floatHeight = 100
-		self._bobAmount = 5
-		self._bobSpeed = 0.5
-
 		self._nextUse = 0
 	end
 
-	local TRACE_OFFSET = Vector(0, 0, 100)
+	local TRACE_OFFSET = Vector(0, 0, 1000)
+	local VECTOR_UP = Vector(0, 0, 1)
 	function ENT:PhysicsSimulate(phys, deltatime)
 		if not IsValid(phys) then return end
 
@@ -66,7 +64,7 @@ if SERVER then
 		})
 
 		-- Calculate target position from ground
-		local floatPos = tr.HitPos + Vector(0, 0, 100 + 5 * math.sin(CurTime()))
+		local floatPos = tr.HitPos + self._floatHeight * VECTOR_UP
 		local targetAng = self:GetAngles()
 		targetAng.p = 0
 		targetAng.r = 0
