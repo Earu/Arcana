@@ -263,8 +263,6 @@ if CLIENT then
 			self._obeliskBottom:Remove()
 		end
 
-		local obeliskColor = Color(255, 255, 255, 255) --Color(161, 164, 255, 255)
-
 		-- Create bottom part
 		self._obeliskBottom = ClientsideModel("models/arcana_obelisk/arcana_obelisk_bottom.mdl")
 		if IsValid(self._obeliskBottom) then
