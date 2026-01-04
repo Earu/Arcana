@@ -48,7 +48,7 @@ if SERVER then
 	end)
 
 	hook.Add("Move", Tag, function(ply, mv)
-		if ply:GetInfoNum("arcana_soul_mode_enabled", 1) ~= 1 then return end
+		if ply:GetInfoNum("arcana_soul_mode", 1) ~= 1 then return end
 		if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
 		local ent = ply:GetNW2Entity("Arcana_SoulEnt")
 		if not ent:IsValid() then return end
@@ -124,7 +124,7 @@ if SERVER then
 
 	hook.Add("PlayerDeathThink", Tag, function(ply)
 		if ply:GetNW2Float("Arcana_SoulGraceUntil", 0) > CurTime() then return end
-		if ply:GetInfoNum("arcana_soul_mode_enabled", 1) ~= 1 then return end
+		if ply:GetInfoNum("arcana_soul_mode", 1) ~= 1 then return end
 
 		if ply.ArcanaSoulSpawnPos then
 			local rag = ply:GetRagdollEntity()
