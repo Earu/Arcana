@@ -326,6 +326,7 @@ local function spawnMushroomHotspot(ctx)
 		m:SetPos(pos + Vector(0, 0, 2))
 		m:SetAngles(Angle(0, math.random(0, 360), 0))
 		m:Spawn()
+		freeze(m)
 
 		table.insert(entities, m)
 	end
@@ -389,6 +390,7 @@ local function spawnFairyGrove(ctx)
 
 		f:SetPos(pos)
 		f:Spawn()
+		f.ms_notouch = true
 		table.insert(entities, f)
 
 		f:SetNWBool("Arcana_FairyVendor", true)
