@@ -454,7 +454,7 @@ if CLIENT then
 		local func = net.ReadString()
 		local args = net.ReadTable()
 
-		if ent:IsValid() then
+		if IsValid(ent) and ent[func] and istable(args) then
 			ent[func](ent, unpack(args))
 		end
 	end)
