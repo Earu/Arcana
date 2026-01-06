@@ -1853,6 +1853,7 @@ if SERVER then
 	}
 
 	local badEntities = {}
+	local badEntitiesOwnership = {}
 	local function assignBadEntity(ent)
 		if not IsValid(ent) then return end
 		if not BAD_ENT_CLASSES[ent:GetClass()] then return end
@@ -1862,6 +1863,7 @@ if SERVER then
 		if not IsValid(owner) then return end
 
 		badEntities[owner] = (badEntities[owner] or 0) + 1
+		badEntitiesOwnership[ent] = owner
 
 		local timerName = "Arcana_BadEntityCheck_Timer_" .. tostring(owner)
 		timer.Remove(timerName)
@@ -1870,11 +1872,9 @@ if SERVER then
 	local function removeBadEntity(ent)
 		if not IsValid(ent) then return end
 		if not BAD_ENT_CLASSES[ent:GetClass()] then return end
-		if not ent.CPPIGetOwner then return end
 
-		local owner = ent:CPPIGetOwner()
+		local owner = badEntitiesOwnership[ent] -- we're forced to do that because CPPIGetOwner is not reliable when entities are removed
 		if not IsValid(owner) then return end
-		if not badEntities[owner] then return end
 
 		badEntities[owner] = math.max(0, (badEntities[owner] or 0) - 1)
 
@@ -1882,7 +1882,7 @@ if SERVER then
 		timer.Create(timerName, 60, 1, function()
 			timer.Remove(timerName)
 
-			if IsValid(owner) and badEntities[owner] == 0 then
+			if IsValid(owner) and badEntities[owner] and badEntities[owner] == 0 then
 				badEntities[owner] = nil
 			end
 		end)
@@ -1897,19 +1897,29 @@ if SERVER then
 		end)
 	end)
 
-	hook.Add("EntityRemoved", "Arcana_BadEntityCheck", removeBadEntity)
+	hook.Add("EntityRemoved", "Arcana_BadEntityCheck", function(ent)
+		removeBadEntity(ent)
+	end)
 
 	hook.Add("PlayerInitialSpawn", "Arcana_BadEntityCheck", function(ply)
-		for className in pairs(BAD_ENT_CLASSES) do
-			for _, ent in ipairs(ents.FindByClass(className)) do
-				assignBadEntity(ent)
+		timer.Simple(0.1, function()
+			for className in pairs(BAD_ENT_CLASSES) do
+				for _, ent in ipairs(ents.FindByClass(className)) do
+					assignBadEntity(ent)
+				end
 			end
-		end
+		end)
 	end)
 
 	hook.Add("PlayerDisconnected", "Arcana_BadEntityCheck", function(ply)
 		if badEntities[ply] then
 			badEntities[ply] = nil
+		end
+
+		for ent, owner in pairs(badEntitiesOwnership) do
+			if owner == ply then
+				badEntitiesOwnership[ent] = nil
+			end
 		end
 	end)
 
