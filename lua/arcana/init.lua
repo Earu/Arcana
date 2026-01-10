@@ -21,6 +21,7 @@ if SERVER then
 end
 
 include("arcana/core.lua")
+include("arcana/circles.lua")
 include("arcana/environments.lua")
 include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
@@ -32,7 +33,6 @@ if SERVER then
 end
 
 if CLIENT then
-	include("arcana/circles.lua")
 	include("arcana/enchant_vfx.lua")
 	include("arcana/hud.lua")
 	include("arcana/spell_browser.lua")

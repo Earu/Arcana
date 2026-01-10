@@ -1,4 +1,10 @@
-if SERVER then return end
+if SERVER then
+	require("shader_to_gma")
+	resource.AddShader("arcana_circle_ps30")
+	resource.AddShader("arcana_circle_vs30")
+	return
+end
+
 local render_SetMaterial = _G.render.SetMaterial
 local render_PushRenderTarget = _G.render.PushRenderTarget
 local render_PopRenderTarget = _G.render.PopRenderTarget
@@ -6,6 +12,7 @@ local render_Clear = _G.render.Clear
 local render_SetColorModulation = _G.render.SetColorModulation
 local render_SetBlend = _G.render.SetBlend
 local render_SetLightingMode = _G.render.SetLightingMode
+local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
 local GetRenderTarget = _G.GetRenderTarget
 local CreateMaterial = _G.CreateMaterial
 local cam_Start3D2D = _G.cam.Start3D2D
@@ -108,7 +115,47 @@ local BAND_RT_CACHE = {}
 local BAND_MESH_CACHE = {}
 
 -- Default ring ejection sound candidates (short, energetic)
-local MAGIC_EJECT_SOUNDS = {"ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav",}
+local MAGIC_EJECT_SOUNDS = {"ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav"}
+
+local shader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
+hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
+	shader_available = true
+end)
+
+-- Helper function to create circle materials with custom shader
+local function CreateCircleMaterial(name, textureName)
+	if not shader_available then
+		return CreateMaterial(name, "UnlitGeneric", {
+			["$basetexture"] = textureName,
+			["$translucent"] = 1,
+			["$vertexalpha"] = 1,
+			["$vertexcolor"] = 1,
+			["$nolod"] = 1,
+			["$nocull"] = 1,
+			["$additive"] = 0,
+		})
+	end
+
+	-- Use custom fullbright shader
+	return CreateShaderMaterial(name, {
+		["$pixshader"] = "arcana_circle_ps30",
+		["$vertexshader"] = "arcana_circle_vs30",
+		["$basetexture"] = textureName,
+		["$translucent"] = 1,
+		["$vertexalpha"] = 1,
+		["$vertexcolor"] = 1,
+		["$nolod"] = 1,
+		["$nocull"] = 1,
+		["$additive"] = 0,
+		["$ignorez"] = 0,
+		-- Time for animated noise (will be updated each frame)
+		["$c0_x"] = 0.0,
+		-- Color tint will be set dynamically per circle (RGB)
+		["$c1_x"] = 1.0,
+		["$c1_y"] = 1.0,
+		["$c1_z"] = 1.0,
+	})
+end
 
 -- Quantize a numeric value to limit the number of RT variants produced
 local function quantize(value, step)
@@ -353,13 +400,10 @@ function Ring:Draw(centerPos, angles, color, time)
 		ringPos = ringPos + f * (off.x or 0) + r * (off.y or 0) + u * (off.z or 0)
 	end
 
-	local ringColor = self.color or Color(color.r, color.g, color.b, color.a)
-	ringColor.a = color.a
-
 	-- Pass the rotation angle directly to drawing functions instead of modifying angles
 	if self.type == RING_TYPES.PATTERN_LINES or self.type == RING_TYPES.RUNE_STAR or self.type == RING_TYPES.SIMPLE_LINE or self.type == RING_TYPES.STAR_RING then
 		-- Non-band rings use RT-only rendering now
-		self:DrawCachedRTQuad(ringPos, angles, ringColor, self.currentRotation)
+		self:DrawCachedRTQuad(ringPos, angles, color, self.currentRotation)
 	elseif self.type == RING_TYPES.BAND_RING then
 		local oriented = Angle(angles.p, angles.y, angles.r)
 
@@ -375,7 +419,7 @@ function Ring:Draw(centerPos, angles, color, time)
 		end
 
 		if self.bandRTBuilt and self.bandMat and self.bandMesh then
-			self:DrawBandMesh(ringPos, oriented, ringColor, self.currentRotation)
+			self:DrawBandMesh(ringPos, oriented, color, self.currentRotation)
 		end
 	end
 end
@@ -389,12 +433,25 @@ function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
 	end
 
 	if not self.rt or not self.rtMat then return false end
+
+	-- Update shader color parameters if using custom shader
+	if self.rtMat and self.rtMat.SetFloat then
+		-- Set time for animated noise
+		self.rtMat:SetFloat("$c0_x", CurTime())
+		-- Set color tint (normalized 0-1)
+		self.rtMat:SetFloat("$c1_x", color.r / 255)
+		self.rtMat:SetFloat("$c1_y", color.g / 255)
+		self.rtMat:SetFloat("$c1_z", color.b / 255)
+		-- Force material refresh
+		self.rtMat:Recompute()
+	end
+
 	-- 3D2D: map texture pixels to world units so that rtRadiusPx maps to self.radius
 	local pxToWorld = 1 / (self.unitToPx or 1)
 	local drawAngles = Angle(angles.p + 180, angles.y, angles.r)
 	cam_Start3D2D(centerPos, drawAngles, pxToWorld)
 	surface_SetMaterial(self.rtMat)
-	surface_SetDrawColor(color.r, color.g, color.b, color.a)
+	surface_SetDrawColor(255, 255, 255, color.a)  -- Use white to let shader control color
 	surface_DrawTexturedRectRotated(0, 0, self.rtSize, self.rtSize, rotationAngle or 0)
 	cam_End3D2D()
 
@@ -411,15 +468,7 @@ function Ring:BuildRingRT()
 		local tex = GetRenderTarget(rtName, size, size, true)
 		local matName = "arcana_ring_mat_" .. key
 
-		local mat = CreateMaterial(matName, "UnlitGeneric", {
-			["$basetexture"] = tex:GetName(),
-			["$translucent"] = 1,
-			["$vertexalpha"] = 1,
-			["$vertexcolor"] = 1,
-			["$nolod"] = 1,
-			["$nocull"] = 1,
-			["$additive"] = 0,
-		})
+		local mat = CreateCircleMaterial(matName, tex:GetName())
 
 		entry = {
 			tex = tex,
@@ -518,13 +567,7 @@ local function GetGlyphMaterial(fontName, char)
 	local tex = GetRenderTarget(rtName, w, h, true)
 	local matName = "arcana_glyph_mat_" .. id
 
-	local mat = CreateMaterial(matName, "UnlitGeneric", {
-		["$basetexture"] = tex:GetName(),
-		["$translucent"] = 1,
-		["$vertexalpha"] = 1,
-		["$vertexcolor"] = 1,
-		["$nolod"] = 1,
-	})
+	local mat = CreateCircleMaterial(matName, tex:GetName())
 
 	-- Render the glyph (white) onto its RT
 	render_PushRenderTarget(tex, 0, 0, w, h)
@@ -562,14 +605,7 @@ function Ring:BuildBandRTAndMesh()
 		local tex = GetRenderTarget(rtName, texW, texH, true)
 		local matName = "arcana_band_mat_" .. rtKey
 
-		local mat = CreateMaterial(matName, "UnlitGeneric", {
-			["$basetexture"] = tex:GetName(),
-			["$translucent"] = 1,
-			["$vertexalpha"] = 1,
-			["$vertexcolor"] = 1,
-			["$nolod"] = 1,
-			["$nocull"] = 1,
-		})
+		local mat = CreateCircleMaterial(matName, tex:GetName())
 
 		self:RT_PrecacheCircularTextGlyphs()
 		render_PushRenderTarget(tex, 0, 0, texW, texH)
@@ -763,13 +799,24 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 
 	if self.bandMat.SetFloat then
 		self.bandMat:SetFloat("$alpha", (color.a or 255) / 255)
+		-- Set time for animated noise
+		self.bandMat:SetFloat("$c0_x", CurTime())
+		-- Set shader color parameters for fullbright rendering
+		self.bandMat:SetFloat("$c1_x", color.r / 255)
+		self.bandMat:SetFloat("$c1_y", color.g / 255)
+		self.bandMat:SetFloat("$c1_z", color.b / 255)
 	end
 
 	render_SetMaterial(self.bandMat)
 	render_SetColorModulation(color.r / 255 * 3, color.g / 255 * 3, color.b / 255 * 3)
 	render_SetBlend((color.a or 255) / 255)
 	render_SetLightingMode(2)
+
+	-- Enable depth testing so band doesn't draw over objects in front
+	render_OverrideDepthEnable(true, true)
 	self.bandMesh:Draw()
+	render_OverrideDepthEnable(false, false)
+
 	render_SetLightingMode(0)
 	render_SetColorModulation(1, 1, 1)
 	render_SetBlend(1)
@@ -801,9 +848,9 @@ end
 
 -- map ring line thickness to a fixed world width so cache matches old look
 function Ring:GetRTThicknessPx()
-	local thicknessWorld = 0.6 -- world units
+	--local thicknessWorld = 0.3 -- world units
 
-	return math_max(1, math_floor((self.unitToPx or 1) * thicknessWorld))
+	return 1
 end
 
 function Ring:RT_DrawSimpleLine2D()
