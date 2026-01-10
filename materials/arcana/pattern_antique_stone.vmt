@@ -1,0 +1,6 @@
+"VertexLitGeneric"
+{
+	"$basetexture" "arcana/pattern_antique_stone"
+	"$bumpmap" "arcana/pattern_antique_stone_n"
+	"$surfaceprop" "concrete"
+}
