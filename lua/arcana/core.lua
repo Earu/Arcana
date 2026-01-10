@@ -631,7 +631,6 @@ if SERVER then
 	util.AddNetworkString("Arcane_SpellFailed")
 	util.AddNetworkString("Arcana_AttachBandVFX")
 	util.AddNetworkString("Arcana_ClearBandVFX")
-	util.AddNetworkString("Arcana_AttachParticles")
 	util.AddNetworkString("Arcane_ConsoleCastSpell")
 	util.AddNetworkString("Arcane_ErrorNotification")
 	util.AddNetworkString("Arcane_SpellUnlocked")
