@@ -169,8 +169,6 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.currentRotation = math_random() * 360 -- Start at random rotation
 	ring.segments = 64
 	ring.opacity = 1.0
-	ring.pulseSpeed = math_random() * 2 + 1 -- 1-3 Hz
-	ring.pulseOffset = math_random() * math_pi * 2
 	ring.lineWidth = 2.0 -- Default line thickness
 	-- Render target cache (only for non-band rings)
 	ring.useRTCache = (ring.type ~= RING_TYPES.BAND_RING)
@@ -340,12 +338,6 @@ function Ring:Update(deltaTime)
 	end
 end
 
-function Ring:GetCurrentOpacity(baseOpacity, time)
-	local pulse = math_sin(time * self.pulseSpeed + self.pulseOffset) * 0.3 + 0.7
-
-	return baseOpacity * self.opacity * pulse
-end
-
 function Ring:Draw(centerPos, angles, color, time)
 	local ringPos = centerPos + angles:Up() * self.height
 	-- remember last center for delayed ejection sounds
@@ -361,9 +353,8 @@ function Ring:Draw(centerPos, angles, color, time)
 		ringPos = ringPos + f * (off.x or 0) + r * (off.y or 0) + u * (off.z or 0)
 	end
 
-	local currentOpacity = self:GetCurrentOpacity(color.a, time)
-	local ringColor = self.color or Color(color.r, color.g, color.b, currentOpacity)
-	ringColor.a = currentOpacity
+	local ringColor = self.color or Color(color.r, color.g, color.b, color.a)
+	ringColor.a = color.a
 
 	-- Pass the rotation angle directly to drawing functions instead of modifying angles
 	if self.type == RING_TYPES.PATTERN_LINES or self.type == RING_TYPES.RUNE_STAR or self.type == RING_TYPES.SIMPLE_LINE or self.type == RING_TYPES.STAR_RING then
@@ -1078,7 +1069,6 @@ function MagicCircle:GenerateRings()
 	table_sort(self.rings, function(a, b) return a.radius > b.radius end)
 	-- Add central glow ring
 	local glowRing = Ring.new(RING_TYPES.SIMPLE_LINE, self.size * 0.1, 0, math_random() * 120 - 60, math_random() > 0.5 and 1 or -1)
-	glowRing.pulseSpeed = 4 -- Faster pulse for glow effect
 	glowRing.lineWidth = self.lineWidth -- Apply the magic circle's line width
 	table_insert(self.rings, glowRing)
 end
@@ -1355,36 +1345,6 @@ end)
 
 hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function()
 	MagicCircleManager:Draw()
-end)
-
--- Client receiver for particle attachments
-net.Receive("Arcana_AttachParticles", function()
-	local ent = net.ReadEntity()
-	local effectName = net.ReadString()
-	local duration = net.ReadFloat()
-	if not IsValid(ent) then return end
-	if not effectName or effectName == "" then return end
-
-	if not ent.ParticleEmitters then
-		ent.ParticleEmitters = {}
-	end
-
-	-- Attempt to use ParticleEffectAttach if available
-	if ParticleEffectAttach then
-		local attached = pcall(function()
-			ParticleEffectAttach(effectName, PATTACH_ABSORIGIN_FOLLOW, ent, 0)
-		end)
-
-		if attached then
-			timer.Simple(duration or 5, function()
-				if IsValid(ent) and ent.StopParticles then
-					ent:StopParticles()
-				end
-			end)
-
-			return
-		end
-	end
 end)
 
 -- Convenience functions (maintaining backward compatibility)
