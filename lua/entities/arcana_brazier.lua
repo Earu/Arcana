@@ -1,7 +1,7 @@
 AddCSLuaFile()
 ENT.Type = "anim"
 ENT.Base = "base_anim"
-ENT.PrintName = "Arcane Brazier"
+ENT.PrintName = "Brazier"
 ENT.Category = "Arcana"
 ENT.Spawnable = true
 ENT.RenderGroup = RENDERGROUP_BOTH
