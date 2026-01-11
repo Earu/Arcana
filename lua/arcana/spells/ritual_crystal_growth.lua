@@ -26,17 +26,20 @@ Arcane:RegisterRitualSpell({
 			mask = MASK_SOLID_BRUSHONLY,
 		})
 
-		local targetPos = tr.Hit and tr.HitPos or ritualPos - Vector(0, 0, 80)
+		local groundPos = tr.Hit and tr.HitPos or ritualPos - Vector(0, 0, 80)
+		local normal = tr.HitNormal or Vector(0, 0, 1)
+
 		local crystal = ents.Create("arcana_mana_crystal")
 		if not IsValid(crystal) then
 			Arcane:SendErrorNotification(ply, "Failed to create mana crystal.")
 			return
 		end
 
+		-- Spawn 4 units above ground, like mana_crystals.lua does
+		crystal:SetPos(groundPos + normal * 4)
+		crystal:SetAngles(Angle(0, math.random(0, 359), 0))
 		crystal:Spawn()
-		crystal:SetPos(targetPos)
 		crystal:DropToFloor()
-		crystal:PhysWake()
 
 		-- Set it to a large scale (0.35 to 2.2 range, start at 1.8 for "big")
 		if crystal.SetCrystalScale then
@@ -48,23 +51,14 @@ Arcane:RegisterRitualSpell({
 			crystal:AddCrystalGrowth(240) -- Near max growth
 		end
 
-		sound.Play("ambient/levels/labs/electric_explosion1.wav", spawnPos, 75, 120)
+		sound.Play("ambient/levels/labs/electric_explosion1.wav", groundPos, 75, 120)
 
-		-- Create a small shockwave effect
-		timer.Simple(0.1, function()
-			if IsValid(crystal) then
-				util.ScreenShake(crystal:GetPos(), 5, 5, 1, 512)
-
-				local tr = util.TraceLine({
-					start = crystal:GetPos(),
-					endpos = crystal:GetPos() - Vector(0, 0, 1000),
-					mask = MASK_SOLID_BRUSHONLY,
-				})
-
-				if tr.Hit then
-					crystal:SetPos(tr.HitPos) -- drop to floor after resizing properly
-				end
-			end
+		-- Drop to floor again after 0.5 seconds (like mana_crystals.lua)
+		-- This ensures proper positioning after physics/scale settle
+		timer.Simple(0.5, function()
+			if not IsValid(crystal) then return end
+			crystal:DropToFloor()
+			util.ScreenShake(crystal:GetPos(), 5, 5, 1, 512)
 		end)
 	end,
 })
