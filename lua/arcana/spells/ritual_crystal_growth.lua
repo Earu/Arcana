@@ -24,7 +24,6 @@ Arcane:RegisterRitualSpell({
 			start = ritualPos,
 			endpos = ritualPos - Vector(0, 0, 1000),
 			mask = MASK_SOLID_BRUSHONLY,
-			filter = {selfEnt, caster},
 		})
 
 		local targetPos = tr.Hit and tr.HitPos or ritualPos - Vector(0, 0, 80)
@@ -55,6 +54,16 @@ Arcane:RegisterRitualSpell({
 		timer.Simple(0.1, function()
 			if IsValid(crystal) then
 				util.ScreenShake(crystal:GetPos(), 5, 5, 1, 512)
+
+				local tr = util.TraceLine({
+					start = crystal:GetPos(),
+					endpos = crystal:GetPos() - Vector(0, 0, 1000),
+					mask = MASK_SOLID_BRUSHONLY,
+				})
+
+				if tr.Hit then
+					crystal:SetPos(tr.HitPos) -- drop to floor after resizing properly
+				end
 			end
 		end)
 	end,
