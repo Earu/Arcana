@@ -366,7 +366,7 @@ local function spawnFloatingIslands(ctx)
 
 			local targetPos = tr.Hit and tr.HitPos or origin
 
-			portal:SetPos(targetPos - Vector(0, 0, 15))
+			portal:SetPos(targetPos - Vector(0, 0, 35))
 			portal:SetAngles(Angle(0, 0, 0))
 			portal:Spawn()
 			portal:Activate()
