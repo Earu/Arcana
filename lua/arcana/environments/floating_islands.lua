@@ -114,8 +114,15 @@ local ENTS_TO_ACTIVATE = {}
 local function activateOnClient(ent)
 	if not IsValid(ent) then return end
 
-	BroadcastLua("local e = Entity(" .. ent:EntIndex() .. "); if IsValid(e) then e:Activate() end")
+	timer.Create("FloatingIslands_ActivateOnClient", 0.2, 3, function()
+		BroadcastLua("local e = Entity(" .. ent:EntIndex() .. "); if IsValid(e) then e:Activate() end")
+	end)
+
 	ENTS_TO_ACTIVATE[ent:EntIndex()] = true
+
+	net.Start("FloatingIslands_ActivateOnClient", true)
+	net.WriteTable(table.GetKeys(ENTS_TO_ACTIVATE))
+	net.Broadcast()
 end
 
 if SERVER then
@@ -237,11 +244,7 @@ local function generateFloatingIsland(center_pos, radius, height, opts)
 
 	if IsValid(octagon) then
 		top_surface_z = octagon:GetPos().z + octagon:OBBMaxs().z
-		timer.Simple(0.1, function()
-			if IsValid(octagon) then
-				activateOnClient(octagon)
-			end
-		end)
+		activateOnClient(octagon)
 	end
 
 	if opts.type == "forest" then
@@ -429,6 +432,7 @@ if CLIENT then
 			local ent = Entity(ent_index)
 			if IsValid(ent) then
 				ent:Activate()
+				ENTS_TO_ACTIVATE[ent_index] = nil
 			else
 				-- if entity is not valid then its not networked to this client yet
 				ENTS_TO_ACTIVATE[ent_index] = true
