@@ -46,6 +46,21 @@ if SERVER then
 		self._nextAmbientSound = 0
 	end
 
+	function ENT:SpawnFunction(ply, tr, className)
+		if not tr or not tr.Hit then return end
+
+		local pos = tr.HitPos + tr.HitNormal * 100
+		local ent = ents.Create(classname or "arcana_brazier")
+		if not IsValid(ent) then return end
+
+		ent:SetPos(pos + Vector(0, 0, 100))
+		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
+		ent:Spawn()
+		ent:Activate()
+
+		return ent
+	end
+
 	local TRACE_OFFSET = Vector(0, 0, 1000)
 	local VECTOR_UP = Vector(0, 0, 1)
 
