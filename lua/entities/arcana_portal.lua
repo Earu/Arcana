@@ -180,8 +180,9 @@ if CLIENT then
 		local pos = self:GetPos() + self:GetUp() * 2
 		local ang = self:GetAngles()
 		ang:RotateAroundAxis(ang:Forward(), 180)
-		local size = math.max(24, self:GetRadius())
-		self._circle = MagicCircle.new(pos, ang, circleColor, 3, size, 2.0)
+		local size = math.max(80, self:GetRadius() * 1.5)
+		local intensity = 50 -- Higher intensity for more complex circles
+		self._circle = MagicCircle.new(pos, ang, circleColor, intensity, size, 2.5)
 		MagicCircleManager:Add(self._circle)
 	end
 
