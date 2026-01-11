@@ -357,7 +357,14 @@ local function spawnFloatingIslands(ctx)
 	if mausoleumPos then
 		local portal = ents.Create("arcana_portal")
 		if IsValid(portal) then
-			portal:SetPos(origin - Vector(0, 0, 80))
+			local tr = util.TraceLine({
+				start = origin,
+				endpos = origin + Vector(0, 0, -1000),
+				mask = MASK_SOLID,
+				filter = portal,
+			})
+
+			portal:SetPos(tr.Hit and tr.HitPos or origin)
 			portal:SetAngles(Angle(0, 0, 0))
 			portal:Spawn()
 			portal:Activate()
