@@ -20,6 +20,14 @@ Arcane:RegisterRitualSpell({
 		if not SERVER then return end
 
 		local ritualPos = selfEnt:GetPos()
+		local tr = util.TraceLine({
+			start = ritualPos,
+			endpos = ritualPos - Vector(0, 0, 1000),
+			mask = MASK_SOLID_BRUSHONLY,
+			filter = {selfEnt, caster},
+		})
+
+		local targetPos = tr.Hit and tr.HitPos or ritualPos - Vector(0, 0, 80)
 		local crystal = ents.Create("arcana_mana_crystal")
 		if not IsValid(crystal) then
 			Arcane:SendErrorNotification(ply, "Failed to create mana crystal.")
@@ -27,7 +35,7 @@ Arcane:RegisterRitualSpell({
 		end
 
 		crystal:Spawn()
-		crystal:SetPos(ritualPos - Vector(0, 0, 80))
+		crystal:SetPos(targetPos)
 		crystal:DropToFloor()
 		crystal:PhysWake()
 
