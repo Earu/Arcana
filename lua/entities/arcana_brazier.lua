@@ -43,7 +43,13 @@ if SERVER then
 
 		-- Initialize fire effect timer
 		self._nextFireEffect = 0
-		self._nextAmbientSound = 0
+
+		-- Start looping fire sound
+		self._fireSound = CreateSound(self, "ambient/fire/fire_med_loop1.wav")
+		if self._fireSound then
+			self._fireSound:Play()
+			self._fireSound:SetSoundLevel(65)
+		end
 	end
 
 	function ENT:SpawnFunction(ply, tr, className)
@@ -126,12 +132,6 @@ if SERVER then
 			self._nextFireEffect = now + 0.1
 		end
 
-		-- Ambient fire sound
-		if not self._nextAmbientSound or now >= self._nextAmbientSound then
-			self:EmitSound("ambient/fire/fire_med_loop1.wav", 65, math.random(95, 105), 0.4)
-			self._nextAmbientSound = now + 2.5
-		end
-
 		self:NextThink(now + 0.05)
 		return true
 	end
@@ -150,7 +150,11 @@ if SERVER then
 	end
 
 	function ENT:OnRemove()
-		self:StopSound("ambient/fire/fire_med_loop1.wav")
+		-- Stop the looping fire sound cleanly
+		if self._fireSound then
+			self._fireSound:Stop()
+			self._fireSound = nil
+		end
 	end
 end
 
