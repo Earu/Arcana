@@ -108,6 +108,7 @@ if SERVER then
 		ent:SetAngles(Angle(0, math.random(0, 359), 0))
 		ent:Spawn()
 		ent:DropToFloor()
+		ent.initialSpawn = true
 
 		local snd = CreateSound(ent, "ambient/levels/labs/teleport_winddown1.wav")
 		snd:SetDSP(16)
@@ -119,6 +120,21 @@ if SERVER then
 			if not IsValid(ent) then return end
 
 			ent:DropToFloor()
+
+			local tr = util.TraceLine({
+				start = ent:GetPos(),
+				endpos = ent:GetPos() - Vector(0, 0, 10),
+				mask = MASK_SOLID,
+				filter = ent,
+			})
+
+			if not tr.Hit then
+				-- we dont want flying crystals
+				SafeRemoveEntity(ent)
+				return
+			end
+
+			ent.initialSpawn = nil
 		end)
 
 		-- Start small
@@ -253,7 +269,20 @@ if SERVER then
 
 		-- Crystals: position, scale, stored mana
 		for _, c in ipairs(ents.FindByClass("arcana_mana_crystal")) do
-			if IsValid(c) then
+			if IsValid(c) and not c.initialSpawn then
+				local tr = util.TraceLine({
+					start = c:GetPos(),
+					endpos = c:GetPos() - Vector(0, 0, 10),
+					mask = MASK_SOLID,
+					filter = c,
+				})
+
+				if not tr.Hit then
+					-- we dont want flying crystals
+					SafeRemoveEntity(c)
+					continue
+				end
+
 				state.crystals[#state.crystals + 1] = {
 					pos = encodeVector(c:GetPos()),
 					scale = tonumber(c.GetCrystalScale and c:GetCrystalScale() or 1) or 1,
