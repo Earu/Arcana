@@ -366,13 +366,13 @@ local function spawnFloatingIslands(ctx)
 
 			local targetPos = tr.Hit and tr.HitPos or origin
 
-			portal:SetPos(targetPos - Vector(0, 0, 35))
+			portal:SetPos(targetPos - Vector(0, 0, 45))
 			portal:SetAngles(Angle(0, 0, 0))
 			portal:Spawn()
 			portal:Activate()
 
 			-- Set destination to inside the mausoleum
-			portal:SetDestination(mausoleumPos + Vector(0, 0, 100))
+			portal:SetDestination(mausoleumPos + Vector(0, 0, 150))
 			portal:SetDestinationAngles(Angle(0, 0, 0))
 			portal:SetRadius(80)
 
