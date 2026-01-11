@@ -243,7 +243,7 @@ local function generateFloatingIsland(center_pos, radius, height, opts)
 	end
 
 	if IsValid(octagon) then
-		top_surface_z = octagon:GetPos().z + octagon:OBBMaxs().z
+		top_surface_z = octagon:GetPos().z + octagon:OBBMaxs().z - 15
 		activateOnClient(octagon)
 	end
 
@@ -364,7 +364,9 @@ local function spawnFloatingIslands(ctx)
 				filter = portal,
 			})
 
-			portal:SetPos(tr.Hit and tr.HitPos or origin)
+			local targetPos = tr.Hit and tr.HitPos or origin
+
+			portal:SetPos(targetPos - Vector(0, 0, 15))
 			portal:SetAngles(Angle(0, 0, 0))
 			portal:Spawn()
 			portal:Activate()
