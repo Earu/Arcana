@@ -99,6 +99,13 @@ if SERVER then
 		local cls = orig:GetClass()
 		if not isstring(cls) or cls == "" then return end
 
+		local swep = list.Get("Weapon")[cls]
+		if not swep.Spawnable then return end
+
+		local isAdmin = ply:IsAdmin() or game.SinglePlayer()
+		if (not swep.Spawnable and not isAdmin) or (swep.AdminOnly and not isAdmin) then return end
+		if not gamemode.Call("PlayerGiveSWEP", ply, cls, swep) then return end
+
 		-- Capture existing enchantments on player's weapon
 		local transferIds = {}
 		local map = Arcane:GetEntityEnchantments(orig)
