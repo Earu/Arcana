@@ -19,9 +19,6 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
-	resource.AddFile("materials/arcana/pattern_antique_stone.vmt")
-	resource.AddFile("materials/arcana/pattern_antique_stone.vtf")
-
 	function ENT:Initialize()
 		-- Use the shell model inverted
 		self:SetModel("models/hunter/misc/shell2x2a.mdl")
