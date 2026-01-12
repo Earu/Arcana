@@ -175,6 +175,12 @@ if CLIENT then
 		self._emitter = ParticleEmitter(self:GetPos(), false)
 		self._nextMagicParticle = 0
 		self._nextEmber = 0
+
+		-- Set large render bounds to account for:
+		-- - Dynamic lights (up to 400 unit radius)
+		-- - Fire particles rising high above
+		-- - Magic circle potentially far below
+		self:SetRenderBounds(Vector(-450, -450, -300), Vector(450, 450, 500))
 	end
 
 	-- Create magic circle on ground underneath showing fire levitation
