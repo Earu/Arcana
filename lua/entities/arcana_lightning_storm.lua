@@ -348,26 +348,25 @@ if CLIENT then
 			return true
 		end,
 		Render = function(self)
+			local entity = self.Entity
+			if not IsValid(entity) then return end
+
 			local progress = math.min((CurTime() - self.StartTime) / self.Life, 1)
 
 			-- Generate lightning bolts only once
 			if not self.LightningBolts then
 				self.LightningBolts = {}
-				local entity = self.Entity
 
 				-- Create main bolt
-				if IsValid(entity) then
-					local numBranches = math.random(3, 7)
+				local numBranches = math.random(3, 7)
+				for i = 1, numBranches do
+					local deviation = 100 * self.Scale
+					local endPoint = self.EndPos + Vector(math.random(-deviation, deviation), math.random(-deviation, deviation), math.random(-20, 0))
 
-					for i = 1, numBranches do
-						local deviation = 100 * self.Scale
-						local endPoint = self.EndPos + Vector(math.random(-deviation, deviation), math.random(-deviation, deviation), math.random(-20, 0))
-
-						table.insert(self.LightningBolts, {
-							points = entity:CreateLightningBolt(self.StartPos, endPoint, 0.4, 30 * self.Scale, 8),
-							alpha = math.random(150, 255)
-						})
-					end
+					table.insert(self.LightningBolts, {
+						points = entity:CreateLightningBolt(self.StartPos, endPoint, 0.4, 30 * self.Scale, 8),
+						alpha = math.random(150, 255)
+					})
 				end
 			end
 
