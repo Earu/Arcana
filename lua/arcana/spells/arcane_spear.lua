@@ -18,7 +18,7 @@ Arcane:RegisterSpell({
 		if not SERVER then return true end
 
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local startPos = (srcEnt.EyePos and srcEnt:EyePos() or srcEnt:WorldSpaceCenter())
+		local startPos = srcEnt:WorldSpaceCenter() -- because eyepos is weird
 		local dir = srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward()
 
 		-- Fire the arcane spear beam
