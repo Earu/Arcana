@@ -71,6 +71,7 @@ local function applyLightningDamage(attacker, hitPos, normal)
 	local candidates = {}
 
 	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do
+		if ent == attacker then continue end
 		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
 			table.insert(candidates, ent)
 		end
