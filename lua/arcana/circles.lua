@@ -848,9 +848,10 @@ end
 
 -- map ring line thickness to a fixed world width so cache matches old look
 function Ring:GetRTThicknessPx()
-	--local thicknessWorld = 0.3 -- world units
-
-	return 1
+	-- Scale thickness with the radius of the circle
+	local baseRadius = 150 -- reference radius
+	local scaleFactor = math_max(1, self.radius / baseRadius)
+	return math_max(3, math_floor(scaleFactor))
 end
 
 function Ring:RT_DrawSimpleLine2D()
