@@ -1,7 +1,3 @@
-if SERVER then
-	util.AddNetworkString("Arcana_SpearBeam")
-end
-
 local function isMeleeHoldType(wep)
 	if not IsValid(wep) then return false end
 
@@ -17,69 +13,14 @@ local function fireArcaneSpear(caster, origin, dir)
 	if not SERVER then return end
 	if not IsValid(caster) then return end
 
-	local startPos = origin
-	local maxDist = 2000
-	local penetrations = 4
-	local damagePerHit = 55
-	local falloff = 0.8
-	local traveled = 0
-
-	local filter = {caster}
-	local segments = {}
-
-	for _ = 1, penetrations do
-		local segStart = startPos
-		local tr = util.TraceLine({
-			start = startPos,
-			endpos = startPos + dir * (maxDist - traveled),
-			filter = filter,
-			mask = MASK_SHOT
-		})
-
-		if not tr.Hit then break end
-		local hitPos = tr.HitPos
-		local hitEnt = tr.Entity
-
-		table.insert(segments, {segStart, hitPos})
-
-		-- Impact visuals
-		local ed = EffectData()
-		ed:SetOrigin(hitPos)
-		util.Effect("cball_explode", ed, true, true)
-		util.Decal("FadingScorch", hitPos + tr.HitNormal * 8, hitPos - tr.HitNormal * 8)
-
-		-- Direct hit damage
-		if IsValid(hitEnt) then
-			local dmg = DamageInfo()
-			dmg:SetDamage(damagePerHit)
-			dmg:SetDamageType(bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM))
-			dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
-			dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-			dmg:SetDamagePosition(hitPos)
-			hitEnt:TakeDamageInfo(dmg)
-		end
-
-		-- Small splash along the lance for feedback
-		Arcane:BlastDamage(caster, caster, hitPos, 80, 18, DMG_DISSOLVE, true)
-
-		-- Prepare for next penetration
-		table.insert(filter, hitEnt or tr.Entity)
-		startPos = hitPos + dir * 6
-		traveled = traveled + tr.Fraction * (maxDist - traveled)
-		damagePerHit = math.max(15, math.floor(damagePerHit * falloff))
-	end
-
-	-- Broadcast beam segments for client visuals
-	if #segments > 0 then
-		net.Start("Arcana_SpearBeam", true)
-		net.WriteEntity(caster)
-		net.WriteUInt(#segments, 8)
-		for i = 1, #segments do
-			net.WriteVector(segments[i][1])
-			net.WriteVector(segments[i][2])
-		end
-		net.Broadcast()
-	end
+	-- Use the shared spear beam API
+	Arcane.Common.SpearBeam(caster, origin, dir, {
+		maxDist = 2000,
+		damage = 55,
+		splashRadius = 80,
+		splashDamage = 18,
+		filter = {caster}
+	})
 
 	caster:EmitSound("arcana/arcane_1.ogg", 70, 120)
 end
