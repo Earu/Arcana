@@ -75,7 +75,13 @@ Arcane:RegisterSpell({
 		cloud:SetPos(pos)
 		cloud:Spawn()
 		cloud:SetMoveType(MOVETYPE_NONE)
-		cloud:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		cloud:SetCollisionGroup(COLLISION_GROUP_WORLD)
+		cloud:SetModelScale(0)
+		cloud:SetNotSolid(true)
+
+		-- Make it indestructible
+		cloud:SetHealth(999999)
+		cloud:SetMaxHealth(999999)
 
 		if cloud.CPPISetOwner then
 			cloud:CPPISetOwner(caster)
