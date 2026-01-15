@@ -22,47 +22,11 @@ Arcane:RegisterSpell({
 		local origin = (ctx and ctx.circlePos) or (srcEnt.EyePos and srcEnt:EyePos() or srcEnt:WorldSpaceCenter())
 		local aim = srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward()
 
-		-- Select target once: closest to center of screen (aim direction)
-		local best, bestDot, maxRange = nil, -1, 1600
-		for _, ent in ipairs(ents.FindInSphere(origin + aim * (maxRange * 0.6), maxRange)) do
-			if not IsValid(ent) or ent == caster then continue end
-			if not (ent:IsPlayer() or ent:IsNPC()) then continue end
-			if ent:Health() <= 0 then continue end
-			local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
-			local d = dir:Dot(aim)
-
-			if d > bestDot then
-				bestDot, best = d, ent
-			end
-		end
-
-		for i = 1, 3 do
-			timer.Simple(0.06 * (i - 1), function()
-				if not IsValid(caster) then return end
-
-				local ent = ents.Create("arcana_missile")
-				if not IsValid(ent) then return end
-
-				ent:SetPos(origin + aim * 12 + caster:GetRight() * ((i - 2) * 6) + caster:GetUp() * (i == 2 and 0 or 2))
-				ent:SetAngles(aim:Angle())
-				ent:Spawn()
-				ent:SetOwner(caster)
-
-				if ent.SetSpellOwner then
-					ent:SetSpellOwner(caster)
-				end
-
-				if ent.CPPISetOwner then
-					ent:CPPISetOwner(caster)
-				end
-
-				if IsValid(best) and ent.SetHomingTarget then
-					ent:SetHomingTarget(best)
-				end
-			end)
-		end
-
-		sound.Play("weapons/physcannon/energy_sing_flyby1.wav", origin, 70, 160)
+		-- Launch missiles using shared API
+		Arcane.Common.LaunchMissiles(caster, origin, aim, {
+			count = 3,
+			delay = 0.06
+		})
 
 		return true
 	end,

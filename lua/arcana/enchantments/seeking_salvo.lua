@@ -11,22 +11,6 @@ local function isMeleeHoldType(wep)
     return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
-local function selectBestTarget(origin, aim, caster)
-    local best, bestDot = nil, -1
-    local maxRange = 1600
-    for _, ent in ipairs(ents.FindInSphere(origin + aim * (maxRange * 0.6), maxRange)) do
-        if not IsValid(ent) or ent == caster then continue end
-        if not (ent:IsPlayer() or ent:IsNPC()) then continue end
-        if ent:Health() <= 0 then continue end
-        local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
-        local d = dir:Dot(aim)
-        if d > bestDot then
-            bestDot, best = d, ent
-        end
-    end
-    return best
-end
-
 local function attachHook(ply, wep, state)
     if not IsValid(ply) or not IsValid(wep) then return end
 
@@ -47,25 +31,11 @@ local function attachHook(ply, wep, state)
         local origin = caster:GetShootPos()
         local aim = caster:GetAimVector()
 
-        local best = selectBestTarget(origin, aim, caster)
-
-        for i = 1, 3 do
-            timer.Simple(0.06 * (i - 1), function()
-                if not IsValid(caster) then return end
-                local missile = ents.Create("arcana_missile")
-                if not IsValid(missile) then return end
-                missile:SetPos(origin + aim * 12 + caster:GetRight() * ((i - 2) * 6) + caster:GetUp() * (i == 2 and 0 or 2))
-                missile:SetAngles(aim:Angle())
-                missile:Spawn()
-                missile:SetOwner(caster)
-
-                if missile.SetSpellOwner then missile:SetSpellOwner(caster) end
-                if missile.CPPISetOwner then missile:CPPISetOwner(caster) end
-                if IsValid(best) and missile.SetHomingTarget then missile:SetHomingTarget(best) end
-            end)
-        end
-
-        sound.Play("weapons/physcannon/energy_sing_flyby1.wav", origin, 70, 160)
+        -- Launch missiles using shared API
+        Arcane.Common.LaunchMissiles(caster, origin, aim, {
+            count = 3,
+            delay = 0.06
+        })
     end)
 end
 
