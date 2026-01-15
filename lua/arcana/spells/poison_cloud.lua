@@ -66,7 +66,7 @@ Arcane:RegisterSpell({
 		local perTickDamage = 8
 		local slowRefresh = 1.2
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local pos = (ctx.circlePos or srcEnt:WorldSpaceCenter()) + Vector(0, 0, 8)
+		local pos = Arcane:ResolveGroundTarget(srcEnt, 900) + Vector(0, 0, 8)
 
 		local cloud = ents.Create("prop_physics")
 		if not IsValid(cloud) then return false end
@@ -94,65 +94,12 @@ Arcane:RegisterSpell({
 		net.WriteFloat(radius)
 		net.Broadcast()
 
-		Arcane:SendAttachBandVFX(cloud, Color(110, 200, 110, 255), radius * 0.9, duration, {
-			{
-				radius = radius * 0.9,
-				height = 6,
-				spin = {
-					p = 0.2,
-					y = 0.4,
-					r = 0.1
-				},
-				lineWidth = 2
-			},
-			{
-				radius = radius * 0.6,
-				height = 10,
-				spin = {
-					p = -0.3,
-					y = -0.2,
-					r = 0.0
-				},
-				lineWidth = 2
-			},
-		})
-
-		-- Add volumetric smoke using env_smokestack clusters (server-side)
-		do
-			local stackCount = 10
-			local discR = math.min(200, radius * 0.8)
-
-			for i = 1, stackCount do
-				local rr = discR * math.sqrt(math.Rand(0.2, 1.0))
-				local ang = math.Rand(0, math.pi * 2)
-				local spos = pos + Vector(math.cos(ang) * rr, math.sin(ang) * rr, math.Rand(0, 12))
-				local stack = ents.Create("env_smokestack")
-
-				if IsValid(stack) then
-					stack:SetPos(spos)
-					stack:SetKeyValue("InitialState", "1")
-					stack:SetKeyValue("BaseSpread", "35")
-					stack:SetKeyValue("SpreadSpeed", "25")
-					stack:SetKeyValue("Speed", "45")
-					stack:SetKeyValue("StartSize", "22")
-					stack:SetKeyValue("EndSize", "100")
-					stack:SetKeyValue("Rate", "50")
-					stack:SetKeyValue("JetLength", "240")
-					stack:SetKeyValue("Twist", "8")
-					stack:SetKeyValue("RenderColor", "110 200 110")
-					stack:SetKeyValue("RenderAmt", "140")
-					stack:SetKeyValue("SmokeMaterial", "particle/particle_smokegrenade")
-					stack:Spawn()
-					stack:Activate()
-					stack:SetParent(cloud)
-					stack:Fire("TurnOn", "", 0)
-					SafeRemoveEntityDelayed(stack, duration + 0.2)
-				end
-			end
-		end
-
-		-- Client visuals handled in this file (CLIENT block below)
-		sound.Play("ambient/levels/canals/toxic_slime_gurgle5.wav", pos, 70, 100, 0.6)
+		-- Toxic cloud spawn sounds
+		sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(1, 8) .. ".wav", pos, 75, 90)
+		sound.Play("ambient/atmosphere/cave_hit" .. math.random(1, 6) .. ".wav", pos, 70, 70)
+		timer.Simple(0.1, function()
+			sound.Play("npc/barnacle/barnacle_gulp" .. math.random(1, 2) .. ".wav", pos, 70, 70)
+		end)
 		local tid = "Arcana_PoisonCloud_" .. cloud:EntIndex()
 
 		timer.Create(tid, tickInterval, math.floor(duration / tickInterval), function()
@@ -190,8 +137,6 @@ Arcane:RegisterSpell({
 			end
 		end)
 
-		caster:EmitSound("npc/antlion/idle2.wav", 65, 120, 0.6)
-
 		return true
 	end,
 	trigger_phrase_aliases = {
@@ -207,70 +152,140 @@ end
 
 if CLIENT then
 	local activeEmitters = {}
+	local matGlow = Material("sprites/light_glow02_add")
+	local matFlare = Material("effects/blueflare1")
 
 	net.Receive("Arcana_PoisonCloud", function()
 		local cloud = net.ReadEntity()
 		if not IsValid(cloud) then return end
 
 		activeEmitters[cloud] = {
-			duration = net.ReadFloat(),
+			duration = CurTime() + net.ReadFloat(),
 			radius = net.ReadFloat(),
+			birthTime = CurTime(),
+			nextParticle = CurTime(),
 		}
 	end)
 
-	-- Client-only soft green smoke for poison clouds, handled entirely in this file
+	-- Custom casting circle for poison cloud on ground
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_PoisonCloud_Circle", function(caster, spellId, castTime, _forwardLike)
+		if spellId ~= "poison_cloud" then return end
+
+		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+			color = Color(140, 220, 80, 255),
+			size = 24,
+			intensity = 3,
+			positionResolver = function(c)
+				return Arcane:ResolveGroundTarget(c, 900)
+			end
+		})
+	end)
+
+
+	-- Enhanced particle system for toxic cloud
 	local nextScanAt = 0
 
 	hook.Add("Think", "Arcana_PoisonCloud_ClientFX", function()
 		local now = CurTime()
 		if now < nextScanAt then return end
-		nextScanAt = now + 0.1
+		nextScanAt = now + 0.05
 
-		-- Discover/emit
-		for ent, emitter_data in pairs(activeEmitters) do
-			if not IsValid(ent) or emitter_data.duration <= now then
-				if emitter_data.emitter and emitter_data.emitter.Finish then
-					emitter_data.emitter:Finish()
+		for ent, data in pairs(activeEmitters) do
+			if not IsValid(ent) or now > data.duration then
+				if data.emitter and data.emitter.Finish then
+					data.emitter:Finish()
 				end
-
 				activeEmitters[ent] = nil
 				continue
 			end
 
-			if emitter_data.duration > now then
-				local rad = emitter_data.radius
-				local em = emitter_data.emitter
+			if now < data.nextParticle then continue end
+			data.nextParticle = now + 0.06
 
-				if not em then
-					em = ParticleEmitter(ent:GetPos(), false)
-					emitter_data.emitter = em
+			local pos = ent:GetPos()
+			local rad = data.radius
+			local em = data.emitter
+
+			if not em then
+				em = ParticleEmitter(pos, false)
+				data.emitter = em
+			end
+
+			if not em then continue end
+			em:SetPos(pos)
+
+			-- Ground-level dense toxic fog
+			for i = 1, 4 do
+				local rr = rad * math.sqrt(math.Rand(0, 1))
+				local a = math.Rand(0, math.pi * 2)
+				local off = Vector(math.cos(a) * rr, math.sin(a) * rr, math.Rand(0, 8))
+				local p = em:Add("particle/particle_smokegrenade", pos + off)
+
+				if p then
+					p:SetDieTime(math.Rand(2.5, 3.5))
+					p:SetStartAlpha(0)
+					p:SetEndAlpha(math.Rand(140, 180))
+					local sz = math.Rand(30, 45)
+					p:SetStartSize(sz)
+					p:SetEndSize(sz * math.Rand(1.4, 1.8))
+					p:SetRoll(math.Rand(0, 360))
+					p:SetRollDelta(math.Rand(-0.3, 0.3))
+
+					-- Toxic yellow-green color
+					local colorVar = math.Rand(0.8, 1.2)
+					p:SetColor(100 * colorVar, 180 * colorVar, 50 * colorVar)
+
+					p:SetAirResistance(120)
+					p:SetGravity(Vector(0, 0, math.Rand(2, 6)))
+					p:SetVelocity(Vector(math.Rand(-15, 15), math.Rand(-15, 15), 0))
+					p:SetCollide(false)
 				end
+			end
 
-				if not em then continue end
-				em:SetPos(ent:GetPos())
-
-				for i = 1, 3 do
-					local rr = rad * math.sqrt(math.Rand(0, 1))
+			-- Rising toxic vapor wisps
+			if math.random() > 0.3 then
+				for i = 1, 2 do
+					local rr = rad * math.Rand(0.3, 0.8)
 					local a = math.Rand(0, math.pi * 2)
-					local off = Vector(math.cos(a) * rr, math.sin(a) * rr, math.Rand(0, 10))
-					local p = em:Add("particle/particle_smokegrenade", ent:GetPos() + off)
+					local off = Vector(math.cos(a) * rr, math.sin(a) * rr, 0)
+					local p = em:Add("particle/particle_smokegrenade", pos + off)
 
 					if p then
-						local life = math.Rand(1.4, 2.4)
-						p:SetDieTime(life)
+						p:SetDieTime(math.Rand(1.5, 2.5))
 						p:SetStartAlpha(0)
-						p:SetEndAlpha(140)
-						local sz = math.Rand(18, 30)
+						p:SetEndAlpha(math.Rand(100, 140))
+						local sz = math.Rand(15, 25)
 						p:SetStartSize(sz)
-						p:SetEndSize(sz * math.Rand(3.4, 4.6))
+						p:SetEndSize(sz * math.Rand(0.6, 1.0))
 						p:SetRoll(math.Rand(0, 360))
-						p:SetRollDelta(math.Rand(-0.5, 0.5))
-						p:SetColor(110, 200, 110)
-						p:SetAirResistance(70)
-						p:SetGravity(Vector(0, 0, math.Rand(22, 38)))
-						p:SetVelocity(VectorRand():GetNormalized() * math.Rand(10, 32))
+						p:SetRollDelta(math.Rand(-1, 1))
+						p:SetColor(120, 220, 70)
+						p:SetAirResistance(50)
+						p:SetGravity(Vector(0, 0, math.Rand(35, 50)))
+						p:SetVelocity(Vector(math.Rand(-8, 8), math.Rand(-8, 8), math.Rand(20, 40)))
 						p:SetCollide(false)
 					end
+				end
+			end
+
+			-- Toxic glow particles (bubbling effect)
+			if math.random() > 0.5 then
+				local rr = rad * math.Rand(0.2, 0.9)
+				local a = math.Rand(0, math.pi * 2)
+				local off = Vector(math.cos(a) * rr, math.sin(a) * rr, 0)
+				local p = em:Add("effects/blueflare1", pos + off)
+
+				if p then
+					p:SetDieTime(math.Rand(0.8, 1.5))
+					p:SetStartAlpha(math.Rand(200, 255))
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(8, 14))
+					p:SetEndSize(0)
+					p:SetColor(140, 220, 80)
+					p:SetAirResistance(30)
+					p:SetGravity(Vector(0, 0, math.Rand(25, 40)))
+					p:SetVelocity(Vector(math.Rand(-10, 10), math.Rand(-10, 10), math.Rand(15, 30)))
+					p:SetCollide(false)
 				end
 			end
 		end
