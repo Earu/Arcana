@@ -631,57 +631,6 @@ Envs:RegisterEnvironment({
 })
 
 if CLIENT then
-	local FOG_COLOR =  Color(74, 102, 92)
-	local volumetricFogActive = false
-
-	-- Update volumetric fog parameters based on player position and environment
-	local function UpdateVolumetricFog()
-		--[[local active = Envs and Envs.Active
-		if not active or active.id ~= "magical_forest" then
-			if volumetricFogActive then
-				Arcane.VolumetricFog.RemoveVolume("magical_forest")
-				volumetricFogActive = false
-			end
-			return
-		end
-
-		local ply = LocalPlayer()
-		if not IsValid(ply) then return end
-
-		local origin = active.origin or Vector(0, 0, 0)
-		local eff = tonumber(active.effective_radius or 0) or 0
-		local forestRange = math.floor(eff * 0.9)
-
-		-- Create or update volumetric fog volume
-		local volumeHeight = math.max(1000, forestRange * 0.5)
-		local fogParams = {}
-		fogParams.enabled = ply:Alive()
-
-		if not volumetricFogActive then
-			fogParams.pos = origin
-			fogParams.aabb = Vector(forestRange * 2, forestRange * 2, 2500)
-			fogParams.density = 0.25
-			fogParams.fogstart = 0
-			fogParams.fogend = 0
-			fogParams.color = FOG_COLOR
-			fogParams.edgefade = forestRange * 0.4
-			fogParams.noisesize = 4000
-			fogParams.noisemininfluence = 1
-			fogParams.noisemaxinfluence = 1
-			fogParams.scrollx = 0
-			fogParams.scrolly = 0
-			fogParams.scrollz = 0
-
-			Arcane.VolumetricFog.RegisterVolume("magical_forest", fogParams)
-			volumetricFogActive = true
-		else
-			Arcane.VolumetricFog.UpdateVolume("magical_forest", fogParams)
-		end]]
-	end
-
-	-- disable volumetric fog for now until we figure out a fix
-	hook.Add("Think", "Arcana_MagicalForest_VolumetricFog", UpdateVolumetricFog)
-
 	-- Client-side summoning circle for graveyard skeleton spawns
 	net.Receive("Arcana_GraveyardCircle", function()
 		local pos = net.ReadVector()
