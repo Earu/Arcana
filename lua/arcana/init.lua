@@ -3,6 +3,7 @@ if SERVER then
 	AddCSLuaFile("arcana/environments.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/enchant_vfx.lua")
+	AddCSLuaFile("arcana/common/spear_beam.lua")
 	AddCSLuaFile("arcana/hud.lua")
 	AddCSLuaFile("arcana/spell_browser.lua")
 	AddCSLuaFile("arcana/voice_activation.lua")
@@ -27,6 +28,7 @@ include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
 include("arcana/soul_mode.lua")
 include("arcana/volumetric_fog.lua")
+include("arcana/common/spear_beam.lua")
 
 if SERVER then
 	include("arcana/mana_crystals.lua")
@@ -39,51 +41,21 @@ if CLIENT then
 	include("arcana/voice_activation.lua")
 end
 
--- Load all statuses from arcana/status/*.lua
-do
-	local files = file.Find("arcana/status/*.lua", "LUA")
+local function includePath(path)
+	local files = file.Find(path .. "/*.lua", "LUA")
 	for _, fname in ipairs(files) do
 		if SERVER then
-			AddCSLuaFile("arcana/status/" .. fname)
+			AddCSLuaFile(path .. "/" .. fname)
 		end
-		include("arcana/status/" .. fname)
+		include(path .. "/" .. fname)
 	end
 end
 
--- Load all environments from arcana/environments/*.lua so each environment can live in its own file
-do
-	local files = file.Find("arcana/environments/*.lua", "LUA")
-	for _, fname in ipairs(files) do
-		if SERVER then
-			AddCSLuaFile("arcana/environments/" .. fname)
-		end
-		include("arcana/environments/" .. fname)
-	end
-end
-
--- Load all spells from arcana/spells/*.lua so each spell can live in its own file
-do
-	local files = file.Find("arcana/spells/*.lua", "LUA")
-	for _, fname in ipairs(files) do
-		if SERVER then
-			AddCSLuaFile("arcana/spells/" .. fname)
-		end
-
-		include("arcana/spells/" .. fname)
-	end
-end
-
--- Load all enchantments from arcana/enchantments/*.lua so each enchantment can live in its own file
-do
-	local files = file.Find("arcana/enchantments/*.lua", "LUA")
-	for _, fname in ipairs(files) do
-		if SERVER then
-			AddCSLuaFile("arcana/enchantments/" .. fname)
-		end
-
-		include("arcana/enchantments/" .. fname)
-	end
-end
+includePath("arcana/common")
+includePath("arcana/status")
+includePath("arcana/environments")
+includePath("arcana/spells")
+includePath("arcana/enchantments")
 
 local function applyFallback(tbl, name, fallback)
 	if not tbl[name] then
