@@ -54,7 +54,12 @@ Arcane:RegisterSpell({
 			},
 		})
 
-		srcEnt:EmitSound("ambient/energy/zap" .. math.random(1, 9) .. ".wav", 75, math.random(110, 130))
+		sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", srcEnt:GetPos(), 80, 110)
+		sound.Play("weapons/physcannon/physcannon_charge.wav", srcEnt:GetPos(), 75, 140)
+
+		timer.Simple(0.05, function()
+			sound.Play("weapons/physcannon/energy_sing_flyby1.wav", srcEnt:GetPos(), 70, 120)
+		end)
 
 		return true
 	end
