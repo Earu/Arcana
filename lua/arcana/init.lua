@@ -3,7 +3,6 @@ if SERVER then
 	AddCSLuaFile("arcana/environments.lua")
 	AddCSLuaFile("arcana/circles.lua")
 	AddCSLuaFile("arcana/enchant_vfx.lua")
-	AddCSLuaFile("arcana/common/spear_beam.lua")
 	AddCSLuaFile("arcana/hud.lua")
 	AddCSLuaFile("arcana/spell_browser.lua")
 	AddCSLuaFile("arcana/voice_activation.lua")
@@ -28,7 +27,6 @@ include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
 include("arcana/soul_mode.lua")
 include("arcana/volumetric_fog.lua")
-include("arcana/common/spear_beam.lua")
 
 if SERVER then
 	include("arcana/mana_crystals.lua")
