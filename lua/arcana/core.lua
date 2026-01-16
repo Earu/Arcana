@@ -55,9 +55,6 @@ end
 
 -- Configuration
 Arcane.Config = {
-	-- XP and Leveling
-	BASE_XP_REQUIRED = 75,
-	XP_MULTIPLIER = 1.25,
 	KNOWLEDGE_POINTS_PER_LEVEL = 1,
 	MAX_LEVEL = 100,
 	-- Full XP is awarded at this cast time; shorter casts scale down, longer casts scale up (clamped)
@@ -563,7 +560,9 @@ end
 
 -- Utility Functions
 function Arcane:GetXPRequiredForLevel(level)
-	return math.floor(Arcane.Config.BASE_XP_REQUIRED * (Arcane.Config.XP_MULTIPLIER ^ (level - 1)))
+	-- New quadratic formula for smoother, more achievable progression
+	-- Designed so that max XP gains of ~100 per action make reaching level 100 feasible
+	return math.floor(1.25 * level * level + 12.5 * level)
 end
 
 function Arcane:GetTotalXPForLevel(level)
@@ -778,7 +777,14 @@ function Arcane:GiveXP(ply, amount, reason)
 
 	local data = self:GetPlayerData(ply)
 	local oldLevel = data.level
-	data.xp = data.xp + amount
+
+	-- Cap XP at max level
+	local maxXP = self:GetTotalXPForLevel(Arcane.Config.MAX_LEVEL)
+	if data.xp >= maxXP then
+		return false -- Already at max XP
+	end
+
+	data.xp = math.min(data.xp + amount, maxXP)
 	reason = reason or "Unknown"
 
 	runHook("PlayerGainedXP", ply, amount, reason)

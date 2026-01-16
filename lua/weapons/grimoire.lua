@@ -542,22 +542,35 @@ if CLIENT then
 				ArtDeco.FillDecoPanel(chipX, chipY, chipW, chipH, ArtDeco.Colors.paleGold, 8)
 				draw.SimpleText(chipText, "Arcana_Ancient", chipX + (chipW - cw) * 0.5, chipY + (chipH - ch) * 0.5, ArtDeco.Colors.chipTextCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 				-- XP bar under title, full width inside the frame
-				local totalForCurrent = Arcane:GetTotalXPForLevel(data.level)
-				local neededForNext = Arcane:GetXPRequiredForLevel(data.level)
-				local xpInto = math.max(0, (data.xp or 0) - totalForCurrent)
-				local progress = neededForNext > 0 and math.Clamp(xpInto / neededForNext, 0, 1) or 1
 				local barX = 18
 				local barW = w - 36
 				local barH = 12
 				local barY = 42
-				-- Fill
 				local innerPad = 4
+
+				-- Check if player is at max level
+				local isMaxLevel = data.level >= Arcane.Config.MAX_LEVEL
+				local progress, xpLabel
+
+				if isMaxLevel then
+					-- Max level: fill bar completely and show "MAX."
+					progress = 1
+					xpLabel = "MAX."
+				else
+					-- Normal XP progression
+					local totalForCurrent = Arcane:GetTotalXPForLevel(data.level)
+					local neededForNext = Arcane:GetXPRequiredForLevel(data.level)
+					local xpInto = math.max(0, (data.xp or 0) - totalForCurrent)
+					progress = neededForNext > 0 and math.Clamp(xpInto / neededForNext, 0, 1) or 1
+					xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext) .. " XP"
+				end
+
+				-- Fill
 				local fillW = math.floor((barW - innerPad * 2) * progress)
 				draw.NoTexture()
 				surface.SetDrawColor(ArtDeco.Colors.xpFill)
 				surface.DrawRect(barX + innerPad, barY + innerPad, fillW, barH - innerPad * 2)
-				-- XP label centered over the bar
-				local xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext)
+				-- XP label
 				surface.SetFont("Arcana_Ancient")
 				local lx, _ = surface.GetTextSize(xpLabel)
 				draw.SimpleText(xpLabel, "Arcana_Ancient", barX + barW - lx, barY - 4, ArtDeco.Colors.textBright)
