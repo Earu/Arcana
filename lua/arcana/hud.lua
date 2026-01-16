@@ -1,5 +1,5 @@
 -- Arcana Global HUD (casting + cooldown), shared independent of SWEP
--- Reuses styling helpers/colors from the grimoire UI for visual cohesion
+-- Reuses styling helpers/colors from the Art Deco library for visual cohesion
 if not CLIENT then return end
 
 -- Local reference cache
@@ -10,209 +10,10 @@ local function getData()
 	return Arcane:GetPlayerData(ply)
 end
 
--- Colors and helpers copied to keep this module self-contained.
--- If you centralize these later, import from a shared style file instead.
-surface.CreateFont("Arcana_AncientSmall", {
-	font = "Georgia",
-	size = 16,
-	weight = 600,
-	antialias = true,
-	extended = true
-})
-
-surface.CreateFont("Arcana_Ancient", {
-	font = "Georgia",
-	size = 20,
-	weight = 700,
-	antialias = true,
-	extended = true
-})
-
-surface.CreateFont("Arcana_AncientLarge", {
-	font = "Georgia",
-	size = 24,
-	weight = 800,
-	antialias = true,
-	extended = true
-})
-
-surface.CreateFont("Arcana_DecoTitle", {
-	font = "Georgia",
-	size = 26,
-	weight = 900,
-	antialias = true,
-	extended = true
-})
-
--- local decoBg = Color(26, 20, 14, 235)
-local decoPanel = Color(32, 24, 18, 235)
-local gold = Color(198, 160, 74, 255)
-local paleGold = Color(222, 198, 120, 255)
-local textBright = Color(236, 230, 220, 255)
--- local textDim = Color(180, 170, 150, 255)
--- reserved for future chips next to titles
--- local chipTextCol = Color(24, 26, 36, 230)
-local xpFill = Color(222, 198, 120, 180)
-
--- Gradient materials (reserved for future use)
--- souls-like banner removed (kept for reference previously)
--- Small Art Deco flourish: center diamond with flanking lines
-local function drawDecoFlourish(x, y, w, h, alpha)
-	local a = math.Clamp(tonumber(alpha) or 255, 0, 255)
-	local cx = x + math.floor(w * 0.5)
-	local lineY = y + math.floor(h * 0.48)
-	local lineCol = Color(gold.r, gold.g, gold.b, math.floor(80 * (a / 255)))
-	surface.SetDrawColor(lineCol)
-	surface.DrawLine(cx - 110, lineY, cx - 20, lineY)
-	surface.DrawLine(cx + 20, lineY, cx + 110, lineY)
-	-- diamond
-	draw.NoTexture()
-	surface.SetDrawColor(gold.r, gold.g, gold.b, math.floor(110 * (a / 255)))
-	local d = 7
-
-	local pts = {
-		{
-			x = cx,
-			y = lineY - d
-		},
-		{
-			x = cx + d,
-			y = lineY
-		},
-		{
-			x = cx,
-			y = lineY + d
-		},
-		{
-			x = cx - d,
-			y = lineY
-		},
-	}
-
-	surface.DrawPoly(pts)
-	-- inner faint diamond
-	surface.SetDrawColor(236, 230, 220, math.floor(60 * (a / 255)))
-	local d2 = 3
-
-	local pts2 = {
-		{
-			x = cx,
-			y = lineY - d2
-		},
-		{
-			x = cx + d2,
-			y = lineY
-		},
-		{
-			x = cx,
-			y = lineY + d2
-		},
-		{
-			x = cx - d2,
-			y = lineY
-		},
-	}
-
-	surface.DrawPoly(pts2)
-end
-
--- Hexagon frame (no fill) to encapsulate announcement text
-local function drawHexFrame(x, y, w, h, alpha)
-	local a = math.Clamp(tonumber(alpha) or 255, 0, 255)
-	local m = math.max(10, math.floor(math.min(w, h) * 0.10))
-	local cy = y + h * 0.5
-
-	local p1 = {
-		x = x + m,
-		y = y
-	}
-
-	local p2 = {
-		x = x + w - m,
-		y = y
-	}
-
-	local p3 = {
-		x = x + w,
-		y = cy
-	}
-
-	local p4 = {
-		x = x + w - m,
-		y = y + h
-	}
-
-	local p5 = {
-		x = x + m,
-		y = y + h
-	}
-
-	local p6 = {
-		x = x,
-		y = cy
-	}
-
-	local function drawEdge(aPt, bPt, col)
-		surface.SetDrawColor(col)
-		surface.DrawLine(aPt.x, aPt.y, bPt.x, bPt.y)
-	end
-
-	local mainCol = Color(gold.r, gold.g, gold.b, math.floor(140 * (a / 255)))
-	local accentCol = Color(236, 230, 220, math.floor(60 * (a / 255)))
-	-- outer stroke
-	drawEdge(p1, p2, mainCol)
-	drawEdge(p2, p3, mainCol)
-	drawEdge(p3, p4, mainCol)
-	drawEdge(p4, p5, mainCol)
-	drawEdge(p5, p6, mainCol)
-	drawEdge(p6, p1, mainCol)
-	-- second pass for a slightly thicker, highlighted edge
-	drawEdge(p1, p2, accentCol)
-	drawEdge(p2, p3, accentCol)
-	drawEdge(p3, p4, accentCol)
-	drawEdge(p4, p5, accentCol)
-	drawEdge(p5, p6, accentCol)
-	drawEdge(p6, p1, accentCol)
-end
-
--- Hexagon dark background fill (slightly inset so the border stays crisp)
-local function drawHexFill(x, y, w, h, alpha)
-	local a = math.Clamp(tonumber(alpha) or 255, 0, 255)
-	local m = math.max(10, math.floor(math.min(w, h) * 0.10))
-	local inset = 1
-	local cy = y + h * 0.5
-
-	local pts = {
-		{
-			x = x + m + inset,
-			y = y + inset
-		},
-		{
-			x = x + w - m - inset,
-			y = y + inset
-		},
-		{
-			x = x + w - inset,
-			y = cy
-		},
-		{
-			x = x + w - m - inset,
-			y = y + h - inset
-		},
-		{
-			x = x + m + inset,
-			y = y + h - inset
-		},
-		{
-			x = x + inset,
-			y = cy
-		},
-	}
-
-	draw.NoTexture()
-	surface.SetDrawColor(20, 16, 12, math.floor(160 * (a / 255)))
-	surface.DrawPoly(pts)
-end
+-- Reusable color objects to avoid allocation overhead in draw calls
+local _tempTextCol = Color(236, 230, 220, 255)
+local _tempSubCol = Color(222, 198, 120, 255)
+local _tempShadowCol = Color(0, 0, 0, 255)
 
 -- Unlock announcement state
 local unlockAnnounce = {
@@ -277,62 +78,6 @@ hook.Add("Arcana_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, 
 	surface.PlaySound("arcana/arcane_1.ogg")
 end)
 
-local function DrawDecoFrame(x, y, w, h, col, corner)
-	local c = math.max(8, corner or 12)
-	surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-	surface.DrawLine(x + c, y, x + w - c, y)
-	surface.DrawLine(x + w, y + c, x + w, y + h - c)
-	surface.DrawLine(x + w - c, y + h, x + c, y + h)
-	surface.DrawLine(x, y + h - c, x, y + c)
-	surface.DrawLine(x, y + c, x + c, y)
-	surface.DrawLine(x + w - c, y, x + w, y + c)
-	surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-	surface.DrawLine(x + c, y + h, x, y + h - c)
-end
-
-local function FillDecoPanel(x, y, w, h, col, corner)
-	local c = math.max(8, corner or 12)
-	draw.NoTexture()
-	surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-
-	local pts = {
-		{
-			x = x + c,
-			y = y
-		},
-		{
-			x = x + w - c,
-			y = y
-		},
-		{
-			x = x + w,
-			y = y + c
-		},
-		{
-			x = x + w,
-			y = y + h - c
-		},
-		{
-			x = x + w - c,
-			y = y + h
-		},
-		{
-			x = x + c,
-			y = y + h
-		},
-		{
-			x = x,
-			y = y + h - c
-		},
-		{
-			x = x,
-			y = y + c
-		},
-	}
-
-	surface.DrawPoly(pts)
-end
-
 -- Casting state (client-only) fed by Arcane_BeginCasting
 local activeCast = {
 	spellId = nil,
@@ -361,22 +106,22 @@ local function drawCastingBar(scrW, scrH)
 	local barW, barH = math.floor(scrW * 0.36), 5 * (1440 / scrH)
 	local x = math.floor((scrW - barW) * 0.5)
 	local y = scrH - 150
-	FillDecoPanel(x - 10, y - 16, barW + 20, barH + 32, decoPanel, 10)
-	DrawDecoFrame(x - 10, y - 16, barW + 20, barH + 32, gold, 10)
+	ArtDeco.FillDecoPanel(x - 10, y - 16, barW + 20, barH + 32, ArtDeco.Colors.decoPanel, 10)
+	ArtDeco.DrawDecoFrame(x - 10, y - 16, barW + 20, barH + 32, ArtDeco.Colors.gold, 10)
 	-- Title
 	local title = string.upper("Casting")
-	draw.SimpleText(title, "Arcana_Ancient", x, y - 14, paleGold)
+	draw.SimpleText(title, "Arcana_Ancient", x, y - 14, ArtDeco.Colors.paleGold)
 	-- Bar background
 	surface.SetDrawColor(60, 46, 34, 220)
 	surface.DrawRect(x, y, barW, barH)
 	-- Fill
-	surface.SetDrawColor(xpFill)
+	surface.SetDrawColor(ArtDeco.Colors.xpFill)
 	surface.DrawRect(x + 2, y + 2, math.floor((barW - 4) * progress), barH - 4)
 	-- Label
 	local remain = math.max(0, activeCast.endsAt - now)
 	local spellName = Arcane.RegisteredSpells[activeCast.spellId] and Arcane.RegisteredSpells[activeCast.spellId].name or activeCast.spellId
 	local label = string.format("%s  %.1fs", spellName or "", remain)
-	draw.SimpleText(label, "Arcana_AncientSmall", x + barW * 0.5, y + barH + 8, textBright, TEXT_ALIGN_CENTER)
+	draw.SimpleText(label, "Arcana_AncientSmall", x + barW * 0.5, y + barH + 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
 end
 
 local function drawCooldownStack(scrW, scrH)
@@ -414,16 +159,16 @@ local function drawCooldownStack(scrW, scrH)
 
 	for i = 1, #entries do
 		local e = entries[i]
-		FillDecoPanel(x, y, rowW, rowH, decoPanel, 8)
-		DrawDecoFrame(x, y, rowW, rowH, gold, 8)
-		draw.SimpleText(e.spell.name, "Arcana_Ancient", x + 10, y + 6, textBright)
+		ArtDeco.FillDecoPanel(x, y, rowW, rowH, ArtDeco.Colors.decoPanel, 8)
+		ArtDeco.DrawDecoFrame(x, y, rowW, rowH, ArtDeco.Colors.gold, 8)
+		draw.SimpleText(e.spell.name, "Arcana_Ancient", x + 10, y + 6, ArtDeco.Colors.textBright)
 		local remainText = string.format("%.1fs", e.remain)
-		draw.SimpleText(remainText, "Arcana_AncientSmall", x + rowW - 10, y + 8, paleGold, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(remainText, "Arcana_AncientSmall", x + rowW - 10, y + 8, ArtDeco.Colors.paleGold, TEXT_ALIGN_RIGHT)
 		-- thin progress bar
 		local progress = 1 - math.Clamp(e.remain / math.max(0.001, e.total), 0, 1)
 		surface.SetDrawColor(60, 46, 34, 220)
 		surface.DrawRect(x + 10, y + rowH - 10, rowW - 20, 6)
-		surface.SetDrawColor(xpFill)
+		surface.SetDrawColor(ArtDeco.Colors.xpFill)
 		surface.DrawRect(x + 12, y + rowH - 8, math.floor((rowW - 24) * progress), 2)
 		y = y + rowH + gap
 	end
@@ -448,24 +193,28 @@ local function drawLevelAnnouncement(scrW, scrH)
 	local panelH = 120
 	local x = math.floor((scrW - panelW) * 0.5)
 	local y = math.floor(scrH * 0.28)
-	local textCol = Color(textBright.r, textBright.g, textBright.b, alpha)
-	local subCol = Color(paleGold.r, paleGold.g, paleGold.b, alpha)
+
+	-- Reuse temp color objects to avoid allocations
+	_tempTextCol.a = alpha
+	_tempSubCol.a = alpha
+	_tempShadowCol.a = alpha
+
 	-- Hex background + frame + subtle flourish
-	drawHexFill(x, y, panelW, panelH, alpha)
-	drawHexFrame(x, y, panelW, panelH, alpha)
-	drawDecoFlourish(x, y, panelW, panelH, alpha)
+	ArtDeco.DrawHexFill(x, y, panelW, panelH, alpha)
+	ArtDeco.DrawHexFrame(x, y, panelW, panelH, alpha)
+	ArtDeco.DrawDecoFlourish(x, y, panelW, panelH, alpha)
 	local title = string.upper("Level Up")
 	local levelText = "Level " .. tostring(levelAnnounce.newLevel)
 	local knowText = "+" .. tostring(levelAnnounce.knowledgeDelta) .. " Knowledge"
 	-- subtle drop shadow for readability
-	draw.SimpleText(title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 21, Color(0, 0, 0, alpha), TEXT_ALIGN_CENTER)
-	draw.SimpleText(title, "Arcana_DecoTitle", x + panelW * 0.5, y + 20, textCol, TEXT_ALIGN_CENTER)
-	draw.SimpleText(levelText, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 61, Color(0, 0, 0, alpha), TEXT_ALIGN_CENTER)
-	draw.SimpleText(levelText, "Arcana_AncientLarge", x + panelW * 0.5, y + 60, subCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 21, _tempShadowCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(title, "Arcana_DecoTitle", x + panelW * 0.5, y + 20, _tempTextCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(levelText, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 61, _tempShadowCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(levelText, "Arcana_AncientLarge", x + panelW * 0.5, y + 60, _tempSubCol, TEXT_ALIGN_CENTER)
 
 	if levelAnnounce.knowledgeDelta and levelAnnounce.knowledgeDelta > 0 then
-		draw.SimpleText(knowText, "Arcana_Ancient", x + panelW * 0.5 + 1, y + 91, Color(0, 0, 0, alpha), TEXT_ALIGN_CENTER)
-		draw.SimpleText(knowText, "Arcana_Ancient", x + panelW * 0.5, y + 90, subCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(knowText, "Arcana_Ancient", x + panelW * 0.5 + 1, y + 91, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(knowText, "Arcana_Ancient", x + panelW * 0.5, y + 90, _tempSubCol, TEXT_ALIGN_CENTER)
 	end
 end
 
@@ -489,17 +238,20 @@ local function drawUnlockAnnouncement(scrW, scrH)
 	local panelH = 110
 	local x = math.floor((scrW - panelW) * 0.5)
 	local y = math.floor(scrH * 0.16)
-	local textCol = Color(textBright.r, textBright.g, textBright.b, alpha)
-	local subCol = Color(paleGold.r, paleGold.g, paleGold.b, alpha)
+
+	-- Reuse temp color objects to avoid allocations
+	_tempTextCol.a = alpha
+	_tempSubCol.a = alpha
+	_tempShadowCol.a = alpha
 
 	-- Hex background + frame + subtle flourish
-	drawHexFill(x, y, panelW, panelH, alpha)
-	drawHexFrame(x, y, panelW, panelH, alpha)
-	drawDecoFlourish(x, y, panelW, panelH, alpha)
-	draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 19, Color(0, 0, 0, alpha), TEXT_ALIGN_CENTER)
-	draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5, y + 18, textCol, TEXT_ALIGN_CENTER)
-	draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 59, Color(0, 0, 0, alpha), TEXT_ALIGN_CENTER)
-	draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, y + 58, subCol, TEXT_ALIGN_CENTER)
+	ArtDeco.DrawHexFill(x, y, panelW, panelH, alpha)
+	ArtDeco.DrawHexFrame(x, y, panelW, panelH, alpha)
+	ArtDeco.DrawDecoFlourish(x, y, panelW, panelH, alpha)
+	draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 19, _tempShadowCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5, y + 18, _tempTextCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 59, _tempShadowCol, TEXT_ALIGN_CENTER)
+	draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, y + 58, _tempSubCol, TEXT_ALIGN_CENTER)
 end
 
 hook.Add("HUDPaint", "Arcana_GlobalHUD", function()

@@ -301,56 +301,9 @@ if CLIENT then
 		surface.PlaySound("buttons/button15.wav")
 	end, nil, "Summon the weapon from astral vault slot 1-6")
 
-	-- Art deco helpers (mirrors enchanter styles)
-	surface.CreateFont("Arcana_AncientSmall", {font = "Georgia", size = 16, weight = 600, antialias = true, extended = true})
-	surface.CreateFont("Arcana_Ancient", {font = "Georgia", size = 20, weight = 700, antialias = true, extended = true})
-	surface.CreateFont("Arcana_AncientLarge", {font = "Georgia", size = 24, weight = 800, antialias = true, extended = true})
-
+	-- Custom colors for astral vault (darker theme)
 	local decoBg = Color(12, 12, 20, 235)
 	local decoPanel = Color(18, 18, 28, 235)
-	local gold = Color(198, 160, 74, 255)
-	local textBright = Color(236, 230, 220, 255)
-	local paleGold = Color(222, 198, 120, 255)
-	local blurMat = Material("pp/blurscreen")
-
-	local function DrawBlurRect(x, y, w, h, layers, density)
-		surface.SetMaterial(blurMat)
-		surface.SetDrawColor(255,255,255)
-		render.SetScissorRect(x, y, x + w, y + h, true)
-		for i = 1, (layers or 4) do
-			blurMat:SetFloat("$blur", (i / (layers or 4)) * (density or 8))
-			blurMat:Recompute()
-			render.UpdateScreenEffectTexture()
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		end
-		render.SetScissorRect(0, 0, 0, 0, false)
-	end
-
-	local function FillDeco(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		draw.NoTexture()
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		local pts = {
-			{x = x + c, y = y}, {x = x + w - c, y = y}, {x = x + w, y = y + c}, {x = x + w, y = y + h - c},
-			{x = x + w - c, y = y + h}, {x = x + c, y = y + h}, {x = x, y = y + h - c}, {x = x, y = y + c},
-		}
-		surface.DrawPoly(pts)
-	end
-
-	local function DrawDecoFrame(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		surface.DisableClipping(true)
-		surface.DrawLine(x + c, y, x + w - c, y)
-		surface.DrawLine(x + w, y + c, x + w, y + h - c)
-		surface.DrawLine(x + w - c, y + h, x + c, y + h)
-		surface.DrawLine(x, y + h - c, x, y + c)
-		surface.DrawLine(x, y + c, x + c, y)
-		surface.DrawLine(x + w - c, y, x + w, y + c)
-		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-		surface.DrawLine(x + c, y + h, x, y + h - c)
-		surface.DisableClipping(false)
-	end
 
 	local function drawGalaxyBackground(pnl, w, h, starSeed)
 		-- Galaxy clipped to an art-deco octagon using the stencil buffer
@@ -419,26 +372,6 @@ if CLIENT then
 	-- Global-ish state for live refresh
 	local VAULT = {frame = nil, items = {}, rebuild = nil}
 
-	local function drawTruncatedText(font, text, x, y, col, maxW)
-		surface.SetFont(font)
-		local tw, _ = surface.GetTextSize(text)
-		if tw <= maxW then
-			draw.SimpleText(text, font, x, y, col)
-			return
-		end
-		local ell = "…"
-		local base = text
-		while #base > 0 do
-			base = string.sub(base, 1, #base - 1)
-			local test = base .. ell
-			local w2, _ = surface.GetTextSize(test)
-			if w2 <= maxW then
-				draw.SimpleText(test, font, x, y, col)
-				return
-			end
-		end
-	end
-
 	local function getEnchantDisplayList(ids)
 		local out = {}
 		for _, id in ipairs(ids or {}) do
@@ -456,9 +389,9 @@ if CLIENT then
 		local tw, th = surface.GetTextSize(txt)
 		local padX, padY = 6, 2
 		local w, h = tw + padX * 2, th + padY * 2
-		FillDeco(x, y, w, h, bgCol or COLOR_CHIP_BG, 6)
-		DrawDecoFrame(x, y, w, h, frameCol or COLOR_CHIP_FRAME, 6)
-		draw.SimpleText(txt, font or "Arcana_AncientSmall", x + padX, y + padY - 1, textBright)
+		ArtDeco.FillDecoPanel(x, y, w, h, bgCol or COLOR_CHIP_BG, 6)
+		ArtDeco.DrawDecoFrame(x, y, w, h, frameCol or COLOR_CHIP_FRAME, 6)
+		draw.SimpleText(txt, font or "Arcana_AncientSmall", x + padX, y + padY - 1, ArtDeco.Colors.textBright)
 		return w, h
 	end
 
@@ -510,13 +443,13 @@ if CLIENT then
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
-			DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
+			ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
 		end)
 
 		frame.Paint = function(pnl, w, h)
 			drawGalaxyBackground(pnl, w, h, VAULT.seed)
-			DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
-			draw.SimpleText(string.upper("Astral Vault"), "Arcana_AncientLarge", 18, 10, paleGold)
+			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
+			draw.SimpleText(string.upper("Astral Vault"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
 		end
 
 		-- Style close button like enchanter
@@ -528,7 +461,7 @@ if CLIENT then
 				if IsValid(close) then close:SetPos(w - 26 - 10, 8) end
 			end
 			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(gold)
+				surface.SetDrawColor(ArtDeco.Colors.gold)
 				local pad = 8
 				surface.DrawLine(pad, pad, w - pad, h - pad)
 				surface.DrawLine(w - pad, pad, pad, h - pad)
@@ -559,11 +492,11 @@ if CLIENT then
 		local function buildSlot(parent, it, slotIndex)
 			local card = vgui.Create("DPanel", parent)
 			card.Paint = function(pnl, w, h)
-				FillDeco(2, 2, w - 4, h - 4, COLOR_DECO_BG, 8)
-				DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
+				ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, COLOR_DECO_BG, 8)
+				ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
 				if it then
 					local title = (it.name or it.print or it.class or "Weapon")
-					drawTruncatedText("Arcana_AncientLarge", title, 10, 8, textBright, w - 20)
+					ArtDeco.DrawTruncatedText("Arcana_AncientLarge", title, 10, 8, ArtDeco.Colors.textBright, w - 20)
 				else
 					draw.SimpleText("EMPTY", "Arcana_AncientLarge", w * 0.5, h * 0.5, COLOR_EMPTY_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
@@ -614,10 +547,10 @@ if CLIENT then
 				local enabled = pnl:IsEnabled()
 				local hovered = enabled and pnl:IsHovered()
 				local bgCol = hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG
-				FillDeco(0, 0, w, h, bgCol, 8)
-				local frameCol = enabled and gold or COLOR_BUTTON_FRAME_DISABLED
-				DrawDecoFrame(0, 0, w, h, frameCol, 8)
-				local txtCol = enabled and textBright or COLOR_BUTTON_TEXT_DISABLED
+				ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
+				local frameCol = enabled and ArtDeco.Colors.gold or COLOR_BUTTON_FRAME_DISABLED
+				ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 8)
+				local txtCol = enabled and ArtDeco.Colors.textBright or COLOR_BUTTON_TEXT_DISABLED
 				draw.SimpleText(it and "Summon" or "Imprint", "Arcana_Ancient", w * 0.5, h * 0.5, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
@@ -752,10 +685,10 @@ if CLIENT then
 			local enabled = pnl:IsEnabled()
 			local hovered = enabled and pnl:IsHovered()
 			local bgCol = hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG
-			FillDeco(0, 0, w, h, bgCol, 8)
-			local frameCol = enabled and gold or COLOR_BUTTON_FRAME_DISABLED
-			DrawDecoFrame(0, 0, w, h, frameCol, 8)
-			local txtCol = enabled and textBright or COLOR_BUTTON_TEXT_DISABLED
+			ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
+			local frameCol = enabled and ArtDeco.Colors.gold or COLOR_BUTTON_FRAME_DISABLED
+			ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 8)
+			local txtCol = enabled and ArtDeco.Colors.textBright or COLOR_BUTTON_TEXT_DISABLED
 			draw.SimpleText("Imprint Current Weapon", "Arcana_AncientLarge", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local sub = "Cost: " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
 			surface.SetFont("Arcana_AncientSmall")

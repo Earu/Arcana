@@ -420,100 +420,6 @@ if SERVER then
 end
 
 if CLIENT then
-	-- Fonts (reusing Arcana style)
-	surface.CreateFont("Arcana_AncientSmall", {
-		font = "Georgia",
-		size = 16,
-		weight = 600,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_Ancient", {
-		font = "Georgia",
-		size = 20,
-		weight = 700,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_AncientLarge", {
-		font = "Georgia",
-		size = 24,
-		weight = 800,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_DecoTitle", {
-		font = "Georgia",
-		size = 26,
-		weight = 900,
-		antialias = true,
-		extended = true
-	})
-
-	-- Colors
-	local decoBg = Color(26, 20, 14, 235)
-	local decoPanel = Color(32, 24, 18, 235)
-	local gold = Color(198, 160, 74, 255)
-	local paleGold = Color(222, 198, 120, 255)
-	local textBright = Color(236, 230, 220, 255)
-	local textDim = Color(180, 170, 150, 255)
-	local cardIdle = Color(46, 36, 26, 235)
-	local cardHover = Color(58, 44, 32, 235)
-
-	-- Blur helper
-	local blurMat = Material("pp/blurscreen")
-	local function Arcana_DrawBlurRect(x, y, w, h, layers, density)
-		surface.SetMaterial(blurMat)
-		surface.SetDrawColor(255, 255, 255)
-		render.SetScissorRect(x, y, x + w, y + h, true)
-
-		for i = 1, layers do
-			blurMat:SetFloat("$blur", (i / layers) * density)
-			blurMat:Recompute()
-			render.UpdateScreenEffectTexture()
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		end
-
-		render.SetScissorRect(0, 0, 0, 0, false)
-	end
-
-	local function Arcana_DrawDecoFrame(x, y, w, h, col, corner)
-		surface.DisableClipping(true)
-		local c = math.max(8, corner or 12)
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		surface.DrawLine(x + c, y, x + w - c, y)
-		surface.DrawLine(x + w, y + c, x + w, y + h - c)
-		surface.DrawLine(x + w - c, y + h, x + c, y + h)
-		surface.DrawLine(x, y + h - c, x, y + c)
-		surface.DrawLine(x, y + c, x + c, y)
-		surface.DrawLine(x + w - c, y, x + w, y + c)
-		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-		surface.DrawLine(x + c, y + h, x, y + h - c)
-		surface.DisableClipping(false)
-	end
-
-	local function Arcana_FillDecoPanel(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		draw.NoTexture()
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-
-		local pts = {
-			{x = x + c, y = y},
-			{x = x + w - c, y = y},
-			{x = x + w, y = y + c},
-			{x = x + w, y = y + h - c},
-			{x = x + w - c, y = y + h},
-			{x = x + c, y = y + h},
-			{x = x, y = y + h - c},
-			{x = x, y = y + c},
-		}
-
-		surface.DrawPoly(pts)
-	end
-
 	-- Spell Caster Menu
 	local function OpenSpellCasterMenu(caster)
 		if not Arcane then return end
@@ -536,13 +442,13 @@ if CLIENT then
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
-			Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
+			ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
 		end)
 
 		frame.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
-			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
-			draw.SimpleText("SPELL CASTER", "Arcana_DecoTitle", 18, 10, paleGold)
+			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
+			draw.SimpleText("SPELL CASTER", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
 		end
 
 		if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
@@ -560,7 +466,7 @@ if CLIENT then
 			end
 
 			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(paleGold)
+				surface.SetDrawColor(ArtDeco.Colors.paleGold)
 				local pad = 8
 				surface.DrawLine(pad, pad, w - pad, h - pad)
 				surface.DrawLine(w - pad, pad, pad, h - pad)
@@ -579,31 +485,31 @@ if CLIENT then
 		infoPanel:DockMargin(0, 0, 0, 5)
 
 		infoPanel.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, Color(36, 44, 54, 235), 8)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, Color(120, 180, 220, 255), 8)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, Color(36, 44, 54, 235), 8)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, Color(120, 180, 220, 255), 8)
 
 			-- Icon
 			draw.SimpleText("⚡", "Arcana_DecoTitle", 18, h * 0.5 - 2, Color(120, 180, 220, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
 			-- Info text
-			draw.SimpleText("This entity works better with wiremod!", "Arcana_Ancient", 48, h * 0.5 - 8, textBright, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			draw.SimpleText("Use Wiremod inputs/outputs for advanced control (overrides menu selection)", "Arcana_AncientSmall", 48, h * 0.5 + 8, textDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText("This entity works better with wiremod!", "Arcana_Ancient", 48, h * 0.5 - 8, ArtDeco.Colors.textBright, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Use Wiremod inputs/outputs for advanced control (overrides menu selection)", "Arcana_AncientSmall", 48, h * 0.5 + 8, ArtDeco.Colors.textDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
 		local listPanel = vgui.Create("DPanel", content)
 		listPanel:Dock(FILL)
 
 		listPanel.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
-			draw.SimpleText(string.upper("Select Spell"), "Arcana_Ancient", 14, 10, paleGold)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
+			draw.SimpleText(string.upper("Select Spell"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 
 			-- Show current selected spell
 			local currentSpell = caster:GetSelectedSpell() or ""
 			if currentSpell ~= "" then
 				local spell = Arcane.RegisteredSpells[currentSpell]
 				if spell then
-					draw.SimpleText("Current: " .. spell.name, "Arcana_AncientSmall", w - 14, 10, textDim, TEXT_ALIGN_RIGHT)
+					draw.SimpleText("Current: " .. spell.name, "Arcana_AncientSmall", w - 14, 10, ArtDeco.Colors.textDim, TEXT_ALIGN_RIGHT)
 				end
 			end
 		end
@@ -618,13 +524,13 @@ if CLIENT then
 		castBtn.Paint = function(pnl, w, h)
 			local enabled = pnl:IsEnabled()
 			local hovered = enabled and pnl:IsHovered()
-			local bg = hovered and cardHover or cardIdle
-			local frameCol = enabled and gold or textDim
-			Arcana_FillDecoPanel(0, 0, w, h, bg, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, frameCol, 8)
+			local bg = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
+			local frameCol = enabled and ArtDeco.Colors.gold or ArtDeco.Colors.textDim
+			ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 8)
 
 			local label = "Cast Spell"
-			local col = enabled and textBright or textDim
+			local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
 
 			-- Show cooldown if applicable
 			local spellId = caster:GetSelectedSpell() or ""
@@ -635,7 +541,7 @@ if CLIENT then
 					if cd and cd > CurTime() then
 						local remaining = math.max(0, math.ceil(cd - CurTime()))
 						label = tostring(remaining) .. "s"
-						col = textDim
+						col = ArtDeco.Colors.textDim
 					end
 				end
 			end
@@ -667,14 +573,14 @@ if CLIENT then
 
 		vbar.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
-			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 			surface.DisableClipping(false)
 		end
 
 		vbar.btnGrip.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
-			surface.SetDrawColor(gold)
+			surface.SetDrawColor(ArtDeco.Colors.gold)
 			surface.DrawRect(0, 0, w, h)
 			surface.DisableClipping(false)
 		end
@@ -699,7 +605,7 @@ if CLIENT then
 				lbl:SetFont("Arcana_AncientLarge")
 				lbl:Dock(TOP)
 				lbl:DockMargin(0, 6, 0, 0)
-				lbl:SetTextColor(textDim)
+				lbl:SetTextColor(ArtDeco.Colors.textDim)
 				return
 			end
 
@@ -715,18 +621,18 @@ if CLIENT then
 				row.Paint = function(pnl, w, h)
 					local hovered = pnl:IsHovered()
 					local selected = (caster:GetSelectedSpell() == item.id)
-					local bg = selected and Color(58, 64, 44, 235) or (hovered and cardHover or cardIdle)
-					local frameCol = selected and Color(120, 200, 100) or gold
+					local bg = selected and Color(58, 64, 44, 235) or (hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle)
+					local frameCol = selected and Color(120, 200, 100) or ArtDeco.Colors.gold
 
-					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
-					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
-					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, textBright)
+					ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
+					ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
+					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
 
 					-- Cost info
 					local ca = tonumber(sp.cost_amount or 0) or 0
 					local ct = tostring(sp.cost_type or "")
 					local sub = string.format("Cost %s %s", string.Comma(ca), ct)
-					draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, textDim)
+					draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, ArtDeco.Colors.textDim)
 				end
 
 				row.DoClick = function()

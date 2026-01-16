@@ -642,54 +642,6 @@ if CLIENT then
 		self:ClientCleanupBandVis()
 	end
 
-	-- Minimal styling reuse from altar
-	surface.CreateFont("Arcana_AncientSmall", {
-		font = "Georgia",
-		size = 16,
-		weight = 600,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_Ancient", {
-		font = "Georgia",
-		size = 20,
-		weight = 700,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_AncientLarge", {
-		font = "Georgia",
-		size = 24,
-		weight = 800,
-		antialias = true,
-		extended = true
-	})
-
-	local decoBg = Color(26, 20, 14, 235)
-	local decoPanel = Color(32, 24, 18, 235)
-	local gold = Color(198, 160, 74, 255)
-	local textBright = Color(236, 230, 220, 255)
-	local paleGold = Color(222, 198, 120, 255)
-	-- Blur helper (same as grimoire menu)
-	local blurMat = Material("pp/blurscreen")
-
-	local function Arcana_DrawBlurRect(x, y, w, h, layers, density)
-		surface.SetMaterial(blurMat)
-		surface.SetDrawColor(255, 255, 255)
-		render.SetScissorRect(x, y, x + w, y + h, true)
-
-		for i = 1, (layers or 4) do
-			blurMat:SetFloat("$blur", (i / (layers or 4)) * (density or 8))
-			blurMat:Recompute()
-			render.UpdateScreenEffectTexture()
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		end
-
-		render.SetScissorRect(0, 0, 0, 0, false)
-	end
-
 	-- UI-only glyph helpers to enrich the circle visuals (standalone from circles.lua)
 	local GREEK_PHRASES = {"αβραξαςαβραξαςαβραξαςαβραξαςαβραξαςαβραξας", "θεοσγνωσιςφωςζωηαληθειακοσμοςψυχηπνευμα", "αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",}
 
@@ -794,63 +746,6 @@ if CLIENT then
 		end
 	end
 
-	local function Arcana_FillDecoPanel(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		draw.NoTexture()
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-
-		local pts = {
-			{
-				x = x + c,
-				y = y
-			},
-			{
-				x = x + w - c,
-				y = y
-			},
-			{
-				x = x + w,
-				y = y + c
-			},
-			{
-				x = x + w,
-				y = y + h - c
-			},
-			{
-				x = x + w - c,
-				y = y + h
-			},
-			{
-				x = x + c,
-				y = y + h
-			},
-			{
-				x = x,
-				y = y + h - c
-			},
-			{
-				x = x,
-				y = y + c
-			},
-		}
-
-		surface.DrawPoly(pts)
-	end
-
-	local function Arcana_DrawDecoFrame(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		surface.DisableClipping(true)
-		surface.DrawLine(x + c, y, x + w - c, y)
-		surface.DrawLine(x + w, y + c, x + w, y + h - c)
-		surface.DrawLine(x + w - c, y + h, x + c, y + h)
-		surface.DrawLine(x, y + h - c, x, y + c)
-		surface.DrawLine(x, y + c, x + c, y)
-		surface.DrawLine(x + w - c, y, x + w, y + c)
-		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-		surface.DrawLine(x + c, y + h, x, y + h - c)
-		surface.DisableClipping(false)
-	end
 
 	local function getEnchantmentsList()
 		return Arcane and Arcane.RegisteredEnchantments or {}
@@ -884,7 +779,7 @@ if CLIENT then
 		-- Screen-space blur behind frame (like grimoire)
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
-			Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
+			ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
 		end)
 
 		-- Style close button like the rest of the UI
@@ -900,7 +795,7 @@ if CLIENT then
 			end
 
 			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(gold)
+				surface.SetDrawColor(ArtDeco.Colors.gold)
 				local pad = 8
 				surface.DrawLine(pad, pad, w - pad, h - pad)
 				surface.DrawLine(w - pad, pad, pad, h - pad)
@@ -908,9 +803,9 @@ if CLIENT then
 		end
 
 		frame.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
-			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
-			draw.SimpleText(string.upper("Enchanter"), "Arcana_AncientLarge", 18, 10, paleGold)
+			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
+			draw.SimpleText(string.upper("Enchanter"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
 		end
 
 		if IsValid(frame.btnMinim) then
@@ -966,8 +861,8 @@ if CLIENT then
 		topBars:DockMargin(0, 0, 0, 8)
 
 		topBars.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 0, w - 8, h, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 0, w - 8, h, gold, 12)
+			ArtDeco.FillDecoPanel(4, 0, w - 8, h, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 0, w - 8, h, ArtDeco.Colors.gold, 12)
 			-- Gather player amounts
 			local haveCoins = (IsValid(ply) and ply.GetCoins and ply:GetCoins()) or 0
 			local haveShards = (IsValid(ply) and ply.GetItemCount and ply:GetItemCount("mana_crystal_shard")) or 0
@@ -976,7 +871,7 @@ if CLIENT then
 			local function drawBar(x, y, bw, bh, label, have, need, fillCol)
 				local innerPad = 8
 				-- Label
-				draw.SimpleText(label, "Arcana_Ancient", x + innerPad, y + 4, textBright)
+				draw.SimpleText(label, "Arcana_Ancient", x + innerPad, y + 4, ArtDeco.Colors.textBright)
 				-- Bar geometry
 				local labelH = draw.GetFontHeight("Arcana_Ancient") + 2
 				local barY = y + labelH
@@ -991,19 +886,19 @@ if CLIENT then
 				local frac = math.Clamp(haveClamped / needSafe, 0, 1)
 				surface.SetDrawColor(fillCol)
 				surface.DrawRect(x + innerPad + 2, barY + 2, math.floor((barW - 4) * frac), barH - 4)
-				surface.SetDrawColor(gold)
+				surface.SetDrawColor(ArtDeco.Colors.gold)
 				surface.DrawOutlinedRect(x + innerPad, barY, barW, barH)
 				-- Text right-aligned
 				local txt = string.format("%s / %s", string.Comma(haveClamped), string.Comma(needSafe))
 				surface.SetFont("Arcana_AncientSmall")
 				local tw, _ = surface.GetTextSize(txt)
-				draw.SimpleText(txt, "Arcana_AncientSmall", x + bw - innerPad - tw, barY - 15, textBright)
+				draw.SimpleText(txt, "Arcana_AncientSmall", x + bw - innerPad - tw, barY - 15, ArtDeco.Colors.textBright)
 			end
 
 			local pad = 2
 			local bw = w - pad * 2
 			local eachH = math.floor((h - pad * 3) * 0.5)
-			drawBar(pad, pad, bw, eachH, "Coins", haveCoins, needCoins, Color(210, 182, 100, 220))
+			drawBar(pad, pad, bw, eachH, "Coins", haveCoins, needCoins, ArtDeco.Colors.xpFill)
 			drawBar(pad, pad * 2 + eachH, bw, eachH, "Crystal Shards", haveShards, needShards, Color(105, 180, 255, 220))
 		end
 
@@ -1013,8 +908,8 @@ if CLIENT then
 		left:SetWide(520)
 
 		left.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
 
 			-- Engraved circle background (non-pentagram)
 			local cx, cy = w * 0.5, h * 0.44
@@ -1023,7 +918,7 @@ if CLIENT then
 			-- Stone base
 			draw.NoTexture()
 			surface.DisableClipping(true)
-			surface.SetDrawColor(36, 28, 22, 240)
+			surface.SetDrawColor(ArtDeco.Colors.decoBg)
 			surface.DrawCircle(cx, cy, radius, 80, 70, 60, 245)
 
 			-- Soft inner disc for contrast
@@ -1048,7 +943,7 @@ if CLIENT then
 			end
 
 			-- Radial ticks
-			surface.SetDrawColor(180, 160, 120, 200)
+			surface.SetDrawColor(ArtDeco.Colors.textDim)
 
 			for i = 0, 11 do
 				local ang = i * (math.pi * 2 / 12)
@@ -1058,7 +953,7 @@ if CLIENT then
 			end
 
 			-- Fine ticks between main ticks (keep within outer band)
-			UI_DrawMinorTicks(cx, cy, radius * 0.89, radius * 0.865, 48, Color(200, 180, 140, 160))
+			UI_DrawMinorTicks(cx, cy, radius * 0.89, radius * 0.865, 48, ArtDeco.Colors.textDim)
 
 			-- Engraved glyph rings (slow counter-rotation)
 			local t = CurTime()
@@ -1096,7 +991,7 @@ if CLIENT then
 		local nameLabel = vgui.Create("DLabel", left)
 		nameLabel:SetText("")
 		nameLabel:SetFont("Arcana_Ancient")
-		nameLabel:SetTextColor(textBright)
+		nameLabel:SetTextColor(ArtDeco.Colors.textBright)
 		nameLabel:SetContentAlignment(5)
 
 		-- Compact success indicator at top-left above the circle
@@ -1111,13 +1006,13 @@ if CLIENT then
 			local chance = machine:ComputeSuccessChance(lp) or 0.05
 
 			-- Badge background
-			Arcana_FillDecoPanel(0, 0, w, h, Color(46, 36, 26, 235), 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.cardIdle, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 
 			-- Left: small ring arc gauge
 			local cx, cy = 20, h * 0.5
 			local r = 12
-			surface.SetDrawColor(gold)
+			surface.SetDrawColor(ArtDeco.Colors.gold)
 			local steps = 22
 			local frac = math.Clamp(chance, 0, 1)
 			local sweep = frac * (math.pi * 1.8)
@@ -1132,8 +1027,8 @@ if CLIENT then
 
 			-- Right: percentage text
 			local pct = math.floor(frac * 100 + 0.5)
-			draw.SimpleText("SUCCESS", "Arcana_AncientSmall", 40, 6, paleGold)
-			draw.SimpleText(pct .. "%", "Arcana_AncientLarge", 40, h - 8, textBright, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
+			draw.SimpleText("SUCCESS", "Arcana_AncientSmall", 40, 6, ArtDeco.Colors.paleGold)
+			draw.SimpleText(pct .. "%", "Arcana_AncientLarge", 40, h - 8, ArtDeco.Colors.textBright, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
 		end
 
 		-- Controls area
@@ -1172,10 +1067,10 @@ if CLIENT then
 			updateToggle()
 			local hovered = self:IsHovered()
 			local bgCol = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
-			Arcana_FillDecoPanel(0, 0, w, h, bgCol, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 			local label = (self._mode == "deposit") and "Deposit" or "Withdraw"
-			draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
 		function toggleBtn:DoClick()
@@ -1221,9 +1116,9 @@ if CLIENT then
 			local enabled = pnl:IsEnabled()
 			local hovered = enabled and pnl:IsHovered()
 			local bg = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
-			Arcana_FillDecoPanel(0, 0, w, h, bg, 8)
-			local frameCol = enabled and gold or Color(140, 120, 90, 255)
-			Arcana_DrawDecoFrame(0, 0, w, h, frameCol, 8)
+			ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+			local frameCol = enabled and ArtDeco.Colors.gold or Color(140, 120, 90, 255)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 8)
 			draw.SimpleText("Enchant", "Arcana_AncientLarge", w * 0.5, h * 0.5, enabled and textBright or Color(200, 190, 170, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
@@ -1339,9 +1234,9 @@ if CLIENT then
 		right:Dock(FILL)
 
 		right.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
-			draw.SimpleText(string.upper("Enchantments"), "Arcana_Ancient", 14, 10, paleGold)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
+			draw.SimpleText(string.upper("Enchantments"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 		end
 
 		local scroll = vgui.Create("DScrollPanel", right)
@@ -1351,12 +1246,12 @@ if CLIENT then
 		vbar:SetWide(8)
 
 		vbar.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 		end
 
 		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(gold)
+			surface.SetDrawColor(ArtDeco.Colors.gold)
 			surface.DrawRect(0, 0, w, h)
 		end
 
@@ -1416,10 +1311,10 @@ if CLIENT then
 						else
 							bg = Color(46, 36, 26, 235)
 						end
-						Arcana_FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
-						local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and textBright) or gold
-						Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
-						draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, textBright)
+						ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
+						local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and ArtDeco.Colors.textBright) or ArtDeco.Colors.gold
+						ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
+						draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, ArtDeco.Colors.textBright)
 						if isApplied then
 							draw.SimpleText("Already applied", "Arcana_AncientSmall", w - 12, 10, Color(180, 220, 255, 255), TEXT_ALIGN_RIGHT)
 						end
@@ -1460,7 +1355,7 @@ if CLIENT then
 					infoIcon:SetSize(20, 20)
 					infoIcon:SetCursor("hand")
 					infoIcon.Paint = function(pnl, w, h)
-						surface.SetDrawColor(gold)
+						surface.SetDrawColor(ArtDeco.Colors.gold)
 						local cx, cy, r = w * 0.5, h * 0.5, 8
 						local seg = 16
 						for i = 0, seg - 1 do
@@ -1468,7 +1363,7 @@ if CLIENT then
 							local a2 = ((i + 1) / seg) * math.pi * 2
 							surface.DrawLine(cx + math.cos(a1) * r, cy + math.sin(a1) * r, cx + math.cos(a2) * r, cy + math.sin(a2) * r)
 						end
-						draw.SimpleText("i", "Arcana_Ancient", cx, cy, gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+						draw.SimpleText("i", "Arcana_Ancient", cx, cy, ArtDeco.Colors.gold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 					end
 
 					-- Tooltip behavior
@@ -1480,14 +1375,14 @@ if CLIENT then
 						tooltip:SetWrap(true)
 						tooltip:SetText(ench.description or "No description available")
 						tooltip:SetFont("Arcana_AncientSmall")
-						tooltip:SetTextColor(textBright)
+						tooltip:SetTextColor(ArtDeco.Colors.textBright)
 						tooltip:SetDrawOnTop(true)
 						tooltip:SetMouseInputEnabled(false)
 						tooltip:SetKeyboardInputEnabled(false)
 						tooltip.Paint = function(pnl, w, h)
 							surface.DisableClipping(true)
-							Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
-							Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
+							ArtDeco.FillDecoPanel(-10, 0, w, h, ArtDeco.Colors.decoBg, 8)
+							ArtDeco.DrawDecoFrame(-10, 0, w, h, ArtDeco.Colors.gold, 8)
 							surface.DisableClipping(false)
 						end
 
@@ -1530,7 +1425,7 @@ if CLIENT then
 					-- Plain cost text under the name
 					local costLbl = vgui.Create("DLabel", row)
 					costLbl:SetFont("Arcana_AncientSmall")
-					costLbl:SetTextColor(Color(180, 170, 150, 255))
+					costLbl:SetTextColor(ArtDeco.Colors.textDim)
 					local parts = {}
 					local coinAmt = tonumber(ench.cost_coins or 0) or 0
 					if coinAmt > 0 then

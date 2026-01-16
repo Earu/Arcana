@@ -1,4 +1,5 @@
 if SERVER then
+	AddCSLuaFile("arcana/art_deco.lua")
 	AddCSLuaFile("arcana/core.lua")
 	AddCSLuaFile("arcana/environments.lua")
 	AddCSLuaFile("arcana/circles.lua")
@@ -31,6 +32,7 @@ if SERVER then
 end
 
 if CLIENT then
+	include("arcana/art_deco.lua")
 	include("arcana/enchant_vfx.lua")
 	include("arcana/hud.lua")
 	include("arcana/spell_browser.lua")

@@ -112,121 +112,6 @@ if SERVER then
 end
 
 if CLIENT then
-	-- Fonts and styling (reused from grimoire/hud)
-	surface.CreateFont("Arcana_AncientSmall", {
-		font = "Georgia",
-		size = 16,
-		weight = 600,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_Ancient", {
-		font = "Georgia",
-		size = 20,
-		weight = 700,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_AncientLarge", {
-		font = "Georgia",
-		size = 24,
-		weight = 800,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_DecoTitle", {
-		font = "Georgia",
-		size = 26,
-		weight = 900,
-		antialias = true,
-		extended = true
-	})
-
-	local decoBg = Color(26, 20, 14, 235)
-	local decoPanel = Color(32, 24, 18, 235)
-	local gold = Color(198, 160, 74, 255)
-	local paleGold = Color(222, 198, 120, 255)
-	local textBright = Color(236, 230, 220, 255)
-	local textDim = Color(180, 170, 150, 255)
-	local chipTextCol = Color(24, 26, 36, 230)
-	-- Removed XP fill color (XP bar hidden in altar UI)
-	-- local backDim = Color(0, 0, 0, 140)
-	local blurMat = Material("pp/blurscreen")
-
-	local function Arcana_DrawBlurRect(x, y, w, h, layers, density)
-		surface.SetMaterial(blurMat)
-		surface.SetDrawColor(255, 255, 255)
-		render.SetScissorRect(x, y, x + w, y + h, true)
-
-		for i = 1, layers do
-			blurMat:SetFloat("$blur", (i / layers) * density)
-			blurMat:Recompute()
-			render.UpdateScreenEffectTexture()
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		end
-
-		render.SetScissorRect(0, 0, 0, 0, false)
-	end
-
-	local function Arcana_DrawDecoFrame(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		surface.DrawLine(x + c, y, x + w - c, y)
-		surface.DrawLine(x + w, y + c, x + w, y + h - c)
-		surface.DrawLine(x + w - c, y + h, x + c, y + h)
-		surface.DrawLine(x, y + h - c, x, y + c)
-		surface.DrawLine(x, y + c, x + c, y)
-		surface.DrawLine(x + w - c, y, x + w, y + c)
-		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-		surface.DrawLine(x + c, y + h, x, y + h - c)
-	end
-
-	local function Arcana_FillDecoPanel(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		draw.NoTexture()
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-
-		local pts = {
-			{
-				x = x + c,
-				y = y
-			},
-			{
-				x = x + w - c,
-				y = y
-			},
-			{
-				x = x + w,
-				y = y + c
-			},
-			{
-				x = x + w,
-				y = y + h - c
-			},
-			{
-				x = x + w - c,
-				y = y + h
-			},
-			{
-				x = x + c,
-				y = y + h
-			},
-			{
-				x = x,
-				y = y + h - c
-			},
-			{
-				x = x,
-				y = y + c
-			},
-		}
-
-		surface.DrawPoly(pts)
-	end
-
 	-- 3D visuals
 	function ENT:Initialize()
 		self._circle = nil
@@ -718,13 +603,13 @@ if CLIENT then
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
-			Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
+			ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
 		end)
 
 		frame.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
-			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
-			draw.SimpleText("ALTAR", "Arcana_DecoTitle", 18, 10, paleGold)
+			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
+			draw.SimpleText("ALTAR", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
 			-- Level and Knowledge Points chips (XP progression hidden by request)
 			local data = Arcane:GetPlayerData(ply)
 
@@ -736,16 +621,16 @@ if CLIENT then
 				local chipY = 11
 				local chipX = 110
 				local lvlChipW, chipH = lvlW + 18, lvlH + 6
-				Arcana_FillDecoPanel(chipX, chipY, lvlChipW, chipH, paleGold, 8)
-				draw.SimpleText(lvlText, "Arcana_Ancient", chipX + (lvlChipW - lvlW) * 0.5, chipY + (chipH - lvlH) * 0.5, chipTextCol)
+				ArtDeco.FillDecoPanel(chipX, chipY, lvlChipW, chipH, ArtDeco.Colors.paleGold, 8)
+				draw.SimpleText(lvlText, "Arcana_Ancient", chipX + (lvlChipW - lvlW) * 0.5, chipY + (chipH - lvlH) * 0.5, ArtDeco.Colors.chipTextCol)
 				-- KP chip to the right
 				local kpText = "KP " .. tostring(data.knowledge_points or 0)
 				local kpW, kpH = surface.GetTextSize(kpText)
 				local gap = 10
 				local kpChipX = chipX + lvlChipW + gap
 				local kpChipW = kpW + 18
-				Arcana_FillDecoPanel(kpChipX, chipY, kpChipW, chipH, paleGold, 8)
-				draw.SimpleText(kpText, "Arcana_Ancient", kpChipX + (kpChipW - kpW) * 0.5, chipY + (chipH - kpH) * 0.5, chipTextCol)
+				ArtDeco.FillDecoPanel(kpChipX, chipY, kpChipW, chipH, ArtDeco.Colors.paleGold, 8)
+				draw.SimpleText(kpText, "Arcana_Ancient", kpChipX + (kpChipW - kpW) * 0.5, chipY + (chipH - kpH) * 0.5, ArtDeco.Colors.chipTextCol)
 			end
 		end
 
@@ -769,7 +654,7 @@ if CLIENT then
 			end
 
 			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(paleGold)
+				surface.SetDrawColor(ArtDeco.Colors.paleGold)
 				local pad = 8
 				surface.DrawLine(pad, pad, w - pad, h - pad)
 				surface.DrawLine(w - pad, pad, pad, h - pad)
@@ -797,9 +682,9 @@ if CLIENT then
 		listPanel:Dock(FILL)
 
 		listPanel.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12)
-			draw.SimpleText(string.upper("Available Spells"), "Arcana_Ancient", 14, 10, paleGold)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
+			draw.SimpleText(string.upper("Available Spells"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 		end
 
 		local scroll = vgui.Create("DScrollPanel", listPanel)
@@ -810,14 +695,14 @@ if CLIENT then
 
 		vbar.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
-			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 			surface.DisableClipping(false)
 		end
 
 		vbar.btnGrip.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
-			surface.SetDrawColor(gold)
+			surface.SetDrawColor(ArtDeco.Colors.gold)
 			surface.DrawRect(0, 0, w, h)
 			surface.DisableClipping(false)
 		end
@@ -832,7 +717,7 @@ if CLIENT then
 				lbl:SetFont("Arcana_AncientLarge")
 				lbl:Dock(TOP)
 				lbl:DockMargin(0, 6, 0, 0)
-				lbl:SetTextColor(textDim)
+				lbl:SetTextColor(ArtDeco.Colors.textDim)
 
 				return
 			end
@@ -854,7 +739,7 @@ if CLIENT then
 					-- Draw a simple "i" icon in a circle using lines to create outline
 					local cx, cy = w / 2, h / 2
 					local radius = 8
-					surface.SetDrawColor(paleGold)
+					surface.SetDrawColor(ArtDeco.Colors.paleGold)
 					-- Draw circle outline by drawing lines in a circle pattern
 					local segments = 16
 
@@ -868,7 +753,7 @@ if CLIENT then
 						surface.DrawLine(x1, y1, x2, y2)
 					end
 
-					draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 
 				-- Tooltip functionality
@@ -885,7 +770,7 @@ if CLIENT then
 					tooltip:SetWrap(true)
 					tooltip:SetText(infoIcon.SpellDescription)
 					tooltip:SetFont("Arcana_AncientSmall")
-					tooltip:SetTextColor(textBright)
+					tooltip:SetTextColor(ArtDeco.Colors.textBright)
 					tooltip:SetDrawOnTop(true)
 					tooltip:SetMouseInputEnabled(false)
 					tooltip:SetKeyboardInputEnabled(false)
@@ -893,8 +778,8 @@ if CLIENT then
 					local TOOLTIP_BG_COLOR = Color(26, 20, 14, 245)
 					tooltip.Paint = function(pnl, w, h)
 						surface.DisableClipping(true)
-						Arcana_FillDecoPanel(-10, 0, w, h, TOOLTIP_BG_COLOR, 8)
-						Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
+						ArtDeco.FillDecoPanel(-10, 0, w, h, TOOLTIP_BG_COLOR, 8)
+						ArtDeco.DrawDecoFrame(-10, 0, w, h, ArtDeco.Colors.gold, 8)
 						surface.DisableClipping(false)
 					end
 
@@ -939,13 +824,13 @@ if CLIENT then
 				infoIcon.OnCursorEntered = createTooltip
 				infoIcon.OnCursorExited = destroyTooltip
 
-				local ROW_BG_COLOR = Color(46, 36, 26, 235)
+				local ROW_BG_COLOR = ArtDeco.Colors.cardIdle
 				row.Paint = function(pnl, w, h)
-					Arcana_FillDecoPanel(2, 2, w - 4, h - 4, ROW_BG_COLOR, 8)
-					Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8)
-					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, textBright)
+					ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, ROW_BG_COLOR, 8)
+					ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
+					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
 					local sub = string.format("Lvl %d  Cost %d KP", sp.level_required or 1, sp.knowledge_cost or 1)
-					draw.SimpleText(sub, "Arcana_AncientSmall", 12, 34, paleGold)
+					draw.SimpleText(sub, "Arcana_AncientSmall", 12, 34, ArtDeco.Colors.paleGold)
 				end
 
 				-- Position the info icon next to the spell name
@@ -974,17 +859,15 @@ if CLIENT then
 
 				updateEnabled()
 
-				local BTN_BG_COLOR = Color(46, 36, 26, 235)
-				local BTN_BG_COLOR_HOVER = Color(58, 44, 32, 235)
 				btn.Paint = function(pnl, w, h)
 					local enabled = pnl:IsEnabled()
 					local hovered = enabled and pnl:IsHovered()
-					local bgCol = hovered and BTN_BG_COLOR_HOVER or BTN_BG_COLOR
+					local bgCol = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
 					surface.DisableClipping(true)
-					Arcana_FillDecoPanel(0, 0, w, h, bgCol, 8)
-					Arcana_DrawDecoFrame(0, 0, w, h, gold, 8)
+					ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
+					ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 					surface.DisableClipping(false)
-					local col = enabled and textBright or textDim
+					local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
 					draw.SimpleText("Unlock", "Arcana_AncientLarge", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 
