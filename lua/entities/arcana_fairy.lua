@@ -617,55 +617,6 @@ if CLIENT then
         local price = net.ReadUInt(32) or 0
         if not IsValid(ent) then return end
 
-        -- Fonts (ensure available)
-        surface.CreateFont("Arcana_AncientSmall", {font = "Georgia", size = 16, weight = 600, antialias = true, extended = true})
-        surface.CreateFont("Arcana_Ancient", {font = "Georgia", size = 20, weight = 700, antialias = true, extended = true})
-        surface.CreateFont("Arcana_AncientLarge", {font = "Georgia", size = 24, weight = 800, antialias = true, extended = true})
-        surface.CreateFont("Arcana_DecoTitle", {font = "Georgia", size = 26, weight = 900, antialias = true, extended = true})
-
-        local decoBg = Color(26, 20, 14, 235)
-        local gold = Color(198, 160, 74, 255)
-        local paleGold = Color(222, 198, 120, 255)
-        local textBright = Color(236, 230, 220, 255)
-        local textDim = Color(180, 170, 150, 255)
-
-        local blurMat = Material("pp/blurscreen")
-        local function Arcana_DrawBlurRect(x, y, w, h, layers, density)
-            surface.SetMaterial(blurMat)
-            surface.SetDrawColor(255, 255, 255)
-            render.SetScissorRect(x, y, x + w, y + h, true)
-            for i = 1, (layers or 4) do
-                blurMat:SetFloat("$blur", (i / (layers or 4)) * (density or 8))
-                blurMat:Recompute()
-                render.UpdateScreenEffectTexture()
-                surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-            end
-            render.SetScissorRect(0, 0, 0, 0, false)
-        end
-
-        local function Arcana_FillDecoPanel(x, y, w, h, col, corner)
-            local c = math.max(8, corner or 12)
-            draw.NoTexture()
-            surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-            local pts = {{x = x + c, y = y},{x = x + w - c, y = y},{x = x + w, y = y + c},{x = x + w, y = y + h - c},{x = x + w - c, y = y + h},{x = x + c, y = y + h},{x = x, y = y + h - c},{x = x, y = y + c}}
-            surface.DrawPoly(pts)
-        end
-
-        local function Arcana_DrawDecoFrame(x, y, w, h, col, corner)
-            local c = math.max(8, corner or 12)
-            surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-            surface.DisableClipping(true)
-            surface.DrawLine(x + c, y, x + w - c, y)
-            surface.DrawLine(x + w, y + c, x + w, y + h - c)
-            surface.DrawLine(x + w - c, y + h, x + c, y + h)
-            surface.DrawLine(x, y + h - c, x, y + c)
-            surface.DrawLine(x, y + c, x + c, y)
-            surface.DrawLine(x + w - c, y, x + w, y + c)
-            surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-            surface.DrawLine(x + c, y + h, x, y + h - c)
-            surface.DisableClipping(false)
-        end
-
         local frame = vgui.Create("DFrame")
         frame:SetSize(520, 260)
         frame:Center()
@@ -674,13 +625,13 @@ if CLIENT then
 
         hook.Add("HUDPaint", frame, function()
             local x, y = frame:LocalToScreen(0, 0)
-            Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
+            ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8)
         end)
 
         frame.Paint = function(pnl, w, h)
-            Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
-            Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14)
-            draw.SimpleText("FAE MARKET", "Arcana_DecoTitle", 18, 10, paleGold)
+            ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+            ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
+            draw.SimpleText("FAE MARKET", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
         end
 
         if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
@@ -693,7 +644,7 @@ if CLIENT then
                 if IsValid(close) then close:SetPos(w - 26 - 10, 8) end
             end
             close.Paint = function(pnl, w, h)
-                surface.SetDrawColor(paleGold)
+                surface.SetDrawColor(ArtDeco.Colors.paleGold)
                 local pad = 8
                 surface.DrawLine(pad, pad, w - pad, h - pad)
                 surface.DrawLine(w - pad, pad, pad, h - pad)
@@ -704,15 +655,15 @@ if CLIENT then
         content:Dock(FILL)
         content:DockMargin(12, 12, 12, 12)
         content.Paint = function(pnl, w, h)
-            Arcana_FillDecoPanel(0, 0, w, h, Color(32, 24, 18, 235), 10)
-            Arcana_DrawDecoFrame(0, 0, w, h, gold, 10)
+            ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 10)
+            ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 10)
         end
 
         local label = vgui.Create("DLabel", content)
         label:Dock(TOP)
         label:DockMargin(12, 10, 12, 6)
         label:SetFont("Arcana_Ancient")
-        label:SetTextColor(textBright)
+        label:SetTextColor(ArtDeco.Colors.textBright)
         label:SetWrap(true)
         label:SetText("How many mushroom spores do you want to exchange (you have " .. tostring(have) .. ")?")
 
@@ -740,7 +691,7 @@ if CLIENT then
         priceLbl:Dock(TOP)
         priceLbl:DockMargin(12, 2, 12, 8)
         priceLbl:SetFont("Arcana_AncientSmall")
-        priceLbl:SetTextColor(paleGold)
+        priceLbl:SetTextColor(ArtDeco.Colors.paleGold)
         priceLbl:SetWrap(true)
         local function refreshPrice()
             local n = tonumber(entry:GetText()) or 0
@@ -788,9 +739,9 @@ if CLIENT then
         local function paintBtn(pnl, w, h, label, enabled)
             local hovered = pnl:IsHovered() and enabled
             local bg = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
-            Arcana_FillDecoPanel(0, 0, w, h, bg, 8)
-            Arcana_DrawDecoFrame(0, 0, w, h, enabled and gold or Color(140, 120, 90, 255), 8)
-            draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, enabled and textBright or Color(200, 190, 170, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+            ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and ArtDeco.Colors.gold or Color(140, 120, 90, 255), 8)
+            draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, enabled and ArtDeco.Colors.textBright or Color(200, 190, 170, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
 
         maxBtn.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "MAX", true) end

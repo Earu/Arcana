@@ -350,64 +350,8 @@ if CLIENT then
 		-- in PostDrawViewModel above.
 	end
 
-	-- Fonts (Art-Deco / Fantasy inspired). Falls back if font not available.
-	surface.CreateFont("Arcana_AncientSmall", {
-		font = "Georgia",
-		size = 16,
-		weight = 600,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_Ancient", {
-		font = "Georgia",
-		size = 20,
-		weight = 700,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_AncientLarge", {
-		font = "Georgia",
-		size = 24,
-		weight = 800,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_DecoTitle", {
-		font = "Georgia",
-		size = 26,
-		weight = 900,
-		antialias = true,
-		extended = true
-	})
-
-	surface.CreateFont("Arcana_AncientGlyph", {
-		font = "Arial",
-		size = 60,
-		weight = 900,
-		antialias = true,
-		extended = true
-	})
-
-	-- Palette tuned to the grimoire model (warm leather + brass)
-	local decoBg = Color(26, 20, 14, 235) -- deep leather brown
-	local decoPanel = Color(32, 24, 18, 235) -- panel leather
-	local gold = Color(198, 160, 74, 255) -- brass gold
-	local paleGold = Color(222, 198, 120, 255) -- soft brass
-	local textBright = Color(236, 230, 220, 255) -- parchment white
-	local textDim = Color(180, 170, 150, 255) -- muted parchment
-	-- Derived colors (centralize all manual Color usage)
-	local brassInner = Color(160, 130, 60, 220)
-	local backDim = Color(0, 0, 0, 140)
-	-- Card/row leather tones (reduce any purple cast)
-	local cardIdle = Color(46, 36, 26, 235)
-	local cardHover = Color(58, 44, 32, 235)
-	local chipTextCol = Color(24, 26, 36, 230)
-	local wedgeIdleFill = Color(gold.r, gold.g, gold.b, 24)
-	local wedgeHoverFill = Color(gold.r, gold.g, gold.b, 70)
-	local xpFill = Color(paleGold.r, paleGold.g, paleGold.b, 180)
+	-- Reusable color objects to avoid allocation overhead in draw calls
+	local _tempGoldFill = Color(198, 160, 74, 24)
 
 	-- Greek glyphs for subtle face accents
 	local greekGlyphs = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"}
@@ -428,189 +372,6 @@ if CLIENT then
 		}
 	}
 
-	-- Modern blur helper (robust, with fallback if material missing)
-	local blurMat = Material("pp/blurscreen")
-
-	local function Arcana_DrawBlurRect(x, y, w, h, layers, density, alpha)
-		surface.SetMaterial(blurMat)
-		surface.SetDrawColor(255, 255, 255)
-		render.SetScissorRect(x, y, x + w, y + h, true)
-
-		for i = 1, layers do
-			blurMat:SetFloat("$blur", (i / layers) * density)
-			blurMat:Recompute()
-			render.UpdateScreenEffectTexture()
-			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		end
-
-		render.SetScissorRect(0, 0, 0, 0, false)
-	end
-
-	-- Thin gold deco frame with clipped corners + center diamond accents
-	local function Arcana_DrawDecoFrame(x, y, w, h, col, corner, drawAccents)
-		local c = math.max(8, corner or 12)
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		-- Outer rectangle with cut corners
-		surface.DrawLine(x + c, y, x + w - c, y)
-		surface.DrawLine(x + w, y + c, x + w, y + h - c)
-		surface.DrawLine(x + w - c, y + h, x + c, y + h)
-		surface.DrawLine(x, y + h - c, x, y + c)
-		-- Corner slants
-		surface.DrawLine(x, y + c, x + c, y)
-		surface.DrawLine(x + w - c, y, x + w, y + c)
-		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-		surface.DrawLine(x + c, y + h, x, y + h - c)
-
-		-- Small center diamond accents mid-top and mid-bottom (optional)
-		if drawAccents ~= false then
-			local mx = x + w * 0.5
-			local dy = 6
-			surface.DisableClipping(true)
-			surface.DrawLine(mx - dy, y, mx, y - dy)
-			surface.DrawLine(mx, y - dy, mx + dy, y)
-			surface.DrawLine(mx - dy, y + h, mx, y + h + dy)
-			surface.DrawLine(mx, y + h + dy, mx + dy, y + h)
-			surface.DisableClipping(false)
-		end
-	end
-
-	-- Filled panel that matches the clipped-corner frame geometry
-	local function Arcana_FillDecoPanel(x, y, w, h, col, corner)
-		local c = math.max(8, corner or 12)
-		draw.NoTexture()
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-
-		local pts = {
-			{
-				x = x + c,
-				y = y
-			},
-			{
-				x = x + w - c,
-				y = y
-			},
-			{
-				x = x + w,
-				y = y + c
-			},
-			{
-				x = x + w,
-				y = y + h - c
-			},
-			{
-				x = x + w - c,
-				y = y + h
-			},
-			{
-				x = x + c,
-				y = y + h
-			},
-			{
-				x = x,
-				y = y + h - c
-			},
-			{
-				x = x,
-				y = y + c
-			},
-		}
-
-		surface.DrawPoly(pts)
-	end
-
-	-- Regular polygon outline helper (e.g., octagon)
-	local function Arcana_DrawPolygonOutline(cx, cy, radius, sides, col)
-		local n = math.max(3, math.floor(sides or 6))
-		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		local prevX, prevY
-
-		for i = 0, n do
-			local a = (math.pi * 2) * (i % n) / n
-			local x = math.floor(cx + math.cos(a) * radius + 0.5)
-			local y = math.floor(cy + math.sin(a) * radius + 0.5)
-
-			if prevX ~= nil then
-				surface.DrawLine(prevX, prevY, x, y)
-			end
-
-			prevX, prevY = x, y
-		end
-	end
-
-	-- Filled polygon ring sector (between two vertices) for regular N-gon
-	local function Arcana_FillPolygonRingSector(cx, cy, rInner, rOuter, sides, index, color)
-		local n = math.max(3, math.floor(sides or 8))
-		local i = ((index - 1) % n) + 1
-		local step = (math.pi * 2) / n
-		local a0 = step * (i - 1)
-		local a1 = step * i
-
-		local poly = {
-			{
-				x = cx + math.cos(a0) * rOuter,
-				y = cy + math.sin(a0) * rOuter
-			},
-			{
-				x = cx + math.cos(a1) * rOuter,
-				y = cy + math.sin(a1) * rOuter
-			},
-			{
-				x = cx + math.cos(a1) * rInner,
-				y = cy + math.sin(a1) * rInner
-			},
-			{
-				x = cx + math.cos(a0) * rInner,
-				y = cy + math.sin(a0) * rInner
-			},
-		}
-
-		draw.NoTexture()
-		surface.SetDrawColor(color.r, color.g, color.b, color.a or 255)
-		surface.DrawPoly(poly)
-	end
-
-	-- Art-deco flourish accents for the radial
-	local function Arcana_DrawRadialFlourish(cx, cy, rInner, rOuter, sides, baseCol, accentCol)
-		local n = math.max(3, math.floor(sides or 8))
-		-- Double-outline vibe
-		local outlineA = Color(baseCol.r, baseCol.g, baseCol.b, 90)
-		local outlineB = Color(baseCol.r, baseCol.g, baseCol.b, 60)
-		Arcana_DrawPolygonOutline(cx, cy, rOuter - 4, n, outlineA)
-		Arcana_DrawPolygonOutline(cx, cy, rOuter - 8, n, outlineB)
-		Arcana_DrawPolygonOutline(cx, cy, rInner + 6, n, outlineB)
-		-- Vertex diamonds
-		draw.NoTexture()
-		surface.SetDrawColor(accentCol.r, accentCol.g, accentCol.b, 40)
-
-		for i = 1, n do
-			local a = (i - 1) * (math.pi * 2) / n
-			local vx = cx + math.cos(a) * (rOuter - 2)
-			local vy = cy + math.sin(a) * (rOuter - 2)
-			local d = 5
-
-			local pts = {
-				{
-					x = vx,
-					y = vy - d
-				},
-				{
-					x = vx + d,
-					y = vy
-				},
-				{
-					x = vx,
-					y = vy + d
-				},
-				{
-					x = vx - d,
-					y = vy
-				},
-			}
-
-			surface.DrawPoly(pts)
-		end
-	end
-
 	function SWEP:GetSelectedFromQuickslot()
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return nil end
@@ -628,61 +389,6 @@ if CLIENT then
 		gui.EnableScreenClicker(true)
 	end
 
-	function SWEP:DrawOldSchoolHUD(scrW, scrH, owner)
-		local data = Arcane:GetPlayerData(owner)
-		if not data then return end
-		-- Quickslot parchment bar
-		local barW, barH = 420, 64
-		local barX, barY = (scrW - barW) * 0.5, scrH - barH - 20
-		draw.RoundedBox(8, barX, barY, barW, barH, parchment)
-		surface.SetDrawColor(parchmentDark)
-		surface.DrawOutlinedRect(barX, barY, barW, barH, 2)
-		local slotW, slotGap = 44, 8
-		local selected = math.Clamp(data.selected_quickslot or 1, 1, 8)
-
-		for i = 1, 8 do
-			local x = barX + 10 + (i - 1) * (slotW + slotGap)
-			local y = barY + 10
-			local isSel = (i == selected)
-			draw.RoundedBox(6, x, y, slotW, slotW, isSel and Color(235, 215, 160, 240) or Color(225, 210, 180, 220))
-			surface.SetDrawColor(isSel and gold or ink)
-			surface.DrawOutlinedRect(x, y, slotW, slotW, isSel and 3 or 2)
-			local spellId = data.quickspell_slots[i]
-
-			if spellId and Arcane.RegisteredSpells[spellId] then
-				local sp = Arcane.RegisteredSpells[spellId]
-				draw.SimpleText(string.upper(string.sub(sp.name, 1, 2)), "Arcana_Ancient", x + slotW * 0.5, y + slotW * 0.5, ink, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			else
-				draw.SimpleText("-", "Arcana_Ancient", x + slotW * 0.5, y + slotW * 0.5, Color(120, 100, 80), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			end
-
-			draw.SimpleText(tostring(i), "Arcana_AncientSmall", x + slotW * 0.5, y + slotW + 10, ink, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		end
-
-		-- Selected spell parchment card
-		local curSpellId = data.quickspell_slots[selected] or self.SelectedSpell
-		local spell = curSpellId and Arcane.RegisteredSpells[curSpellId] or Arcane.RegisteredSpells[self.SelectedSpell]
-
-		if spell then
-			local cardW, cardH = 300, 110
-			local x, y = scrW - cardW - 20, scrH - cardH - 20
-			draw.RoundedBox(10, x, y, cardW, cardH, parchment)
-			surface.SetDrawColor(parchmentDark)
-			surface.DrawOutlinedRect(x, y, cardW, cardH, 2)
-			draw.SimpleText(spell.name, "Arcana_AncientLarge", x + 12, y + 10, ink)
-			draw.SimpleText("Lvl " .. spell.level_required .. "  Cost " .. string.Comma(spell.cost_amount) .. " " .. spell.cost_type, "Arcana_Ancient", x + 12, y + 40, ink)
-			local cdText = "Ready"
-			local cdCol = Color(32, 120, 48)
-			local cd = data.spell_cooldowns[curSpellId or self.SelectedSpell]
-
-			if cd and cd > CurTime() then
-				cdText = tostring(math.ceil(cd - CurTime())) .. "s"
-				cdCol = Color(140, 40, 40)
-			end
-
-			draw.SimpleText("Cooldown: " .. cdText, "Arcana_Ancient", x + 12, y + 64, cdCol)
-		end
-	end
 
 	function SWEP:DrawQuickRadial(scrW, scrH, owner)
 		local cx, cy = scrW * 0.5, scrH * 0.5
@@ -697,15 +403,15 @@ if CLIENT then
 		end
 
 		-- Modern blurred backdrop + slight vignette
-		Arcana_DrawBlurRect(0, 0, scrW, scrH, 5, 8, 255)
-		surface.SetDrawColor(backDim)
+		ArtDeco.DrawBlurRect(0, 0, scrW, scrH, 5, 8, 255)
+		surface.SetDrawColor(ArtDeco.Colors.backDim)
 		surface.DrawRect(0, 0, scrW, scrH)
 		-- Octagonal background ring (filled between two octagons)
 		local sides = 8
 
 		for i = 1, sides do
-			local col = Color(gold.r, gold.g, gold.b, 24)
-			Arcana_FillPolygonRingSector(cx, cy, rInner, radius, sides, i, col)
+			_tempGoldFill.a = 24
+			ArtDeco.FillPolygonRingSector(cx, cy, rInner, radius, sides, i, _tempGoldFill)
 			-- Face center glyphs (Greek)
 			local a0 = (i - 1) * 45
 			local a1 = i * 45
@@ -718,9 +424,9 @@ if CLIENT then
 		end
 
 		-- Octagonal frame outlines + flourish
-		Arcana_DrawPolygonOutline(cx, cy, radius, sides, gold)
-		Arcana_DrawPolygonOutline(cx, cy, rInner, sides, brassInner)
-		Arcana_DrawRadialFlourish(cx, cy, rInner, radius, sides, gold, paleGold)
+		ArtDeco.DrawPolygonOutline(cx, cy, radius, sides, ArtDeco.Colors.gold)
+		ArtDeco.DrawPolygonOutline(cx, cy, rInner, sides, ArtDeco.Colors.brassInner)
+		ArtDeco.DrawRadialFlourish(cx, cy, rInner, radius, sides, ArtDeco.Colors.gold, ArtDeco.Colors.paleGold)
 		-- Precompute label radius using trapezoid centroid along face normal
 		local sinTerm = math.sin(math.pi / sides)
 		local baseOut = 2 * radius * sinTerm
@@ -749,15 +455,15 @@ if CLIENT then
 			local tyNum = math.floor(cy + math.sin(mid) * rNum + 0.5)
 			local isHover = (i == hoverSlot)
 			-- Octagonal sector highlight (flat sides)
-			Arcana_FillPolygonRingSector(cx, cy, rInner, radius, sides, i, isHover and wedgeHoverFill or wedgeIdleFill)
-			draw.SimpleText(tostring(i), "Arcana_Ancient", txNum, tyNum, isHover and paleGold or textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			ArtDeco.FillPolygonRingSector(cx, cy, rInner, radius, sides, i, isHover and ArtDeco.Colors.wedgeHoverFill or ArtDeco.Colors.wedgeIdleFill)
+			draw.SimpleText(tostring(i), "Arcana_Ancient", txNum, tyNum, isHover and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local spellId = data.quickspell_slots[i]
 
 			if spellId and Arcane.RegisteredSpells[spellId] then
 				local sp = Arcane.RegisteredSpells[spellId]
-				draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", txAbbr, tyAbbr, isHover and textBright or paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", txAbbr, tyAbbr, isHover and ArtDeco.Colors.textBright or ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			else
-				draw.SimpleText("-", "Arcana_AncientLarge", txAbbr, tyAbbr, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("-", "Arcana_AncientLarge", txAbbr, tyAbbr, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 		end
 
@@ -766,12 +472,12 @@ if CLIENT then
 
 		if hsId and Arcane.RegisteredSpells[hsId] then
 			local sp = Arcane.RegisteredSpells[hsId]
-			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local ct = tostring(sp.cost_type or "")
 			local ca = tonumber(sp.cost_amount or 0) or 0
-			draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		else
-			draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
 		-- Select on release
@@ -810,18 +516,18 @@ if CLIENT then
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
-			Arcana_DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8, 255)
+			ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8, 255)
 		end)
 
 		frame.Paint = function(pnl, w, h)
 			-- Full solid fallback to avoid any missing textures from default skin
-			Arcana_FillDecoPanel(6, 6, w - 12, h - 12, decoBg, 14)
-			Arcana_DrawDecoFrame(6, 6, w - 12, h - 12, gold, 14, false)
+			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 			-- Title
 			local titleText = string.upper("Grimoire")
 			surface.SetFont("Arcana_DecoTitle")
 			local tw = surface.GetTextSize(titleText)
-			draw.SimpleText(titleText, "Arcana_DecoTitle", 18, 10, paleGold)
+			draw.SimpleText(titleText, "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
 			-- Level chip next to title
 			local data = Arcane and IsValid(owner) and Arcane:GetPlayerData(owner) or nil
 
@@ -833,8 +539,8 @@ if CLIENT then
 				local chipY = 10
 				local chipW = cw + 18
 				local chipH = ch + 6
-				Arcana_FillDecoPanel(chipX, chipY, chipW, chipH, paleGold, 8)
-				draw.SimpleText(chipText, "Arcana_Ancient", chipX + (chipW - cw) * 0.5, chipY + (chipH - ch) * 0.5, chipTextCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+				ArtDeco.FillDecoPanel(chipX, chipY, chipW, chipH, ArtDeco.Colors.paleGold, 8)
+				draw.SimpleText(chipText, "Arcana_Ancient", chipX + (chipW - cw) * 0.5, chipY + (chipH - ch) * 0.5, ArtDeco.Colors.chipTextCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 				-- XP bar under title, full width inside the frame
 				local totalForCurrent = Arcane:GetTotalXPForLevel(data.level)
 				local neededForNext = Arcane:GetXPRequiredForLevel(data.level)
@@ -848,13 +554,13 @@ if CLIENT then
 				local innerPad = 4
 				local fillW = math.floor((barW - innerPad * 2) * progress)
 				draw.NoTexture()
-				surface.SetDrawColor(xpFill)
+				surface.SetDrawColor(ArtDeco.Colors.xpFill)
 				surface.DrawRect(barX + innerPad, barY + innerPad, fillW, barH - innerPad * 2)
 				-- XP label centered over the bar
 				local xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext)
 				surface.SetFont("Arcana_Ancient")
 				local lx, _ = surface.GetTextSize(xpLabel)
-				draw.SimpleText(xpLabel, "Arcana_Ancient", barX + barW - lx, barY - 4, textBright)
+				draw.SimpleText(xpLabel, "Arcana_Ancient", barX + barW - lx, barY - 4, ArtDeco.Colors.textBright)
 			end
 		end
 
@@ -881,9 +587,9 @@ if CLIENT then
 			close.Paint = function(pnl, w, h)
 				--local hovered = pnl:IsHovered()
 				--Arcana_FillDecoPanel(0, 0, w, h, hovered and Color(40, 32, 24, 220) or Color(26, 22, 18, 220), 6)
-				--Arcana_DrawDecoFrame(0, 0, w, h, gold, 6)
+				--Arcana_DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 6)
 				-- Stylized "X"
-				surface.SetDrawColor(paleGold)
+				surface.SetDrawColor(ArtDeco.Colors.paleGold)
 				local pad = 8
 				surface.DrawLine(pad, pad, w - pad, h - pad)
 				surface.DrawLine(w - pad, pad, pad, h - pad)
@@ -919,9 +625,9 @@ if CLIENT then
 		left._hoverSlot = nil
 
 		left.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12, false)
-			draw.SimpleText(string.upper("Quick Access"), "Arcana_Ancient", 14, 10, paleGold)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
+			draw.SimpleText(string.upper("Quick Access"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 			-- Center the wheel within the left panel using a content box (account for title area)
 			local titlePadTop = 32
 			local padSide = 16
@@ -942,8 +648,8 @@ if CLIENT then
 
 			-- Background ring with Greek glyphs
 			for i = 1, 8 do
-				local col = Color(gold.r, gold.g, gold.b, (i == hoverSlot) and 70 or 24)
-				Arcana_FillPolygonRingSector(cx, cy, rInner, radius, 8, i, col)
+				_tempGoldFill.a = (i == hoverSlot) and 70 or 24
+				ArtDeco.FillPolygonRingSector(cx, cy, rInner, radius, 8, i, _tempGoldFill)
 				local a0 = (i - 1) * 45
 				local a1 = i * 45
 				local mid = math.rad((a0 + a1) * 0.5)
@@ -954,9 +660,9 @@ if CLIENT then
 				draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(21, 20, 14, 190), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
-			Arcana_DrawPolygonOutline(cx, cy, radius, 8, gold)
-			Arcana_DrawPolygonOutline(cx, cy, rInner, 8, brassInner)
-			Arcana_DrawRadialFlourish(cx, cy, rInner, radius, 8, gold, paleGold)
+			ArtDeco.DrawPolygonOutline(cx, cy, radius, 8, ArtDeco.Colors.gold)
+			ArtDeco.DrawPolygonOutline(cx, cy, rInner, 8, ArtDeco.Colors.brassInner)
+			ArtDeco.DrawRadialFlourish(cx, cy, rInner, radius, 8, ArtDeco.Colors.gold, ArtDeco.Colors.paleGold)
 			-- Label radius (towards center for readability)
 			local sinTerm = math.sin(math.pi / 8)
 			local baseOut = 2 * radius * sinTerm
@@ -976,14 +682,14 @@ if CLIENT then
 				local tnX = math.floor(cx + math.cos(mid) * rNum + 0.5)
 				local tnY = math.floor(cy + math.sin(mid) * rNum + 0.5)
 				local isHover = (i == hoverSlot)
-				draw.SimpleText(tostring(i), "Arcana_AncientSmall", tnX, tnY, isHover and paleGold or textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(tostring(i), "Arcana_AncientSmall", tnX, tnY, isHover and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				local sid = pdata.quickspell_slots[i]
 
 				if sid and Arcane.RegisteredSpells[sid] then
 					local sp = Arcane.RegisteredSpells[sid]
-					draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", tx, ty, isHover and textBright or paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", tx, ty, isHover and ArtDeco.Colors.textBright or ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				else
-					draw.SimpleText("-", "Arcana_AncientLarge", tx, ty, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					draw.SimpleText("-", "Arcana_AncientLarge", tx, ty, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 			end
 
@@ -992,12 +698,12 @@ if CLIENT then
 
 			if hsId and Arcane.RegisteredSpells[hsId] then
 				local sp = Arcane.RegisteredSpells[hsId]
-				draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				local ct = tostring(sp.cost_type or "")
 				local ca = tonumber(sp.cost_amount or 0) or 0
-				draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			else
-				draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 		end
 
@@ -1045,9 +751,9 @@ if CLIENT then
 		middle:DockMargin(0, 0, 0, 0)
 
 		middle.Paint = function(pnl, w, h)
-			Arcana_FillDecoPanel(4, 4, w - 8, h - 8, decoPanel, 12)
-			Arcana_DrawDecoFrame(4, 4, w - 8, h - 8, gold, 12, false)
-			draw.SimpleText(string.upper("Learned Spells"), "Arcana_Ancient", 14, 10, paleGold)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
+			draw.SimpleText(string.upper("Learned Spells"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 		end
 
 		local listScroll = vgui.Create("DScrollPanel", middle)
@@ -1058,14 +764,14 @@ if CLIENT then
 
 		vbar.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
-			Arcana_FillDecoPanel(0, 0, w, h, decoPanel, 8)
-			Arcana_DrawDecoFrame(0, 0, w, h, gold, 8, false)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
 			surface.DisableClipping(false)
 		end
 
 		vbar.btnGrip.Paint = function(pnl, w, h)
 			surface.DisableClipping(true)
-			surface.SetDrawColor(gold)
+			surface.SetDrawColor(ArtDeco.Colors.gold)
 			surface.DrawRect(0, 0, w, h)
 			surface.DisableClipping(false)
 		end
@@ -1103,7 +809,7 @@ if CLIENT then
 				-- Draw a simple "i" icon in a circle using lines to create outline
 				local cx, cy = w / 2, h / 2
 				local radius = 8
-				surface.SetDrawColor(paleGold)
+				surface.SetDrawColor(ArtDeco.Colors.paleGold)
 				-- Draw circle outline by drawing lines in a circle pattern
 				local segments = 16
 
@@ -1117,7 +823,7 @@ if CLIENT then
 					surface.DrawLine(x1, y1, x2, y2)
 				end
 
-				draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("i", "Arcana_Ancient", w / 2, h / 2, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
 			-- Tooltip functionality
@@ -1128,15 +834,15 @@ if CLIENT then
 				tooltip:SetWrap(true)
 				tooltip:SetText(infoIcon.SpellDescription)
 				tooltip:SetFont("Arcana_AncientSmall")
-				tooltip:SetTextColor(textBright)
+				tooltip:SetTextColor(ArtDeco.Colors.textBright)
 				tooltip:SetDrawOnTop(true)
 				tooltip:SetMouseInputEnabled(false)
 				tooltip:SetKeyboardInputEnabled(false)
 
 				tooltip.Paint = function(pnl, w, h)
 					surface.DisableClipping(true)
-					Arcana_FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
-					Arcana_DrawDecoFrame(-10, 0, w, h, gold, 8)
+					ArtDeco.FillDecoPanel(-10, 0, w, h, Color(26, 20, 14, 245), 8)
+					ArtDeco.DrawDecoFrame(-10, 0, w, h, ArtDeco.Colors.gold, 8)
 					surface.DisableClipping(false)
 				end
 
@@ -1187,14 +893,14 @@ if CLIENT then
 
 			row.Paint = function(pnl, w, h)
 				local hovered = pnl:IsHovered()
-				Arcana_FillDecoPanel(2, 2, w - 4, h - 4, hovered and cardHover or cardIdle, 8)
-				Arcana_DrawDecoFrame(2, 2, w - 4, h - 4, gold, 8, false)
-				draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, textBright)
+				ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle, 8)
+				ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
+				draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
 				-- Subline: cost only
 				local ca = tonumber(sp.cost_amount or 0) or 0
 				local ct = tostring(sp.cost_type or "")
 				local sub = string.format("Cost %s %s", string.Comma(ca), ct)
-				draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, textDim)
+				draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, ArtDeco.Colors.textDim)
 			end
 
 			-- Cast button on the right side of the row
@@ -1221,18 +927,18 @@ if CLIENT then
 			castBtn.Paint = function(pnl, w, h)
 				local disabled = not pnl:IsEnabled()
 				local bg = disabled and Color(40, 32, 24, 200) or Color(50, 40, 28, 220)
-				local col = disabled and textDim or paleGold
-				local border = gold
+				local col = disabled and ArtDeco.Colors.textDim or ArtDeco.Colors.paleGold
+				local border = ArtDeco.Colors.gold
 
 				if not disabled and pnl:IsHovered() then
-					bg = cardHover
-					col = textBright
-					border = textBright
+					bg = ArtDeco.Colors.cardHover
+					col = ArtDeco.Colors.textBright
+					border = ArtDeco.Colors.textBright
 				end
 
 				surface.DisableClipping(true)
-				Arcana_FillDecoPanel(0, 0, w, h, bg, 6)
-				Arcana_DrawDecoFrame(0, 0, w, h, border, 6, false)
+				ArtDeco.FillDecoPanel(0, 0, w, h, bg, 6)
+				ArtDeco.DrawDecoFrame(0, 0, w, h, border, 6)
 				surface.DisableClipping(false)
 				pnl:SetTextColor(col)
 			end
