@@ -1664,7 +1664,7 @@ if SERVER then
 		local altar = SpawnAltar()
 		SpawnPortalToAltar(altar)
 
-		if _G.aowl and _G.aowl.GotoLocations then
+		if IsValid(altar) and _G.aowl and _G.aowl.GotoLocations then
 			local aliases = {"altar", "magic", "arcane", "arcana"}
 			for _, alias in ipairs(aliases) do
 				_G.aowl.GotoLocations[alias] = altar:WorldSpaceCenter() + altar:GetForward() * 200
