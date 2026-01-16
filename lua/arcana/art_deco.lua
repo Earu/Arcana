@@ -439,6 +439,98 @@ if CLIENT then
 		}
 		surface.DrawPoly(pts2)
 	end
+
+	-- ===========================================================================
+	-- INFO ICON WITH TOOLTIP COMPONENT
+	-- ===========================================================================
+
+	--- Creates an info icon with tooltip functionality
+	-- @param parent The parent panel
+	-- @param text The tooltip text to display
+	-- @param tooltipWidth Width of tooltip (default: 300)
+	-- @param tooltipHeight Height of tooltip (default: 60)
+	-- @return The info icon panel
+	function ArtDeco.CreateInfoIcon(parent, text, tooltipWidth, tooltipHeight)
+		local infoIcon = vgui.Create("DPanel", parent)
+		infoIcon:SetSize(20, 20)
+		infoIcon:SetCursor("hand")
+
+		-- Draw the "i" in circle icon
+		infoIcon.Paint = function(pnl, w, h)
+			local cx, cy = w * 0.5, h * 0.5
+			local radius = 8
+			surface.SetDrawColor(ArtDeco.Colors.paleGold)
+
+			-- Circle outline
+			local segments = 16
+			for i = 0, segments - 1 do
+				local a1 = (i / segments) * math.pi * 2
+				local a2 = ((i + 1) / segments) * math.pi * 2
+				surface.DrawLine(
+					cx + math.cos(a1) * radius,
+					cy + math.sin(a1) * radius,
+					cx + math.cos(a2) * radius,
+					cy + math.sin(a2) * radius
+				)
+			end
+
+			-- "i" text
+			draw.SimpleText("i", "Arcana_Ancient", cx, cy, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+
+		-- Tooltip on hover
+		infoIcon.OnCursorEntered = function()
+			if IsValid(infoIcon.tooltip) then return end
+
+			local tooltip = vgui.Create("DLabel")
+			tooltip:SetSize(tooltipWidth or 300, tooltipHeight or 60)
+			tooltip:SetWrap(true)
+			tooltip:SetText(text or "No description available")
+			tooltip:SetFont("Arcana_AncientSmall")
+			tooltip:SetTextColor(ArtDeco.Colors.textBright)
+			tooltip:SetDrawOnTop(true)
+			tooltip:SetMouseInputEnabled(false)
+			tooltip:SetKeyboardInputEnabled(false)
+
+			tooltip.Paint = function(pnl, w, h)
+				surface.DisableClipping(true)
+				ArtDeco.FillDecoPanel(-10, 0, w, h, ArtDeco.Colors.decoBg, 8)
+				ArtDeco.DrawDecoFrame(-10, 0, w, h, ArtDeco.Colors.gold, 8)
+				surface.DisableClipping(false)
+			end
+
+			infoIcon.tooltip = tooltip
+
+			-- Position tooltip near cursor
+			local function updatePos()
+				if not IsValid(tooltip) then return end
+				local x, y = gui.MousePos()
+				tooltip:SetPos(x + 15, y - 30)
+			end
+
+			updatePos()
+
+			-- Track cursor movement
+			hook.Add("Think", "ArcanaTooltip_" .. tostring(tooltip), function()
+				if not IsValid(tooltip) or not IsValid(infoIcon) then
+					hook.Remove("Think", "ArcanaTooltip_" .. tostring(tooltip))
+					if IsValid(tooltip) then tooltip:Remove() end
+					return
+				end
+				updatePos()
+			end)
+		end
+
+		infoIcon.OnCursorExited = function()
+			if IsValid(infoIcon.tooltip) then
+				hook.Remove("Think", "ArcanaTooltip_" .. tostring(infoIcon.tooltip))
+				infoIcon.tooltip:Remove()
+				infoIcon.tooltip = nil
+			end
+		end
+
+		return infoIcon
+	end
 end
 
 -- Store in global scope
