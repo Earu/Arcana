@@ -119,21 +119,18 @@ if CLIENT then
 	function ArtDeco.DrawDecoFrame(x, y, w, h, col, corner)
 		local c = math.max(8, corner or 12)
 		surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
-		surface.DisableClipping(true)
 
-		-- Outer rectangle with cut corners
-		surface.DrawLine(x + c, y, x + w - c, y)
-		surface.DrawLine(x + w, y + c, x + w, y + h - c)
-		surface.DrawLine(x + w - c, y + h, x + c, y + h)
-		surface.DrawLine(x, y + h - c, x, y + c)
+	-- Outer rectangle with cut corners
+	surface.DrawLine(x + c, y, x + w - c, y)
+	surface.DrawLine(x + w - 1, y + c, x + w - 1, y + h - c)
+	surface.DrawLine(x + w - c, y + h - 1, x + c, y + h - 1)
+	surface.DrawLine(x, y + h - c, x, y + c)
 
-		-- Corner slants
-		surface.DrawLine(x, y + c, x + c, y)
-		surface.DrawLine(x + w - c, y, x + w, y + c)
-		surface.DrawLine(x + w, y + h - c, x + w - c, y + h)
-		surface.DrawLine(x + c, y + h, x, y + h - c)
-
-		surface.DisableClipping(false)
+	-- Corner slants
+	surface.DrawLine(x, y + c, x + c, y)
+	surface.DrawLine(x + w - c, y, x + w - 1, y + c)
+	surface.DrawLine(x + w - 1, y + h - c, x + w - c, y + h - 1)
+	surface.DrawLine(x + c, y + h - 1, x, y + h - c)
 	end
 
 	-- ===========================================================================
@@ -491,12 +488,11 @@ if CLIENT then
 			tooltip:SetDrawOnTop(true)
 			tooltip:SetMouseInputEnabled(false)
 			tooltip:SetKeyboardInputEnabled(false)
+			tooltip:NoClipping(true)
 
 			tooltip.Paint = function(pnl, w, h)
-				surface.DisableClipping(true)
 				ArtDeco.FillDecoPanel(-10, 0, w, h, ArtDeco.Colors.decoBg, 8)
 				ArtDeco.DrawDecoFrame(-10, 0, w, h, ArtDeco.Colors.gold, 8)
-				surface.DisableClipping(false)
 			end
 
 			infoIcon.tooltip = tooltip

@@ -694,17 +694,14 @@ if CLIENT then
 		vbar:SetWide(8)
 
 		vbar.Paint = function(pnl, w, h)
-			surface.DisableClipping(true)
 			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
 			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-			surface.DisableClipping(false)
 		end
 
+		vbar.btnGrip:NoClipping(true)
 		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.DisableClipping(true)
 			surface.SetDrawColor(ArtDeco.Colors.gold)
 			surface.DrawRect(0, 0, w, h)
-			surface.DisableClipping(false)
 		end
 
 		local function rebuild()
@@ -771,10 +768,8 @@ if CLIENT then
 					local enabled = pnl:IsEnabled()
 					local hovered = enabled and pnl:IsHovered()
 					local bgCol = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
-					surface.DisableClipping(true)
 					ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
 					ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-					surface.DisableClipping(false)
 					local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
 					draw.SimpleText("Unlock", "Arcana_AncientLarge", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
