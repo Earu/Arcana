@@ -572,17 +572,14 @@ if CLIENT then
 		vbar:SetWide(8)
 
 		vbar.Paint = function(pnl, w, h)
-			surface.DisableClipping(true)
 			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
 			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-			surface.DisableClipping(false)
 		end
 
+		vbar.btnGrip:NoClipping(true)
 		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.DisableClipping(true)
 			surface.SetDrawColor(ArtDeco.Colors.gold)
 			surface.DrawRect(0, 0, w, h)
-			surface.DisableClipping(false)
 		end
 
 		local function rebuild()

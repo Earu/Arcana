@@ -906,6 +906,7 @@ if CLIENT then
 		local left = vgui.Create("DPanel", content)
 		left:Dock(LEFT)
 		left:SetWide(520)
+		left:NoClipping(true)
 
 		left.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
@@ -917,7 +918,6 @@ if CLIENT then
 
 			-- Stone base
 			draw.NoTexture()
-			surface.DisableClipping(true)
 			surface.SetDrawColor(ArtDeco.Colors.decoBg)
 			surface.DrawCircle(cx, cy, radius, 80, 70, 60, 245)
 
@@ -975,8 +975,6 @@ if CLIENT then
 			thickCircle(bandInnerIn, 1)
 			local phraseInner = ARABIC_PHRASES[1 + (math.floor(t * 0.015 + 1) % #ARABIC_PHRASES)]
 			UI_DrawGlyphRing(cx, cy, bandInnerMid, "MagicCircle_Small", phraseInner, 0.26, 48, Color(220, 200, 150, 210), -t * 0.06)
-
-			surface.DisableClipping(false)
 		end
 
 		-- Weapon model preview centered in the circle
