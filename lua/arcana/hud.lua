@@ -59,6 +59,9 @@ net.Receive("Arcane_SpellUnlocked", function()
 	showUnlockAnnouncement("spell", name, -cost)
 end)
 
+-- XP gain announcement stack (multiple notifications can be active)
+local xpAnnounceStack = {}
+
 -- Level-up / Knowledge announcement state
 local levelAnnounce = {
 	active = false,
@@ -76,6 +79,19 @@ hook.Add("Arcana_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, 
 	levelAnnounce.knowledgeDelta = knowledgeDelta or 0
 	-- Distinct chime for level-up
 	surface.PlaySound("arcana/arcane_1.ogg")
+end)
+
+-- XP gain hook
+hook.Add("Arcana_PlayerGainedXP", "ArcanaHUD_XPAnnounce", function(ply, amount, reason)
+	if not IsValid(ply) or ply ~= LocalPlayer() then return end
+
+	-- Add new notification to the stack
+	table.insert(xpAnnounceStack, {
+		startedAt = CurTime(),
+		endsAt = CurTime() + 2.5,
+		amount = amount or 0,
+		reason = reason or ""
+	})
 end)
 
 -- Casting state (client-only) fed by Arcane_BeginCasting
@@ -174,6 +190,103 @@ local function drawCooldownStack(scrW, scrH)
 	end
 end
 
+local function drawXPAnnouncement(scrW, scrH)
+	if #xpAnnounceStack == 0 then return end
+	local now = CurTime()
+
+	-- Remove expired notifications
+	for i = #xpAnnounceStack, 1, -1 do
+		if now >= xpAnnounceStack[i].endsAt then
+			table.remove(xpAnnounceStack, i)
+		end
+	end
+
+	if #xpAnnounceStack == 0 then return end
+
+	-- Position in middle-right
+	local baseX = scrW - 30
+	local baseY = scrH * 0.5
+	local rowHeight = 30
+	local startY = baseY - ((#xpAnnounceStack - 1) * rowHeight * 0.5)
+
+	-- Draw each notification in the stack
+	for i, notify in ipairs(xpAnnounceStack) do
+		local y = startY + ((i - 1) * rowHeight)
+
+		-- Fade in/out
+		local total = notify.endsAt - notify.startedAt
+		local t = (now - notify.startedAt) / math.max(0.001, total)
+		local fadeIn = math.Clamp(t / 0.15, 0, 1)
+		local fadeOut = math.Clamp((notify.endsAt - now) / 0.3, 0, 1)
+
+		-- Text alpha: fades in/out
+		local textAlpha = math.floor(255 * math.min(fadeIn, fadeOut))
+
+		-- Calculate text widths for dynamic sizing
+		surface.SetFont("Arcana_Ancient")
+		local xpText = "+" .. string.Comma(notify.amount) .. " XP"
+		local xpTextW, _ = surface.GetTextSize(xpText)
+
+		local reasonText = (notify.reason and notify.reason ~= "") and notify.reason or ""
+		local reasonTextW, _ = surface.GetTextSize(reasonText)
+
+		-- Diamond spacing
+		local diamondSpace = 20
+
+		-- Set text colors with proper alpha
+		_tempTextCol.a = textAlpha
+		_tempSubCol.a = textAlpha
+		_tempShadowCol.a = textAlpha
+
+		-- XP amount (right side) with stronger shadow
+		draw.SimpleText(xpText, "Arcana_Ancient", baseX + 2, y + 2, _tempShadowCol, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(xpText, "Arcana_Ancient", baseX, y, _tempSubCol, TEXT_ALIGN_RIGHT)
+
+		-- Diamond separator position
+		local diamondX = baseX - xpTextW - (diamondSpace / 2)
+		local diamondY = y + 10
+
+		if reasonTextW > 0 then
+			-- Diamond shadow (stronger)
+			draw.NoTexture()
+			surface.SetDrawColor(0, 0, 0, textAlpha)
+			local d = 4
+			local pts = {
+				{x = diamondX + 2, y = diamondY - d + 2},
+				{x = diamondX + d + 2, y = diamondY + 2},
+				{x = diamondX + 2, y = diamondY + d + 2},
+				{x = diamondX - d + 2, y = diamondY + 2},
+			}
+			surface.DrawPoly(pts)
+
+			-- Diamond
+			surface.SetDrawColor(ArtDeco.Colors.gold.r, ArtDeco.Colors.gold.g, ArtDeco.Colors.gold.b, textAlpha)
+			local pts2 = {
+				{x = diamondX, y = diamondY - d},
+				{x = diamondX + d, y = diamondY},
+				{x = diamondX, y = diamondY + d},
+				{x = diamondX - d, y = diamondY},
+			}
+			surface.DrawPoly(pts2)
+
+			-- Inner diamond
+			surface.SetDrawColor(236, 230, 220, textAlpha)
+			local d2 = 2
+			local pts3 = {
+				{x = diamondX, y = diamondY - d2},
+				{x = diamondX + d2, y = diamondY},
+				{x = diamondX, y = diamondY + d2},
+				{x = diamondX - d2, y = diamondY},
+			}
+			surface.DrawPoly(pts3)
+
+			-- Reason (left side) with stronger shadow
+			draw.SimpleText(reasonText, "Arcana_Ancient", diamondX - (diamondSpace / 2) + 2, y + 2, _tempShadowCol, TEXT_ALIGN_RIGHT)
+			draw.SimpleText(reasonText, "Arcana_Ancient", diamondX - (diamondSpace / 2), y, _tempTextCol, TEXT_ALIGN_RIGHT)
+		end
+	end
+end
+
 local function drawLevelAnnouncement(scrW, scrH)
 	if not levelAnnounce.active then return end
 	local now = CurTime()
@@ -258,6 +371,7 @@ hook.Add("HUDPaint", "Arcana_GlobalHUD", function()
 	local scrW, scrH = ScrW(), ScrH()
 	drawUnlockAnnouncement(scrW, scrH)
 	drawLevelAnnouncement(scrW, scrH)
+	drawXPAnnouncement(scrW, scrH)
 	drawCastingBar(scrW, scrH)
 	drawCooldownStack(scrW, scrH)
 end)

@@ -771,6 +771,11 @@ end
 function Arcane:GiveXP(ply, amount, reason)
 	if not IsValid(ply) or amount <= 0 then return false end
 
+	-- we cannot upgrade for more than 4 billion xp
+	if amount > 0xFFFFFFFF then
+		amount = 0xFFFFFFFF
+	end
+
 	local data = self:GetPlayerData(ply)
 	local oldLevel = data.level
 	data.xp = data.xp + amount
@@ -789,6 +794,7 @@ function Arcane:GiveXP(ply, amount, reason)
 		net.Start("Arcane_XPUpdate")
 		net.WriteUInt(data.xp, 32)
 		net.WriteUInt(data.level, 16)
+		net.WriteUInt(amount, 32)
 		net.WriteString(reason)
 		net.Send(ply)
 	end
@@ -1302,12 +1308,18 @@ if CLIENT then
 	net.Receive("Arcane_XPUpdate", function()
 		local xp = net.ReadUInt(32)
 		local level = net.ReadUInt(16)
-		local _reason = net.ReadString()
+		local xpGained = net.ReadUInt(32)
+		local reason = net.ReadString()
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
+
 		local data = Arcane:GetPlayerData(ply)
 		data.xp = xp
 		data.level = level
+		-- Use the amount sent directly from the server
+		if xpGained > 0 then
+			runHook("PlayerGainedXP", ply, xpGained, reason)
+		end
 	end)
 
 	net.Receive("Arcane_LevelUp", function()
@@ -1320,7 +1332,6 @@ if CLIENT then
 		local prevKnowledge = data.knowledge_points or 0
 		data.level = newLevel
 		data.knowledge_points = newKnowledgeTotal
-		-- Notify UI (HUD) with deltas
 		runHook("ClientLevelUp", prevLevel, newLevel, math.max(0, newKnowledgeTotal - prevKnowledge))
 	end)
 
