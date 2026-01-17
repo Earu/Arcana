@@ -495,7 +495,7 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "lightning_strike" then return end
 
-		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(170, 200, 255, 255),
 			size = 26,
 			intensity = 4,
