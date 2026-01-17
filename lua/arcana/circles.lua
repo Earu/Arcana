@@ -1299,10 +1299,11 @@ function MagicCircle:IsActive()
 	return self.isActive
 end
 
-function MagicCircle:Destroy()
+function MagicCircle:Remove()
 	-- Trigger a quick fade-out instead of instant disappearance
 	self:StartFadeOut(self.fadeDuration)
 end
+MagicCircle.Destroy = MagicCircle.Remove
 
 function MagicCircle:StartFadeOut(duration)
 	if self.isFading then return end
@@ -1563,6 +1564,7 @@ end
 function BandCircle:Remove()
 	self:StartFadeOut(self.fadeDuration)
 end
+BandCircle.Destroy = BandCircle.Remove
 
 function BandCircle:StartFadeOut(duration)
 	if self.isFading then return end
