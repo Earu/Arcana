@@ -93,8 +93,12 @@ function ENT:CreateLightningStrike()
 	local targetEnt = nil
 	local players = player.GetAll()
 	local targetableEntities = {}
+	local owner = self.CPPIGetOwner and self:CPPIGetOwner() or self:GetOwner()
 
 	for _, ply in ipairs(players) do
+		-- Skip the owner
+		if ply == owner then continue end
+
 		if ply:Alive() and ply:GetPos():Distance(cloudCenter) <= radius then
 			-- Check if player is outdoors (not under a roof)
 			local tr = util.TraceLine({
@@ -114,6 +118,9 @@ function ENT:CreateLightningStrike()
 	end
 
 	for _, ent in ipairs(ents.FindInSphere(cloudCenter, radius)) do
+		-- Skip the owner
+		if ent == owner then continue end
+
 		-- Check if NPC is outdoors
 		local tr = util.TraceLine({
 			start = Vector(ent:GetPos().x, ent:GetPos().y, cloudCenter.z),
@@ -209,13 +216,14 @@ end
 function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 	local damage = self:GetNWInt("Damage")
 	local damageRadius = 150 -- Area of damage around strike
+	local owner = self.CPPIGetOwner and self:CPPIGetOwner() or self:GetOwner()
 
 	-- Apply direct damage to target entity if available (extra damage to primary target)
-	if IsValid(targetEnt) then
+	if IsValid(targetEnt) and targetEnt ~= owner then
 		local dmgInfo = DamageInfo()
 		dmgInfo:SetDamage(damage * 3) -- 3x more damage for direct hit
 		dmgInfo:SetDamageType(DMG_DISSOLVE)
-		dmgInfo:SetAttacker(self)
+		dmgInfo:SetAttacker(IsValid(owner) and owner or self)
 		dmgInfo:SetInflictor(self)
 		targetEnt:Ignite(1, damageRadius)
 		Arcane:TakeDamageInfo(targetEnt, dmgInfo)
@@ -228,15 +236,22 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 		end
 	end
 
-	-- Deal AOE damage to surrounding entities
-	util.BlastDamage(self, self, strikePos, damageRadius, damage)
-
-	-- Find all entities for physics effects and fire
+	-- Deal AOE damage to surrounding entities (excluding owner)
 	for _, ent in pairs(ents.FindInSphere(strikePos, damageRadius)) do
-		if IsValid(ent) and ent ~= self and ent ~= targetEnt then
+		if IsValid(ent) and ent ~= self and ent ~= owner then
 			-- Calculate damage based on distance
 			local distance = ent:GetPos():Distance(strikePos)
 			local scaledDamage = damage * (1 - distance / damageRadius)
+
+			-- Apply damage
+			if ent:Health() > 0 or ent:IsNPC() or ent:IsPlayer() then
+				local dmgInfo = DamageInfo()
+				dmgInfo:SetDamage(scaledDamage)
+				dmgInfo:SetDamageType(DMG_DISSOLVE)
+				dmgInfo:SetAttacker(IsValid(owner) and owner or self)
+				dmgInfo:SetInflictor(self)
+				Arcane:TakeDamageInfo(ent, dmgInfo)
+			end
 
 			-- Apply force to physics objects
 			local phys = ent:GetPhysicsObject()
