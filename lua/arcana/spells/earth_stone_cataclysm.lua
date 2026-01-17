@@ -591,7 +591,7 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_StoneCataclysm_Circle", function(caster, spellId, castTime)
 		if spellId ~= "stone_cataclysm" then return end
 
-		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(120, 90, 40, 255),
 			size = 360,
 			intensity = 80,

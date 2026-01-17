@@ -177,7 +177,7 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_PoisonCloud_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "poison_cloud" then return end
 
-		return Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(140, 220, 80, 255),
 			size = 24,
 			intensity = 3,

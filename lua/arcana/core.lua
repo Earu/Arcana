@@ -1820,7 +1820,19 @@ if CLIENT then
 			end
 		end)
 
-		return true
+		hook.Add("Arcana_CastSpellFailure", hookName, function(caster, spellId)
+			if spellId ~= spellId then return end
+			if not IsValid(caster) or not circle then
+				hook.Remove("Arcana_CastSpellFailure", hookName)
+				return
+			end
+
+			if circle.StartBreakdown then
+				circle:StartBreakdown(0.1)
+			end
+
+			hook.Remove("Arcana_CastSpellFailure", hookName)
+		end)
 	end
 end
 
