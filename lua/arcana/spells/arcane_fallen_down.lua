@@ -5,10 +5,17 @@ if SERVER then
 	util.AddNetworkString("Arcana_FallenDown_BeamStart")
 	util.AddNetworkString("Arcana_FallenDown_BeamTick")
 	util.AddNetworkString("Arcana_FallenDown_ImpactWave")
+	util.AddNetworkString("Arcana_FallenDown_VacuumImplosion")
+	util.AddNetworkString("Arcana_FallenDown_VacuumCollapse")
+	util.AddNetworkString("Arcana_FallenDown_BGM")
+
+	resource.AddFile("sound/arcana/fallen_down/bgm.wav")
+	resource.AddFile("sound/arcana/fallen_down/blast.wav")
+	resource.AddFile("sound/arcana/fallen_down/after_blast.wav")
 end
 
 local CHARGE_TIME = 60.0
-local BEAM_DURATION = 10.0
+local BEAM_DURATION = 15.0 -- Grows for first 10s, stays at max for last 5s
 local MAX_BEAM_RADIUS = 2000 -- Doubled for massive devastation
 local BEAM_DAMAGE_PER_TICK = 1000000 -- 1 million damage per tick - instant obliteration
 
@@ -37,19 +44,27 @@ if SERVER then
 	end)
 end
 
-local function cleanupChargingState(ply)
+local function cleanupChargingState(ply, stopBGM)
 	if not IsValid(ply) then return end
 	chargingPlayers[ply] = nil
+
+	-- Stop BGM if interrupted
+	if SERVER and stopBGM then
+		net.Start("Arcana_FallenDown_BGM", true)
+		net.WriteEntity(ply)
+		net.WriteBool(false) -- Stop
+		net.Broadcast()
+	end
 end
 
 -- Cleanup on death/disconnect
 if SERVER then
 	hook.Add("PlayerDeath", "Arcana_FallenDown_Cleanup", function(ply)
-		cleanupChargingState(ply)
+		cleanupChargingState(ply, true) -- Stop BGM on death
 	end)
 
 	hook.Add("PlayerDisconnected", "Arcana_FallenDown_Cleanup", function(ply)
-		cleanupChargingState(ply)
+		cleanupChargingState(ply, true) -- Stop BGM on disconnect
 	end)
 
 	-- Set up charging state when spell casting begins
@@ -62,12 +77,18 @@ if SERVER then
 			charging = true,
 			startTime = CurTime()
 		}
+
+		-- Start BGM
+		net.Start("Arcana_FallenDown_BGM", true)
+		net.WriteEntity(caster)
+		net.WriteBool(true) -- Start
+		net.Broadcast()
 	end)
 
 	-- Clean up charging state if spell cast fails
 	hook.Add("Arcana_CastSpellFailure", "Arcana_FallenDown_CleanupOnFail", function(caster, spellId)
 		if spellId ~= "fallen_down" then return end
-		cleanupChargingState(caster)
+		cleanupChargingState(caster, true) -- Stop BGM on failure
 	end)
 end
 
@@ -78,29 +99,12 @@ local function startBeamPhase(caster, targetPos)
 	-- Clean up charging state
 	cleanupChargingState(caster)
 
-	-- Announce beam start to clients
+	-- Announce beam start to clients (they handle all sounds)
 	net.Start("Arcana_FallenDown_BeamStart", true)
 	net.WriteEntity(caster)
 	net.WriteVector(targetPos)
 	net.WriteFloat(BEAM_DURATION)
 	net.Broadcast()
-
-	-- MASSIVE initial impact sounds - layered for overwhelming effect
-	sound.Play("ambient/explosions/explode_9.wav", targetPos, 125, 50) -- Deep explosion
-	sound.Play("ambient/atmosphere/thunder1.wav", targetPos, 120, 40) -- Very deep thunder
-	timer.Simple(0.1, function()
-		sound.Play("ambient/explosions/explode_8.wav", targetPos, 120, 60)
-		sound.Play("weapons/physcannon/energy_disintegrate5.wav", targetPos, 115, 70)
-	end)
-	timer.Simple(0.2, function()
-		sound.Play("ambient/energy/whiteflash.wav", targetPos, 120, 80)
-		sound.Play("ambient/explosions/explode_7.wav", targetPos, 118, 55)
-	end)
-
-	-- Continuous roaring beam sound
-	caster:EmitSound("ambient/energy/force_field_loop1.wav", 110, 60, 1.0)
-	caster:EmitSound("ambient/atmosphere/city_rumble_loop1.wav", 108, 35, 1.0)
-	caster:EmitSound("weapons/physcannon/superphys_launch3.wav", 105, 50, 1.0)
 
 	-- Initial MASSIVE screen shake
 	util.ScreenShake(targetPos, 30, 150, 3.0, MAX_BEAM_RADIUS * 2)
@@ -116,9 +120,11 @@ local function startBeamPhase(caster, targetPos)
 		timer.Simple(tick * damageTickRate, function()
 			if not IsValid(caster) then return end
 
-			local elapsed = CurTime() - startTime
-			local progress = math.Clamp(elapsed / BEAM_DURATION, 0, 1)
-			local currentRadius = Lerp(progress, 50, MAX_BEAM_RADIUS)
+		local elapsed = CurTime() - startTime
+		local progress = math.Clamp(elapsed / BEAM_DURATION, 0, 1)
+		-- Beam grows for first 10s, stays at max for last 5s (10/15 = 0.666...)
+		local growthProgress = math.Clamp(progress * 1.5, 0, 1) -- Reaches 1.0 at 66.6% (10s out of 15s)
+		local currentRadius = Lerp(growthProgress, 50, MAX_BEAM_RADIUS)
 
 			-- Broadcast current beam state for visuals
 			net.Start("Arcana_FallenDown_BeamTick", true)
@@ -187,10 +193,12 @@ local function startBeamPhase(caster, targetPos)
 	timer.Simple(BEAM_DURATION, function()
 		if not IsValid(caster) then return end
 
-		-- Stop continuous beam sounds
+		-- Stop ALL continuous beam sounds
 		caster:StopSound("ambient/energy/force_field_loop1.wav")
 		caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
 		caster:StopSound("weapons/physcannon/superphys_launch3.wav")
+		caster:StopSound("ambient/wind/wind_rooftop1.wav")
+		caster:StopSound("ambient/atmosphere/ambience01.wav")
 
 		-- Absolutely MASSIVE final blast with layered sounds
 		sound.Play("ambient/explosions/explode_9.wav", targetPos, 130, 40) -- Deepest explosion
@@ -204,15 +212,117 @@ local function startBeamPhase(caster, targetPos)
 			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 120, 50)
 		end)
 
-		util.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
+	util.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
 
-		-- Final damage wave
-		Arcane:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS, 200, bit.bor(DMG_BLAST, DMG_DISSOLVE), true)
+	-- Final damage wave
+	Arcane:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS, 200, bit.bor(DMG_BLAST, DMG_DISSOLVE), true)
 
-		-- Broadcast final impact wave
-		net.Start("Arcana_FallenDown_ImpactWave", true)
-		net.WriteVector(targetPos)
-		net.Broadcast()
+	-- Broadcast final impact wave
+	net.Start("Arcana_FallenDown_ImpactWave", true)
+	net.WriteVector(targetPos)
+	net.Broadcast()
+
+		-- VACUUM IMPLOSION PHASE - Air rushes in violently after 0.5 seconds
+		timer.Simple(0.5, function()
+			if not IsValid(caster) then return end
+
+			-- Broadcast vacuum implosion start
+			net.Start("Arcana_FallenDown_VacuumImplosion", true)
+			net.WriteVector(targetPos)
+			net.WriteFloat(MAX_BEAM_RADIUS)
+			net.Broadcast()
+
+			-- Eerie vacuum sounds
+			sound.Play("ambient/wind/wind_snippet5.wav", targetPos, 120, 30) -- Rushing air (low pitch)
+			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", targetPos, 115, 40) -- Void sound
+
+			local implosionDuration = 3.0 -- 3 seconds of violent suction
+			local implosionTicks = 30
+			local tickRate = implosionDuration / implosionTicks
+
+			for tick = 0, implosionTicks do
+				timer.Simple(tick * tickRate, function()
+					if not IsValid(caster) then return end
+
+					local suctionProgress = tick / implosionTicks
+					local suctionStrength = math.sin(suctionProgress * math.pi) -- Peak in middle
+
+					-- Pull everything towards center
+					local ents = ents.FindInSphere(targetPos, MAX_BEAM_RADIUS * 1.5)
+					for _, ent in ipairs(ents) do
+						if IsValid(ent) and ent ~= caster then
+							local dir = (targetPos - ent:WorldSpaceCenter()):GetNormalized()
+							local distance = ent:WorldSpaceCenter():Distance(targetPos)
+							local pullForce = (1 - (distance / (MAX_BEAM_RADIUS * 1.5))) * suctionStrength
+
+							-- Apply physics force
+							local phys = ent:GetPhysicsObject()
+							if IsValid(phys) then
+								phys:Wake()
+								phys:ApplyForceCenter(dir * 150000 * pullForce)
+							end
+
+							-- Pull players/NPCs
+							if ent:IsPlayer() or ent:IsNPC() then
+								local vel = ent:GetVelocity()
+								ent:SetVelocity(vel + dir * 40 * pullForce)
+							end
+
+							-- Damage entities caught in implosion
+							if tick % 10 == 0 and (ent:IsPlayer() or ent:IsNPC()) then
+								local dmg = DamageInfo()
+								dmg:SetDamage(15000 * suctionStrength)
+								dmg:SetDamageType(DMG_CRUSH)
+								dmg:SetAttacker(caster)
+								dmg:SetInflictor(caster)
+								Arcane:TakeDamageInfo(ent, dmg)
+							end
+						end
+					end
+
+					-- Periodic vacuum sounds
+					if tick % 8 == 0 then
+						sound.Play("ambient/wind/wind_hit" .. math.random(1, 3) .. ".wav", targetPos, 110, 40 + (suctionProgress * 30))
+					end
+
+					-- Screen shake
+					if tick % 5 == 0 then
+						util.ScreenShake(targetPos, 15 + (suctionProgress * 10), 150, 0.4, MAX_BEAM_RADIUS * 2)
+					end
+				end)
+			end
+
+		-- Final implosion collapse
+		timer.Simple(implosionDuration, function()
+			if not IsValid(caster) then return end
+
+			-- Massive collapse sounds - MUCH MORE INTENSE
+			sound.Play("ambient/explosions/explode_9.wav", targetPos, 135, 40) -- Deep explosion
+			sound.Play("ambient/explosions/explode_8.wav", targetPos, 133, 50)
+			sound.Play("physics/body/body_medium_break" .. math.random(2, 4) .. ".wav", targetPos, 130, 30)
+
+			timer.Simple(0.1, function()
+				sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 128, 35)
+				sound.Play("weapons/physcannon/energy_disintegrate5.wav", targetPos, 125, 55)
+			end)
+
+			timer.Simple(0.2, function()
+				sound.Play("ambient/energy/whiteflash.wav", targetPos, 125, 60)
+				sound.Play("ambient/explosions/explode_7.wav", targetPos, 123, 60)
+			end)
+
+			-- Final pull damage
+			Arcane:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, bit.bor(DMG_CRUSH, DMG_BLAST), true)
+
+			util.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
+
+			-- Broadcast collapse visuals
+			net.Start("Arcana_FallenDown_VacuumCollapse", true)
+			net.WriteVector(targetPos)
+			net.WriteFloat(MAX_BEAM_RADIUS)
+			net.Broadcast()
+		end)
+		end)
 	end)
 end
 
@@ -241,12 +351,12 @@ Arcane:RegisterSpell({
 		-- Server-side: unleash the beam immediately when cast completes
 		-- (cast function is called AFTER the 60-second charge time)
 		if SERVER then
-			-- Re-check target position at moment of cast completion
-			local finalTarget = Arcane:ResolveGroundTarget(caster, 2000)
-			if not finalTarget then
-				cleanupChargingState(caster)
-				return false
-			end
+		-- Re-check target position at moment of cast completion
+		local finalTarget = Arcane:ResolveGroundTarget(caster, 2000)
+		if not finalTarget then
+			cleanupChargingState(caster, true) -- Stop BGM on targeting failure
+			return false
+		end
 
 			-- Unleash beam immediately (charging is already done)
 			startBeamPhase(caster, finalTarget)
@@ -272,6 +382,103 @@ if CLIENT then
 	-- Lightning arc system for phase 2
 	local fallenDownLightningArcs = {}
 	local fallenDownCircleData = {} -- Store circle data per caster
+
+	-- ============================================================================
+	-- FIRST-PERSON HUD FOR CASTER
+	-- ============================================================================
+
+	-- Ancient Greek character sets (GMod compatible)
+	local RUNES = {
+		-- Uppercase Greek
+		"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω",
+		-- Lowercase Greek
+		"α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "ς", "τ", "υ", "φ", "χ", "ψ", "ω"
+	}
+
+	local SYSTEM_MESSAGES = {
+		">>> PROTOCOL GAMMA-5 INITIATED",
+		">>> OVERRIDE SEQUENCE ACTIVE",
+		">>> MANA FLUX STABILIZING",
+		">>> DIMENSIONAL ANCHOR LOCKED",
+		">>> REALITY BREACH IMMINENT",
+		">>> ARCANE MATRIX SYNCHRONIZING",
+		">>> SUPER-TIER AUTHORIZATION GRANTED",
+		">>> WARNING: POWER LEVELS CRITICAL",
+		">>> VOID SIGNATURE DETECTED",
+		">>> FAILSAFE PROTOCOLS DISABLED"
+	}
+
+	-- Terminal state for Phase 1
+	local terminalLines = {}
+	local terminalNextCharTime = 0
+	local terminalCharDelay = 0.015 -- 15ms per character (faster)
+	local terminalLineDelay = 0.2 -- 200ms between lines (faster)
+	local currentlyTypingLine = nil -- Track which line is currently being typed
+	local phase1Complete = false -- Track when Phase 1 terminal is done
+	local phase1CompleteTime = 0 -- When Phase 1 completed
+	local transitionDuration = 1.5 -- 1.5 second transition with noise
+
+	-- Big runes for Phase 2
+	local bigRunesList = {}
+	local matrixStreams = {}
+
+	-- FOV state
+	local currentFOVModifier = 0
+	local fovActive = false
+
+	local function resetHUDState()
+		terminalLines = {}
+		terminalNextCharTime = 0
+		currentlyTypingLine = nil
+		phase1Complete = false
+		phase1CompleteTime = 0
+		bigRunesList = {}
+		matrixStreams = {}
+
+		-- Reset FOV
+		currentFOVModifier = 0
+		fovActive = false
+	end
+
+	local function getRandomRune()
+		return RUNES[math.random(1, #RUNES)]
+	end
+
+	local function generateRuneLine()
+		local len = math.random(15, 45) -- Varied length for better pacing
+		local line = ""
+		for i = 1, len do
+			line = line .. getRandomRune()
+			if math.random() < 0.3 then -- 30% chance to add space between runes
+				line = line .. " "
+			end
+		end
+		return line
+	end
+
+	-- BGM Control
+	net.Receive("Arcana_FallenDown_BGM", function()
+		local caster = net.ReadEntity()
+		local shouldStart = net.ReadBool()
+
+		if not IsValid(caster) then return end
+
+		if shouldStart then
+			-- Caster hears it clearly (higher volume, no DSP), others hear it in 3D with DSP
+			if caster == LocalPlayer() then
+				LocalPlayer():EmitSound("arcana/fallen_down/bgm.wav", 120, 100, 10) -- No DSP, louder
+			else
+				caster:EmitSound("arcana/fallen_down/bgm.wav", 85, 100, 10, CHAN_AUTO, SND_NOFLAGS, 22) -- 3D with DSP
+			end
+		else
+			-- Stop for both cases
+			if caster == LocalPlayer() then
+				LocalPlayer():StopSound("arcana/fallen_down/bgm.wav")
+			else
+				caster:StopSound("arcana/fallen_down/bgm.wav")
+			end
+		end
+	end)
 
 	local function spawnLightningArc(caster)
 		if not IsValid(caster) then return end
@@ -367,10 +574,117 @@ if CLIENT then
 	end
 
 	-- Override the default casting visuals for Fallen Down
+	-- Client-side cleanup function for interruption
+	local function cleanupClientVisuals(caster)
+		if not IsValid(caster) then return end
+
+		-- Remove all hooks for this caster
+		local chargeSoundHook = "Arcana_FallenDown_ChargeSounds_" .. tostring(caster)
+		local particleHook = "Arcana_FallenDown_ChargeParticles_" .. tostring(caster)
+		local renderHook = "Arcana_FallenDown_RenderCircles_" .. tostring(caster)
+		local lightHook = "Arcana_FallenDown_ChargeLight_" .. tostring(caster)
+		local shakeHook = "Arcana_FallenDown_ChargeShake_" .. tostring(caster)
+		local screenHook = "Arcana_FallenDown_ChargeScreen_" .. tostring(caster)
+
+		hook.Remove("Think", chargeSoundHook)
+		hook.Remove("Think", particleHook)
+		hook.Remove("PostDrawTranslucentRenderables", renderHook)
+		hook.Remove("Think", lightHook)
+		hook.Remove("Think", shakeHook)
+		hook.Remove("RenderScreenspaceEffects", screenHook)
+		timer.Remove("Arcana_FallenDown_MenacingSounds_" .. tostring(caster))
+
+		-- Clear lightning arcs and circle data
+		table.Empty(fallenDownLightningArcs)
+
+		-- Remove all magic circles
+		if fallenDownCircleData[caster] then
+			local data = fallenDownCircleData[caster]
+			-- Remove main vertical stacked circles
+			if data.circles then
+				for _, circleData in ipairs(data.circles) do
+					if circleData.circle and circleData.circle.Remove then
+						circleData.circle:Remove()
+					end
+				end
+			end
+			-- Remove satellite circles
+			if data.satelliteCircles then
+				for _, circle in ipairs(data.satelliteCircles) do
+					if circle and circle.Remove then
+						circle:Remove()
+					end
+				end
+			end
+			-- Remove mid satellite circles
+			if data.midSatelliteCircles then
+				for _, circle in ipairs(data.midSatelliteCircles) do
+					if circle and circle.Remove then
+						circle:Remove()
+					end
+				end
+			end
+			-- Remove band circles
+			if data.bandCircles then
+				for _, bc in ipairs(data.bandCircles) do
+					if bc and bc.Remove then
+						bc:Remove()
+					end
+				end
+			end
+			-- Remove band orbs (which may have circles attached)
+			if data.bandOrbs then
+				for _, orb in ipairs(data.bandOrbs) do
+					if orb.circles then
+						for _, circle in ipairs(orb.circles) do
+							if circle and circle.Remove then
+								circle:Remove()
+							end
+						end
+					end
+				end
+			end
+			fallenDownCircleData[caster] = nil
+		end
+
+		-- Reset HUD state if this is the local player
+		if caster == LocalPlayer() then
+			resetHUDState()
+		end
+
+		-- Stop all looping sounds
+		if IsValid(caster) then
+			caster:StopSound("ambient/wind/wind_rooftop1.wav")
+			caster:StopSound("ambient/wind/wind_snippet1.wav")
+			caster:StopSound("ambient/atmosphere/cave_hit1.wav")
+			caster:StopSound("ambient/energy/weld1.wav")
+			caster:StopSound("ambient/energy/weld2.wav")
+			caster:StopSound("ambient/energy/whiteflash.wav")
+			caster:StopSound("ambient/atmosphere/tone_quiet.wav")
+			caster:StopSound("ambient/atmosphere/tone_alley.wav")
+			caster:StopSound("ambient/energy/force_field_loop1.wav")
+			caster:StopSound("ambient/atmosphere/ambience5.wav")
+			caster:StopSound("ambient/levels/citadel/citadel_ambient_scream_loop1.wav")
+			caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
+			caster:StopSound("ambient/atmosphere/cave_hit2.wav")
+			caster:StopSound("ambient/atmosphere/cave_hit3.wav")
+			caster:StopSound("weapons/physcannon/physcannon_charge.wav")
+			-- Stop thunder sounds (may have electrical crackling)
+			for i = 1, 4 do
+				caster:StopSound("ambient/atmosphere/thunder" .. i .. ".wav")
+			end
+		end
+	end
+
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_ChargingCircles", function(caster, spellId, castTime, _)
 		if spellId ~= "fallen_down" then return end
 		if not IsValid(caster) then return end
 		if not MagicCircle then return end
+
+		-- Reset HUD state IMMEDIATELY if this is the local player casting
+		if caster == LocalPlayer() then
+			resetHUDState()
+		end
 
 		-- Create a structured array of magic circles
 		local circles = {}
@@ -380,12 +694,15 @@ if CLIENT then
 		local bandOrbs = {}
 		local color = Color(170, 220, 255, 255) -- Bright blue-white/cyan like in the anime
 
-		-- Store circle data for lightning arcs
-		fallenDownCircleData[caster] = {
-			satelliteCircles = satelliteCircles,
-			midSatelliteCircles = midSatelliteCircles,
-			bandOrbs = bandOrbs
-		}
+	-- Store circle data for lightning arcs, HUD, and cleanup
+	fallenDownCircleData[caster] = {
+		circles = circles, -- Main vertical stacked circles
+		satelliteCircles = satelliteCircles,
+		midSatelliteCircles = midSatelliteCircles,
+		bandCircles = bandCircles,
+		bandOrbs = bandOrbs,
+		startTime = CurTime()
+	}
 
 		-- Define all circle parameters
 		local stackHeights = {80, 200, 350, 550, 780}
@@ -1244,41 +1561,7 @@ if CLIENT then
 
 		-- Cleanup after charge
 		timer.Simple(castTime, function()
-			hook.Remove("Think", chargeSoundHook)
-			hook.Remove("Think", particleHook)
-			hook.Remove("PostDrawTranslucentRenderables", renderHook)
-			hook.Remove("Think", lightHook)
-			hook.Remove("Think", shakeHook)
-			hook.Remove("RenderScreenspaceEffects", screenHook)
-			timer.Remove("Arcana_FallenDown_MenacingSounds_" .. tostring(caster))
-
-			-- Clear lightning arcs and circle data
-			table.Empty(fallenDownLightningArcs)
-			fallenDownCircleData[caster] = nil
-
-			-- Stop all looping sounds when spell is unleashed or interrupted
-			if IsValid(caster) then
-				caster:StopSound("ambient/wind/wind_rooftop1.wav")
-				caster:StopSound("ambient/wind/wind_snippet1.wav")
-				caster:StopSound("ambient/atmosphere/cave_hit1.wav")
-				caster:StopSound("ambient/energy/weld1.wav")
-				caster:StopSound("ambient/energy/weld2.wav")
-				caster:StopSound("ambient/energy/whiteflash.wav")
-				caster:StopSound("ambient/atmosphere/tone_quiet.wav")
-				caster:StopSound("ambient/atmosphere/tone_alley.wav")
-				caster:StopSound("ambient/energy/force_field_loop1.wav")
-				caster:StopSound("ambient/atmosphere/ambience5.wav")
-				caster:StopSound("ambient/levels/citadel/citadel_ambient_scream_loop1.wav")
-				caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
-				caster:StopSound("ambient/atmosphere/cave_hit2.wav")
-				caster:StopSound("ambient/atmosphere/cave_hit3.wav")
-				caster:StopSound("weapons/physcannon/physcannon_charge.wav")
-				-- Stop thunder sounds (may have electrical crackling)
-				for i = 1, 4 do
-					caster:StopSound("ambient/atmosphere/thunder" .. i .. ".wav")
-				end
-			end
-
+			cleanupClientVisuals(caster)
 			auraParticles = {}
 		end)
 
@@ -1292,6 +1575,11 @@ if CLIENT then
 		local duration = net.ReadFloat()
 
 		if not IsValid(caster) then return end
+
+		-- Reset HUD state for caster when beam starts (charging complete)
+		if caster == LocalPlayer() then
+			resetHUDState()
+		end
 
 		-- Stop all charging phase looping sounds
 		caster:StopSound("ambient/wind/wind_rooftop1.wav")
@@ -1314,19 +1602,62 @@ if CLIENT then
 			caster:StopSound("ambient/atmosphere/thunder" .. i .. ".wav")
 		end
 
-		-- Store active beam state
-		activeBeams[#activeBeams + 1] = {
-			caster = caster,
-			targetPos = targetPos,
-			startTime = CurTime(),
-			endTime = CurTime() + duration,
-			duration = duration
-		}
+	-- Store active beam state
+	activeBeams[#activeBeams + 1] = {
+		caster = caster,
+		targetPos = targetPos,
+		startTime = CurTime(),
+		endTime = CurTime() + duration,
+		duration = duration
+	}
 
-		-- MASSIVE initial flash - blinding
-		local dlight = DynamicLight(math.random(50000, 99999))
-		if dlight then
-			dlight.pos = targetPos
+	-- APOCALYPTIC BEAM BLARE - DEAFENING initial impact (CLIENT-SIDE)
+	surface.PlaySound("arcana/fallen_down/blast.wav") -- PRIMARY BLAST SOUND
+	sound.Play("ambient/explosions/explode_9.wav", targetPos, 140, 45) -- MASSIVE deep explosion
+	sound.Play("ambient/atmosphere/thunder1.wav", targetPos, 138, 35) -- Devastating thunder
+	sound.Play("ambient/explosions/explode_8.wav", targetPos, 137, 50)
+	timer.Simple(0.05, function()
+		sound.Play("weapons/physcannon/energy_disintegrate5.wav", targetPos, 135, 60)
+		sound.Play("ambient/energy/whiteflash.wav", targetPos, 135, 70)
+	end)
+	timer.Simple(0.1, function()
+		sound.Play("ambient/explosions/explode_7.wav", targetPos, 133, 55)
+		sound.Play("ambient/atmosphere/thunder2.wav", targetPos, 132, 40)
+	end)
+	timer.Simple(0.15, function()
+		sound.Play("ambient/explosions/explode_4.wav", targetPos, 130, 65)
+	end)
+
+	-- SUSTAINED ROARING BEAM SOUND - Loops for entire duration at MAXIMUM volume
+	caster:EmitSound("ambient/energy/force_field_loop1.wav", 135, 50, 1.0) -- Intense energy roar
+	caster:EmitSound("ambient/atmosphere/city_rumble_loop1.wav", 133, 30, 1.0) -- Deep rumbling
+	caster:EmitSound("weapons/physcannon/superphys_launch3.wav", 130, 45, 1.0) -- Physics cannon roar
+
+	-- Additional sustained intensity layers
+	timer.Simple(1, function()
+		if IsValid(caster) then
+			caster:EmitSound("ambient/energy/weld2.wav", 128, 40, 1.0)
+		end
+	end)
+	timer.Simple(2, function()
+		if IsValid(caster) then
+			caster:EmitSound("ambient/explosions/explode_5.wav", 125, 60)
+		end
+	end)
+
+	-- Periodic impact sounds throughout beam duration
+	for i = 1, math.floor(duration / 2) do
+		timer.Simple(i * 2, function()
+			if not IsValid(caster) then return end
+			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 128, math.random(35, 50))
+			sound.Play("ambient/explosions/explode_" .. math.random(4, 8) .. ".wav", targetPos, 125, math.random(50, 70))
+		end)
+	end
+
+	-- MASSIVE initial flash - blinding
+	local dlight = DynamicLight(math.random(50000, 99999))
+	if dlight then
+		dlight.pos = targetPos
 			dlight.r = 255
 			dlight.g = 255
 			dlight.b = 255
@@ -1374,9 +1705,9 @@ if CLIENT then
 				end
 			end
 
-			emitter:Finish()
-		end
-	end)
+		emitter:Finish()
+	end
+end)
 
 	-- Beam tick: Update current radius
 	net.Receive("Arcana_FallenDown_BeamTick", function()
@@ -1506,18 +1837,298 @@ if CLIENT then
 			emitter:Finish()
 		end
 
-		-- Massive final light with blue tint
-		local dlight = DynamicLight(math.random(20000, 29999))
-		if dlight then
-			dlight.pos = pos
-			dlight.r = 170
-			dlight.g = 220
-			dlight.b = 255
-			dlight.brightness = 20
-			dlight.Decay = 3000
-			dlight.Size = 3000
-			dlight.DieTime = CurTime() + 2.0
+	-- Massive final light with blue tint
+	local dlight = DynamicLight(math.random(20000, 29999))
+	if dlight then
+		dlight.pos = pos
+		dlight.r = 170
+		dlight.g = 220
+		dlight.b = 255
+		dlight.brightness = 20
+		dlight.Decay = 3000
+		dlight.Size = 3000
+		dlight.DieTime = CurTime() + 2.0
+	end
+	end)
+
+	-- VACUUM IMPLOSION - Everything gets violently sucked inward
+	net.Receive("Arcana_FallenDown_VacuumImplosion", function()
+		local pos = net.ReadVector()
+		local radius = net.ReadFloat()
+
+		-- Play after blast sound when implosion starts
+		surface.PlaySound("arcana/fallen_down/after_blast.wav")
+
+		local implosionDuration = 3.0
+		local startTime = CurTime()
+
+		-- Create MASSIVE particle implosion effect - reusing dust particles
+		local emitter = ParticleEmitter(pos)
+		if emitter then
+			-- Spawn dust particles at the edges being violently sucked inward
+			for i = 1, 500 do
+				timer.Simple(math.Rand(0, 0.5), function()
+					if not emitter then return end
+
+					-- Start at random position in expanded area
+					local angle = math.rad(math.random(0, 360))
+					local dist = math.Rand(radius * 0.8, radius * 1.8)
+					local height = math.Rand(-100, 600)
+					local startPos = pos + Vector(
+						math.cos(angle) * dist,
+						math.sin(angle) * dist,
+						height
+					)
+
+					-- Dust particle (like beam dust)
+					local p = emitter:Add("particle/particle_smokegrenade", startPos)
+					if p then
+						local dir = (pos - startPos):GetNormalized()
+						local speed = math.Rand(1000, 2000)
+
+						p:SetVelocity(dir * speed)
+						p:SetDieTime(math.Rand(2.0, 2.8))
+						p:SetStartAlpha(math.Rand(150, 220))
+						p:SetEndAlpha(0)
+						p:SetStartSize(math.Rand(60, 120))
+						p:SetEndSize(10)
+						p:SetColor(150, 140, 120) -- Dust color
+						p:SetRoll(math.Rand(0, 360))
+						p:SetRollDelta(math.Rand(-3, 3))
+						p:SetAirResistance(0) -- No air resistance for violent suction
+						p:SetGravity(Vector(0, 0, 0))
+
+						-- Accelerate towards center over time
+						p:SetThinkFunction(function(particle)
+							if not IsValid(particle) then return end
+							local toCenter = (pos - particle:GetPos()):GetNormalized()
+							local currentVel = particle:GetVelocity()
+							particle:SetVelocity(currentVel + toCenter * 1500 * FrameTime())
+						end)
+						p:SetNextThink(CurTime())
+					end
+				end)
+			end
+
+			-- Blue energy streaks being sucked in
+			for i = 1, 250 do
+				timer.Simple(math.Rand(0, 0.8), function()
+					if not emitter then return end
+
+					local angle = math.rad(math.random(0, 360))
+					local dist = math.Rand(radius * 0.6, radius * 1.5)
+					local height = math.Rand(0, 500)
+					local startPos = pos + Vector(
+						math.cos(angle) * dist,
+						math.sin(angle) * dist,
+						height
+					)
+
+					local p = emitter:Add("effects/blueflare1", startPos)
+					if p then
+						local dir = (pos - startPos):GetNormalized()
+						p:SetVelocity(dir * math.Rand(1200, 2500))
+						p:SetDieTime(math.Rand(1.5, 2.5))
+						p:SetStartAlpha(255)
+						p:SetEndAlpha(0)
+						p:SetStartSize(math.Rand(20, 50))
+						p:SetEndSize(2)
+						p:SetColor(170, 220, 255)
+						p:SetLighting(false)
+						p:SetGravity(Vector(0, 0, 0))
+						p:SetAirResistance(0)
+
+						-- Accelerate inward
+						p:SetThinkFunction(function(particle)
+							if not IsValid(particle) then return end
+							local toCenter = (pos - particle:GetPos()):GetNormalized()
+							particle:SetVelocity(particle:GetVelocity() + toCenter * 2000 * FrameTime())
+						end)
+						p:SetNextThink(CurTime())
+					end
+				end)
+			end
+
+			-- Debris/vaporized matter trails
+			for i = 1, 150 do
+				timer.Simple(math.Rand(0, 1.0), function()
+					if not emitter then return end
+
+					local angle = math.rad(math.random(0, 360))
+					local dist = math.Rand(radius * 1.0, radius * 2.0)
+					local height = math.Rand(50, 400)
+					local startPos = pos + Vector(
+						math.cos(angle) * dist,
+						math.sin(angle) * dist,
+						height
+					)
+
+					local p = emitter:Add("effects/fire_cloud1", startPos)
+					if p then
+						local dir = (pos - startPos):GetNormalized()
+						p:SetVelocity(dir * math.Rand(800, 1500))
+						p:SetDieTime(math.Rand(1.0, 2.0))
+						p:SetStartAlpha(200)
+						p:SetEndAlpha(0)
+						p:SetStartSize(math.Rand(80, 150))
+						p:SetEndSize(5)
+						p:SetColor(100, 120, 140) -- Dark vaporized color
+						p:SetLighting(false)
+						p:SetGravity(Vector(0, 0, 0))
+					end
+				end)
+			end
+
+			timer.Simple(implosionDuration + 0.5, function()
+				if emitter then
+					emitter:Finish()
+				end
+			end)
 		end
+
+		-- Dark pulsing light effect (void)
+		local hookName = "Arcana_FallenDown_VacuumLight_" .. math.random(100000, 999999)
+		hook.Add("Think", hookName, function()
+			local elapsed = CurTime() - startTime
+			if elapsed > implosionDuration then
+				hook.Remove("Think", hookName)
+				return
+			end
+
+			local progress = elapsed / implosionDuration
+			local intensity = math.sin(progress * math.pi) * 12
+
+			local dlight = DynamicLight(math.random(10000, 19999))
+			if dlight then
+				dlight.pos = pos + Vector(0, 0, 200)
+				dlight.r = 80
+				dlight.g = 100
+				dlight.b = 120
+				dlight.brightness = intensity
+				dlight.Decay = 2000
+				dlight.Size = radius * (1 - progress * 0.4) -- Shrinking void
+				dlight.DieTime = CurTime() + 0.1
+			end
+		end)
+	end)
+
+	-- VACUUM COLLAPSE - Final explosion when implosion completes
+	net.Receive("Arcana_FallenDown_VacuumCollapse", function()
+		local pos = net.ReadVector()
+		local radius = net.ReadFloat()
+
+		-- MASSIVE explosion burst at center
+		local emitter = ParticleEmitter(pos)
+		if emitter then
+	-- Shockwave ring - MUCH BIGGER
+	for i = 1, 12 do -- More rings
+		timer.Simple(i * 0.05, function()
+			if not emitter then return end
+
+			local ringRadius = i * 400 -- Larger radius
+				for ang = 0, 360, 20 do -- More particles per ring
+					local angle = math.rad(ang)
+					local ringPos = pos + Vector(math.cos(angle) * ringRadius, math.sin(angle) * ringRadius, 20) -- Ground level
+
+					local p = emitter:Add("effects/blueflare1", ringPos)
+					if p then
+						p:SetVelocity(Vector(0, 0, math.Rand(100, 300))) -- Higher velocity
+						p:SetDieTime(math.Rand(2.0, 3.5)) -- Lives longer
+						p:SetStartAlpha(255)
+						p:SetEndAlpha(0)
+						p:SetStartSize(math.Rand(120, 200)) -- Much larger
+						p:SetEndSize(10)
+						p:SetColor(170, 220, 255)
+						p:SetLighting(false)
+						p:SetGravity(Vector(0, 0, -150))
+					end
+				end
+			end)
+		end
+
+		-- Central explosion burst (violent outward) - MUCH BIGGER
+		for i = 1, 600 do -- Doubled particle count
+			local p = emitter:Add("effects/blueflare1", pos + Vector(0, 0, 20)) -- Ground level
+			if p then
+				local dir = VectorRand():GetNormalized()
+				p:SetVelocity(dir * math.Rand(1200, 2500)) -- Faster
+				p:SetDieTime(math.Rand(3.0, 6.0)) -- Lives longer
+				p:SetStartAlpha(255)
+				p:SetEndAlpha(0)
+				p:SetStartSize(math.Rand(80, 150)) -- Much larger
+				p:SetEndSize(5)
+				p:SetColor(math.Rand(150, 255), math.Rand(200, 255), 255)
+				p:SetLighting(false)
+				p:SetGravity(Vector(0, 0, -150))
+				p:SetAirResistance(50)
+				p:SetRoll(math.Rand(0, 360))
+				p:SetRollDelta(math.Rand(-5, 5))
+			end
+		end
+
+		-- Dust explosion cloud - MUCH BIGGER
+		for i = 1, 300 do -- Doubled particle count
+			local p = emitter:Add("particle/particle_smokegrenade", pos + Vector(0, 0, 10)) -- Ground level
+			if p then
+				p:SetVelocity(VectorRand() * math.Rand(400, 900)) -- Faster spread
+				p:SetDieTime(math.Rand(4.0, 7.0)) -- Lives longer
+				p:SetStartAlpha(220)
+				p:SetEndAlpha(0)
+				p:SetStartSize(math.Rand(150, 300)) -- Much larger
+				p:SetEndSize(math.Rand(500, 800)) -- Grows even bigger
+				p:SetColor(120, 120, 120)
+				p:SetRoll(math.Rand(0, 360))
+				p:SetRollDelta(math.Rand(-2, 2))
+				p:SetGravity(Vector(0, 0, -30)) -- Less gravity for longer float
+				p:SetAirResistance(100)
+			end
+		end
+
+		-- Debris/sparks - MUCH BIGGER
+		for i = 1, 200 do -- Doubled particle count
+			local p = emitter:Add("effects/fire_cloud1", pos + Vector(0, 0, 15)) -- Ground level
+			if p then
+				p:SetVelocity(VectorRand() * math.Rand(700, 1500)) -- Faster
+				p:SetDieTime(math.Rand(2.0, 4.0))
+				p:SetStartAlpha(255)
+				p:SetEndAlpha(0)
+				p:SetStartSize(math.Rand(60, 120)) -- Much larger
+				p:SetEndSize(10)
+				p:SetColor(200, 150, 100)
+				p:SetLighting(false)
+				p:SetGravity(Vector(0, 0, -300))
+				p:SetAirResistance(80)
+			end
+		end
+
+		-- Delay emitter finish until all delayed spawns are complete
+		-- Longest timer is 12 * 0.05 = 0.6s, so wait 1.0s to be safe
+		timer.Simple(1.0, function()
+			if emitter then
+				emitter:Finish()
+			end
+		end)
+		end
+
+	-- MASSIVE blinding light - EVEN BIGGER
+	for i = 1, 5 do -- More lights
+		timer.Simple(i * 0.08, function()
+			local dlight = DynamicLight(math.random(30000, 39999))
+			if dlight then
+				dlight.pos = pos + Vector(0, 0, 50) -- Ground level
+				dlight.r = 200
+				dlight.g = 230
+				dlight.b = 255
+				dlight.brightness = 25 - (i * 3) -- Brighter
+				dlight.Decay = 4000 -- Slower decay
+				dlight.Size = radius * 3 -- MUCH larger
+				dlight.DieTime = CurTime() + 0.8 -- Lasts longer
+			end
+		end)
+	end
+
+		-- Ground decal
+		util.Decal("Scorch", pos + Vector(0, 0, 10), pos - Vector(0, 0, 10))
 	end)
 
 	-- Render the beam from sky
@@ -1593,26 +2204,33 @@ if CLIENT then
 			end
 		end
 
-		-- Clean up expired beams
-		for i = #activeBeams, 1, -1 do
-			if curTime > activeBeams[i].endTime then
-				table.remove(activeBeams, i)
+	-- Clean up expired beams
+	for i = #activeBeams, 1, -1 do
+		if curTime > activeBeams[i].endTime then
+			local beam = activeBeams[i]
+			-- Stop all sustained beam sounds
+			if IsValid(beam.caster) then
+				beam.caster:StopSound("ambient/energy/force_field_loop1.wav")
+				beam.caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
+				beam.caster:StopSound("weapons/physcannon/superphys_launch3.wav")
+				beam.caster:StopSound("ambient/energy/weld2.wav")
 			end
+			table.remove(activeBeams, i)
 		end
+	end
 
-		-- Render active beams as PERFECT EXPANDING CYLINDERS
-		for _, beam in ipairs(activeBeams) do
-			local elapsed = curTime - beam.startTime
-			local progress = math.Clamp(elapsed / beam.duration, 0, 1)
-			local currentRadius = Lerp(progress, 50, MAX_BEAM_RADIUS)
+	-- Render active beams as PERFECT EXPANDING CYLINDERS
+	for _, beam in ipairs(activeBeams) do
+		local elapsed = curTime - beam.startTime
+		local progress = math.Clamp(elapsed / beam.duration, 0, 1)
+		-- Beam grows for first 10s, stays at max for last 5s
+		local growthProgress = math.Clamp(progress * 1.5, 0, 1)
+		local currentRadius = Lerp(growthProgress, 50, MAX_BEAM_RADIUS)
 
 			-- Sky position (very high above)
 			local skyPos = beam.targetPos + Vector(0, 0, 10000) -- Maximum height
 			local groundPos = beam.targetPos
-
-			-- Subtle pulsing for energy effect
-			local pulse = math.sin(curTime * 4) * 0.05 + 0.95
-			local radiusPulse = currentRadius * pulse * 30
+			local beamRadius = currentRadius * 40 -- 10x radius for massive beam
 
 			-- Draw PERFECT UNIFORM CYLINDER (same radius at top and bottom)
 			-- MASSIVE width multipliers to fill the entire attack radius
@@ -1620,32 +2238,32 @@ if CLIENT then
 
 			-- Core white vaporizing beam (UNIFORM CYLINDER) - MUCH THICKER
 			render.StartBeam(2)
-			render.AddBeam(skyPos, radiusPulse * 0.7, 0, Color(255, 255, 255, 255))
-			render.AddBeam(groundPos, radiusPulse * 0.7, 1, Color(255, 255, 255, 255))
+			render.AddBeam(skyPos, beamRadius * 0.7, 0, Color(255, 255, 255, 255))
+			render.AddBeam(groundPos, beamRadius * 0.7, 1, Color(255, 255, 255, 255))
 			render.EndBeam()
 
 			-- Bright cyan-white layer (UNIFORM CYLINDER) - MUCH THICKER
 			render.StartBeam(2)
-			render.AddBeam(skyPos, radiusPulse * 0.9, 0, Color(220, 240, 255, 240))
-			render.AddBeam(groundPos, radiusPulse * 0.9, 1, Color(220, 240, 255, 240))
+			render.AddBeam(skyPos, beamRadius * 0.9, 0, Color(220, 240, 255, 240))
+			render.AddBeam(groundPos, beamRadius * 0.9, 1, Color(220, 240, 255, 240))
 			render.EndBeam()
 
 			-- Blue-white layer (UNIFORM CYLINDER) - FILLS CYLINDER
 			render.StartBeam(2)
-			render.AddBeam(skyPos, radiusPulse * 1.05, 0, Color(190, 225, 255, 220))
-			render.AddBeam(groundPos, radiusPulse * 1.05, 1, Color(190, 225, 255, 220))
+			render.AddBeam(skyPos, beamRadius * 1.05, 0, Color(190, 225, 255, 220))
+			render.AddBeam(groundPos, beamRadius * 1.05, 1, Color(190, 225, 255, 220))
 			render.EndBeam()
 
 			-- Outer blue glow (UNIFORM CYLINDER) - SLIGHTLY BEYOND RADIUS
 			render.StartBeam(2)
-			render.AddBeam(skyPos, radiusPulse * 1.2, 0, Color(170, 215, 255, 180))
-			render.AddBeam(groundPos, radiusPulse * 1.2, 1, Color(170, 215, 255, 180))
+			render.AddBeam(skyPos, beamRadius * 1.2, 0, Color(170, 215, 255, 180))
+			render.AddBeam(groundPos, beamRadius * 1.2, 1, Color(170, 215, 255, 180))
 			render.EndBeam()
 
 			-- Soft outer edge (UNIFORM CYLINDER) - MAXIMUM SPREAD
 			render.StartBeam(2)
-			render.AddBeam(skyPos, radiusPulse * 1.35, 0, Color(150, 200, 255, 120))
-			render.AddBeam(groundPos, radiusPulse * 1.35, 1, Color(150, 200, 255, 120))
+			render.AddBeam(skyPos, beamRadius * 1.35, 0, Color(150, 200, 255, 120))
+			render.AddBeam(groundPos, beamRadius * 1.35, 1, Color(150, 200, 255, 120))
 			render.EndBeam()
 
 			-- Draw massive expanding ground ring
@@ -1719,22 +2337,491 @@ if CLIENT then
 				render.DrawQuadEasy(pos, Vector(0, 0, 1), size, size, Color(150, 140, 120, alpha), curTime * 50 + i * 5)
 			end
 
-			-- Add multiple dynamic lights along the beam height
-			for lightIdx = 1, 6 do
-				local heightFrac = lightIdx / 6
-				local lightPos = LerpVector(heightFrac, groundPos, skyPos)
-				local dlight = DynamicLight(50000 + (beam.startTime * 1000) % 1000 + lightIdx)
-				if dlight then
-					dlight.pos = lightPos
-					dlight.r = 200
-					dlight.g = 235
-					dlight.b = 255
-					dlight.brightness = 10 * (1 - heightFrac * 0.4)
-					dlight.Decay = 6000
-					dlight.Size = currentRadius * 2.5
-					dlight.DieTime = curTime + 0.1
+		-- Add multiple dynamic lights along the beam height
+		for lightIdx = 1, 6 do
+			local heightFrac = lightIdx / 6
+			local lightPos = LerpVector(heightFrac, groundPos, skyPos)
+			local dlight = DynamicLight(50000 + (beam.startTime * 1000) % 1000 + lightIdx)
+			if dlight then
+				dlight.pos = lightPos
+				dlight.r = 200
+				dlight.g = 235
+				dlight.b = 255
+				dlight.brightness = 10 * (1 - heightFrac * 0.4)
+				dlight.Decay = 6000
+				dlight.Size = currentRadius * 2.5
+				dlight.DieTime = curTime + 0.1
+			end
+		end
+	end
+	end)
+
+	-- Start HUD when casting begins
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_StartHUD", function(caster, spellId, castTime, targetPos)
+		if spellId ~= "fallen_down" then return end
+		if caster ~= LocalPlayer() then return end
+
+		resetHUDState()
+	end)
+
+	-- Main HUD rendering
+	hook.Add("HUDPaint", "Arcana_FallenDown_CasterHUD", function()
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+
+		-- Find if we're casting
+		local casting = false
+		local startTime = 0
+
+		for caster, data in pairs(fallenDownCircleData) do
+			if caster == ply and data.startTime then
+				casting = true
+				startTime = data.startTime
+				break
+			end
+		end
+
+		if not casting then
+			-- Ensure HUD state is reset when not casting
+			if phase1Complete or fovActive or #terminalLines > 0 then
+				resetHUDState()
+			end
+			return
+		end
+
+		local elapsed = CurTime() - startTime
+		if elapsed >= CHARGE_TIME then
+			-- Charging is done, reset HUD state
+			resetHUDState()
+			return
+		end
+
+		local scrW, scrH = ScrW(), ScrH()
+		local rampUpTime = CHARGE_TIME / 3
+
+	-- ==========================================
+	-- PHASE 1: Terminal-style rune loading (0-20s or until complete)
+	-- ==========================================
+	if not phase1Complete then
+			surface.SetFont("DermaLarge")
+
+			local currentTime = CurTime()
+			local terminalY = scrH * 0.15
+			local lineHeight = 30
+
+		-- Add new line only if no line is currently being typed
+		local isTyping = false
+		if #terminalLines > 0 then
+			local lastLine = terminalLines[#terminalLines]
+			if not lastLine.completed then
+				isTyping = true
+			end
+		end
+
+		-- Create new line if not currently typing and enough time has passed
+		if not isTyping and currentTime >= terminalNextCharTime then
+			-- Decide if we add a system message or runes
+			local isSystemMsg = math.random() < 0.35 -- 35% chance for system messages (more dramatic)
+
+			if isSystemMsg then
+				local msg = SYSTEM_MESSAGES[math.random(1, #SYSTEM_MESSAGES)]
+				table.insert(terminalLines, {
+					text = msg,
+					currentLength = 0,
+					targetLength = #msg,
+					isSystem = true,
+					nextCharTime = currentTime,
+					completed = false,
+					startedTyping = false
+				})
+			else
+				local runeText = generateRuneLine()
+				table.insert(terminalLines, {
+					text = runeText,
+					currentLength = 0,
+					targetLength = #runeText,
+					isSystem = false,
+					nextCharTime = currentTime,
+					completed = false,
+					startedTyping = false
+				})
+			end
+
+			-- Play tick sound when new line starts
+			surface.PlaySound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
+
+			terminalNextCharTime = currentTime + terminalLineDelay
+		end
+
+		-- Remove old lines that have scrolled off screen to keep performance good
+		while #terminalLines > 30 do
+			table.remove(terminalLines, 1)
+		end
+
+		-- Update and render lines
+		local yOffset = terminalY
+		for i, line in ipairs(terminalLines) do
+			-- Only type the last line (sequential typing)
+			if i == #terminalLines and not line.completed then
+				if currentTime >= line.nextCharTime then
+					line.currentLength = math.min(line.currentLength + 1, line.targetLength)
+					line.nextCharTime = currentTime + terminalCharDelay
+
+					if line.currentLength >= line.targetLength then
+						line.completed = true
+					end
+				end
+			end
+
+			local displayText = string.sub(line.text, 1, line.currentLength)
+
+			-- Draw with shadow for better visibility
+			if line.isSystem then
+				draw.SimpleText(displayText, "DermaLarge", scrW * 0.1 + 2, yOffset + 2, Color(0, 0, 0, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP) -- Shadow
+				draw.SimpleText(displayText, "DermaLarge", scrW * 0.1, yOffset, Color(100, 126, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+			else
+				draw.SimpleText(displayText, "DermaLarge", scrW * 0.1 + 2, yOffset + 2, Color(0, 0, 0, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP) -- Shadow
+				draw.SimpleText(displayText, "DermaLarge", scrW * 0.1, yOffset, Color(170, 220, 255, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+			end
+
+			yOffset = yOffset + lineHeight
+
+			-- Stop rendering if we go off screen
+			if yOffset > scrH * 0.85 then break end
+		end
+
+		-- Draw cursor blink effect on last incomplete line
+		if #terminalLines > 0 and not terminalLines[#terminalLines].completed then
+			if math.floor(currentTime * 3) % 2 == 0 then
+				local lastLine = terminalLines[#terminalLines]
+				local cursorY = terminalY + (#terminalLines - 1) * lineHeight
+				local textWidth = surface.GetTextSize(string.sub(lastLine.text, 1, lastLine.currentLength))
+				surface.SetDrawColor(170, 220, 255, 255)
+				surface.DrawRect(scrW * 0.1 + textWidth, cursorY + 5, 15, 20)
+			end
+		end
+
+	-- Mark Phase 1 as complete when we've reached the ramp up time (20 seconds)
+	if elapsed >= rampUpTime and not phase1Complete then
+		phase1Complete = true
+		phase1CompleteTime = CurTime()
+	end
+
+	-- ==========================================
+	-- PHASE 2: Big fading runes + Matrix streams (after Phase 1 complete, until 5s before end)
+	-- ==========================================
+	elseif phase1Complete and elapsed < CHARGE_TIME - 5 then
+		-- Render terminal lines with CRAZY noise transition fade-out
+		local transitionElapsed = CurTime() - phase1CompleteTime
+		if transitionElapsed < transitionDuration then
+			local transitionProgress = transitionElapsed / transitionDuration
+			local fadeAlpha = (1 - transitionProgress) * 255
+
+			local terminalY = scrH * 0.15
+			local lineHeight = 30
+			local yOffset = terminalY
+
+			for i, line in ipairs(terminalLines) do
+				local displayText = string.sub(line.text, 1, line.currentLength)
+
+				-- Skip random lines as glitch gets stronger
+				if math.random() < transitionProgress * 0.4 then
+					yOffset = yOffset + lineHeight
+					continue
+				end
+
+				-- EXTREME glitch effects that get crazier over time
+				local glitchIntensity = transitionProgress * 50 -- Up to 50 pixels
+				local xGlitch = math.random(-glitchIntensity, glitchIntensity)
+				local yGlitch = math.random(-glitchIntensity * 0.5, glitchIntensity * 0.5)
+
+				-- RGB color separation effect
+				local rgbSeparation = transitionProgress * 10
+
+				local baseX = scrW * 0.1
+				local baseY = yOffset + yGlitch
+
+				-- Randomly distort the text itself
+				if math.random() < transitionProgress * 0.3 then
+					displayText = string.sub(displayText, 1, math.random(1, #displayText))
+				end
+
+				if line.isSystem then
+					-- Draw multiple ghost copies for more chaos
+					if transitionProgress > 0.3 then
+						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch - rgbSeparation, baseY, Color(255, 0, 0, fadeAlpha * 0.5), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch + rgbSeparation, baseY, Color(0, 255, 255, fadeAlpha * 0.5), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					end
+
+					-- Main text with shadow
+					draw.SimpleText(displayText, "DermaLarge", baseX + 2 + xGlitch, baseY + 2, Color(0, 0, 0, fadeAlpha * 0.8), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch, baseY, Color(100, 126, 255, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+				else
+					-- Draw multiple ghost copies for more chaos
+					if transitionProgress > 0.3 then
+						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch - rgbSeparation, baseY, Color(255, 0, 0, fadeAlpha * 0.4), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch + rgbSeparation, baseY, Color(0, 255, 255, fadeAlpha * 0.4), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					end
+
+					draw.SimpleText(displayText, "DermaLarge", baseX + 2 + xGlitch, baseY + 2, Color(0, 0, 0, fadeAlpha * 0.8), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch, baseY, Color(170, 220, 255, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+				end
+
+				yOffset = yOffset + lineHeight
+				if yOffset > scrH * 0.85 then break end
+			end
+		end
+
+	-- Matrix and big runes (start appearing during/after transition)
+		local phaseProgress = (elapsed - rampUpTime) / (CHARGE_TIME - 5 - rampUpTime)
+
+		-- Fade-out transition as we approach Phase 3 (last 2 seconds of Phase 2)
+		local timeUntilPhase3 = (CHARGE_TIME - 5) - elapsed
+		local transitionFade = 1.0
+		local phase2TransitionDuration = 2.0
+		if timeUntilPhase3 < phase2TransitionDuration then
+			transitionFade = timeUntilPhase3 / phase2TransitionDuration
+		end
+
+	-- FOV manipulation during Phase 2 (only in first person)
+		fovActive = true
+		-- Gradually DECREASE FOV during Phase 2 (down to -50 FOV - VERY narrow tunnel vision)
+		currentFOVModifier = math.Approach(currentFOVModifier, -50 * phaseProgress, FrameTime() * 25)
+
+	-- Initialize matrix streams if needed (going UP)
+		if #matrixStreams == 0 then
+			for i = 1, 40 do
+				table.insert(matrixStreams, {
+					x = math.random(0, scrW),
+					y = math.random(scrH, scrH + 200), -- Start at bottom
+					speed = math.random(200, 600),
+					runes = {}
+				})
+
+				-- Pre-generate runes for this stream
+				for j = 1, 15 do
+					table.insert(matrixStreams[i].runes, getRandomRune())
 				end
 			end
 		end
+
+		-- Update and draw matrix streams (background) - GOING UP
+		surface.SetFont("DermaLarge")
+		for _, stream in ipairs(matrixStreams) do
+			stream.y = stream.y - stream.speed * FrameTime() * (1 + phaseProgress * 2) -- Negative = up
+
+			if stream.y < -200 then -- Reset when goes off top
+				stream.y = scrH + 200
+				stream.x = math.random(0, scrW)
+			end
+
+	-- Draw rune trail with shadow and CHROMATIC ABERRATION (trail goes DOWN as stream moves UP)
+	for i, rune in ipairs(stream.runes) do
+		local yPos = stream.y + i * 30 -- Positive offset = trail below
+		local alpha = math.max(0, 150 - i * 10) * (0.5 + phaseProgress * 0.5) * transitionFade
+
+		-- Chromatic aberration - grows stronger with phase progress
+		local aberrationOffset = phaseProgress * 8 -- Up to 8 pixels separation
+
+		-- Red channel (left)
+		draw.SimpleText(rune, "DermaLarge", stream.x - aberrationOffset, yPos, Color(255, 0, 0, alpha * 0.6), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		-- Cyan channel (right)
+		draw.SimpleText(rune, "DermaLarge", stream.x + aberrationOffset, yPos, Color(0, 255, 255, alpha * 0.6), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		-- Main blue channel (center) with shadow
+		draw.SimpleText(rune, "DermaLarge", stream.x + 2, yPos + 2, Color(0, 0, 0, alpha * 0.8), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText(rune, "DermaLarge", stream.x, yPos, Color(170, 220, 255, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	end
+		end
+
+		-- Add big runes periodically
+		if math.random() < 0.02 * (1 + phaseProgress * 3) then
+			table.insert(bigRunesList, {
+				rune = getRandomRune(),
+				x = math.random(scrW * 0.1, scrW * 0.9), -- Across entire screen width
+				y = math.random(scrH * 0.1, scrH * 0.9), -- Across entire screen height
+				size = math.random(scrH * 0.15, scrH * 0.35) * (1 + phaseProgress), -- MUCH bigger, scales with screen
+				alpha = 0,
+				lifetime = 0,
+				maxLifetime = math.random(1.5, 3.0)
+			})
+		end
+
+		-- Update and draw big runes (foreground)
+		for i = #bigRunesList, 1, -1 do
+				local rune = bigRunesList[i]
+				rune.lifetime = rune.lifetime + FrameTime()
+
+				-- Fade in, stay, fade out
+				local fadeProgress = rune.lifetime / rune.maxLifetime
+				if fadeProgress < 0.2 then
+					rune.alpha = (fadeProgress / 0.2) * 255
+				elseif fadeProgress > 0.8 then
+					rune.alpha = ((1 - fadeProgress) / 0.2) * 255
+				else
+					rune.alpha = 255
+				end
+
+		if rune.lifetime >= rune.maxLifetime then
+			table.remove(bigRunesList, i)
+		else
+			-- UNSTABLE EFFECTS - make runes look chaotic and powerful
+			local time = CurTime()
+
+			-- Position jitter (increases with phase progress)
+			local jitterAmount = phaseProgress * 15
+			local xJitter = math.sin(time * 15 + rune.lifetime * 10) * jitterAmount
+			local yJitter = math.cos(time * 12 + rune.lifetime * 8) * jitterAmount
+
+			-- Scale pulse (breathing effect)
+			local scalePulse = 1 + math.sin(time * 8 + rune.lifetime * 5) * 0.15 * phaseProgress
+			local unstableSize = rune.size * scalePulse
+
+			-- Alpha flicker (subtle)
+			local alphaFlicker = 1 - math.random() * 0.1 * phaseProgress
+			local finalAlpha = rune.alpha * alphaFlicker
+
+			-- Color shift (subtle blue/white variation)
+			local colorShift = math.sin(time * 10 + rune.lifetime * 7) * 30 * phaseProgress
+			local r = math.Clamp(200 + colorShift, 170, 255)
+			local g = math.Clamp(230 + colorShift, 200, 255)
+
+			-- Create/use dynamic font for this rune size
+			local fontName = "FallenDown_BigRune_" .. math.floor(unstableSize / 50)
+			if not _G["_fallendown_font_" .. fontName] then
+				surface.CreateFont(fontName, {
+					font = "Arial",
+					size = unstableSize,
+					weight = 700,
+					antialias = true
+				})
+				_G["_fallendown_font_" .. fontName] = true
+			end
+
+		-- Draw with shadow for visibility (shadow also jitters slightly)
+		local shadowOffset = math.max(3, unstableSize * 0.02)
+		local finalX = rune.x + xJitter
+		local finalY = rune.y + yJitter
+
+		-- Apply transition fade
+		local fadedAlpha = finalAlpha * transitionFade
+
+		-- Chromatic aberration - scales with rune size and phase progress
+		local aberrationOffset = (unstableSize * 0.015) * phaseProgress -- Grows with progress
+
+		-- Red channel (offset left)
+		draw.SimpleText(rune.rune, fontName, finalX - aberrationOffset, finalY, Color(255, 0, 100, fadedAlpha * 0.5), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		-- Cyan channel (offset right)
+		draw.SimpleText(rune.rune, fontName, finalX + aberrationOffset, finalY, Color(0, 255, 255, fadedAlpha * 0.5), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		-- Shadow
+		draw.SimpleText(rune.rune, fontName, finalX + shadowOffset, finalY + shadowOffset, Color(0, 0, 0, fadedAlpha * 0.8), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		-- Main colored text (center)
+		draw.SimpleText(rune.rune, fontName, finalX, finalY, Color(r, g, 255, fadedAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+			end
+
+	-- ==========================================
+	-- PHASE 3: White screen + Alpha/Omega (last 5 seconds)
+	-- ==========================================
+	elseif phase1Complete and elapsed >= CHARGE_TIME - 5 then
+		local climaxProgress = (elapsed - (CHARGE_TIME - 5)) / 5
+
+	-- DRAMATIC FOV EXPLOSION for Phase 3
+	fovActive = true
+	-- MAXIMUM FOV boost: +70 FOV (from -30 to +70 is a HUGE 100 FOV swing!)
+	currentFOVModifier = math.Approach(currentFOVModifier, 70, FrameTime() * 200)
+
+		-- White screen fade
+		local whiteAlpha = math.min(255, climaxProgress * 255 * 1.5)
+		surface.SetDrawColor(255, 255, 255, whiteAlpha)
+		surface.DrawRect(0, 0, scrW, scrH)
+
+	-- Draw ABSOLUTELY MASSIVE ALPHA and OMEGA symbols in black (140% of screen - goes off-screen!)
+	if whiteAlpha > 150 then
+		local symbolAlpha = math.min(255, (climaxProgress - 0.5) * 400)
+
+		-- Create ABSOLUTELY MASSIVE font (140% of screen height - dominates everything!)
+		local massiveSize = scrH * 1.4
+		local fontName = "FallenDown_AlphaOmega"
+		if not _G["_fallendown_font_alphaomega"] then
+			surface.CreateFont(fontName, {
+				font = "Arial",
+				size = massiveSize,
+				weight = 900, -- Ultra bold
+				antialias = true
+			})
+			_G["_fallendown_font_alphaomega"] = true
+		end
+
+	-- Alpha (Α) on left side - centered to show more of the character
+	draw.SimpleText("Α", fontName, scrW * 0.3, scrH * 0.5, Color(0, 0, 0, symbolAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+	-- Omega (Ω) on right side - centered to show more of the character
+	draw.SimpleText("Ω", fontName, scrW * 0.7, scrH * 0.5, Color(0, 0, 0, symbolAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	end
+
+	-- ==========================================
+	-- IMPACT FRAME: Last 0.3 seconds before unleash
+	-- ==========================================
+	elseif phase1Complete and elapsed >= CHARGE_TIME - 0.3 then
+		-- FULL BLACK SCREEN impact frame
+		surface.SetDrawColor(0, 0, 0, 255)
+		surface.DrawRect(0, 0, scrW, scrH)
+
+		-- Flash of symbols at moment of impact
+		local impactProgress = (elapsed - (CHARGE_TIME - 0.3)) / 0.3
+
+		-- Create ultra-massive font
+		local impactSize = scrH * 1.6
+		local impactFont = "FallenDown_Impact"
+		if not _G["_fallendown_font_impact"] then
+			surface.CreateFont(impactFont, {
+				font = "Arial",
+				size = impactSize,
+				weight = 900,
+				antialias = true
+			})
+			_G["_fallendown_font_impact"] = true
+		end
+
+		-- Symbols flash with inverted colors (white on black)
+		local flashAlpha = math.sin(impactProgress * math.pi * 3) * 255 -- Multiple flashes
+
+		draw.SimpleText("Α", impactFont, scrW * 0.3, scrH * 0.5, Color(255, 255, 255, flashAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("Ω", impactFont, scrW * 0.7, scrH * 0.5, Color(255, 255, 255, flashAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+	end)
+
+	-- Cleanup HUD when spell fails
+	hook.Add("Arcana_CastSpellFailure", "Arcana_FallenDown_CleanupHUD", function(caster, spellId)
+		if spellId ~= "fallen_down" then return end
+		-- Clean up all client visuals, sounds, and HUD
+		cleanupClientVisuals(caster)
+		-- Stop sustained beam sounds if interrupted (beam was already started)
+		if IsValid(caster) then
+			caster:StopSound("ambient/energy/force_field_loop1.wav")
+			caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
+			caster:StopSound("weapons/physcannon/superphys_launch3.wav")
+			caster:StopSound("ambient/energy/weld2.wav")
+		end
+	end)
+
+	-- CalcView hook to apply FOV changes (only in first person)
+	hook.Add("CalcView", "Arcana_FallenDown_FOV", function(ply, pos, angles, fov)
+		if not fovActive then return end
+		if ply ~= LocalPlayer() then return end
+		if ply:ShouldDrawLocalPlayer() then return end -- Only in first person
+
+		local view = {
+			origin = pos,
+			angles = angles,
+			fov = fov + currentFOVModifier
+		}
+
+		return view
 	end)
 end
