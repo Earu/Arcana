@@ -199,6 +199,7 @@ if SERVER then
 
 				net.Start("Arcane_SpellFailed", true)
 				net.WriteEntity(self)
+				net.WriteString(spellId)
 				net.WriteFloat(castTime)
 				net.Broadcast()
 
@@ -292,6 +293,7 @@ if SERVER then
 
 			net.Start("Arcane_SpellFailed", true)
 			net.WriteEntity(self)
+			net.WriteString(spellId)
 			net.WriteFloat(castTime)
 			net.Broadcast()
 		end

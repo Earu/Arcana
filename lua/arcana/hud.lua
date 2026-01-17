@@ -108,6 +108,15 @@ hook.Add("Arcana_BeginCastingVisuals", "ArcanaHUD_TrackCast", function(caster, s
 	activeCast.endsAt = CurTime() + (castTime or 0)
 end)
 
+hook.Add("Arcana_CastSpellFailure", "ArcanaHUD_TrackFail", function(caster, spellId, castTime)
+	if not IsValid(caster) or caster ~= LocalPlayer() then return end
+
+	-- reset the casting bar if spail fails
+	activeCast.spellId = nil
+	activeCast.startedAt = 0
+	activeCast.endsAt = 0
+end)
+
 local function drawCastingBar(scrW, scrH)
 	if not activeCast.spellId then return end
 	local now = CurTime()

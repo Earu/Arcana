@@ -674,6 +674,39 @@ if CLIENT then
 	end)
 end
 
+-- Interrupt an ongoing spell cast
+function Arcane:InterruptSpell(ply, spellId)
+	if not IsValid(ply) then return false end
+
+	local pdata = self:GetPlayerData(ply)
+	if not pdata then return false end
+
+	-- Check if player is actually casting this spell
+	if pdata.casting_spell ~= spellId then return false end
+
+	-- Clear casting state
+	pdata.casting_until = nil
+	pdata.casting_spell = nil
+
+	-- Cancel the pending cast timer (server-side)
+	if SERVER then
+		local timerName = "Arcana_CastSpell_" .. ply:SteamID64() .. "_" .. spellId
+		timer.Remove(timerName)
+
+		-- Notify clients to fail the spell visuals
+		net.Start("Arcane_SpellFailed", true)
+		net.WriteEntity(ply)
+		net.WriteString(spellId)
+		net.WriteFloat(0)
+		net.Broadcast()
+	end
+
+	-- Run the failure hook
+	runHook("CastSpellFailure", ply, spellId)
+
+	return true
+end
+
 -- Begin casting with a minimum cast time and broadcast evolving circle
 function Arcane:StartCasting(ply, spellId)
 	if not IsValid(ply) then return false end
@@ -718,8 +751,9 @@ function Arcane:StartCasting(ply, spellId)
 		net.WriteBool(forwardLike)
 		net.Broadcast()
 
-		-- Schedule execution after cast time
-		timer.Simple(castTime, function()
+		-- Schedule execution after cast time using a named timer that can be cancelled
+		local timerName = "Arcana_CastSpell_" .. ply:SteamID64() .. "_" .. spellId
+		timer.Create(timerName, castTime, 1, function()
 			if not IsValid(ply) then return end
 
 			-- Clear casting lock before final validation and execution
@@ -734,8 +768,12 @@ function Arcane:StartCasting(ply, spellId)
 			if not ok then
 				net.Start("Arcane_SpellFailed", true)
 				net.WriteEntity(ply)
+				net.WriteString(spellId)
 				net.WriteFloat(castTime)
 				net.Broadcast()
+
+				-- Trigger failure hook on server
+				runHook("CastSpellFailure", ply, spellId)
 
 				return
 			end
@@ -1163,6 +1201,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		if SERVER then
 			net.Start("Arcane_SpellFailed", true)
 			net.WriteEntity(ply)
+			net.WriteString(spellId)
 			net.WriteFloat((context and context.castTime) or 0)
 			net.Broadcast()
 		end
@@ -1480,8 +1519,12 @@ if CLIENT then
 	-- On spell failure, break down the tracked circle for the caster (works for both players and entities)
 	net.Receive("Arcane_SpellFailed", function()
 		local caster = net.ReadEntity()
+		local spellId = net.ReadString()
 		local castTime = net.ReadFloat() or 0
 		if not IsValid(caster) then return end
+
+		-- Trigger the failure hook on client so spell-specific cleanup can happen
+		runHook("CastSpellFailure", caster, spellId)
 
 		local circle = caster._ArcanaCastingCircle
 
@@ -1618,7 +1661,21 @@ if SERVER then
 		end
 	end)
 
+	hook.Add("PlayerDeath", "Arcane_InterruptOnDeath", function(victim)
+		-- Interrupt any active spell casting
+		local pdata = Arcane:GetPlayerData(victim)
+		if pdata and pdata.casting_spell then
+			Arcane:InterruptSpell(victim, pdata.casting_spell)
+		end
+	end)
+
 	hook.Add("PlayerDisconnected", "Arcane_PlayerLeave", function(ply)
+		-- Interrupt any active spell casting
+		local pdata = Arcane:GetPlayerData(ply)
+		if pdata and pdata.casting_spell then
+			Arcane:InterruptSpell(ply, pdata.casting_spell)
+		end
+
 		local sid = IsValid(ply) and ply:SteamID64() or nil
 		if sid then
 			timer.Remove("Arcana_RetryLoad_" .. tostring(sid))
