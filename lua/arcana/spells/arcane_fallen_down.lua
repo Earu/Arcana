@@ -716,6 +716,7 @@ if CLIENT then
 		-- Ground circle appears first (immediately)
 		timer.Simple(0, function()
 			if not IsValid(caster) then return end
+			if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 			local groundCircle = MagicCircle.CreateMagicCircle(
 				caster:GetPos() + Vector(0, 0, 2),
 				Angle(0, 0, 0),
@@ -741,6 +742,7 @@ if CLIENT then
 			local delay = (i / 6) * rampUpTime -- Spread evenly: ~3.33s, ~6.67s, ~10s
 			timer.Simple(delay, function()
 				if not IsValid(caster) then return end
+				if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 				local circle = MagicCircle.CreateMagicCircle(
 					caster:GetPos() + Vector(0, 0, stackHeights[i]),
 					Angle(0, 0, 0),
@@ -783,6 +785,7 @@ if CLIENT then
 		local circle4Delay = satelliteStartDelay + (8 * satelliteSpacing) -- After last satellite (~15s)
 		timer.Simple(circle4Delay, function()
 			if not IsValid(caster) then return end
+			if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 			local circle = MagicCircle.CreateMagicCircle(
 				caster:GetPos() + Vector(0, 0, stackHeights[4]),
 				Angle(0, 0, 0),
@@ -809,6 +812,7 @@ if CLIENT then
 		local circle5Delay = circle4Delay + 1.0 -- Just 1 second later (~16s)
 		timer.Simple(circle5Delay, function()
 			if not IsValid(caster) then return end
+			if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 			local circle = MagicCircle.CreateMagicCircle(
 				caster:GetPos() + Vector(0, 0, stackHeights[5]),
 				Angle(0, 0, 0),
@@ -840,6 +844,7 @@ if CLIENT then
 
 		timer.Simple(midSystemDelay, function()
 			if not IsValid(caster) then return end
+			if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 			local remainingTime = castTime - midSystemDelay
 
 			-- Single thump sound for entire mid-level system
@@ -925,6 +930,7 @@ if CLIENT then
 
 			timer.Simple(between3and4Delay, function()
 				if not IsValid(caster) then return end
+				if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 				local remainingTime = castTime - between3and4Delay
 				local bc3to4 = BandCircle.Create(caster:GetPos() + Vector(0, 0, between3and4Height), Angle(0, 0, 0), color, between3and4Radius * 2, remainingTime)
 				if bc3to4 then
@@ -939,6 +945,7 @@ if CLIENT then
 		if BandCircle then
 			timer.Simple(bandsDelay, function()
 				if not IsValid(caster) then return end
+				if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 				local remainingTime = castTime - bandsDelay
 
 				-- Single thump for both bands
@@ -967,6 +974,7 @@ if CLIENT then
 			local delay = satelliteStartDelay + (i * satelliteSpacing) -- Rapid succession
 			timer.Simple(delay, function()
 				if not IsValid(caster) then return end
+				if not fallenDownCircleData[caster] then return end -- Spell was interrupted
 				local baseAngle = (i / 8) * math.pi * 2
 
 				-- Angled 45 degrees upward (pitch 45, facing outward)
@@ -1002,6 +1010,12 @@ if CLIENT then
 		local hookName = "Arcana_FallenDown_FollowCaster_" .. tostring(caster)
 		hook.Add("Think", hookName, function()
 			if not IsValid(caster) then
+				hook.Remove("Think", hookName)
+				return
+			end
+
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
 				hook.Remove("Think", hookName)
 				return
 			end
@@ -1086,6 +1100,13 @@ if CLIENT then
 
 		hook.Add("Think", chargeSoundHook, function()
 			if not IsValid(caster) then
+				hook.Remove("Think", chargeSoundHook)
+				timer.Remove("Arcana_FallenDown_MenacingSounds_" .. tostring(caster))
+				return
+			end
+
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
 				hook.Remove("Think", chargeSoundHook)
 				timer.Remove("Arcana_FallenDown_MenacingSounds_" .. tostring(caster))
 				return
@@ -1239,6 +1260,12 @@ if CLIENT then
 				return
 			end
 
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
+				hook.Remove("Think", particleHook)
+				return
+			end
+
 			local casterPos = caster:GetPos()
 			local now = CurTime()
 			local elapsed = now - chargeStartTime
@@ -1316,6 +1343,12 @@ if CLIENT then
 
 		hook.Add("PostDrawTranslucentRenderables", renderHook, function()
 			if not IsValid(caster) then
+				hook.Remove("PostDrawTranslucentRenderables", renderHook)
+				return
+			end
+
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
 				hook.Remove("PostDrawTranslucentRenderables", renderHook)
 				return
 			end
@@ -1403,6 +1436,12 @@ if CLIENT then
 				return
 			end
 
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
+				hook.Remove("Think", lightHook)
+				return
+			end
+
 			local now = CurTime()
 
 			-- Main aura light
@@ -1459,6 +1498,12 @@ if CLIENT then
 				return
 			end
 
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
+				hook.Remove("Think", shakeHook)
+				return
+			end
+
 			local now = CurTime()
 			local elapsed = now - chargeStartTime
 			local midPhaseStart = CHARGE_TIME / 2 -- 30 seconds
@@ -1487,6 +1532,12 @@ if CLIENT then
 
 		hook.Add("RenderScreenspaceEffects", screenHook, function()
 			if not IsValid(caster) then
+				hook.Remove("RenderScreenspaceEffects", screenHook)
+				return
+			end
+
+			-- Stop if spell was interrupted
+			if not fallenDownCircleData[caster] then
 				hook.Remove("RenderScreenspaceEffects", screenHook)
 				return
 			end
