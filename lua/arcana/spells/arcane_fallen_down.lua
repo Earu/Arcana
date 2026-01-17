@@ -1,0 +1,1740 @@
+-- Fallen Down: A devastating super-tier spell inspired by Overlord
+-- Charges for 60 seconds with spectacular magic circle array, then unleashes a godly beam from the heavens
+
+if SERVER then
+	util.AddNetworkString("Arcana_FallenDown_BeamStart")
+	util.AddNetworkString("Arcana_FallenDown_BeamTick")
+	util.AddNetworkString("Arcana_FallenDown_ImpactWave")
+end
+
+local CHARGE_TIME = 60.0
+local BEAM_DURATION = 10.0
+local MAX_BEAM_RADIUS = 2000 -- Doubled for massive devastation
+local BEAM_DAMAGE_PER_TICK = 1000000 -- 1 million damage per tick - instant obliteration
+
+-- Track players currently charging this spell
+local chargingPlayers = {}
+
+-- Prevent movement during charge (server-side)
+if SERVER then
+	hook.Add("SetupMove", "Arcana_FallenDown_LockMovement", function(ply, mv, cmd)
+		local state = chargingPlayers[ply]
+		if not state then return end
+		if not state.charging then return end
+
+		-- Allow looking around but prevent all movement
+		mv:SetForwardSpeed(0)
+		mv:SetSideSpeed(0)
+		mv:SetUpSpeed(0)
+
+		-- Keep player in place
+		mv:SetVelocity(Vector(0, 0, 0))
+
+		-- Prevent jumping
+		if cmd:KeyDown(IN_JUMP) then
+			cmd:RemoveKey(IN_JUMP)
+		end
+	end)
+end
+
+local function cleanupChargingState(ply)
+	if not IsValid(ply) then return end
+	chargingPlayers[ply] = nil
+end
+
+-- Cleanup on death/disconnect
+if SERVER then
+	hook.Add("PlayerDeath", "Arcana_FallenDown_Cleanup", function(ply)
+		cleanupChargingState(ply)
+	end)
+
+	hook.Add("PlayerDisconnected", "Arcana_FallenDown_Cleanup", function(ply)
+		cleanupChargingState(ply)
+	end)
+
+	-- Set up charging state when spell casting begins
+	hook.Add("Arcana_BeginCasting", "Arcana_FallenDown_StartCharging", function(caster, spellId)
+		if spellId ~= "fallen_down" then return end
+		if not IsValid(caster) then return end
+
+		-- Mark player as charging (movement lock starts immediately)
+		chargingPlayers[caster] = {
+			charging = true,
+			startTime = CurTime()
+		}
+	end)
+
+	-- Clean up charging state if spell cast fails
+	hook.Add("Arcana_CastSpellFailure", "Arcana_FallenDown_CleanupOnFail", function(caster, spellId)
+		if spellId ~= "fallen_down" then return end
+		cleanupChargingState(caster)
+	end)
+end
+
+local function startBeamPhase(caster, targetPos)
+	if not SERVER then return end
+	if not IsValid(caster) then return end
+
+	-- Clean up charging state
+	cleanupChargingState(caster)
+
+	-- Announce beam start to clients
+	net.Start("Arcana_FallenDown_BeamStart", true)
+	net.WriteEntity(caster)
+	net.WriteVector(targetPos)
+	net.WriteFloat(BEAM_DURATION)
+	net.Broadcast()
+
+	-- MASSIVE initial impact sounds - layered for overwhelming effect
+	sound.Play("ambient/explosions/explode_9.wav", targetPos, 125, 50) -- Deep explosion
+	sound.Play("ambient/atmosphere/thunder1.wav", targetPos, 120, 40) -- Very deep thunder
+	timer.Simple(0.1, function()
+		sound.Play("ambient/explosions/explode_8.wav", targetPos, 120, 60)
+		sound.Play("weapons/physcannon/energy_disintegrate5.wav", targetPos, 115, 70)
+	end)
+	timer.Simple(0.2, function()
+		sound.Play("ambient/energy/whiteflash.wav", targetPos, 120, 80)
+		sound.Play("ambient/explosions/explode_7.wav", targetPos, 118, 55)
+	end)
+
+	-- Continuous roaring beam sound
+	caster:EmitSound("ambient/energy/force_field_loop1.wav", 110, 60, 1.0)
+	caster:EmitSound("ambient/atmosphere/city_rumble_loop1.wav", 108, 35, 1.0)
+	caster:EmitSound("weapons/physcannon/superphys_launch3.wav", 105, 50, 1.0)
+
+	-- Initial MASSIVE screen shake
+	util.ScreenShake(targetPos, 30, 150, 3.0, MAX_BEAM_RADIUS * 2)
+
+	local startTime = CurTime()
+	local endTime = startTime + BEAM_DURATION
+
+	-- Damage tick rate
+	local damageTickRate = 0.1
+	local damageTicks = math.floor(BEAM_DURATION / damageTickRate)
+
+	for tick = 0, damageTicks do
+		timer.Simple(tick * damageTickRate, function()
+			if not IsValid(caster) then return end
+
+			local elapsed = CurTime() - startTime
+			local progress = math.Clamp(elapsed / BEAM_DURATION, 0, 1)
+			local currentRadius = Lerp(progress, 50, MAX_BEAM_RADIUS)
+
+			-- Broadcast current beam state for visuals
+			net.Start("Arcana_FallenDown_BeamTick", true)
+			net.WriteVector(targetPos)
+			net.WriteFloat(currentRadius)
+			net.WriteFloat(progress)
+			net.Broadcast()
+
+			-- Apply damage to everything in the growing beam
+			for _, ent in ipairs(ents.FindInSphere(targetPos, currentRadius)) do
+				if not IsValid(ent) then continue end
+				if ent == caster then continue end
+
+				local isLiving = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+
+				if isLiving then
+					-- Obliterate living things with GODLY damage - 1 million per tick
+					local dmg = DamageInfo()
+					dmg:SetDamage(BEAM_DAMAGE_PER_TICK)
+					dmg:SetDamageType(bit.bor(DMG_ENERGYBEAM, DMG_DISSOLVE, DMG_DIRECT))
+					dmg:SetAttacker(caster)
+					dmg:SetInflictor(caster)
+					dmg:SetDamagePosition(targetPos)
+
+					Arcane:TakeDamageInfo(ent, dmg)
+				else
+					-- Ignite everything else
+					if ent:IsOnFire() == false then
+						ent:Ignite(10, 0)
+					end
+
+					-- Apply force to physics objects
+					local phys = ent:GetPhysicsObject()
+					if IsValid(phys) then
+						local dir = (ent:WorldSpaceCenter() - targetPos):GetNormalized()
+						dir.z = math.abs(dir.z) + 0.5
+						phys:Wake()
+						phys:ApplyForceCenter(dir * 50000 * progress)
+					end
+				end
+			end
+
+			-- Periodic screen shake - more intense as beam grows
+			if tick % 3 == 0 then
+				util.ScreenShake(targetPos, 15 * progress, 120, 0.6, currentRadius * 1.5)
+			end
+
+			-- Periodic powerful rumble sounds
+			if tick % 8 == 0 then
+				sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 105, 60 + math.random(-10, 10))
+			end
+
+			-- Additional crackling energy sounds
+			if tick % 12 == 5 then
+				sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", targetPos, 100, 75)
+			end
+
+			-- Periodic explosions as things vaporize
+			if tick % 20 == 0 then
+				sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", targetPos, 95, 70 + math.random(-15, 15))
+			end
+		end)
+	end
+
+	-- Final explosion at the end
+	timer.Simple(BEAM_DURATION, function()
+		if not IsValid(caster) then return end
+
+		-- Stop continuous beam sounds
+		caster:StopSound("ambient/energy/force_field_loop1.wav")
+		caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
+		caster:StopSound("weapons/physcannon/superphys_launch3.wav")
+
+		-- Absolutely MASSIVE final blast with layered sounds
+		sound.Play("ambient/explosions/explode_9.wav", targetPos, 130, 40) -- Deepest explosion
+		sound.Play("ambient/explosions/explode_8.wav", targetPos, 128, 50)
+		timer.Simple(0.1, function()
+			sound.Play("ambient/explosions/explode_7.wav", targetPos, 125, 60)
+			sound.Play("weapons/physcannon/energy_disintegrate4.wav", targetPos, 120, 65)
+		end)
+		timer.Simple(0.2, function()
+			sound.Play("ambient/energy/whiteflash.wav", targetPos, 125, 70)
+			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 120, 50)
+		end)
+
+		util.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
+
+		-- Final damage wave
+		Arcane:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS, 200, bit.bor(DMG_BLAST, DMG_DISSOLVE), true)
+
+		-- Broadcast final impact wave
+		net.Start("Arcana_FallenDown_ImpactWave", true)
+		net.WriteVector(targetPos)
+		net.Broadcast()
+	end)
+end
+
+Arcane:RegisterSpell({
+	id = "fallen_down",
+	name = "Fallen Down",
+	description = "A spell of absolute devastation. Charge for 60 seconds, immobilized by the spell's complexity, then unleash a godly beam from the heavens that obliterates everything in its wake.",
+	category = Arcane.CATEGORIES.COMBAT,
+	level_required = Arcane.Config.MAX_LEVEL,
+	knowledge_cost = 15,
+	cooldown = 60 * 20, -- 20 minutes
+	cost_type = Arcane.COST_TYPES.COINS,
+	cost_amount = 5000000,
+	cast_time = CHARGE_TIME,
+	range = 2000,
+	icon = "icon16/star.png",
+	is_projectile = false,
+	has_target = true,
+	cast_anim = "becon",
+	can_cast = function(caster)
+		return true
+	end,
+	cast = function(caster, _, _, ctx)
+		if not IsValid(caster) then return false end
+
+		-- Server-side: unleash the beam immediately when cast completes
+		-- (cast function is called AFTER the 60-second charge time)
+		if SERVER then
+			-- Re-check target position at moment of cast completion
+			local finalTarget = Arcane:ResolveGroundTarget(caster, 2000)
+			if not finalTarget then
+				cleanupChargingState(caster)
+				return false
+			end
+
+			-- Unleash beam immediately (charging is already done)
+			startBeamPhase(caster, finalTarget)
+		end
+
+		return true
+	end,
+	trigger_phrase_aliases = {
+		"fallen down",
+		"super tier",
+	}
+})
+
+if CLIENT then
+	local matBeam = Material("effects/laser1")
+	local matGlow = Material("sprites/light_glow02_add")
+	local matFlare = Material("effects/blueflare1")
+	local matRing = Material("effects/select_ring")
+
+	-- Active beams being rendered
+	local activeBeams = {}
+
+	-- Lightning arc system for phase 2
+	local fallenDownLightningArcs = {}
+	local fallenDownCircleData = {} -- Store circle data per caster
+
+	local function spawnLightningArc(caster)
+		if not IsValid(caster) then return end
+		local data = fallenDownCircleData[caster]
+		if not data then return end
+
+		local satelliteCircles = data.satelliteCircles or {}
+		local midSatelliteCircles = data.midSatelliteCircles or {}
+		local bandOrbs = data.bandOrbs or {}
+
+		-- Collect all possible sources (satellites and orbs)
+		local sources = {}
+
+		-- Add main satellites
+		for _, satData in ipairs(satelliteCircles) do
+			if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
+				local elapsed = CurTime() - satData.startTime
+				local spinSpeed = (math.pi * 2) / 8
+				local currentAngle = satData.baseAngle + (elapsed * spinSpeed)
+				local offsetX = math.cos(currentAngle) * satData.radius
+				local offsetY = math.sin(currentAngle) * satData.radius
+				local pos = caster:GetPos() + Vector(offsetX, offsetY, satData.height)
+				table.insert(sources, pos)
+			end
+		end
+
+		-- Add mid satellites and their orbs
+		for idx, satData in ipairs(midSatelliteCircles) do
+			if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
+				local elapsed = CurTime() - satData.startTime
+				local spinSpeed = (math.pi * 2) / 10
+				local currentAngle = satData.baseAngle + (elapsed * spinSpeed)
+				local offsetX = math.cos(currentAngle) * satData.radius
+				local offsetY = math.sin(currentAngle) * satData.radius
+				local pos = caster:GetPos() + Vector(offsetX, offsetY, satData.height)
+				table.insert(sources, pos)
+
+				-- Add orbs
+				for _, orbData in ipairs(bandOrbs) do
+					if orbData.parentSatIndex == (idx - 1) and orbData.bc and orbData.bc.isActive then
+						local orbOffsetX = math.cos(currentAngle) * (satData.radius + orbData.orbDistance)
+						local orbOffsetY = math.sin(currentAngle) * (satData.radius + orbData.orbDistance)
+						local orbPos = caster:GetPos() + Vector(orbOffsetX, orbOffsetY, orbData.height)
+						table.insert(sources, orbPos)
+					end
+				end
+			end
+		end
+
+		if #sources == 0 then return end
+
+		-- Pick random source
+		local startPos = sources[math.random(1, #sources)]
+
+		-- Find ground position within 1000 units
+		local angle = math.random() * math.pi * 2
+		local dist = math.Rand(300, 1000) -- Increased min distance for visibility
+		local targetPos = caster:GetPos() + Vector(math.cos(angle) * dist, math.sin(angle) * dist, 0)
+
+		-- Trace to ground
+		local tr = util.TraceLine({
+			start = targetPos + Vector(0, 0, 5000),
+			endpos = targetPos - Vector(0, 0, 5000),
+			mask = MASK_SOLID_BRUSHONLY
+		})
+
+		local endPos = tr.HitPos + Vector(0, 0, 5)
+
+		-- Create lightning arc
+		table.insert(fallenDownLightningArcs, {
+			startPos = startPos,
+			endPos = endPos,
+			dieTime = CurTime() + 0.3, -- Slightly longer duration (was 0.25)
+			startTime = CurTime()
+		})
+
+		-- Impact effect at ground with sound
+		local ed = EffectData()
+		ed:SetOrigin(endPos)
+		ed:SetScale(2)
+		util.Effect("ElectricSpark", ed, true, true)
+
+		-- Impact sounds (layered for better effect)
+		sound.Play("ambient/energy/spark" .. math.random(1, 6) .. ".wav", endPos, 70, math.random(90, 110))
+		sound.Play("ambient/energy/zap" .. math.random(1, 3) .. ".wav", endPos, 68, math.random(100, 120))
+
+		-- Small explosion impact
+		if math.random() < 0.7 then -- 70% chance for extra impact
+			timer.Simple(0.05, function()
+				sound.Play("weapons/physcannon/energy_bounce" .. math.random(1, 2) .. ".wav", endPos, 65, math.random(130, 150))
+			end)
+		end
+	end
+
+	-- Override the default casting visuals for Fallen Down
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_ChargingCircles", function(caster, spellId, castTime, _)
+		if spellId ~= "fallen_down" then return end
+		if not IsValid(caster) then return end
+		if not MagicCircle then return end
+
+		-- Create a structured array of magic circles
+		local circles = {}
+		local satelliteCircles = {}
+		local midSatelliteCircles = {}
+		local bandCircles = {}
+		local bandOrbs = {}
+		local color = Color(170, 220, 255, 255) -- Bright blue-white/cyan like in the anime
+
+		-- Store circle data for lightning arcs
+		fallenDownCircleData[caster] = {
+			satelliteCircles = satelliteCircles,
+			midSatelliteCircles = midSatelliteCircles,
+			bandOrbs = bandOrbs
+		}
+
+		-- Define all circle parameters
+		local stackHeights = {80, 200, 350, 550, 780}
+		local stackSizes = {120, 180, 240, 320, 240}
+		local stackIntensities = {5, 6, 7, 9, 7}
+
+		-- Ramp-up timing: all circles should be visible by 1/3 of cast time (20 seconds)
+		local rampUpTime = castTime / 3
+		local startTime = CurTime()
+
+		-- Ground circle appears first (immediately)
+		timer.Simple(0, function()
+			if not IsValid(caster) then return end
+			local groundCircle = MagicCircle.CreateMagicCircle(
+				caster:GetPos() + Vector(0, 0, 2),
+				Angle(0, 0, 0),
+				color,
+				6,
+				150,
+				castTime,
+				2
+			)
+			if groundCircle and groundCircle.StartEvolving then
+				groundCircle:StartEvolving(castTime, true)
+				circles[#circles + 1] = {circle = groundCircle, height = 2}
+			end
+
+			-- Quick, loud "lock in" sound for ground circle - layered
+			local lockPitch = 85
+			caster:EmitSound("ambient/energy/weld1.wav", 95, lockPitch, 1.0) -- Sharp energy hit (base)
+			caster:EmitSound("weapons/physcannon/energy_sing_explosion2.wav", 80, lockPitch - 10, 0.6) -- Deep impact
+		end)
+
+		-- First 3 stacked circles appear progressively
+		for i = 1, 3 do
+			local delay = (i / 6) * rampUpTime -- Spread evenly: ~3.33s, ~6.67s, ~10s
+			timer.Simple(delay, function()
+				if not IsValid(caster) then return end
+				local circle = MagicCircle.CreateMagicCircle(
+					caster:GetPos() + Vector(0, 0, stackHeights[i]),
+					Angle(0, 0, 0),
+					color,
+					stackIntensities[i],
+					stackSizes[i],
+					castTime - delay,
+					3
+				)
+				if circle and circle.StartEvolving then
+					circle:StartEvolving(castTime - delay, true)
+					circles[#circles + 1] = {circle = circle, height = stackHeights[i]}
+				end
+
+				-- Quick, loud "lock in" sound
+				local lockPitch = 85
+				local volume = 88 + (i * 2) -- 90, 92, 94
+
+				caster:EmitSound("weapons/physcannon/energy_sing_explosion2.wav", volume - 12, lockPitch - 10, 0.6)
+			end)
+		end
+
+		-- Satellite configuration
+		local satelliteHeight = stackHeights[4]
+		local satelliteRadius = stackSizes[4] * 0.95
+		local satelliteSize = 60
+
+		-- Band and satellite timing
+		local bandHeightOffset = 80
+		local lowerBandHeight = satelliteHeight - bandHeightOffset
+		local upperBandHeight = satelliteHeight + bandHeightOffset
+		local lowerBandRadius = satelliteRadius + bandHeightOffset
+		local upperBandRadius = satelliteRadius - bandHeightOffset
+		local bandsDelay = (3 / 6) * rampUpTime + 0.5 -- 0.5s after circle 3 (~10.5s)
+		local satelliteStartDelay = bandsDelay + 0.5 -- Start 0.5s after bands (~11s)
+		local satelliteSpacing = 0.5 -- 0.5 seconds between each satellite
+		local satelliteStartTime = startTime + satelliteStartDelay
+
+		-- Circle 4 (biggest) appears AFTER all satellites with a louder, deeper thump
+		local circle4Delay = satelliteStartDelay + (8 * satelliteSpacing) -- After last satellite (~15s)
+		timer.Simple(circle4Delay, function()
+			if not IsValid(caster) then return end
+			local circle = MagicCircle.CreateMagicCircle(
+				caster:GetPos() + Vector(0, 0, stackHeights[4]),
+				Angle(0, 0, 0),
+				color,
+				stackIntensities[4],
+				stackSizes[4],
+				castTime - circle4Delay,
+				3
+			)
+			if circle and circle.StartEvolving then
+				circle:StartEvolving(castTime - circle4Delay, true)
+				circles[#circles + 1] = {circle = circle, height = stackHeights[4]}
+			end
+
+			-- LOUDER, DEEPER thump for the 4th circle
+			local lockPitch = 70 -- Deeper than normal (was 85)
+			local volume = 100 -- Much louder
+
+			caster:EmitSound("weapons/physcannon/energy_sing_explosion2.wav", volume - 10, lockPitch - 15, 0.8) -- Extra deep
+			caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", volume - 8, lockPitch - 20, 0.7) -- Massive impact
+		end)
+
+		-- Circle 5 appears quickly after circle 4 (accelerated)
+		local circle5Delay = circle4Delay + 1.0 -- Just 1 second later (~16s)
+		timer.Simple(circle5Delay, function()
+			if not IsValid(caster) then return end
+			local circle = MagicCircle.CreateMagicCircle(
+				caster:GetPos() + Vector(0, 0, stackHeights[5]),
+				Angle(0, 0, 0),
+				color,
+				stackIntensities[5],
+				stackSizes[5],
+				castTime - circle5Delay,
+				3
+			)
+			if circle and circle.StartEvolving then
+				circle:StartEvolving(castTime - circle5Delay, true)
+				circles[#circles + 1] = {circle = circle, height = stackHeights[5]}
+			end
+
+			-- LOUDER, DEEPER thump for the 5th circle
+			local lockPitch = 70 -- Deeper than normal (was 85)
+			local volume = 100 -- Much louder
+
+			caster:EmitSound("weapons/physcannon/energy_sing_explosion2.wav", volume - 12, lockPitch - 10, 0.6)
+			caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", volume - 10, lockPitch - 15, 0.5)
+		end)
+
+		-- Mid-level system: band circle, 2 satellites, and orbs - all appear together
+		local midSatelliteHeight = (stackHeights[2] + stackHeights[3]) / 2 -- Between 200 and 350 = 275
+		local midSatelliteRadius = 150
+		local midSatelliteSize = 50
+		local midSystemDelay = (2.5 / 6) * rampUpTime -- ~8.33 seconds - between circle 2 (6.67s) and circle 3 (10s)
+		local midSatelliteStartTime = startTime + midSystemDelay
+
+		timer.Simple(midSystemDelay, function()
+			if not IsValid(caster) then return end
+			local remainingTime = castTime - midSystemDelay
+
+			-- Single thump sound for entire mid-level system
+			local lockPitch = 85
+			local volume = 93
+			caster:EmitSound("ambient/energy/newspark0" .. math.random(4, 8) .. ".wav", volume - 8, lockPitch - 5, 0.8)
+			caster:EmitSound("weapons/physcannon/energy_sing_explosion2.wav", volume - 12, lockPitch - 10, 0.6)
+
+			-- Create band circle at mid-satellite height
+			if BandCircle then
+				local midBandRadius = midSatelliteRadius * 0.8 -- Smaller than satellite orbit (120 vs 150)
+				local bcMid = BandCircle.Create(caster:GetPos() + Vector(0, 0, midSatelliteHeight), Angle(0, 0, 0), color, midBandRadius * 2, remainingTime)
+				if bcMid then
+					bcMid:AddBand(midBandRadius, 10, {p = 0, y = 35, r = 0}, 2.5)
+					bandCircles[#bandCircles + 1] = {bc = bcMid, height = midSatelliteHeight}
+				end
+			end
+
+			-- Create 2 satellites and their orbs
+			for i = 0, 1 do -- 2 satellites (0-1)
+				local baseAngle = (i / 2) * math.pi * 2 -- Opposite sides (0 and 180 degrees)
+
+				-- Facing outwards (90 degrees perpendicular to center)
+				local satCircle = MagicCircle.CreateMagicCircle(
+					caster:GetPos() + Vector(0, 0, midSatelliteHeight),
+					Angle(90, math.deg(baseAngle), 0),
+					color,
+					4,
+					midSatelliteSize,
+					remainingTime,
+					2
+				)
+				if satCircle and satCircle.StartEvolving then
+					satCircle:StartEvolving(remainingTime, true)
+					midSatelliteCircles[#midSatelliteCircles + 1] = {
+						circle = satCircle,
+						height = midSatelliteHeight,
+						baseAngle = baseAngle,
+						radius = midSatelliteRadius,
+						startTime = midSatelliteStartTime,
+						createdAt = CurTime()
+					}
+
+					-- Create 1 band circle orb in front of this satellite
+					if BandCircle then
+						-- Position orb in front of the satellite circle
+						local orbDistance = 80 -- 80 units in front
+						local angle = baseAngle
+						local offsetX = math.cos(angle) * (midSatelliteRadius + orbDistance)
+						local offsetY = math.sin(angle) * (midSatelliteRadius + orbDistance)
+
+						local orb = BandCircle.Create(
+							caster:GetPos() + Vector(offsetX, offsetY, midSatelliteHeight),
+							Angle(0, 0, 0),
+							color,
+							40, -- Size
+							remainingTime
+						)
+
+						if orb then
+							-- Add bands like the ritual entity
+							orb:AddBand(20, 5, {p = 20, y = 60, r = 10}, 2)
+							orb:AddBand(32, 4, {p = -30, y = -40, r = 0}, 2)
+							orb:AddBand(26, 6, {p = -10, y = -20, r = 60}, 2)
+
+							bandOrbs[#bandOrbs + 1] = {
+								bc = orb,
+								parentSatIndex = i,
+								orbDistance = orbDistance,
+								height = midSatelliteHeight
+							}
+						end
+					end
+				end
+			end
+		end)
+
+		-- Band circle between 3rd and 4th vertical circles
+		if BandCircle then
+			local between3and4Height = (stackHeights[3] + stackHeights[4]) / 2 -- Between 350 and 550 = 450
+			local between3and4Radius = stackSizes[3] * 1.1 -- Slightly bigger than 3rd circle (240 * 1.1 = 264)
+			local between3and4Delay = rampUpTime * 0.6
+
+			timer.Simple(between3and4Delay, function()
+				if not IsValid(caster) then return end
+				local remainingTime = castTime - between3and4Delay
+				local bc3to4 = BandCircle.Create(caster:GetPos() + Vector(0, 0, between3and4Height), Angle(0, 0, 0), color, between3and4Radius * 2, remainingTime)
+				if bc3to4 then
+					bc3to4:AddBand(between3and4Radius, 11, {p = 0, y = -40, r = 0}, 2.8)
+					bandCircles[#bandCircles + 1] = {bc = bc3to4, height = between3and4Height}
+				end
+			end)
+		end
+
+		-- 2 Band circles spawn first: one below satellites, one above, spinning opposite directions
+		-- These define the satellite ring area before satellites appear
+		if BandCircle then
+			timer.Simple(bandsDelay, function()
+				if not IsValid(caster) then return end
+				local remainingTime = castTime - bandsDelay
+
+				-- Single thump for both bands
+				local lockPitch = 85
+				local volume = 95
+				caster:EmitSound("weapons/physcannon/energy_sing_explosion2.wav", volume - 12, lockPitch - 10, 0.6)
+
+				-- Lower band circle (below satellites, spinning clockwise)
+				local bcLower = BandCircle.Create(caster:GetPos() + Vector(0, 0, lowerBandHeight), Angle(0, 0, 0), color, lowerBandRadius * 2, remainingTime)
+				if bcLower then
+					bcLower:AddBand(lowerBandRadius, 12, {p = 0, y = 50, r = 0}, 3)
+					bandCircles[#bandCircles + 1] = {bc = bcLower, height = lowerBandHeight}
+				end
+
+				-- Upper band circle (above satellites, spinning counter-clockwise)
+				local bcUpper = BandCircle.Create(caster:GetPos() + Vector(0, 0, upperBandHeight), Angle(0, 0, 0), color, upperBandRadius * 2, remainingTime)
+				if bcUpper then
+					bcUpper:AddBand(upperBandRadius, 12, {p = 0, y = -50, r = 0}, 3)
+					bandCircles[#bandCircles + 1] = {bc = bcUpper, height = upperBandHeight}
+				end
+			end)
+		end
+
+		-- 8 satellite circles spawn rapidly AFTER the bands with lighter thumps for each
+		for i = 0, 7 do -- 8 satellites (0-7)
+			local delay = satelliteStartDelay + (i * satelliteSpacing) -- Rapid succession
+			timer.Simple(delay, function()
+				if not IsValid(caster) then return end
+				local baseAngle = (i / 8) * math.pi * 2
+
+				-- Angled 45 degrees upward (pitch 45, facing outward)
+				local satCircle = MagicCircle.CreateMagicCircle(
+					caster:GetPos() + Vector(0, 0, satelliteHeight),
+					Angle(45, math.deg(baseAngle), 0), -- 45 deg upward
+					color,
+					5,
+					satelliteSize,
+					castTime - delay,
+					2
+				)
+				if satCircle and satCircle.StartEvolving then
+					satCircle:StartEvolving(castTime - delay, true)
+					satelliteCircles[#satelliteCircles + 1] = {
+						circle = satCircle,
+						height = satelliteHeight,
+						baseAngle = baseAngle,
+						radius = satelliteRadius,
+						startTime = satelliteStartTime,
+						createdAt = CurTime()
+					}
+				end
+
+				-- Light thump for each satellite
+				local lockPitch = 90 -- Higher pitch (lighter)
+				local volume = 80 -- Quieter
+				caster:EmitSound("ambient/energy/weld" .. math.random(1, 2) .. ".wav", volume, lockPitch, 0.7)
+			end)
+		end
+
+		-- Make all circles follow the caster during charge
+		local hookName = "Arcana_FallenDown_FollowCaster_" .. tostring(caster)
+		hook.Add("Think", hookName, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", hookName)
+				return
+			end
+
+			local casterPos = caster:GetPos()
+
+			-- Update all main circles
+			for _, circleData in ipairs(circles) do
+				if circleData.circle and circleData.circle.IsActive and circleData.circle:IsActive() then
+					circleData.circle.position = casterPos + Vector(0, 0, circleData.height)
+				end
+			end
+
+			-- Update satellite circles (orbit around 4th circle position, spinning)
+			for _, satData in ipairs(satelliteCircles) do
+				if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
+					-- Calculate spinning angle (one full rotation every 8 seconds)
+					local elapsed = CurTime() - satData.startTime
+					local spinSpeed = (math.pi * 2) / 8 -- radians per second
+					local currentAngle = satData.baseAngle + (elapsed * spinSpeed)
+
+					-- Update position in orbit
+					local offsetX = math.cos(currentAngle) * satData.radius
+					local offsetY = math.sin(currentAngle) * satData.radius
+					satData.circle.position = casterPos + Vector(offsetX, offsetY, satData.height)
+
+					-- Update angle to face outward and upward at 45 degrees
+					satData.circle.angles = Angle(45, math.deg(currentAngle), 0)
+				end
+			end
+
+			-- Update mid-level satellite circles (between 2nd and 3rd vertical circles)
+			for idx, satData in ipairs(midSatelliteCircles) do
+				if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
+					-- Calculate spinning angle (one full rotation every 10 seconds, slower)
+					local elapsed = CurTime() - satData.startTime
+					local spinSpeed = (math.pi * 2) / 10 -- radians per second
+					local currentAngle = satData.baseAngle + (elapsed * spinSpeed)
+
+					-- Update position in orbit
+					local offsetX = math.cos(currentAngle) * satData.radius
+					local offsetY = math.sin(currentAngle) * satData.radius
+					satData.circle.position = casterPos + Vector(offsetX, offsetY, satData.height)
+
+					-- Update angle to face outward (perpendicular)
+					satData.circle.angles = Angle(90, math.deg(currentAngle), 0)
+
+					-- Update band orbs that belong to this satellite (parentSatIndex is 0 or 1, idx-1 to match)
+					for _, orbData in ipairs(bandOrbs) do
+						if orbData.parentSatIndex == (idx - 1) and orbData.bc and orbData.bc.isActive then
+							-- Position orb in front of the satellite
+							local orbOffsetX = math.cos(currentAngle) * (satData.radius + orbData.orbDistance)
+							local orbOffsetY = math.sin(currentAngle) * (satData.radius + orbData.orbDistance)
+							orbData.bc.position = casterPos + Vector(orbOffsetX, orbOffsetY, orbData.height)
+						end
+					end
+				end
+			end
+
+			-- Update band circles
+			for _, bcData in ipairs(bandCircles) do
+				if bcData.bc and bcData.bc.isActive then
+					bcData.bc.position = casterPos + Vector(0, 0, bcData.height)
+				end
+			end
+		end)
+
+		-- Charging aura - elegant beam rising to the sky
+		-- Store aura particles for manual rendering to ensure they appear on top of circles
+		local auraParticles = {}
+		-- Track when charging started for phase transitions
+		local chargeStartTime = CurTime()
+
+		-- Ambient sound design for charging phases
+		local chargeSoundHook = "Arcana_FallenDown_ChargeSounds_" .. tostring(caster)
+		local nextAmbientSound = 0
+		local phase1SoundStarted = false
+		local phase2SoundStarted = false
+		local phase3SoundStarted = false
+		local finalPhaseStarted = false
+		local nextFinalPhaseSound = 0
+
+		hook.Add("Think", chargeSoundHook, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", chargeSoundHook)
+				timer.Remove("Arcana_FallenDown_MenacingSounds_" .. tostring(caster))
+				return
+			end
+
+			local now = CurTime()
+			local elapsed = now - chargeStartTime
+			local midPhaseStart = CHARGE_TIME / 2 -- 30 seconds
+
+			-- Phase 1: Charging phase (0-20s) - Powerful energy gathering
+			if elapsed < rampUpTime and not phase1SoundStarted then
+				phase1SoundStarted = true
+				-- Powerful ambient base layers
+				caster:EmitSound("ambient/atmosphere/cave_hit1.wav", 75, 55, 0.8) -- Deeper, louder rumble
+				caster:EmitSound("ambient/energy/weld1.wav", 70, 60, 0.6) -- Energy hum base
+				timer.Simple(0.3, function()
+					if IsValid(caster) then
+						caster:EmitSound("ambient/wind/wind_rooftop1.wav", 72, 45, 0.7) -- Deeper wind
+					end
+				end)
+				timer.Simple(0.8, function()
+					if IsValid(caster) then
+						caster:EmitSound("ambient/atmosphere/tone_quiet.wav", 70, 70, 0.6) -- Ominous tone layer
+					end
+				end)
+				nextAmbientSound = now + 2.5
+			end
+
+			-- Periodic powerful energy surges during phase 1
+			if elapsed < rampUpTime and now >= nextAmbientSound then
+				local progress = elapsed / rampUpTime -- 0 to 1
+				local volume = 65 + (progress * 15) -- 65 to 80 - gets louder over time
+
+				local soundChoice = math.random(1, 4)
+				if soundChoice == 2 then
+					-- Thunder only (no lightning in phase 1 - circles not ready yet)
+					caster:EmitSound("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", volume - 5, 80, 0.4)
+				elseif soundChoice == 3 then
+					caster:EmitSound("ambient/energy/whiteflash.wav", volume - 8, 75, 0.5) -- Energy flash
+				else
+					caster:EmitSound("ambient/wind/wind_snippet1.wav", volume - 10, 55, 0.4) -- Wind gust
+				end
+				nextAmbientSound = now + math.Rand(1.5, 2.5) -- More frequent (was 2-3.5)
+			end
+
+			-- Phase 2: Power phase (20-30s) - Ominous intensification
+			if elapsed >= rampUpTime and elapsed < midPhaseStart and not phase2SoundStarted then
+				phase2SoundStarted = true
+				-- Ominous, threatening sounds as godly power builds
+				caster:EmitSound("ambient/atmosphere/tone_alley.wav", 78, 60, 0.8) -- Ominous drone
+				nextAmbientSound = now + 2
+			end
+
+			-- Periodic menacing energy sounds during phase 2 WITH LIGHTNING ARCS
+			if elapsed >= rampUpTime and elapsed < midPhaseStart and now >= nextAmbientSound then
+				local soundChoice = math.random(1, 4)
+				if soundChoice == 1 then
+					-- Thunder with multiple lightning arcs
+					caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", 72, 70, 1)
+					local numArcs = math.random(3, 5)
+					for i = 1, numArcs do
+						spawnLightningArc(caster)
+					end
+				elseif soundChoice == 2 then
+					-- Electric explosion with arcs
+					caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", 70, 80, 1)
+					local numArcs = math.random(2, 3)
+					for i = 1, numArcs do
+						spawnLightningArc(caster)
+					end
+				elseif soundChoice == 3 then
+					-- Electric crackle with single arc
+					caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", 68, 60, 1)
+					spawnLightningArc(caster)
+				else
+					-- Eerie whispers without lightning
+					caster:EmitSound("ambient/levels/citadel/strange_talk" .. math.random(3, 11) .. ".wav", 60, 40, 1)
+				end
+				nextAmbientSound = now + math.Rand(1, 2) -- More frequent (was 2-3)
+			end
+
+			-- Phase 3: Maximum power (30-60s) - MENACING godly power
+			if elapsed >= midPhaseStart and not phase3SoundStarted then
+				phase3SoundStarted = true
+				-- Deep, menacing, apocalyptic sounds
+				caster:EmitSound("ambient/levels/citadel/citadel_ambient_scream_loop1.wav", 85, 40, 0.9) -- Distant screams/doom
+				caster:EmitSound("ambient/atmosphere/city_rumble_loop1.wav", 82, 45, 0.8) -- Deep ominous rumble
+				caster:EmitSound("ambient/atmosphere/cave_hit2.wav", 78, 35, 0.7) -- Very deep impact
+
+				-- Periodic menacing impacts during final phase WITH MASSIVE LIGHTNING
+				local menacingTimer = "Arcana_FallenDown_MenacingSounds_" .. tostring(caster)
+				timer.Create(menacingTimer, 3, 10, function() -- Every 3 seconds (was 4), more instances
+					if IsValid(caster) then
+						local timeRemaining = CHARGE_TIME - (CurTime() - chargeStartTime)
+						local isFinalFive = timeRemaining <= 5
+
+						-- Thunder with massive lightning display
+						caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", isFinalFive and 82 or 78, 65, isFinalFive and 0.8 or 0.7)
+						local numArcs = isFinalFive and math.random(6, 9) or math.random(4, 7) -- EVEN MORE in final 5s
+						for i = 1, numArcs do
+							spawnLightningArc(caster)
+						end
+
+						-- Follow-up electric explosion with more arcs
+						timer.Simple(0.4, function()
+							if IsValid(caster) then
+								caster:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", isFinalFive and 76 or 72, 50, isFinalFive and 0.7 or 0.6)
+								local numArcs2 = isFinalFive and math.random(3, 6) or math.random(2, 4)
+								for i = 1, numArcs2 do
+									spawnLightningArc(caster)
+								end
+							end
+						end)
+
+						-- Extra intense layer in final 5 seconds
+						if isFinalFive then
+							timer.Simple(0.2, function()
+								if IsValid(caster) then
+									caster:EmitSound("ambient/energy/whiteflash.wav", 75, 70, 0.7)
+									caster:EmitSound("weapons/physcannon/physcannon_charge.wav", 70, 80, 0.6)
+								end
+							end)
+						end
+					end
+				end)
+			end
+
+			-- Final Phase: Last 5 seconds (55-60s) - APOCALYPTIC CLIMAX
+			local finalPhaseTime = CHARGE_TIME - 5 -- 55 seconds
+			if elapsed >= finalPhaseTime and not finalPhaseStarted then
+				finalPhaseStarted = true
+				-- Massive intensity layered sounds
+				caster:EmitSound("ambient/atmosphere/city_rumble_loop1.wav", 88, 40, 1.0) -- VERY LOUD deep rumble
+				caster:EmitSound("ambient/energy/force_field_loop1.wav", 85, 55, 0.9) -- Intense energy
+				nextFinalPhaseSound = now + 1
+			end
+
+			-- Periodic intense bursts during final 5 seconds
+			if elapsed >= finalPhaseTime and now >= nextFinalPhaseSound then
+				caster:EmitSound("ambient/energy/whiteflash.wav", 78, 75, 0.7)
+				caster:EmitSound("ambient/atmosphere/cave_hit3.wav", 75, 30, 0.6) -- Very deep impact
+				nextFinalPhaseSound = now + math.Rand(0.8, 1.5) -- Very frequent bursts
+			end
+		end)
+
+		local particleHook = "Arcana_FallenDown_ChargeParticles_" .. tostring(caster)
+
+		hook.Add("Think", particleHook, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", particleHook)
+				return
+			end
+
+			local casterPos = caster:GetPos()
+			local now = CurTime()
+			local elapsed = now - chargeStartTime
+
+			-- Phase 1: Charging phase (first 20 seconds) - particles move inward like mana crystal
+			if elapsed < rampUpTime then
+				-- Spawn particles around the caster that move inward
+				local spawnRadius = 200
+				local casterCenter = casterPos + Vector(0, 0, 50)
+
+				-- Spawn 5-8 charging particles
+				local numParticles = math.random(5, 8)
+				for i = 1, numParticles do
+					-- Random point around the caster
+					local dir = VectorRand()
+					dir:Normalize()
+					local spawnPos = casterCenter + dir * spawnRadius
+					spawnPos.z = spawnPos.z + math.Rand(-spawnRadius * 0.3, spawnRadius * 0.3)
+
+					-- Velocity toward the center
+					local vel = (casterCenter - spawnPos):GetNormalized() * math.Rand(120, 200)
+
+					table.insert(auraParticles, {
+						pos = spawnPos,
+						velocity = vel,
+						dieTime = now + math.Rand(0.6, 1.0),
+						startTime = now,
+						size = math.Rand(4, 8),
+						alpha = 220,
+						color = Color(170, 220, 255),
+						isCharging = true
+					})
+				end
+			else
+				-- Phase 2: Power phase (after all circles visible) - upward beam
+				local finalPhaseTime = CHARGE_TIME - 5 -- Last 5 seconds (55s)
+				local isFinalPhase = elapsed >= finalPhaseTime
+
+				-- Scale up particles in final 5 seconds
+				local sizeMultiplier = isFinalPhase and 1.8 or 1.0
+				local numOuterParticles = isFinalPhase and 5 or 3 -- More particles in final phase
+				local velocityBoost = isFinalPhase and 100 or 0
+
+				-- Outer aura - large glowing particles (MORE and BIGGER in final phase)
+				for i = 1, numOuterParticles do
+					table.insert(auraParticles, {
+						pos = casterPos + Vector(0, 0, 5),
+						velocity = Vector(0, 0, math.Rand(200 + velocityBoost, 300 + velocityBoost)),
+						dieTime = now + math.Rand(3.5, 4.5),
+						startTime = now,
+						size = math.Rand(100, 140) * sizeMultiplier,
+						alpha = isFinalPhase and 150 or 120, -- Brighter in final phase
+						color = Color(170, 220, 255),
+						isCharging = false
+					})
+				end
+
+				-- Inner core - bright streak (MUCH BIGGER in final phase)
+				table.insert(auraParticles, {
+					pos = casterPos + Vector(0, 0, 5),
+					velocity = Vector(0, 0, math.Rand(280 + velocityBoost, 380 + velocityBoost)),
+					dieTime = now + math.Rand(4.0, 5.0),
+					startTime = now,
+					size = math.Rand(40, 60) * sizeMultiplier,
+					alpha = isFinalPhase and 240 or 200, -- Much brighter in final phase
+					color = Color(200, 235, 255),
+					isCharging = false
+				})
+			end
+		end)
+
+		-- Render aura particles and orb sprites on top of everything
+		local renderHook = "Arcana_FallenDown_RenderAura_" .. tostring(caster)
+		local matGlow = Material("sprites/light_glow02_add")
+
+		hook.Add("PostDrawTranslucentRenderables", renderHook, function()
+			if not IsValid(caster) then
+				hook.Remove("PostDrawTranslucentRenderables", renderHook)
+				return
+			end
+
+			-- Don't draw particles for the caster if they're in first person
+			local localPly = LocalPlayer()
+			local isCasterLocalPlayer = (caster == localPly)
+			local isThirdPerson = localPly:ShouldDrawLocalPlayer()
+
+			if isCasterLocalPlayer and not isThirdPerson then
+				-- Still need to update particle positions even if not rendering
+				local now = CurTime()
+				for i = #auraParticles, 1, -1 do
+					local p = auraParticles[i]
+					if now > p.dieTime then
+						table.remove(auraParticles, i)
+					else
+						p.pos = p.pos + p.velocity * FrameTime()
+					end
+				end
+				return
+			end
+
+			local now = CurTime()
+
+			-- Update and render aura particles
+			for i = #auraParticles, 1, -1 do
+				local p = auraParticles[i]
+
+				-- Remove dead particles
+				if now > p.dieTime then
+					table.remove(auraParticles, i)
+				else
+					-- Update position
+					local dt = now - p.startTime
+					p.pos = p.pos + p.velocity * FrameTime()
+
+					-- Calculate fade
+					local lifetime = p.dieTime - p.startTime
+					local age = now - p.startTime
+					local frac = age / lifetime
+					local currentAlpha = p.alpha * (1 - frac)
+					local currentSize = p.size * (1 - frac * 0.3) -- Shrink slightly as they rise
+
+					-- Render particle
+					render.SetMaterial(matGlow)
+					local renderColor = Color(p.color.r, p.color.g, p.color.b, currentAlpha)
+					render.DrawSprite(p.pos, currentSize, currentSize, renderColor)
+				end
+			end
+
+			-- Render glowing sprites in the center of each band orb (like ritual entity)
+			for idx, satData in ipairs(midSatelliteCircles) do
+				if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
+					local elapsed = now - satData.startTime
+					local spinSpeed = (math.pi * 2) / 10
+					local currentAngle = satData.baseAngle + (elapsed * spinSpeed)
+
+					-- Find orbs for this satellite
+					for _, orbData in ipairs(bandOrbs) do
+						if orbData.parentSatIndex == (idx - 1) and orbData.bc and orbData.bc.isActive then
+							-- Calculate orb position
+							local orbOffsetX = math.cos(currentAngle) * (satData.radius + orbData.orbDistance)
+							local orbOffsetY = math.sin(currentAngle) * (satData.radius + orbData.orbDistance)
+							local orbPos = caster:GetPos() + Vector(orbOffsetX, orbOffsetY, orbData.height)
+
+							-- Render pulsing sprite like ritual entity
+							local t = now
+							local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
+							local size = 50 + 15 * pulse
+
+							render.SetMaterial(matGlow)
+							render.DrawSprite(orbPos, size, size, Color(170, 220, 255, 230))
+						end
+					end
+				end
+			end
+		end)
+
+		-- Intense dynamic light during charge with blue color
+		local lightHook = "Arcana_FallenDown_ChargeLight_" .. tostring(caster)
+		hook.Add("Think", lightHook, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", lightHook)
+				return
+			end
+
+			local now = CurTime()
+
+			-- Main aura light
+			local dlight = DynamicLight(caster:EntIndex() + 30000)
+			if dlight then
+				dlight.pos = caster:GetPos() + Vector(0, 0, 100)
+				dlight.r = 170
+				dlight.g = 220
+				dlight.b = 255
+				dlight.brightness = 8
+				dlight.Decay = 1000
+				dlight.Size = 600
+				dlight.DieTime = now + 0.2
+			end
+
+			-- Dynamic lights for each band orb (like ritual entity)
+			for idx, satData in ipairs(midSatelliteCircles) do
+				if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
+					local elapsed = now - satData.startTime
+					local spinSpeed = (math.pi * 2) / 10
+					local currentAngle = satData.baseAngle + (elapsed * spinSpeed)
+
+					for orbIdx, orbData in ipairs(bandOrbs) do
+						if orbData.parentSatIndex == (idx - 1) and orbData.bc and orbData.bc.isActive then
+							-- Calculate orb position
+							local orbOffsetX = math.cos(currentAngle) * (satData.radius + orbData.orbDistance)
+							local orbOffsetY = math.sin(currentAngle) * (satData.radius + orbData.orbDistance)
+							local orbPos = caster:GetPos() + Vector(orbOffsetX, orbOffsetY, orbData.height)
+
+							-- Create dynamic light for this orb
+							local orbLight = DynamicLight(caster:EntIndex() + 31000 + orbIdx)
+							if orbLight then
+								orbLight.pos = orbPos
+								orbLight.r = 170
+								orbLight.g = 220
+								orbLight.b = 255
+								orbLight.brightness = 2
+								orbLight.Decay = 600
+								orbLight.Size = 120
+								orbLight.DieTime = now + 0.1
+							end
+						end
+					end
+				end
+			end
+		end)
+
+		-- Progressive screen shake (starts at 30s, intensifies until unleash)
+		local shakeHook = "Arcana_FallenDown_ScreenShake_" .. tostring(caster)
+		local lastShakeTime = 0
+		hook.Add("Think", shakeHook, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", shakeHook)
+				return
+			end
+
+			local now = CurTime()
+			local elapsed = now - chargeStartTime
+			local midPhaseStart = CHARGE_TIME / 2 -- 30 seconds
+
+			-- Start shaking at 30 seconds
+			if elapsed >= midPhaseStart then
+				local shakeProgress = (elapsed - midPhaseStart) / (CHARGE_TIME / 2) -- 0 to 1 over 30 seconds
+
+				-- Shake frequency increases over time
+				local shakeInterval = Lerp(shakeProgress, 0.5, 0.05) -- From every 0.5s to every 0.05s
+
+				if now >= lastShakeTime + shakeInterval then
+					-- Shake intensity increases over time
+					local amplitude = Lerp(shakeProgress, 1, 15) -- From 1 to 15
+					local frequency = Lerp(shakeProgress, 1, 8) -- From 1 to 8
+					local duration = Lerp(shakeProgress, 0.3, 1.0) -- From 0.3s to 1.0s
+
+					util.ScreenShake(caster:GetPos(), amplitude, frequency, duration, 3000)
+					lastShakeTime = now
+				end
+			end
+		end)
+
+		-- Screen effects and post-processing (starts at 30s, intensifies until unleash)
+		local screenHook = "Arcana_FallenDown_ScreenEffect_" .. tostring(caster)
+
+		hook.Add("RenderScreenspaceEffects", screenHook, function()
+			if not IsValid(caster) then
+				hook.Remove("RenderScreenspaceEffects", screenHook)
+				return
+			end
+
+			local now = CurTime()
+			local elapsed = now - chargeStartTime
+			local midPhaseStart = CHARGE_TIME / 2 -- 30 seconds
+			local finalPhaseStart = CHARGE_TIME - 2 -- 58 seconds
+
+			-- Phase 1: Progressive effects from 30s to 58s
+			--[[if elapsed >= midPhaseStart then
+				local midProgress = math.Clamp((elapsed - midPhaseStart) / (CHARGE_TIME / 2), 0, 1) -- 0 to 1 over 30 seconds
+
+				-- Color modification (brightness and contrast increase)
+				local colorMod = {
+					["$pp_colour_addr"] = midProgress * 0.1,
+					["$pp_colour_addg"] = midProgress * 0.15,
+					["$pp_colour_addb"] = midProgress * 0.2,
+					["$pp_colour_brightness"] = midProgress * 0.15,
+					["$pp_colour_contrast"] = 1 + (midProgress * 0.3),
+					["$pp_colour_colour"] = 1 + (midProgress * 0.5),
+				}
+				DrawColorModify(colorMod)
+
+				-- Bloom effect (glow intensifies)
+				local bloomDarken = Lerp(midProgress, 1, 0.7)
+				local bloomMultiply = Lerp(midProgress, 1, 2.5)
+				local bloomSizeX = Lerp(midProgress, 1, 4)
+				local bloomSizeY = Lerp(midProgress, 1, 4)
+				local bloomPasses = math.floor(Lerp(midProgress, 1, 3))
+				local bloomColor = Lerp(midProgress, 1, 1.5)
+
+				DrawBloom(bloomDarken, bloomMultiply, bloomSizeX, bloomSizeY, bloomPasses, bloomColor, 1, 1, 1)
+
+				-- Motion blur (slight distortion effect)
+				local blurAmount = midProgress * 0.15
+				if blurAmount > 0.01 then
+					DrawMotionBlur(1 - blurAmount, blurAmount, 0.02)
+				end
+
+				-- Sharpen effect (makes everything more intense)
+				local sharpenContrast = Lerp(midProgress, 0, 1.5)
+				local sharpenDistance = Lerp(midProgress, 0, 2)
+				if sharpenContrast > 0.1 then
+					DrawSharpen(sharpenContrast, sharpenDistance)
+				end
+			end]]--
+
+			-- Phase 2: Final intense sunbeams + white fade (58s to 60s)
+			if elapsed >= finalPhaseStart then
+				local finalProgress = (elapsed - finalPhaseStart) / 2 -- 0 to 1 over 2 seconds
+
+				-- Get screen position of caster for sunbeams origin
+				local casterScreenPos = caster:GetPos():ToScreen()
+
+				-- Sunbeams effect (intensifies rapidly)
+				local sunbeamDarkness = Lerp(finalProgress, 0.95, 0.1) -- Gets much brighter
+				local sunbeamMultiplier = Lerp(finalProgress, 0.5, 3.5) -- Intensifies dramatically
+
+				DrawSunbeams(sunbeamDarkness, sunbeamMultiplier, 0.15, casterScreenPos.x / ScrW(), casterScreenPos.y / ScrH())
+
+				-- White fade overlay (grows to complete white)
+				local whiteAlpha = Lerp(finalProgress, 0, 255)
+
+				if whiteAlpha > 0 then
+					-- Draw white overlay that fills the screen
+					surface.SetDrawColor(255, 255, 255, whiteAlpha)
+					surface.DrawRect(0, 0, ScrW(), ScrH())
+				end
+			end
+		end)
+
+		-- Cleanup after charge
+		timer.Simple(castTime, function()
+			hook.Remove("Think", chargeSoundHook)
+			hook.Remove("Think", particleHook)
+			hook.Remove("PostDrawTranslucentRenderables", renderHook)
+			hook.Remove("Think", lightHook)
+			hook.Remove("Think", shakeHook)
+			hook.Remove("RenderScreenspaceEffects", screenHook)
+			timer.Remove("Arcana_FallenDown_MenacingSounds_" .. tostring(caster))
+
+			-- Clear lightning arcs and circle data
+			table.Empty(fallenDownLightningArcs)
+			fallenDownCircleData[caster] = nil
+
+			-- Stop all looping sounds when spell is unleashed or interrupted
+			if IsValid(caster) then
+				caster:StopSound("ambient/wind/wind_rooftop1.wav")
+				caster:StopSound("ambient/wind/wind_snippet1.wav")
+				caster:StopSound("ambient/atmosphere/cave_hit1.wav")
+				caster:StopSound("ambient/energy/weld1.wav")
+				caster:StopSound("ambient/energy/weld2.wav")
+				caster:StopSound("ambient/energy/whiteflash.wav")
+				caster:StopSound("ambient/atmosphere/tone_quiet.wav")
+				caster:StopSound("ambient/atmosphere/tone_alley.wav")
+				caster:StopSound("ambient/energy/force_field_loop1.wav")
+				caster:StopSound("ambient/atmosphere/ambience5.wav")
+				caster:StopSound("ambient/levels/citadel/citadel_ambient_scream_loop1.wav")
+				caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
+				caster:StopSound("ambient/atmosphere/cave_hit2.wav")
+				caster:StopSound("ambient/atmosphere/cave_hit3.wav")
+				caster:StopSound("weapons/physcannon/physcannon_charge.wav")
+				-- Stop thunder sounds (may have electrical crackling)
+				for i = 1, 4 do
+					caster:StopSound("ambient/atmosphere/thunder" .. i .. ".wav")
+				end
+			end
+
+			auraParticles = {}
+		end)
+
+		return true -- We've handled the visuals
+	end)
+
+	-- Beam start: Initialize the growing beam
+	net.Receive("Arcana_FallenDown_BeamStart", function()
+		local caster = net.ReadEntity()
+		local targetPos = net.ReadVector()
+		local duration = net.ReadFloat()
+
+		if not IsValid(caster) then return end
+
+		-- Stop all charging phase looping sounds
+		caster:StopSound("ambient/wind/wind_rooftop1.wav")
+		caster:StopSound("ambient/wind/wind_snippet1.wav")
+		caster:StopSound("ambient/atmosphere/cave_hit1.wav")
+		caster:StopSound("ambient/energy/weld1.wav")
+		caster:StopSound("ambient/energy/weld2.wav")
+		caster:StopSound("ambient/energy/whiteflash.wav")
+		caster:StopSound("ambient/atmosphere/tone_quiet.wav")
+		caster:StopSound("ambient/atmosphere/tone_alley.wav")
+		caster:StopSound("ambient/energy/force_field_loop1.wav")
+		caster:StopSound("ambient/atmosphere/ambience5.wav")
+		caster:StopSound("ambient/levels/citadel/citadel_ambient_scream_loop1.wav")
+		caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
+		caster:StopSound("ambient/atmosphere/cave_hit2.wav")
+		caster:StopSound("ambient/atmosphere/cave_hit3.wav")
+		caster:StopSound("weapons/physcannon/physcannon_charge.wav")
+		-- Stop thunder sounds (may have electrical crackling)
+		for i = 1, 4 do
+			caster:StopSound("ambient/atmosphere/thunder" .. i .. ".wav")
+		end
+
+		-- Store active beam state
+		activeBeams[#activeBeams + 1] = {
+			caster = caster,
+			targetPos = targetPos,
+			startTime = CurTime(),
+			endTime = CurTime() + duration,
+			duration = duration
+		}
+
+		-- MASSIVE initial flash - blinding
+		local dlight = DynamicLight(math.random(50000, 99999))
+		if dlight then
+			dlight.pos = targetPos
+			dlight.r = 255
+			dlight.g = 255
+			dlight.b = 255
+			dlight.brightness = 20 -- Even brighter
+			dlight.Decay = 10000
+			dlight.Size = 4000 -- Doubled size
+			dlight.DieTime = CurTime() + 0.8
+		end
+
+		-- Create overwhelming particle effects for the beam impact
+		local emitter = ParticleEmitter(targetPos, false)
+		if emitter then
+			-- Initial explosion burst
+			for i = 1, 150 do
+				local particle = emitter:Add("effects/softglow", targetPos + Vector(0, 0, 50))
+				if particle then
+					local dir = VectorRand():GetNormalized()
+					particle:SetVelocity(dir * math.Rand(500, 2000))
+					particle:SetLifeTime(0)
+					particle:SetDieTime(math.Rand(2, 4))
+					particle:SetStartAlpha(255)
+					particle:SetEndAlpha(0)
+					particle:SetStartSize(math.Rand(30, 80))
+					particle:SetEndSize(math.Rand(5, 15))
+					particle:SetColor(math.Rand(170, 255), math.Rand(220, 255), 255)
+					particle:SetRoll(math.Rand(0, 360))
+					particle:SetRollDelta(math.Rand(-2, 2))
+					particle:SetGravity(Vector(0, 0, math.Rand(-50, 50)))
+				end
+			end
+
+			-- Upward energy streaks
+			for i = 1, 80 do
+				local particle = emitter:Add("effects/softglow", targetPos + VectorRand() * 200)
+				if particle then
+					particle:SetVelocity(Vector(0, 0, math.Rand(800, 1500)))
+					particle:SetLifeTime(0)
+					particle:SetDieTime(math.Rand(1.5, 3))
+					particle:SetStartAlpha(220)
+					particle:SetEndAlpha(0)
+					particle:SetStartSize(math.Rand(40, 100))
+					particle:SetEndSize(math.Rand(10, 30))
+					particle:SetColor(math.Rand(200, 255), math.Rand(230, 255), 255)
+					particle:SetRoll(math.Rand(0, 360))
+				end
+			end
+
+			emitter:Finish()
+		end
+	end)
+
+	-- Beam tick: Update current radius
+	net.Receive("Arcana_FallenDown_BeamTick", function()
+		local targetPos = net.ReadVector()
+		local currentRadius = net.ReadFloat()
+		local progress = net.ReadFloat()
+
+		-- HEAVY DUST and energy particles
+		local emitter = ParticleEmitter(targetPos)
+		if emitter then
+			-- MASSIVE HEAVY DUST CLOUDS around cylinder edge
+			for i = 1, 40 do
+				local angle = math.random() * math.pi * 2
+				local dist = currentRadius * math.Rand(0.95, 1.15) -- At and beyond edge
+				local height = math.Rand(0, 1000)
+				local pos = targetPos + Vector(math.cos(angle) * dist, math.sin(angle) * dist, height)
+
+				-- Heavy brown/gray dust
+				local p = emitter:Add("particle/smokesprites_000" .. math.random(1, 9), pos)
+				if p then
+					local outward = Vector(math.cos(angle), math.sin(angle), 0)
+					p:SetVelocity(outward * math.Rand(100, 250) + Vector(0, 0, math.Rand(50, 150)))
+					p:SetDieTime(math.Rand(2, 4))
+					p:SetStartAlpha(math.Rand(180, 220))
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(currentRadius * 0.15, currentRadius * 0.3))
+					p:SetEndSize(math.Rand(currentRadius * 0.4, currentRadius * 0.6))
+					p:SetColor(math.Rand(120, 160), math.Rand(110, 150), math.Rand(90, 130))
+					p:SetLighting(true)
+					p:SetCollide(false)
+					p:SetRoll(math.Rand(0, 360))
+					p:SetRollDelta(math.Rand(-1, 1))
+					p:SetAirResistance(50)
+				end
+			end
+
+			-- Inner energy glow particles
+			for i = 1, 15 do
+				local angle = math.random() * math.pi * 2
+				local dist = math.Rand(0, currentRadius * 0.7)
+				local pos = targetPos + Vector(math.cos(angle) * dist, math.sin(angle) * dist, math.Rand(0, 800))
+
+				local p = emitter:Add("effects/softglow", pos)
+				if p then
+					p:SetVelocity(Vector(0, 0, math.Rand(1000, 2000)))
+					p:SetDieTime(math.Rand(0.8, 1.5))
+					p:SetStartAlpha(220)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(60, 120))
+					p:SetEndSize(math.Rand(20, 40))
+					p:SetColor(math.Rand(200, 255), math.Rand(230, 255), 255)
+					p:SetLighting(false)
+					p:SetCollide(false)
+					p:SetRoll(math.Rand(0, 360))
+				end
+			end
+
+			-- Debris and vaporization at the edge
+			for i = 1, 25 do
+				local angle = math.random() * math.pi * 2
+				local dist = currentRadius * math.Rand(0.9, 1.0)
+				local pos = targetPos + Vector(math.cos(angle) * dist, math.sin(angle) * dist, math.Rand(0, 300))
+
+				local p = emitter:Add("effects/yellowflare", pos)
+				if p then
+					local dir = Vector(math.cos(angle), math.sin(angle), math.Rand(-0.2, 0.5)):GetNormalized()
+					p:SetVelocity(dir * math.Rand(400, 900))
+					p:SetDieTime(math.Rand(0.4, 1.0))
+					p:SetStartAlpha(255)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(20, 45))
+					p:SetEndSize(0)
+					p:SetColor(255, math.Rand(180, 240), math.Rand(120, 180))
+					p:SetLighting(false)
+					p:SetCollide(true)
+					p:SetBounce(0.3)
+					p:SetGravity(Vector(0, 0, -200))
+				end
+			end
+
+			emitter:Finish()
+		end
+
+		-- Multiple powerful dynamic lights throughout the beam area
+		for lightIdx = 1, 3 do
+			if math.random() < 0.7 then
+				local dlight = DynamicLight(math.random(40000, 49999))
+				if dlight then
+					dlight.pos = targetPos + VectorRand() * currentRadius * 0.6
+					dlight.r = math.Rand(200, 255)
+					dlight.g = math.Rand(230, 255)
+					dlight.b = 255
+					dlight.brightness = math.Rand(12, 18)
+					dlight.Decay = 5000
+					dlight.Size = currentRadius * 0.8
+					dlight.DieTime = CurTime() + 0.15
+				end
+			end
+		end
+	end)
+
+	-- Final impact wave
+	net.Receive("Arcana_FallenDown_ImpactWave", function()
+		local pos = net.ReadVector()
+
+		-- Massive explosion particles with blue-white color
+		local emitter = ParticleEmitter(pos)
+		if emitter then
+			for i = 1, 200 do
+				local p = emitter:Add("effects/blueflare1", pos)
+				if p then
+					p:SetVelocity(VectorRand() * math.Rand(500, 1000))
+					p:SetDieTime(math.Rand(2.0, 4.0))
+					p:SetStartAlpha(255)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(30, 60))
+					p:SetEndSize(0)
+					p:SetColor(170, 220, 255)
+					p:SetLighting(false)
+					p:SetAirResistance(50)
+					p:SetGravity(Vector(0, 0, -200))
+					p:SetCollide(true)
+					p:SetBounce(0.3)
+				end
+			end
+
+			emitter:Finish()
+		end
+
+		-- Massive final light with blue tint
+		local dlight = DynamicLight(math.random(20000, 29999))
+		if dlight then
+			dlight.pos = pos
+			dlight.r = 170
+			dlight.g = 220
+			dlight.b = 255
+			dlight.brightness = 20
+			dlight.Decay = 3000
+			dlight.Size = 3000
+			dlight.DieTime = CurTime() + 2.0
+		end
+	end)
+
+	-- Render the beam from sky
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_FallenDown_RenderBeam", function()
+		local curTime = CurTime()
+
+		-- Render and clean up lightning arcs
+		local matBeamLightning = Material("effects/laser1")
+		for i = #fallenDownLightningArcs, 1, -1 do
+			local arc = fallenDownLightningArcs[i]
+
+			if curTime > arc.dieTime then
+				table.remove(fallenDownLightningArcs, i)
+			else
+				local age = curTime - arc.startTime
+				local lifetime = arc.dieTime - arc.startTime
+				local frac = age / lifetime
+				local flicker = math.sin(curTime * 60 + arc.startTime * 80) * 0.3 + 0.7
+				local alpha = (1 - frac) * 255 * flicker
+
+				render.SetMaterial(matBeamLightning)
+
+				-- Generate jagged lightning path
+				local segments = 10 -- More segments for better detail
+				local arcPath = {}
+				for seg = 0, segments do
+					local t = seg / segments
+					local pos = LerpVector(t, arc.startPos, arc.endPos)
+					local jaggedAmount = math.sin(t * math.pi) * 30 -- More jagged
+					pos = pos + VectorRand() * jaggedAmount
+					arcPath[seg] = pos
+				end
+
+				-- White core (brightest)
+				render.StartBeam(segments + 1)
+				for seg = 0, segments do
+					local t = seg / segments
+					local width = 12 * flicker -- Thicker (was 8)
+					render.AddBeam(arcPath[seg], width, t, Color(255, 255, 255, alpha))
+				end
+				render.EndBeam()
+
+				-- Bright cyan layer
+				render.StartBeam(segments + 1)
+				for seg = 0, segments do
+					local t = seg / segments
+					local width = 20 * flicker -- Thicker (was 15)
+					render.AddBeam(arcPath[seg], width, t, Color(200, 235, 255, alpha * 0.8))
+				end
+				render.EndBeam()
+
+				-- Blue outer glow (widest)
+				render.StartBeam(segments + 1)
+				for seg = 0, segments do
+					local t = seg / segments
+					local width = 32 * flicker -- Much thicker
+					render.AddBeam(arcPath[seg], width, t, Color(170, 220, 255, alpha * 0.5))
+				end
+				render.EndBeam()
+
+				-- Add dynamic light at impact point
+				local dlight = DynamicLight(math.random(40000, 49999))
+				if dlight then
+					dlight.pos = arc.endPos
+					dlight.r = 170
+					dlight.g = 220
+					dlight.b = 255
+					dlight.brightness = 3 * (1 - frac)
+					dlight.Decay = 2000
+					dlight.Size = 300
+					dlight.DieTime = curTime + 0.1
+				end
+			end
+		end
+
+		-- Clean up expired beams
+		for i = #activeBeams, 1, -1 do
+			if curTime > activeBeams[i].endTime then
+				table.remove(activeBeams, i)
+			end
+		end
+
+		-- Render active beams as PERFECT EXPANDING CYLINDERS
+		for _, beam in ipairs(activeBeams) do
+			local elapsed = curTime - beam.startTime
+			local progress = math.Clamp(elapsed / beam.duration, 0, 1)
+			local currentRadius = Lerp(progress, 50, MAX_BEAM_RADIUS)
+
+			-- Sky position (very high above)
+			local skyPos = beam.targetPos + Vector(0, 0, 10000) -- Maximum height
+			local groundPos = beam.targetPos
+
+			-- Subtle pulsing for energy effect
+			local pulse = math.sin(curTime * 4) * 0.05 + 0.95
+			local radiusPulse = currentRadius * pulse * 30
+
+			-- Draw PERFECT UNIFORM CYLINDER (same radius at top and bottom)
+			-- MASSIVE width multipliers to fill the entire attack radius
+			render.SetMaterial(matBeam)
+
+			-- Core white vaporizing beam (UNIFORM CYLINDER) - MUCH THICKER
+			render.StartBeam(2)
+			render.AddBeam(skyPos, radiusPulse * 0.7, 0, Color(255, 255, 255, 255))
+			render.AddBeam(groundPos, radiusPulse * 0.7, 1, Color(255, 255, 255, 255))
+			render.EndBeam()
+
+			-- Bright cyan-white layer (UNIFORM CYLINDER) - MUCH THICKER
+			render.StartBeam(2)
+			render.AddBeam(skyPos, radiusPulse * 0.9, 0, Color(220, 240, 255, 240))
+			render.AddBeam(groundPos, radiusPulse * 0.9, 1, Color(220, 240, 255, 240))
+			render.EndBeam()
+
+			-- Blue-white layer (UNIFORM CYLINDER) - FILLS CYLINDER
+			render.StartBeam(2)
+			render.AddBeam(skyPos, radiusPulse * 1.05, 0, Color(190, 225, 255, 220))
+			render.AddBeam(groundPos, radiusPulse * 1.05, 1, Color(190, 225, 255, 220))
+			render.EndBeam()
+
+			-- Outer blue glow (UNIFORM CYLINDER) - SLIGHTLY BEYOND RADIUS
+			render.StartBeam(2)
+			render.AddBeam(skyPos, radiusPulse * 1.2, 0, Color(170, 215, 255, 180))
+			render.AddBeam(groundPos, radiusPulse * 1.2, 1, Color(170, 215, 255, 180))
+			render.EndBeam()
+
+			-- Soft outer edge (UNIFORM CYLINDER) - MAXIMUM SPREAD
+			render.StartBeam(2)
+			render.AddBeam(skyPos, radiusPulse * 1.35, 0, Color(150, 200, 255, 120))
+			render.AddBeam(groundPos, radiusPulse * 1.35, 1, Color(150, 200, 255, 120))
+			render.EndBeam()
+
+			-- Draw massive expanding ground ring
+			render.SetMaterial(matRing)
+			local ringAlpha = 240 * (1 - progress * 0.3)
+			render.DrawQuadEasy(groundPos + Vector(0, 0, 5), Vector(0, 0, 1), currentRadius * 2.5, currentRadius * 2.5, Color(170, 220, 255, ringAlpha), curTime * 20)
+
+			-- Draw bright impact sprite at ground
+			render.SetMaterial(matGlow)
+			render.DrawSprite(groundPos + Vector(0, 0, 10), currentRadius * 3, currentRadius * 3, Color(220, 240, 255, 220))
+			render.DrawSprite(groundPos + Vector(0, 0, 15), currentRadius * 2, currentRadius * 2, Color(255, 255, 255, 200))
+
+			-- Draw sky source sprite
+			render.DrawSprite(skyPos, currentRadius * 2.5, currentRadius * 2.5, Color(200, 230, 255, 240))
+			render.DrawSprite(skyPos, currentRadius * 1.5, currentRadius * 1.5, Color(255, 255, 255, 220))
+
+			-- HEAVY DUST CLOUD around the cylinder edge
+			local matSmoke = Material("particle/smokesprites_0001")
+			render.SetMaterial(matSmoke)
+
+			-- Create dust ring segments around the cylinder
+			local dustSegments = 32
+			for seg = 0, dustSegments - 1 do
+				local angle = (seg / dustSegments) * math.pi * 2
+				local nextAngle = ((seg + 1) / dustSegments) * math.pi * 2
+
+				-- Multiple dust layers at different heights
+				for heightIdx = 0, 8 do
+					local height = (heightIdx / 8) * 8000
+					local heightFrac = heightIdx / 8
+
+					-- Position dust slightly outside the beam radius
+					local dustOffset = currentRadius * 1.08
+					local pos = beam.targetPos + Vector(
+						math.cos(angle) * dustOffset,
+						math.sin(angle) * dustOffset,
+						height
+					)
+
+					-- Dust rotation and drift
+					local driftAngle = curTime * 10 + seg * 15 + heightIdx * 20
+					local drift = Vector(math.cos(math.rad(driftAngle)) * 50, math.sin(math.rad(driftAngle)) * 50, 0)
+					pos = pos + drift
+
+					-- Dust size varies with height and time
+					local dustSize = currentRadius * 0.4 * (1 + heightFrac * 0.3) * (math.sin(curTime * 2 + seg + heightIdx) * 0.2 + 1)
+					local dustAlpha = 140 * (1 - heightFrac * 0.5) * (1 - progress * 0.2)
+
+					-- Heavy brown/gray dust
+					local dustColor = Color(180, 170, 150, dustAlpha)
+					render.DrawQuadEasy(pos, (pos - beam.targetPos):GetNormalized(), dustSize, dustSize, dustColor, math.deg(angle))
+				end
+			end
+
+			-- Additional swirling dust particles
+			local dustParticles = 80
+			for i = 1, dustParticles do
+				local angle = (i / dustParticles) * math.pi * 2 + curTime * 20
+				local radiusOffset = currentRadius * (0.95 + math.sin(curTime * 3 + i) * 0.15)
+				local height = ((i + curTime * 500) % 8000)
+
+				local pos = beam.targetPos + Vector(
+					math.cos(angle) * radiusOffset,
+					math.sin(angle) * radiusOffset,
+					height
+				)
+
+				local size = currentRadius * 0.15 * (math.sin(curTime * 2 + i * 0.1) * 0.3 + 1.2)
+				local alpha = 100 * (1 - (height / 8000) * 0.6)
+
+				render.DrawQuadEasy(pos, Vector(0, 0, 1), size, size, Color(150, 140, 120, alpha), curTime * 50 + i * 5)
+			end
+
+			-- Add multiple dynamic lights along the beam height
+			for lightIdx = 1, 6 do
+				local heightFrac = lightIdx / 6
+				local lightPos = LerpVector(heightFrac, groundPos, skyPos)
+				local dlight = DynamicLight(50000 + (beam.startTime * 1000) % 1000 + lightIdx)
+				if dlight then
+					dlight.pos = lightPos
+					dlight.r = 200
+					dlight.g = 235
+					dlight.b = 255
+					dlight.brightness = 10 * (1 - heightFrac * 0.4)
+					dlight.Decay = 6000
+					dlight.Size = currentRadius * 2.5
+					dlight.DieTime = curTime + 0.1
+				end
+			end
+		end
+	end)
+end
