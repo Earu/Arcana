@@ -23,6 +23,10 @@ Arcane:RegisterRitualSpell({
 		orange = 20
 	},
 	can_cast = function(caster)
+		if Arcane.Environments:IsActive() then
+			return false, "Another environment is already active."
+		end
+
 		local tr = caster:GetEyeTrace()
 		if not tr.Hit or not ACCEPTABLE_SURFACE_TYPES[tr.MatType] then return false, "This ritual may only be cast on grass, dirt, sand, or snow terrain." end
 
