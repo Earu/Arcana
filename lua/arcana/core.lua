@@ -920,6 +920,8 @@ function Arcane:RegisterSpell(spellData)
 		icon = spellData.icon or "icon16/wand.png",
 		-- Divine Pacts: special category of powerful spells unlocked at certain levels
 		is_divine_pact = spellData.is_divine_pact or false,
+		-- Rituals: special category of spells that create ritual entities
+		is_ritual = spellData.is_ritual or false,
 		-- Functions
 		cast = spellData.cast, -- function(caster, target, data)
 		can_cast = spellData.can_cast, -- function(caster, target, data) - optional validation
@@ -1047,6 +1049,7 @@ function Arcane:RegisterRitualSpell(opts)
 		can_cast = opts.can_cast or defaultCanCast,
 		cast = ritualCast,
 		is_projectile = false,
+		is_ritual = true,
 	})
 end
 

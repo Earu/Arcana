@@ -527,6 +527,79 @@ if CLIENT then
 
 		return infoIcon
 	end
+
+	--- Draws a divine pact frame with triple ornate frames, pulsing glow, and corner ornaments
+	-- @param x X position
+	-- @param y Y position
+	-- @param w Width
+	-- @param h Height
+	-- @param colors Table with bg, frame1, frame2, accent color definitions
+	-- @param time Current time for pulsing animation (CurTime())
+	-- @param radius Corner radius (default: 10)
+	function ArtDeco.DrawDivinePactFrame(x, y, w, h, colors, time, radius)
+		radius = radius or 10
+
+		-- Background
+		ArtDeco.FillDecoPanel(x, y, w, h, colors.bg, radius)
+
+		-- Multiple ornate frames with pulsing glow
+		local glowIntensity = 0.7 + 0.3 * math.sin(time * 2)
+		local frame1 = ColorAlpha(colors.frame1, 255 * glowIntensity)
+		local frame2 = ColorAlpha(colors.frame2, 255 * glowIntensity)
+
+		ArtDeco.DrawDecoFrame(x, y, w, h, frame1, radius)
+		ArtDeco.DrawDecoFrame(x + 2, y + 2, w - 4, h - 4, colors.accent, radius)
+		ArtDeco.DrawDecoFrame(x + 4, y + 4, w - 8, h - 8, frame2, radius)
+
+		-- Decorative corner ornaments (L-shaped brackets)
+		local cornerSize = 12
+		local cornerPad = 8
+		surface.SetDrawColor(colors.accent)
+
+		-- Top-left
+		surface.DrawLine(x + cornerPad, y + cornerPad, x + cornerPad + cornerSize, y + cornerPad)
+		surface.DrawLine(x + cornerPad, y + cornerPad, x + cornerPad, y + cornerPad + cornerSize)
+		surface.DrawLine(x + cornerPad + 1, y + cornerPad, x + cornerPad + cornerSize, y + cornerPad)
+		surface.DrawLine(x + cornerPad, y + cornerPad + 1, x + cornerPad, y + cornerPad + cornerSize)
+
+		-- Top-right
+		surface.DrawLine(x + w - cornerPad - cornerSize - 1, y + cornerPad, x + w - cornerPad - 1, y + cornerPad)
+		surface.DrawLine(x + w - cornerPad - 1, y + cornerPad, x + w - cornerPad - 1, y + cornerPad + cornerSize)
+		surface.DrawLine(x + w - cornerPad - cornerSize - 1, y + cornerPad, x + w - cornerPad - 1, y + cornerPad)
+		surface.DrawLine(x + w - cornerPad - 1, y + cornerPad + 1, x + w - cornerPad - 1, y + cornerPad + cornerSize)
+
+		-- Bottom-left
+		surface.DrawLine(x + cornerPad, y + h - cornerPad - 1, x + cornerPad + cornerSize, y + h - cornerPad - 1)
+		surface.DrawLine(x + cornerPad, y + h - cornerPad - cornerSize - 1, x + cornerPad, y + h - cornerPad - 1)
+		surface.DrawLine(x + cornerPad + 1, y + h - cornerPad - 1, x + cornerPad + cornerSize, y + h - cornerPad - 1)
+		surface.DrawLine(x + cornerPad, y + h - cornerPad - cornerSize - 1, x + cornerPad, y + h - cornerPad - 1)
+
+		-- Bottom-right
+		surface.DrawLine(x + w - cornerPad - cornerSize - 1, y + h - cornerPad - 1, x + w - cornerPad - 1, y + h - cornerPad - 1)
+		surface.DrawLine(x + w - cornerPad - 1, y + h - cornerPad - cornerSize - 1, x + w - cornerPad - 1, y + h - cornerPad - 1)
+		surface.DrawLine(x + w - cornerPad - cornerSize - 1, y + h - cornerPad - 1, x + w - cornerPad - 1, y + h - cornerPad - 1)
+		surface.DrawLine(x + w - cornerPad - 1, y + h - cornerPad - cornerSize - 1, x + w - cornerPad - 1, y + h - cornerPad - 1)
+	end
+
+	--- Draws a ritual frame with double frames for mystical effect
+	-- @param x X position
+	-- @param y Y position
+	-- @param w Width
+	-- @param h Height
+	-- @param colors Table with bg, frame1, frame2 color definitions
+	function ArtDeco.DrawRitualFrame(x, y, w, h, colors)
+		-- Background
+		draw.NoTexture()
+		surface.SetDrawColor(colors.bg.r, colors.bg.g, colors.bg.b, colors.bg.a)
+		surface.DrawRect(x, y, w, h)
+
+		-- Double frame for mystical effect
+		surface.SetDrawColor(colors.frame1.r, colors.frame1.g, colors.frame1.b, 255)
+		surface.DrawOutlinedRect(x, y, w, h, 2)
+
+		surface.SetDrawColor(colors.frame2.r, colors.frame2.g, colors.frame2.b, 200)
+		surface.DrawOutlinedRect(x + 3, y + 3, w - 6, h - 6, 1)
+	end
 end
 
 -- Store in global scope

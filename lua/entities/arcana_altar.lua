@@ -562,39 +562,65 @@ if CLIENT then
 
 	-- Client menu
 	local function BuildEligibleSpellList(ply)
-		if not Arcane or not IsValid(ply) then return {} end
+		if not Arcane or not IsValid(ply) then return {}, {} end
 		local data = Arcane:GetPlayerData(ply)
-		if not data then return {} end
-		local out = {}
+		if not data then return {}, {} end
+		local regularSpells = {}
+		local rituals = {}
 
 		for sid, sp in pairs(Arcane.RegisteredSpells or {}) do
 			local already = data.unlocked_spells and data.unlocked_spells[sid]
 			local levelOk = (data.level or 1) >= (sp.level_required or 1)
 			local kpOk = (data.knowledge_points or 0) >= (sp.knowledge_cost or 1)
 			local isDivinePact = sp.is_divine_pact == true
+			local isRitual = sp.is_ritual == true
 
-			-- Exclude Divine Pacts from the altar
+			-- Exclude Divine Pacts from the altar, but separate rituals from regular spells
 			if not already and levelOk and kpOk and not isDivinePact then
-				table.insert(out, {
+				local item = {
 					id = sid,
 					spell = sp
-				})
+				}
+
+				if isRitual then
+					table.insert(rituals, item)
+				else
+					table.insert(regularSpells, item)
+				end
 			end
 		end
 
-		table.sort(out, function(a, b)
+		table.sort(regularSpells, function(a, b)
 			if a.spell.level_required == b.spell.level_required then return a.spell.name < b.spell.name end
 
 			return a.spell.level_required < b.spell.level_required
 		end)
 
-		return out
+		table.sort(rituals, function(a, b)
+			if a.spell.level_required == b.spell.level_required then return a.spell.name < b.spell.name end
+
+			return a.spell.level_required < b.spell.level_required
+		end)
+
+		return regularSpells, rituals
 	end
 
 	local function OpenAltarMenu(altar)
 		if not Arcane then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
+
+		-- Ritual uses art deco palette - same backgrounds as normal spells
+		local ritualColors = {
+			bg = ArtDeco.Colors.cardIdle,
+			bgHover = ArtDeco.Colors.cardHover,
+			frame1 = ArtDeco.Colors.brassInner,
+			frame2 = ArtDeco.Colors.gold,
+			accent = ArtDeco.Colors.paleGold,
+			text = ArtDeco.Colors.textBright,
+			textDim = ArtDeco.Colors.textDim,
+		}
+
 		local frame = vgui.Create("DFrame")
 		frame:SetSize(760, 520)
 		frame:Center()
@@ -678,7 +704,7 @@ if CLIENT then
 
 		local content = vgui.Create("DPanel", frame)
 		content:Dock(FILL)
-		content:DockMargin(12, 34, 12, 12)
+		content:DockMargin(12, 12, 12, 12)
 		content.Paint = nil
 		local listPanel = vgui.Create("DPanel", content)
 		listPanel:Dock(FILL)
@@ -708,9 +734,9 @@ if CLIENT then
 
 		local function rebuild()
 			scroll:Clear()
-			local eligible = BuildEligibleSpellList(ply)
+			local regularSpells, rituals = BuildEligibleSpellList(ply)
 
-			if #eligible == 0 then
+			if #regularSpells == 0 and #rituals == 0 then
 				local lbl = vgui.Create("DLabel", scroll)
 				lbl:SetText("No spells available to unlock right now.")
 				lbl:SetFont("Arcana_AncientLarge")
@@ -721,7 +747,7 @@ if CLIENT then
 				return
 			end
 
-			for _, item in ipairs(eligible) do
+			for _, item in ipairs(regularSpells) do
 				local sp = item.spell
 				local row = vgui.Create("DPanel", scroll)
 				row:Dock(TOP)
@@ -752,8 +778,8 @@ if CLIENT then
 
 				local btn = vgui.Create("DButton", row)
 				btn:Dock(RIGHT)
-				btn:DockMargin(6, 10, 10, 10)
-				btn:SetWide(120)
+				btn:DockMargin(12, 14, 12, 14)
+				btn:SetSize(90, 32)
 				btn:SetText("")
 
 				-- Determine affordability live from current data
@@ -770,10 +796,10 @@ if CLIENT then
 					local enabled = pnl:IsEnabled()
 					local hovered = enabled and pnl:IsHovered()
 					local bgCol = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
-					ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
-					ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
+					ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 6)
+					ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 6)
 					local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
-					draw.SimpleText("Unlock", "Arcana_AncientLarge", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					draw.SimpleText("Unlock", "Arcana_Ancient", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 
 				function btn:DoClick()
@@ -795,6 +821,111 @@ if CLIENT then
 					surface.PlaySound("buttons/button14.wav")
 					self:SetEnabled(false)
 					timer.Simple(0.25, rebuild)
+				end
+			end
+
+			-- Render rituals section
+			if #rituals > 0 then
+				-- Spacer before rituals
+				local spacer = vgui.Create("DPanel", scroll)
+				spacer:Dock(TOP)
+				spacer:SetTall(10)
+				spacer:DockMargin(0, 0, 0, 0)
+				spacer.Paint = function() end
+
+				-- Category header
+				local ritualHeader = vgui.Create("DPanel", scroll)
+				ritualHeader:Dock(TOP)
+				ritualHeader:SetTall(19)
+				ritualHeader:DockMargin(0, 0, 0, 4)
+
+				ritualHeader.Paint = function(pnl, w, h)
+					draw.SimpleText(string.upper("Rituals"), "Arcana_Ancient", 2, 0, ArtDeco.Colors.paleGold)
+				end
+
+				for _, item in ipairs(rituals) do
+					local sp = item.spell
+					local row = vgui.Create("DPanel", scroll)
+					row:Dock(TOP)
+					row:SetTall(68)
+					row:DockMargin(0, 0, 0, 8)
+					-- Create info icon for spell description tooltip
+					local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+					infoIcon:SetPos(0, 0) -- Will be positioned in PerformLayout
+
+					row.Paint = function(pnl, w, h)
+						-- Use consolidated ritual frame drawing
+						local frameColors = {
+							bg = ritualColors.bg,
+							frame1 = ritualColors.frame1,
+							frame2 = ritualColors.frame2
+						}
+						ArtDeco.DrawRitualFrame(2, 2, w - 4, h - 4, frameColors)
+
+						-- Strip "Ritual: " prefix from name since it's already in the Rituals category
+						local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
+						draw.SimpleText(displayName, "Arcana_AncientLarge", 14, 10, ritualColors.text)
+						local sub = string.format("Lvl %d  Cost %d KP", sp.level_required or 1, sp.knowledge_cost or 1)
+						draw.SimpleText(sub, "Arcana_AncientSmall", 14, 38, ritualColors.textDim)
+					end
+
+					-- Position the info icon next to the spell name
+					row.PerformLayout = function(pnl, w, h)
+						if IsValid(infoIcon) then
+							-- Get the width of the spell name to position icon after it
+							surface.SetFont("Arcana_AncientLarge")
+							local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
+							local nameW, nameH = surface.GetTextSize(displayName)
+							infoIcon:SetPos(18 + nameW, 10 + (nameH - 20) / 2)
+						end
+					end
+
+					local btn = vgui.Create("DButton", row)
+					btn:Dock(RIGHT)
+					btn:DockMargin(12, 18, 12, 18)
+					btn:SetSize(90, 32)
+					btn:SetText("")
+
+					-- Determine affordability live from current data
+					local function updateEnabled()
+						local d = Arcane:GetPlayerData(ply)
+						local curKP = (d and d.knowledge_points) or 0
+						local cost = sp.knowledge_cost or 1
+						btn:SetEnabled(curKP >= cost)
+					end
+
+					updateEnabled()
+
+					btn.Paint = function(pnl, w, h)
+						local enabled = pnl:IsEnabled()
+						local hovered = enabled and pnl:IsHovered()
+						local bgCol = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
+						ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 6)
+						ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 6)
+						local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
+						draw.SimpleText("Unlock", "Arcana_Ancient", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					end
+
+					function btn:DoClick()
+						local d = Arcane:GetPlayerData(ply)
+						local curKP = (d and d.knowledge_points) or 0
+						local cost = sp.knowledge_cost or 1
+
+						if curKP < cost then
+							surface.PlaySound("buttons/button8.wav")
+							notification.AddLegacy("Not enough Knowledge Points", NOTIFY_ERROR, 3)
+							rebuild()
+
+							return
+						end
+
+						net.Start("Arcane_UnlockSpell")
+						net.WriteString(item.id)
+						net.SendToServer()
+						surface.PlaySound("buttons/button14.wav")
+						self:SetEnabled(false)
+						timer.Simple(0.25, rebuild)
+					end
 				end
 			end
 		end
