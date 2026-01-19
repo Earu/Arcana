@@ -166,8 +166,7 @@ if SERVER then
 
 		-- Use entity's position and orientation for casting circle
 		local pos = self:GetPos() + self:GetForward() * 30
-		local ang = self:GetAngles()
-		ang:RotateAroundAxis(ang:Up(), 90)
+		local ang = self:GetForward():Angle()
 		ang:RotateAroundAxis(ang:Right(), 90)
 		local size = 30
 
@@ -252,8 +251,7 @@ if SERVER then
 		self.SpellCooldowns[spellId] = CurTime() + spell.cooldown
 
 		pos = self:GetPos() + self:GetForward() * 30
-		ang = self:GetAngles()
-		ang:RotateAroundAxis(ang:Up(), 90)
+		ang = self:GetForward():Angle()
 		ang:RotateAroundAxis(ang:Right(), 90)
 		size = 30
 

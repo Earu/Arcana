@@ -1425,8 +1425,7 @@ if CLIENT then
 
 		if isSpellCaster then
 			pos = caster:WorldSpaceCenter() + caster:GetForward() * 30
-			ang = caster:GetAngles()
-			ang:RotateAroundAxis(ang:Up(), 90)
+			ang = caster:GetForward():Angle()
 			ang:RotateAroundAxis(ang:Right(), 90)
 			size = 30
 		else
@@ -1491,9 +1490,8 @@ if CLIENT then
 			if isSpellCaster then
 				-- Spell caster entity positioning
 				newPos = caster:WorldSpaceCenter() + caster:GetForward() * 30
-				newAng = caster:GetAngles()
+				newAng = caster:GetForward():Angle()
 				newAng:RotateAroundAxis(newAng:Right(), 90)
-				newAng:RotateAroundAxis(newAng:Up(), 90)
 				newSize = 30
 			else
 				-- Player positioning
