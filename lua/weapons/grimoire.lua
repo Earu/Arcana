@@ -788,9 +788,10 @@ if CLIENT then
 
 		local unlocked = {}
 
-		-- Separate Divine Pacts from regular spells
+		-- Separate spells into categories: regular, divine pacts, and rituals
 		local regularSpells = {}
 		local divinePacts = {}
+		local rituals = {}
 
 		for sid, sp in pairs(Arcane.RegisteredSpells) do
 			if owner:HasSpellUnlocked(sid) then
@@ -801,6 +802,8 @@ if CLIENT then
 
 				if sp.is_divine_pact then
 					table.insert(divinePacts, item)
+				elseif sp.is_ritual then
+					table.insert(rituals, item)
 				else
 					table.insert(regularSpells, item)
 				end
@@ -809,16 +812,28 @@ if CLIENT then
 
 		table.sort(regularSpells, function(a, b) return a.spell.name < b.spell.name end)
 		table.sort(divinePacts, function(a, b) return a.spell.level_required < b.spell.level_required end)
+		table.sort(rituals, function(a, b) return a.spell.name < b.spell.name end)
 
-		-- Unified Divine Pact color palette - enhanced version of main theme
+		-- Unified Divine Pact color palette - uses normal spell backgrounds with ornate frames
 		local divinePactColors = {
-			bg = Color(35, 28, 20, 235),
-			bgHover = Color(50, 40, 28, 250),
+			bg = ArtDeco.Colors.cardIdle,
+			bgHover = ArtDeco.Colors.cardHover,
 			frame1 = Color(220, 180, 100, 255),
 			frame2 = Color(255, 215, 140, 255),
 			accent = Color(255, 230, 150, 255),
 			text = Color(255, 245, 220, 255),
 			glow = Color(240, 200, 120, 255),
+		}
+
+		-- Ritual uses art deco palette - same backgrounds as normal spells
+		local ritualColors = {
+			bg = ArtDeco.Colors.cardIdle,
+			bgHover = ArtDeco.Colors.cardHover,
+			frame1 = ArtDeco.Colors.brassInner,
+			frame2 = ArtDeco.Colors.gold,
+			accent = ArtDeco.Colors.paleGold,
+			text = ArtDeco.Colors.textBright,
+			textDim = ArtDeco.Colors.textDim,
 		}
 
 		-- Render regular spells first
@@ -962,42 +977,14 @@ if CLIENT then
 					local bg = hovered and divinePactColors.bgHover or divinePactColors.bg
 					local time = CurTime()
 
-					-- Animated gradient background
-					ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, bg, 10)
-
-					-- Multiple ornate frames with pulsing glow
-					local glowIntensity = 0.7 + 0.3 * math.sin(time * 2)
-					local frame1 = ColorAlpha(divinePactColors.frame1, 255 * glowIntensity)
-					local frame2 = ColorAlpha(divinePactColors.frame2, 255 * glowIntensity)
-
-					ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frame1, 10)
-					ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, divinePactColors.accent, 10)
-					ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, frame2, 10)
-
-					-- Decorative corner ornaments
-					local cornerSize = 12
-					local cornerPad = 8
-					surface.SetDrawColor(divinePactColors.accent)
-					-- Top-left
-					surface.DrawLine(cornerPad, cornerPad, cornerPad + cornerSize, cornerPad)
-					surface.DrawLine(cornerPad, cornerPad, cornerPad, cornerPad + cornerSize)
-					surface.DrawLine(cornerPad + 1, cornerPad, cornerPad + cornerSize, cornerPad)
-					surface.DrawLine(cornerPad, cornerPad + 1, cornerPad, cornerPad + cornerSize)
-					-- Top-right
-					surface.DrawLine(w - cornerPad - cornerSize - 1, cornerPad, w - cornerPad - 1, cornerPad)
-					surface.DrawLine(w - cornerPad - 1, cornerPad, w - cornerPad - 1, cornerPad + cornerSize)
-					surface.DrawLine(w - cornerPad - cornerSize - 1, cornerPad, w - cornerPad - 1, cornerPad)
-					surface.DrawLine(w - cornerPad - 1, cornerPad + 1, w - cornerPad - 1, cornerPad + cornerSize)
-					-- Bottom-left
-					surface.DrawLine(cornerPad, h - cornerPad - 1, cornerPad + cornerSize, h - cornerPad - 1)
-					surface.DrawLine(cornerPad, h - cornerPad - cornerSize - 1, cornerPad, h - cornerPad - 1)
-					surface.DrawLine(cornerPad + 1, h - cornerPad - 1, cornerPad + cornerSize, h - cornerPad - 1)
-					surface.DrawLine(cornerPad, h - cornerPad - cornerSize - 1, cornerPad, h - cornerPad - 1)
-					-- Bottom-right
-					surface.DrawLine(w - cornerPad - cornerSize - 1, h - cornerPad - 1, w - cornerPad - 1, h - cornerPad - 1)
-					surface.DrawLine(w - cornerPad - 1, h - cornerPad - cornerSize - 1, w - cornerPad - 1, h - cornerPad - 1)
-					surface.DrawLine(w - cornerPad - cornerSize - 1, h - cornerPad - 1, w - cornerPad - 1, h - cornerPad - 1)
-					surface.DrawLine(w - cornerPad - 1, h - cornerPad - cornerSize - 1, w - cornerPad - 1, h - cornerPad - 1)
+					-- Use consolidated divine pact frame drawing
+					local frameColors = {
+						bg = bg,
+						frame1 = divinePactColors.frame1,
+						frame2 = divinePactColors.frame2,
+						accent = divinePactColors.accent
+					}
+					ArtDeco.DrawDivinePactFrame(2, 2, w - 4, h - 4, frameColors, time, 10)
 
 					-- Spell name with glow effect
 					local nameY = 10
@@ -1107,6 +1094,149 @@ if CLIENT then
 						surface.SetFont("Arcana_AncientLarge")
 						local nameW, nameH = surface.GetTextSize(sp.name)
 						infoIcon:SetPos(16 + nameW, 10 + (nameH - 20) / 2)
+					end
+
+					if IsValid(castBtn) then
+						local btnW, btnH = castBtn:GetWide(), castBtn:GetTall()
+						castBtn:SetPos(w - btnW - 12, (h - btnH) * 0.5)
+					end
+				end
+			end
+		end
+
+		-- Render Rituals section if any are unlocked
+		if #rituals > 0 then
+			-- Spacer before Rituals section
+			local spacer = vgui.Create("DPanel", listScroll)
+			spacer:Dock(TOP)
+			spacer:SetTall(10)
+			spacer:DockMargin(0, 0, 0, 0)
+			spacer.Paint = function() end
+
+			-- Category header - matching "Learned Spells" style
+			local ritualHeader = vgui.Create("DPanel", listScroll)
+			ritualHeader:Dock(TOP)
+			ritualHeader:SetTall(19)
+			ritualHeader:DockMargin(0, 0, 8, 0)
+
+			ritualHeader.Paint = function(pnl, w, h)
+				-- Just text, no frame - matching "Learned Spells" exactly
+				draw.SimpleText(string.upper("Rituals"), "Arcana_Ancient", 2, 0, ArtDeco.Colors.paleGold)
+			end
+
+			-- Render Ritual spells (with unique mystical styling)
+			for _, item in ipairs(rituals) do
+				local sp = item.spell
+				local row = vgui.Create("DButton", listScroll)
+				row:Dock(TOP)
+				row:SetTall(64)
+				row:DockMargin(0, 0, 8, 6)
+				row:SetText("")
+				row.SpellId = item.id
+				row:Droppable("arcana_spell")
+
+				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+				infoIcon:SetPos(0, 0)
+
+				row.Paint = function(pnl, w, h)
+					local hovered = pnl:IsHovered()
+					local bg = hovered and ritualColors.bgHover or ritualColors.bg
+
+					-- Use consolidated ritual frame drawing
+					local frameColors = {
+						bg = bg,
+						frame1 = ritualColors.frame1,
+						frame2 = ritualColors.frame2
+					}
+					ArtDeco.DrawRitualFrame(2, 2, w - 4, h - 4, frameColors)
+
+					-- Strip "Ritual: " prefix from name since it's already in the Rituals category
+					local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
+					draw.SimpleText(displayName, "Arcana_AncientLarge", 14, 10, ritualColors.text)
+					-- Subline: cost only
+					local ca = tonumber(sp.cost_amount or 0) or 0
+					local ct = tostring(sp.cost_type or "")
+					local sub = string.format("Cost %s %s", string.Comma(ca), ct)
+					draw.SimpleText(sub, "Arcana_AncientSmall", 14, 36, ritualColors.textDim)
+				end
+
+				row.OnCursorEntered = function(pnl)
+					pnl:InvalidateLayout(true)
+				end
+
+				row.OnCursorExited = function(pnl)
+					pnl:InvalidateLayout(true)
+				end
+
+				row.DoClick = function(pnl)
+					net.Start("Arcane_ConsoleCastSpell")
+					net.WriteString(item.id)
+					net.SendToServer()
+					local ctrlDown = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
+					if not ctrlDown then
+						frame:Close()
+					end
+				end
+
+				local castBtn = vgui.Create("DButton", row)
+				castBtn:SetFont("Arcana_Ancient")
+				castBtn:SetText("Cast")
+				castBtn:SetSize(72, 28)
+
+				castBtn.DoClick = function(pnl)
+					net.Start("Arcane_ConsoleCastSpell")
+					net.WriteString(item.id)
+					net.SendToServer()
+					local ctrlDown = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
+					if not ctrlDown then
+						frame:Close()
+					end
+				end
+
+				castBtn.Paint = function(pnl, w, h)
+					local disabled = not pnl:IsEnabled()
+					local bg = disabled and Color(40, 32, 24, 200) or Color(50, 40, 28, 220)
+					local col = disabled and ArtDeco.Colors.textDim or ArtDeco.Colors.paleGold
+					local border = ArtDeco.Colors.gold
+
+					if not disabled and pnl:IsHovered() then
+						bg = ArtDeco.Colors.cardHover
+						col = ArtDeco.Colors.textBright
+						border = ArtDeco.Colors.textBright
+					end
+
+					ArtDeco.FillDecoPanel(0, 0, w, h, bg, 6)
+					ArtDeco.DrawDecoFrame(0, 0, w, h, border, 6)
+					pnl:SetTextColor(col)
+				end
+
+				castBtn.Think = function(pnl)
+					local data = Arcane and Arcane:GetPlayerData(owner) or nil
+					local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
+
+					if cd and cd > CurTime() then
+						local remaining = math.max(0, math.ceil(cd - CurTime()))
+
+						if pnl:IsEnabled() then
+							pnl:SetEnabled(false)
+						end
+
+						pnl:SetText(tostring(remaining) .. "s")
+					else
+						if not pnl:IsEnabled() then
+							pnl:SetEnabled(true)
+						end
+
+						pnl:SetText("Cast")
+					end
+				end
+
+				row.PerformLayout = function(pnl, w, h)
+					if IsValid(infoIcon) then
+						surface.SetFont("Arcana_AncientLarge")
+						local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
+						local nameW, nameH = surface.GetTextSize(displayName)
+						infoIcon:SetPos(16 + nameW, 8 + (nameH - 20) / 2)
 					end
 
 					if IsValid(castBtn) then
