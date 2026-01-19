@@ -22,26 +22,49 @@ local unlockAnnounce = {
 	subtitle = "",
 	startedAt = 0,
 	endsAt = 0,
+	isDivinePact = false,
+	spellId = "",
 }
 
-local function showUnlockAnnouncement(kind, displayName, knowledgeDelta)
+local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId)
 	unlockAnnounce.active = true
-	unlockAnnounce.title = string.upper(kind == "ritual" and "Ritual Unlocked" or "Spell Unlocked")
+	unlockAnnounce.spellId = spellId or ""
+
+	-- Check if this is a Divine Pact
+	local isDivine = false
+	if spellId and Arcane.RegisteredSpells[spellId] then
+		isDivine = Arcane.RegisteredSpells[spellId].is_divine_pact == true
+	end
+
+	unlockAnnounce.isDivinePact = isDivine
+	unlockAnnounce.title = string.upper(isDivine and "Divine Pact Unlocked" or "Spell Unlocked")
 	unlockAnnounce.subtitle = tostring(displayName or "")
 	unlockAnnounce.startedAt = CurTime()
-	unlockAnnounce.endsAt = CurTime() + 4.5
+	unlockAnnounce.endsAt = CurTime() + (isDivine and 6.0 or 4.5) -- Longer display for Divine Pacts
 	unlockAnnounce.knowledgeDelta = tonumber(knowledgeDelta or 0) or 0
-	-- Play a deep, long sound. Prefer addon sounds; fallback to HL2 ambient if missing.
+	-- Play a deep, long sound. For Divine Pacts, use a more dramatic sound if available
 	local snd = nil
 
-	if file.Exists("sound/arcana/arcane_1.ogg", "GAME") then
-		snd = "arcana/arcane_1.ogg"
-	elseif file.Exists("sound/arcana/arcane_2.ogg", "GAME") then
-		snd = "arcana/arcane_2.ogg"
-	elseif file.Exists("sound/arcana/arcane_3.ogg", "GAME") then
-		snd = "arcana/arcane_3.ogg"
+	if isDivine then
+		-- Divine Pact gets special dramatic sound
+		if file.Exists("sound/arcana/arcane_3.ogg", "GAME") then
+			snd = "arcana/arcane_3.ogg"
+		elseif file.Exists("sound/arcana/arcane_1.ogg", "GAME") then
+			snd = "arcana/arcane_1.ogg"
+		else
+			snd = "ambient/atmosphere/terrain_rumble1.wav"
+		end
 	else
-		snd = "ambient/atmosphere/terrain_rumble1.wav"
+		-- Regular spell/ritual unlock
+		if file.Exists("sound/arcana/arcane_1.ogg", "GAME") then
+			snd = "arcana/arcane_1.ogg"
+		elseif file.Exists("sound/arcana/arcane_2.ogg", "GAME") then
+			snd = "arcana/arcane_2.ogg"
+		elseif file.Exists("sound/arcana/arcane_3.ogg", "GAME") then
+			snd = "arcana/arcane_3.ogg"
+		else
+			snd = "ambient/atmosphere/terrain_rumble1.wav"
+		end
 	end
 
 	surface.PlaySound(snd)
@@ -56,7 +79,7 @@ net.Receive("Arcane_SpellUnlocked", function()
 		cost = tonumber(Arcane.RegisteredSpells[_id].knowledge_cost or 0) or 0
 	end
 
-	showUnlockAnnouncement("spell", name, -cost)
+	showUnlockAnnouncement("spell", name, -cost, _id)
 end)
 
 -- XP gain announcement stack (multiple notifications can be active)
@@ -356,8 +379,10 @@ local function drawUnlockAnnouncement(scrW, scrH)
 	local fadeIn = math.Clamp(t / 0.2, 0, 1)
 	local fadeOut = math.Clamp((unlockAnnounce.endsAt - now) / 0.4, 0, 1)
 	local alpha = math.floor(255 * math.min(fadeIn, fadeOut))
-	local panelW = math.floor(scrW * 0.5)
-	local panelH = 110
+
+	local isDivine = unlockAnnounce.isDivinePact
+	local panelW = math.floor(scrW * (isDivine and 0.6 or 0.5))
+	local panelH = isDivine and 140 or 110
 	local x = math.floor((scrW - panelW) * 0.5)
 	local y = math.floor(scrH * 0.16)
 
@@ -366,14 +391,97 @@ local function drawUnlockAnnouncement(scrW, scrH)
 	_tempSubCol.a = alpha
 	_tempShadowCol.a = alpha
 
-	-- Hex background + frame + subtle flourish
-	ArtDeco.DrawHexFill(x, y, panelW, panelH, alpha)
-	ArtDeco.DrawHexFrame(x, y, panelW, panelH, alpha)
-	ArtDeco.DrawDecoFlourish(x, y, panelW, panelH, alpha)
-	draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 19, _tempShadowCol, TEXT_ALIGN_CENTER)
-	draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5, y + 18, _tempTextCol, TEXT_ALIGN_CENTER)
-	draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 59, _tempShadowCol, TEXT_ALIGN_CENTER)
-	draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, y + 58, _tempSubCol, TEXT_ALIGN_CENTER)
+	if isDivine then
+		-- Divine Pact special styling with ornaments
+		local divinePactColors = {
+			bg = Color(35, 28, 20, 235),
+			frame1 = Color(220, 180, 100, 255),
+			frame2 = Color(255, 215, 140, 255),
+			accent = Color(255, 230, 150, 255),
+			text = Color(255, 245, 220, 255),
+			glow = Color(240, 200, 120, 255),
+		}
+
+		-- Pulsing glow effect
+		local glowIntensity = 0.7 + 0.3 * math.sin(now * 2.5)
+
+		-- Background with alpha
+		local bgAlpha = math.floor(alpha * (divinePactColors.bg.a / 255))
+		draw.NoTexture()
+		surface.SetDrawColor(divinePactColors.bg.r, divinePactColors.bg.g, divinePactColors.bg.b, bgAlpha)
+		surface.DrawRect(x, y, panelW, panelH)
+
+		-- Triple ornate frames with pulsing glow
+		local frame1Alpha = math.floor(alpha * glowIntensity)
+		local frame2Alpha = math.floor(alpha * glowIntensity)
+		local accentAlpha = alpha
+
+		-- Frame 1 (outer)
+		surface.SetDrawColor(divinePactColors.frame1.r, divinePactColors.frame1.g, divinePactColors.frame1.b, frame1Alpha)
+		surface.DrawOutlinedRect(x, y, panelW, panelH, 2)
+
+		-- Accent frame (middle)
+		surface.SetDrawColor(divinePactColors.accent.r, divinePactColors.accent.g, divinePactColors.accent.b, accentAlpha)
+		surface.DrawOutlinedRect(x + 3, y + 3, panelW - 6, panelH - 6, 2)
+
+		-- Frame 2 (inner)
+		surface.SetDrawColor(divinePactColors.frame2.r, divinePactColors.frame2.g, divinePactColors.frame2.b, frame2Alpha)
+		surface.DrawOutlinedRect(x + 6, y + 6, panelW - 12, panelH - 12, 2)
+
+		-- Corner ornaments
+		local cornerSize = 20
+		local pad = 12
+		local cornerAlpha = math.floor(alpha * glowIntensity)
+		surface.SetDrawColor(divinePactColors.accent.r, divinePactColors.accent.g, divinePactColors.accent.b, cornerAlpha)
+
+		-- Top-left
+		surface.DrawLine(x + pad, y + pad, x + pad + cornerSize, y + pad)
+		surface.DrawLine(x + pad, y + pad, x + pad, y + pad + cornerSize)
+		surface.DrawLine(x + pad, y + pad + 1, x + pad + cornerSize, y + pad + 1)
+		surface.DrawLine(x + pad + 1, y + pad, x + pad + 1, y + pad + cornerSize)
+
+		-- Top-right
+		surface.DrawLine(x + panelW - pad - cornerSize, y + pad, x + panelW - pad, y + pad)
+		surface.DrawLine(x + panelW - pad, y + pad, x + panelW - pad, y + pad + cornerSize)
+		surface.DrawLine(x + panelW - pad - cornerSize, y + pad + 1, x + panelW - pad, y + pad + 1)
+		surface.DrawLine(x + panelW - pad - 1, y + pad, x + panelW - pad - 1, y + pad + cornerSize)
+
+		-- Bottom-left
+		surface.DrawLine(x + pad, y + panelH - pad, x + pad + cornerSize, y + panelH - pad)
+		surface.DrawLine(x + pad, y + panelH - pad - cornerSize, x + pad, y + panelH - pad)
+		surface.DrawLine(x + pad, y + panelH - pad - 1, x + pad + cornerSize, y + panelH - pad - 1)
+		surface.DrawLine(x + pad + 1, y + panelH - pad - cornerSize, x + pad + 1, y + panelH - pad)
+
+		-- Bottom-right
+		surface.DrawLine(x + panelW - pad - cornerSize, y + panelH - pad, x + panelW - pad, y + panelH - pad)
+		surface.DrawLine(x + panelW - pad, y + panelH - pad - cornerSize, x + panelW - pad, y + panelH - pad)
+		surface.DrawLine(x + panelW - pad - cornerSize, y + panelH - pad - 1, x + panelW - pad, y + panelH - pad - 1)
+		surface.DrawLine(x + panelW - pad - 1, y + panelH - pad - cornerSize, x + panelW - pad - 1, y + panelH - pad)
+
+		-- Text with divine glow
+		local divineTextCol = Color(divinePactColors.text.r, divinePactColors.text.g, divinePactColors.text.b, alpha)
+		local divineGlowCol = Color(divinePactColors.glow.r, divinePactColors.glow.g, divinePactColors.glow.b, math.floor(alpha * 0.6))
+
+		-- Title with glow
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 2, y + 27, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 26, divineGlowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5, y + 25, divineTextCol, TEXT_ALIGN_CENTER)
+
+		-- Subtitle with glow
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 2, y + 77, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 76, divineGlowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, y + 75, divineTextCol, TEXT_ALIGN_CENTER)
+	else
+		-- Regular spell/ritual unlock
+		-- Hex background + frame + subtle flourish
+		ArtDeco.DrawHexFill(x, y, panelW, panelH, alpha)
+		ArtDeco.DrawHexFrame(x, y, panelW, panelH, alpha)
+		ArtDeco.DrawDecoFlourish(x, y, panelW, panelH, alpha)
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 19, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5, y + 18, _tempTextCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 59, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, y + 58, _tempSubCol, TEXT_ALIGN_CENTER)
+	end
 end
 
 hook.Add("HUDPaint", "Arcana_GlobalHUD", function()
