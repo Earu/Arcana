@@ -571,8 +571,10 @@ if CLIENT then
 			local already = data.unlocked_spells and data.unlocked_spells[sid]
 			local levelOk = (data.level or 1) >= (sp.level_required or 1)
 			local kpOk = (data.knowledge_points or 0) >= (sp.knowledge_cost or 1)
+			local isDivinePact = sp.is_divine_pact == true
 
-			if not already and levelOk and kpOk then
+			-- Exclude Divine Pacts from the altar
+			if not already and levelOk and kpOk and not isDivinePact then
 				table.insert(out, {
 					id = sid,
 					spell = sp

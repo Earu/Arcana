@@ -17,6 +17,7 @@ Arcane:RegisterSpell({
 	cast_time = 6,
 	range = 0,
 	icon = "icon16/brick.png",
+	is_divine_pact = true,
 	is_projectile = false,
 	has_target = true,
 	cast_anim = "forward",
