@@ -868,6 +868,19 @@ function Arcane:LevelUp(ply, oldLevel, newLevel)
 	data.level = newLevel
 	data.knowledge_points = data.knowledge_points + (levelsGained * Arcane.Config.KNOWLEDGE_POINTS_PER_LEVEL)
 
+	-- Auto-unlock Divine Pact spells when reaching their level threshold
+	if SERVER then
+		for spellId, spell in pairs(self.RegisteredSpells) do
+			if spell.is_divine_pact and not data.unlocked_spells[spellId] then
+				-- Check if we just reached or passed this spell's level requirement
+				if newLevel >= spell.level_required and oldLevel < spell.level_required then
+					-- Use the existing UnlockSpell function with force=true to bypass knowledge point cost
+					self:UnlockSpell(ply, spellId, true)
+				end
+			end
+		end
+	end
+
 	-- Notify player
 	if SERVER then
 		-- Network level up notification
@@ -905,6 +918,8 @@ function Arcane:RegisterSpell(spellData)
 		cast_time = spellData.cast_time or 0, -- Instant by default
 		range = spellData.range or 500,
 		icon = spellData.icon or "icon16/wand.png",
+		-- Divine Pacts: special category of powerful spells unlocked at certain levels
+		is_divine_pact = spellData.is_divine_pact or false,
 		-- Functions
 		cast = spellData.cast, -- function(caster, target, data)
 		can_cast = spellData.can_cast, -- function(caster, target, data) - optional validation
