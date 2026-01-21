@@ -339,6 +339,10 @@ if SERVER then
 		e:SetRadius(M.Config.regionRadius)
 		e:SetIntensity(math.Clamp(tonumber(entry.intensity) or 0, 0, 2))
 
+		if e._lastIntensityIncrease then
+			e._lastIntensityIncrease = CurTime()
+		end
+
 		local key = regionKey(center, M.Config.regionRadius)
 		M.regions[key] = M.regions[key] or {center = center}
 		M.regions[key].corruptEnt = e
