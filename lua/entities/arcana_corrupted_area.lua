@@ -67,7 +67,7 @@ if SERVER then
 		-- Decay system: track when intensity last increased
 		self._lastIntensityIncrease = CurTime()
 		self._decayGracePeriod = 600 -- 10 minutes in seconds
-		self._decayRate = 0.01 -- intensity decrease per second
+		self._decayRate = 0.001 -- intensity decrease per second (~20 min for 1.2 intensity)
 		self._isDecaying = false
 	end
 
