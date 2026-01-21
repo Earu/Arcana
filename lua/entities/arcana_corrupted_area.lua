@@ -63,6 +63,12 @@ if SERVER then
 		end
 
 		self._lastIntensity = -1
+
+		-- Decay system: track when intensity last increased
+		self._lastIntensityIncrease = CurTime()
+		self._decayGracePeriod = 600 -- 10 minutes in seconds
+		self._decayRate = 0.01 -- intensity decrease per second
+		self._isDecaying = false
 	end
 
 	local function applyIntensityServer(self)
@@ -272,6 +278,13 @@ if SERVER then
 		-- Apply intensity changes live
 		local curI = self:GetIntensity() or 1
 		if curI ~= (self._lastIntensity or -1) then
+			-- Check if intensity increased
+			if curI > (self._lastIntensity or -1) and self._lastIntensity >= 0 then
+				-- Reset decay timer when intensity increases
+				self._lastIntensityIncrease = now
+				self._isDecaying = false
+			end
+
 			applyIntensityServer(self)
 			self._lastIntensity = curI
 		end
@@ -312,6 +325,37 @@ if SERVER then
 			self._nextHeavySpawn = now + (self._heavySpawnInterval or 12)
 		end
 
+		-- Progressive intensity decay for low-intensity areas
+		local currentIntensity = self:GetIntensity() or 1
+		if currentIntensity < 1.2 then
+			local timeSinceIncrease = now - (self._lastIntensityIncrease or now)
+
+			if timeSinceIncrease >= self._decayGracePeriod then
+				-- Start decaying
+				if not self._isDecaying then
+					self._isDecaying = true
+					self._lastDecayTick = now
+				end
+
+				-- Apply decay
+				local deltaTime = now - (self._lastDecayTick or now)
+				if deltaTime > 0 then
+					local newIntensity = math.max(0, currentIntensity - self._decayRate * deltaTime)
+					self:SetIntensity(newIntensity)
+					self._lastDecayTick = now
+
+					-- Remove the entity if intensity reaches 0
+					if newIntensity <= 0 then
+						self:Remove()
+						return
+					end
+				end
+			end
+		else
+			-- Reset decay state if intensity is >= 1.2
+			self._isDecaying = false
+		end
+
 		-- Despawn wisps if area idle for too long
 		if (now - (self._lastPlayerPresence or now)) > (self._despawnGrace or 15) then
 			self:ClearEntities()
@@ -328,6 +372,13 @@ if SERVER then
 
 	function ENT:OnRemove()
 		self:ClearEntities()
+
+		for key, region in pairs(Arcane.ManaCrystals.regions) do
+			if region and region.corruptEnt == self then
+				Arcane.ManaCrystals.regions[key] = nil
+				break
+			end
+		end
 	end
 end
 
