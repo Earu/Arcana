@@ -343,7 +343,7 @@ Arcane:RegisterSpell({
 
 		return true
 	end,
-	trigger_phrase_aliases = {"fallen down", "super tier",}
+	trigger_phrase_aliases = {"fallen down"}
 })
 
 if CLIENT then
