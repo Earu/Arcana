@@ -2,6 +2,9 @@
 -- Reuses styling helpers/colors from the Art Deco library for visual cohesion
 if not CLIENT then return end
 
+-- Create HUD namespace
+Arcane.HUD = Arcane.HUD or {}
+
 -- Local reference cache
 local function getData()
 	local ply = LocalPlayer()
@@ -94,7 +97,8 @@ local levelAnnounce = {
 	knowledgeDelta = 0,
 }
 
-hook.Add("Arcana_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, newLevel, knowledgeDelta)
+-- Direct callback for level-up announcements (called by core, bypasses hooks)
+function Arcane.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
 	levelAnnounce.active = true
 	levelAnnounce.startedAt = CurTime()
 	levelAnnounce.endsAt = CurTime() + 4.5
@@ -102,10 +106,10 @@ hook.Add("Arcana_ClientLevelUp", "ArcanaHUD_LevelAnnounce", function(prevLevel, 
 	levelAnnounce.knowledgeDelta = knowledgeDelta or 0
 	-- Distinct chime for level-up
 	surface.PlaySound("arcana/arcane_1.ogg")
-end)
+end
 
--- XP gain hook
-hook.Add("Arcana_PlayerGainedXP", "ArcanaHUD_XPAnnounce", function(ply, amount, reason)
+-- Direct callback for XP gain announcements (called by core, bypasses hooks)
+function Arcane.HUD.ShowXPAnnouncement(ply, amount, reason)
 	if not IsValid(ply) or ply ~= LocalPlayer() then return end
 
 	-- Add new notification to the stack
@@ -115,7 +119,7 @@ hook.Add("Arcana_PlayerGainedXP", "ArcanaHUD_XPAnnounce", function(ply, amount, 
 		amount = amount or 0,
 		reason = reason or ""
 	})
-end)
+end
 
 -- Casting state (client-only) fed by Arcane_BeginCasting
 local activeCast = {
@@ -124,21 +128,23 @@ local activeCast = {
 	endsAt = 0,
 }
 
-hook.Add("Arcana_BeginCastingVisuals", "ArcanaHUD_TrackCast", function(caster, spellId, castTime)
+-- Direct callback for tracking casts (called by core, bypasses hooks)
+function Arcane.HUD.TrackCast(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 	activeCast.spellId = spellId
 	activeCast.startedAt = CurTime()
 	activeCast.endsAt = CurTime() + (castTime or 0)
-end)
+end
 
-hook.Add("Arcana_CastSpellFailure", "ArcanaHUD_TrackFail", function(caster, spellId, castTime)
+-- Direct callback for tracking cast failures (called by core, bypasses hooks)
+function Arcane.HUD.TrackCastFailure(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 
-	-- reset the casting bar if spail fails
+	-- reset the casting bar if spell fails
 	activeCast.spellId = nil
 	activeCast.startedAt = 0
 	activeCast.endsAt = 0
-end)
+end
 
 local function drawCastingBar(scrW, scrH)
 	if not activeCast.spellId then return end

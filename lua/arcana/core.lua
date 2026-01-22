@@ -1381,6 +1381,11 @@ if CLIENT then
 		data.level = level
 		-- Use the amount sent directly from the server
 		if xpGained > 0 then
+			-- Call HUD directly to avoid hook interruption
+			if Arcane.HUD and Arcane.HUD.ShowXPAnnouncement then
+				Arcane.HUD.ShowXPAnnouncement(ply, xpGained, reason)
+			end
+			-- Still call hook for third-party addons
 			runHook("PlayerGainedXP", ply, xpGained, reason)
 		end
 	end)
@@ -1395,7 +1400,13 @@ if CLIENT then
 		local prevKnowledge = data.knowledge_points or 0
 		data.level = newLevel
 		data.knowledge_points = newKnowledgeTotal
-		runHook("ClientLevelUp", prevLevel, newLevel, math.max(0, newKnowledgeTotal - prevKnowledge))
+		local knowledgeDelta = math.max(0, newKnowledgeTotal - prevKnowledge)
+		-- Call HUD directly to avoid hook interruption
+		if Arcane.HUD and Arcane.HUD.ShowLevelUpAnnouncement then
+			Arcane.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
+		end
+		-- Still call hook for third-party addons
+		runHook("ClientLevelUp", prevLevel, newLevel, knowledgeDelta)
 	end)
 
 	net.Receive("Arcane_FullSync", function()
@@ -1432,6 +1443,12 @@ if CLIENT then
 		local castTime = net.ReadFloat()
 		local forwardLike = net.ReadBool()
 		if not IsValid(caster) then return end
+
+		-- Call HUD directly to avoid hook interruption
+		if Arcane.HUD and Arcane.HUD.TrackCast then
+			Arcane.HUD.TrackCast(caster, spellId, castTime)
+		end
+
 		if not MagicCircle then return end
 
 		-- Allow spells to override the default casting circle. If a hook returns true, stop.
@@ -1538,6 +1555,11 @@ if CLIENT then
 		local spellId = net.ReadString()
 		local castTime = net.ReadFloat() or 0
 		if not IsValid(caster) then return end
+
+		-- Call HUD directly to avoid hook interruption
+		if Arcane.HUD and Arcane.HUD.TrackCastFailure then
+			Arcane.HUD.TrackCastFailure(caster, spellId, castTime)
+		end
 
 		-- Trigger the failure hook on client so spell-specific cleanup can happen
 		runHook("CastSpellFailure", caster, spellId)
