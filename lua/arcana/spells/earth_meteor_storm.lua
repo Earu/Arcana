@@ -658,6 +658,17 @@ if CLIENT then
 			intensity = 0
 		}
 
+		-- Create large persistent ground circle showing area of effect
+		MagicCircle.CreateMagicCircle(
+			center + Vector(0, 0, 2), -- Slightly above ground
+			Angle(0, 0, 0), -- Flat on ground
+			Color(200, 120, 60, 255), -- Earthy orange/brown
+			6, -- Intensity
+			radius, -- Full radius of effect (1400)
+			duration, -- Lasts entire duration
+			3 -- Complexity
+		)
+
 		-- Dust rising from ground as reality warps
 		local emitter = ParticleEmitter(center)
 		if emitter then
