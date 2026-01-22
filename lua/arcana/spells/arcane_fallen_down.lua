@@ -310,7 +310,7 @@ Arcane:RegisterSpell({
 	description = "A spell of absolute devastation. Charge for 60 seconds, immobilized by the spell's complexity, then unleash a godly beam from the heavens that obliterates everything in its wake.",
 	category = Arcane.CATEGORIES.COMBAT,
 	level_required = Arcane.Config.MAX_LEVEL,
-	knowledge_cost = 15,
+	knowledge_cost = 15, -- It doesnt cost KPs, but XP scales off this value
 	cooldown = 60 * 20, -- 20 minutes
 	cost_type = Arcane.COST_TYPES.COINS,
 	cost_amount = 5000000,
