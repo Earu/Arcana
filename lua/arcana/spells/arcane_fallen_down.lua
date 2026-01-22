@@ -2838,4 +2838,18 @@ if CLIENT then
 
 		return view
 	end)
+
+	-- Casting circle to indicate where the spell will land and its size
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_TargetCircle", function(caster, spellId, castTime, _forwardLike)
+		if spellId ~= "fallen_down" then return end
+
+		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+			color = Color(170, 220, 255, 255), -- Bright blue-white/cyan matching the spell's theme
+			size = MAX_BEAM_RADIUS, -- 2000 - shows the full impact radius
+			intensity = 150,
+			positionResolver = function(c)
+				return Arcane:ResolveGroundTarget(c, 1000)
+			end
+		})
+	end)
 end
