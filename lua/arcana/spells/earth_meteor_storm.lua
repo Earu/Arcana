@@ -44,7 +44,7 @@ Arcane:RegisterSpell({
 
 		timer.Simple(0.15, function()
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", center, 125, 55)
-			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", center, 120, 40)
+			sound.Play("ambient/atmosphere/thunder1.wav", center, 120, 40)
 		end)
 
 		-- Broadcast climax VFX (circles explode, flash, etc.)
@@ -168,7 +168,7 @@ Arcane:RegisterSpell({
 						sound.Play("physics/concrete/boulder_impact_hard4.wav", groundPos, 120, 50)
 
 						timer.Simple(0.1, function()
-							sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", groundPos, 125, 35)
+							sound.Play("ambient/atmosphere/thunder1.wav", groundPos, 125, 35)
 							sound.Play("weapons/physcannon/energy_disintegrate5.wav", groundPos, 120, 60)
 						end)
 
@@ -398,7 +398,7 @@ Arcane:RegisterSpell({
 			timer.Simple(finalMeteorDelay, function()
 				if not IsValid(caster) then return end
 				-- First warning - distant rumble
-				sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", center, 110, 35)
+				sound.Play("ambient/atmosphere/thunder1.wav", center, 110, 35)
 				util.ScreenShake(center, 5, 80, 1.5, baseRadius * 2)
 
 				-- Second warning after pause
@@ -417,7 +417,7 @@ Arcane:RegisterSpell({
 					net.Broadcast()
 					-- Deep, ominous incoming sound
 					sound.Play("weapons/mortar/mortar_shell_incomming1.wav", center, 115, 40)
-					sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", center, 110, 30)
+					sound.Play("ambient/atmosphere/thunder1.wav", center, 110, 30)
 					-- Spawn the massive meteor with longer travel time
 					spawnMeteorImpact(center, 1100, 400, true)
 				end)
@@ -939,7 +939,7 @@ if CLIENT then
 		-- Play additional rumble layers over time
 		timer.Simple(0.8, function()
 			sound.Play("ambient/atmosphere/terrain_rumble1.wav", center, 105, 65)
-			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", center, 100, 40)
+			sound.Play("ambient/atmosphere/thunder1.wav", center, 100, 40)
 		end)
 
 		timer.Simple(1.6, function()
@@ -1350,14 +1350,14 @@ if CLIENT then
 		timer.Simple(castTime * 0.75, function()
 			if not IsValid(caster) then return end
 			sound.Play("ambient/energy/whiteflash.wav", caster:GetPos(), 90, 90)
-			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", caster:GetPos(), 95, 45)
+			sound.Play("ambient/atmosphere/thunder1.wav", caster:GetPos(), 95, 45)
 			util.ScreenShake(caster:GetPos(), 8, 120, 1.5, 500)
 		end)
 
 		-- Final buildup at 90% charge
 		timer.Simple(castTime * 0.9, function()
 			if not IsValid(caster) then return end
-			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", caster:GetPos(), 100, 38)
+			sound.Play("ambient/atmosphere/thunder1.wav", caster:GetPos(), 100, 38)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 95, 70)
 			util.ScreenShake(caster:GetPos(), 10, 140, 2.0, 600)
 		end)
