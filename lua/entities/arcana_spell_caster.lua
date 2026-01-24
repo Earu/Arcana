@@ -386,6 +386,11 @@ if SERVER then
 	function ENT:Use(activator)
 		if not IsValid(activator) or not activator:IsPlayer() then return end
 
+		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
+		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return end
+		if owner ~= activator then return end
+
 		-- Open spell selection menu
 		net.Start("Arcana_SpellCaster_OpenMenu")
 		net.WriteEntity(self)
