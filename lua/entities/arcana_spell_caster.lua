@@ -90,6 +90,15 @@ if SERVER then
 		local spell = Arcane.RegisteredSpells[spellId]
 		if not spell then return false, "Spell not found (" .. spellId .. ")" end
 
+		-- Spell casters cannot cast divine pacts or ritual spells
+		if spell.is_divine_pact then
+			return false, "Cannot cast divine pact spells"
+		end
+
+		if spell.is_ritual then
+			return false, "Cannot cast ritual spells"
+		end
+
 		-- Check if currently casting
 		if self.CastingUntil > CurTime() then
 			return false, "Already casting"
@@ -589,7 +598,8 @@ if CLIENT then
 
 			local unlocked = {}
 			for sid, sp in pairs(Arcane.RegisteredSpells) do
-				if data.unlocked_spells[sid] then
+				-- Filter out divine pacts and ritual spells
+				if data.unlocked_spells[sid] and not sp.is_divine_pact and not sp.is_ritual then
 					table.insert(unlocked, {id = sid, spell = sp})
 				end
 			end
