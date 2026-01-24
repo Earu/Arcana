@@ -37,7 +37,7 @@ SWEP.Slot = 0
 SWEP.SlotPos = 1
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
-SWEP.HoldType = "slam"
+SWEP.HoldType = "revolver"
 -- Grimoire-specific properties
 SWEP.SelectedSpell = "fireball"
 SWEP.MenuOpen = false
@@ -46,12 +46,13 @@ SWEP.RadialHoverSlot = nil
 SWEP.RadialOpenTime = 0
 
 function SWEP:Initialize()
-	self:SetWeaponHoldType(self.HoldType)
+	self:SetHoldType(self.HoldType)
 	-- Store active magic circle reference
 	self.ActiveMagicCircle = nil
 end
 
 function SWEP:Deploy()
+	self:SetHoldType(self.HoldType)
 	return true
 end
 
