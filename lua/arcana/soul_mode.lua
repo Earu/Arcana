@@ -474,17 +474,6 @@ if CLIENT then
 		return IsValid(soulEnt)
 	end
 
-	local WORLD_MAT = CreateMaterial("arcana_soul_mode_world_" .. FrameNumber(), "LightmappedGeneric", {
-		["$basetexture"] = "models/debug/debugwhite",
-		["$color"] = "[0 0 0]",
-	})
-
-	hook.Add("RenderScene", Tag, function()
-		if not isInSoulMode() then return end
-
-		render.WorldMaterialOverride(WORLD_MAT)
-	end)
-
 	hook.Add("HUDShouldDraw", Tag, function(name)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
