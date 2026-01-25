@@ -37,7 +37,7 @@ SWEP.Slot = 0
 SWEP.SlotPos = 1
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
-SWEP.HoldType = "revolver"
+SWEP.HoldType = "slam"
 -- Grimoire-specific properties
 SWEP.SelectedSpell = "fireball"
 SWEP.MenuOpen = false
