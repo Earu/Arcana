@@ -11,6 +11,7 @@ if SERVER then
 	AddCSLuaFile("arcana/mana_crystals.lua")
 	AddCSLuaFile("arcana/astral_vault.lua")
 	AddCSLuaFile("arcana/soul_mode.lua")
+	AddCSLuaFile("arcana/tutorial.lua")
 
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
@@ -18,6 +19,14 @@ if SERVER then
 
 	resource.AddFile("materials/arcana/pattern.vmt")
 	resource.AddFile("materials/arcana/pattern_antique_stone.vmt")
+
+	-- Tutorial skybox textures (VTF only, materials created dynamically)
+	resource.AddFile("materials/arcana/skybox/nebula/right.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/left.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/up.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/down.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/front.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/back.vtf")
 end
 
 include("arcana/core.lua")
@@ -37,6 +46,11 @@ if CLIENT then
 	include("arcana/hud.lua")
 	include("arcana/spell_browser.lua")
 	include("arcana/voice_activation.lua")
+	include("arcana/tutorial.lua")
+
+	-- Optional: Include tutorial examples and auto-triggers
+	-- Uncomment the line below to enable automatic tutorial popups
+	-- include("arcana/tutorial_example.lua")
 end
 
 local function includePath(path)
