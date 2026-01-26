@@ -1,17 +1,62 @@
 AddCSLuaFile()
+require("shader_to_gma")
 
-if SERVER then return end -- This is a CLIENT-only module
+if SERVER then
+	resource.AddFile("materials/arcana/skybox/nebula/right.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/left.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/up.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/down.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/front.vtf")
+	resource.AddFile("materials/arcana/skybox/nebula/back.vtf")
+
+	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
+
+	resource.AddShader("arcana_crystal_surface_ps30")
+	resource.AddShader("arcana_crystal_surface_vs30")
+	return
+end -- This is a CLIENT-only module
 
 local Tutorial = {}
 Arcane.Tutorial = Tutorial
 
--- Greek alphabet for ancient aesthetic
-local greekChars = {
-	"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ",
-	"Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω",
-	"α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ",
-	"ν", "ξ", "ο", "π", "ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"
-}
+-- Initialize crystal shader material for tree
+local TREE_SHADER_MAT
+local function initTreeShaderMaterial()
+	TREE_SHADER_MAT = CreateShaderMaterial("tree_crystal_dispersion", {
+		["$pixshader"] = "arcana_crystal_surface_ps30",
+		["$vertexshader"] = "arcana_crystal_surface_vs30",
+		["$model"] = 1,
+		["$vertexnormal"] = 1,
+		["$softwareskin"] = 1,
+		["$alpha_blend"] = 1,
+		["$linearwrite"] = 1,
+		["$linearread_basetexture"] = 1,
+		["$c0_x"] = 3.0, -- dispersion strength
+		["$c0_y"] = 4.0, -- fresnel power
+		["$c0_z"] = 1.0, -- tint r (golden)
+		["$c0_w"] = 0.7, -- tint g (golden)
+		["$c1_x"] = 0.0, -- tint b (golden)
+		["$c1_y"] = 1, -- opacity
+		["$c1_z"] = 0.75, -- albedo blend
+		["$c1_w"] = 1.0, -- selfillum glow strength
+		-- Defaults for grain/sparkles and facet multi-bounce
+		["$c2_y"] = 12, -- NOISE_SCALE
+		["$c2_z"] = 0.6, -- GRAIN_STRENGTH
+		["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
+		["$c3_x"] = 0.15, -- THICKNESS_SCALE
+		["$c3_y"] = 12, -- FACET_QUANT
+		["$c3_z"] = 8, -- BOUNCE_FADE
+		["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
+	})
+end
+
+if system.IsWindows() then
+	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+		initTreeShaderMaterial()
+	else
+		hook.Add("ShaderMounted", "arcana_tree_crystal_dispersion", initTreeShaderMaterial)
+	end
+end
 
 -- Tutorial state
 Tutorial.active = false
@@ -278,17 +323,12 @@ function Tutorial:CreateTree(sequence)
 	self.tree = ClientsideModel("models/props/cs_militia/tree_large_militia.mdl", RENDERGROUP_OPAQUE)
 	if not IsValid(self.tree) then return end
 
-	self.tree:SetNoDraw(true)
 	self.tree:SetModelScale(0.25)
 
 	-- Position tree in front of player
-	local treePos = self.simulatedPos + self.simulatedAng:Forward() * -200 - self.simulatedAng:Up() * 50
+	local treePos = self.simulatedPos + self.simulatedAng:Forward() * -200 + self.simulatedAng:Up() * -60
 	self.tree:SetPos(treePos)
 	self.tree:SetAngles(Angle(0, self.simulatedAng.y - 180, 0))
-
-	-- Set golden color and transparent gradient material (more saturated)
-	self.tree:SetColor(Color(255, 180, 0))
-	self.tree:SetMaterial("models/weapons/c_items/c_urinejar_urine")
 end
 
 -- Start ambient music for tutorial
@@ -395,24 +435,28 @@ function Tutorial:StartSequence(sequence)
 	-- Store full text for line-by-line gradient reveal
 	self.finalText = sequence.teachingText or "Welcome to Arcana"
 
+	local function shouldHide()
+		return self.phase == "tutorial" or self.phase == "fade_from_black" or self.phase == "fade_to_white" or self.phase == "show_panel"
+	end
+
 	-- Hook for rendering
 	hook.Add("PreDrawOpaqueRenderables", "Arcana_TutorialRender", function(_, isSkybox)
-		if isSkybox then return self.phase == "tutorial" or nil end
+		if isSkybox then return shouldHide() or nil end
 
 		self:RenderTutorial()
-		if self.phase == "tutorial" then return true end
+		if shouldHide() then return true end
 	end)
 
 	hook.Add("PreDrawSkyBox", "Arcana_TutorialSkybox", function()
-		if self.phase == "tutorial" then return true end -- Don't render skybox during tutorial
+		if shouldHide() then return true end -- Don't render skybox during tutorial
 	end)
 
 	hook.Add("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent", function()
-		if self.phase == "tutorial" then return true end
+		if shouldHide() then return true end
 	end)
 
 	hook.Add("ShouldDrawLocalPlayer", "Arcana_TutorialShouldDrawLocalPlayer", function()
-		if self.phase == "tutorial" then return false end
+		if shouldHide() then return false end
 	end)
 
 	hook.Add("CalcView", "Arcana_TutorialView", function(ply, pos, angles, fov)
@@ -830,6 +874,7 @@ function Tutorial:DrawWaterPlate(eyePos)
 end
 
 -- Draw the golden tree
+local TREE_COLOR = Color(255, 180, 0)
 function Tutorial:DrawTree(eyePos)
 	if not IsValid(self.tree) then return end
 
@@ -837,7 +882,7 @@ function Tutorial:DrawTree(eyePos)
 	if not self.treeGlowMats then
 		self.treeGlowMats = {
 			warp = Material("particle/warp2_warp"),
-			glare = CreateMaterial("ArcanaTreeGlow_" .. math.random(10000), "UnlitGeneric", {
+			glare = CreateMaterial("ArcanaTreeGlow_" .. FrameNumber(), "UnlitGeneric", {
 				["$BaseTexture"] = "particle/fire",
 				["$Additive"] = 1,
 				["$VertexColor"] = 1,
@@ -847,43 +892,77 @@ function Tutorial:DrawTree(eyePos)
 		}
 	end
 
-	local col = self.tree:GetColor()
+	local col = TREE_COLOR
 
 	-- Calculate actual root position (bottom of tree bounding box)
 	local mins, maxs = self.tree:GetRenderBounds()
 	local treeRoot = self.tree:GetPos() + Vector(0, 0, mins.z) -- Actual root/base of tree
 	local treeCenter = self.tree:GetPos() + Vector(0, 0, 80) -- Center for subtle glow
 
-	-- 1. Draw the tree normally (solid)
-	render.SetColorModulation(col.r / 255, col.g / 255, col.b / 255)
-	render.SetBlend(0.85)
-	self.tree:DrawModel()
+	-- Draw with crystal shader if available
+	if TREE_SHADER_MAT then
+		-- Crystal shader rendering (multi-pass refraction)
+		--render.UpdateScreenEffectTexture()
+		render.OverrideDepthEnable(true, false) -- no Z write
 
-	-- 2. Draw second transparent pass for glow effect (barely visible)
-	render.SetBlend(0.08)
-	self.tree:DrawModel()
+		-- Draw base model underneath at a low alpha to unify color
+		render.SetBlend(0.9)
+		self.tree:DrawModel()
+		render.SetBlend(1)
 
-	-- Reset render state
-	render.SetColorModulation(1, 1, 1)
-	render.SetBlend(1)
+		-- Draw refractive passes
+		local PASSES = 4
+		local baseDisp = 0.5
+		local perPassOpacity = 1 / PASSES
+
+		-- Start from current screen
+		local scr = render.GetScreenEffectTexture()
+		TREE_SHADER_MAT:SetTexture("$basetexture", scr)
+		TREE_SHADER_MAT:SetFloat("$c2_x", RealTime())
+		TREE_SHADER_MAT:SetFloat("$c1_w", 0.25)
+
+		-- Set golden color (255, 180, 0)
+		TREE_SHADER_MAT:SetFloat("$c0_z", col.r / 255 * 10)
+		TREE_SHADER_MAT:SetFloat("$c0_w", col.g / 255 * 10)
+		TREE_SHADER_MAT:SetFloat("$c1_x", col.b / 255 * 10)
+		TREE_SHADER_MAT:SetFloat("$c1_z", 0)
+
+		for i = 1, PASSES do
+			-- Ramp dispersion a bit each pass
+			TREE_SHADER_MAT:SetFloat("$c0_x", baseDisp * (1 + 0.25 * (i - 1)))
+			-- Reduce opacity per pass
+			TREE_SHADER_MAT:SetFloat("$c1_y", perPassOpacity)
+
+			render.MaterialOverride(TREE_SHADER_MAT)
+			self.tree:DrawModel()
+			render.MaterialOverride()
+
+			-- Capture the result to feed into next pass
+			--render.CopyRenderTargetToTexture(scr)
+		end
+
+		render.OverrideDepthEnable(false, false)
+	else
+		-- Fallback: Draw the tree normally (solid)
+		render.SetColorModulation(col.r / 255, col.g / 255, col.b / 255)
+		render.SetBlend(0.85)
+		self.tree:DrawModel()
+
+		-- Second transparent pass for glow effect (barely visible)
+		render.SetBlend(0.08)
+		self.tree:DrawModel()
+
+		-- Reset render state
+		render.SetColorModulation(1, 1, 1)
+		render.SetBlend(1)
+	end
 
 	-- 3. Draw crystal shard-style layered glow effect (very minimal)
 	local radius = self.tree:BoundingRadius() * 0.5
 
-	-- Depth-ignored core effects
-	--cam.IgnoreZ(true)
-
-	-- Central warp sprite (very subtle)
-	--render.SetMaterial(self.treeGlowMats.warp)
-	--render.DrawSprite(treeCenter, 40, 40, Color(col.r * 2, col.g * 2, col.b * 2, 10))
-
-	-- Layered glare sprites (3 layers, very reduced to see tree clearly)
+	-- Layered glare sprites (very reduced to see tree clearly)
 	render.SetMaterial(self.treeGlowMats.glare)
-	--render.DrawSprite(treeCenter, radius * 2, radius * 2, Color(col.r, col.g, col.b, 40))
-	--render.DrawSprite(treeCenter, radius * 4, radius * 4, Color(col.r, col.g, col.b, 25))
 	render.DrawSprite(treeCenter, radius * 6, radius * 6, Color(col.r, col.g, col.b, 15))
-
-	--cam.IgnoreZ(false)
 
 	-- Outer glow (respects depth, minimal)
 	render.SetMaterial(self.treeGlowMats.glare2)

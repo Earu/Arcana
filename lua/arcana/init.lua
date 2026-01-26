@@ -19,14 +19,6 @@ if SERVER then
 
 	resource.AddFile("materials/arcana/pattern.vmt")
 	resource.AddFile("materials/arcana/pattern_antique_stone.vmt")
-
-	-- Tutorial skybox textures (VTF only, materials created dynamically)
-	resource.AddFile("materials/arcana/skybox/nebula/right.vtf")
-	resource.AddFile("materials/arcana/skybox/nebula/left.vtf")
-	resource.AddFile("materials/arcana/skybox/nebula/up.vtf")
-	resource.AddFile("materials/arcana/skybox/nebula/down.vtf")
-	resource.AddFile("materials/arcana/skybox/nebula/front.vtf")
-	resource.AddFile("materials/arcana/skybox/nebula/back.vtf")
 end
 
 include("arcana/core.lua")
