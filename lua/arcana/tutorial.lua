@@ -104,7 +104,7 @@ function Tutorial:InitializeSkybox()
 			["$basetexture"] = "arcana/skybox/nebula/" .. face,
 			["$nolod"] = 1,
 			["$vertexcolor"] = 1,
-			["$vertexalpha"] = 1
+			["$vertexalpha"] = 1,
 		})
 	end
 end
@@ -396,8 +396,23 @@ function Tutorial:StartSequence(sequence)
 	self.finalText = sequence.teachingText or "Welcome to Arcana"
 
 	-- Hook for rendering
-	hook.Add("PreDrawOpaqueRenderables", "Arcana_TutorialRender", function()
+	hook.Add("PreDrawOpaqueRenderables", "Arcana_TutorialRender", function(_, isSkybox)
+		if isSkybox then return self.phase == "tutorial" or nil end
+
 		self:RenderTutorial()
+		if self.phase == "tutorial" then return true end
+	end)
+
+	hook.Add("PreDrawSkyBox", "Arcana_TutorialSkybox", function()
+		if self.phase == "tutorial" then return true end -- Don't render skybox during tutorial
+	end)
+
+	hook.Add("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent", function()
+		if self.phase == "tutorial" then return true end
+	end)
+
+	hook.Add("ShouldDrawLocalPlayer", "Arcana_TutorialShouldDrawLocalPlayer", function()
+		if self.phase == "tutorial" then return false end
 	end)
 
 	hook.Add("CalcView", "Arcana_TutorialView", function(ply, pos, angles, fov)
@@ -574,6 +589,9 @@ function Tutorial:EndSequence()
 
 	-- Remove hooks
 	hook.Remove("PreDrawOpaqueRenderables", "Arcana_TutorialRender")
+	hook.Remove("PreDrawSkyBox", "Arcana_TutorialSkybox")
+	hook.Remove("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent")
+	hook.Remove("ShouldDrawLocalPlayer", "Arcana_TutorialShouldDrawLocalPlayer")
 	hook.Remove("CalcView", "Arcana_TutorialView")
 	hook.Remove("HUDPaint", "Arcana_TutorialHUD")
 	hook.Remove("RenderScreenspaceEffects", "Arcana_TutorialScreenspace")
@@ -696,7 +714,9 @@ function Tutorial:ModifyView(ply, pos, angles, fov)
 			origin = self.simulatedPos + Vector(0, 0, 64), -- Eye height
 			angles = angles,
 			fov = fov,
-			drawviewer = false
+			drawviewer = false,
+			zfar = 4000,
+			znear = 1,
 		}
 
 		return view
@@ -710,6 +730,9 @@ function Tutorial:RenderTutorial()
 	-- Don't render during fade_to_black (still in normal world) or fade_from_white (back to normal)
 	if self.phase ~= "tutorial" and self.phase ~= "fade_from_black" and
 	   self.phase ~= "show_panel" and self.phase ~= "fade_to_white" then return end
+
+	-- Forcefully clear any world rendering artifacts
+	render.Clear(0, 0, 0, 255, true, true)
 
 	-- Set up rendering from simulated position
 	local eyePos = self.simulatedPos + Vector(0, 0, 64)
