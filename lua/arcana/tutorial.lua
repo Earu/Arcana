@@ -440,9 +440,7 @@ function Tutorial:StartSequence(sequence)
 	end
 
 	-- Hook for rendering
-	hook.Add("PreDrawOpaqueRenderables", "Arcana_TutorialRender", function(_, isSkybox)
-		if isSkybox then return shouldHide() or nil end
-
+	hook.Add("PreDrawOpaqueRenderables", "Arcana_TutorialRender", function()
 		self:RenderTutorial()
 		if shouldHide() then return true end
 	end)
@@ -591,7 +589,58 @@ function Tutorial:ShowTeachingPanel()
 	-- Enable mouse cursor
 	gui.EnableScreenClicker(true)
 
-	surface.PlaySound("buttons/button14.wav")
+	-- Create the "Understood" button
+	self:CreateUnderstoodButton()
+end
+
+-- Create the "Understood" button
+function Tutorial:CreateUnderstoodButton()
+	if IsValid(self.understoodButton) then
+		self.understoodButton:Remove()
+	end
+
+	local scrW, scrH = ScrW(), ScrH()
+	local panelW, panelH = 1000, 600
+	local panelY = (scrH - panelH) * 0.5
+	local padding = 60
+	local btnW, btnH = 180, 50
+	local btnX = (scrW - btnW) * 0.5
+	local btnY = panelY + panelH - btnH - padding
+
+	self.understoodButton = vgui.Create("DButton")
+	self.understoodButton:SetPos(btnX, btnY)
+	self.understoodButton:SetSize(btnW, btnH)
+	self.understoodButton:SetText("")
+	self.understoodButton:SetCursor("hand")
+	self.understoodButton:SetVisible(false) -- Will be shown when animation completes
+
+	-- Custom paint function
+	self.understoodButton.Paint = function(pnl, w, h)
+		local hovered = pnl:IsHovered()
+
+		-- Button background with golden theme using ArtDeco
+		local bgCol = hovered and Color(220, 180, 70, 200) or Color(180, 140, 50, 150)
+		local borderCol = Color(140, 100, 30, 255)
+
+		if ArtDeco then
+			ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, borderCol, 8)
+		else
+			draw.RoundedBox(8, 0, 0, w, h, bgCol)
+			surface.SetDrawColor(borderCol)
+			surface.DrawOutlinedRect(0, 0, w, h, 2)
+		end
+
+		-- Button text with shadow
+		draw.SimpleText("Understood", "Arcana_Ancient", w * 0.5 + 1, h * 0.5 + 1,
+			Color(0, 0, 0, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("Understood", "Arcana_Ancient", w * 0.5, h * 0.5,
+			Color(255, 230, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	end
+
+	self.understoodButton.DoClick = function()
+		self:CloseTeachingPanel()
+	end
 end
 
 -- Close teaching panel and transition back
@@ -601,10 +650,16 @@ function Tutorial:CloseTeachingPanel()
 	self.fadeProgress = 0
 	self.fadeStart = CurTime()
 
+	-- Remove the button
+	if IsValid(self.understoodButton) then
+		self.understoodButton:Remove()
+		self.understoodButton = nil
+	end
+
 	-- Disable mouse cursor
 	gui.EnableScreenClicker(false)
 
-	surface.PlaySound("buttons/button9.wav")
+	surface.PlaySound("arcana/arcane_1.ogg")
 
 	-- Call onComplete callback
 	if self.currentSequence and self.currentSequence.onComplete then
@@ -621,6 +676,12 @@ function Tutorial:EndSequence()
 	if IsValid(self.tree) then
 		self.tree:Remove()
 		self.tree = nil
+	end
+
+	-- Remove the button if it exists
+	if IsValid(self.understoodButton) then
+		self.understoodButton:Remove()
+		self.understoodButton = nil
 	end
 
 	-- Clean up particles and materials
@@ -652,6 +713,24 @@ function Tutorial:Think()
 
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return end
+
+	-- Check if player died during tutorial
+	if not ply:Alive() and self.phase ~= "fade_to_white" and self.phase ~= "fade_from_white" then
+		-- Close any open panels
+		if self.showingPanel then
+			self.showingPanel = false
+			if IsValid(self.understoodButton) then
+				self.understoodButton:Remove()
+				self.understoodButton = nil
+			end
+			gui.EnableScreenClicker(false)
+		end
+
+		-- Start fade to white transition to return to reality
+		self.phase = "fade_to_white"
+		self.fadeProgress = 0
+		self.fadeStart = CurTime()
+	end
 
 	local now = CurTime()
 	local dt = FrameTime()
@@ -739,6 +818,29 @@ function Tutorial:Think()
 	-- Update sentence fade-in progress
 	if self.showingPanel and self.fadeProgress < 1 then
 		self.fadeProgress = math.Clamp((now - self.fadeStart) / self.fadeDuration, 0, 1)
+
+		-- Check for space or mouse button press to skip to next line
+		if input.IsKeyDown(KEY_SPACE) or input.IsMouseDown(MOUSE_LEFT) or input.IsMouseDown(MOUSE_RIGHT) then
+			if not self._skipHandled then
+				self._skipHandled = true
+
+				-- Calculate which line we're on and skip to the next one
+				local wrappedLines = self:WrapText(self.finalText, "Arcana_AncientLarge", 1000 - 120)
+				local totalLines = #wrappedLines
+				local currentLineFloat = self.fadeProgress * totalLines
+				local currentLineIndex = math.floor(currentLineFloat)
+
+				-- Move to the next line (or complete if we're on the last line)
+				if currentLineIndex < totalLines - 1 then
+					self.fadeProgress = (currentLineIndex + 1) / totalLines
+					self.fadeStart = now - (self.fadeProgress * self.fadeDuration)
+				else
+					self.fadeProgress = 1
+				end
+			end
+		else
+			self._skipHandled = false
+		end
 	end
 
 	-- Update ambient music volume
@@ -1216,43 +1318,9 @@ function Tutorial:DrawTeachingPanel(scrW, scrH)
 		end
 	end
 
-	-- Close button (only show when all sentences are visible)
-	if self.fadeProgress >= 1 then
-		local btnW, btnH = 180, 50
-		local btnX = (scrW - btnW) * 0.5 -- Center horizontally
-		local btnY = panelY + panelH - btnH - padding
-
-		local mx, my = gui.MousePos()
-		local hovered = mx >= btnX and mx <= btnX + btnW and my >= btnY and my <= btnY + btnH
-
-		-- Button background with golden theme using ArtDeco
-		local bgCol = hovered and Color(220, 180, 70, 200) or Color(180, 140, 50, 150)
-		local borderCol = Color(140, 100, 30, 255)
-
-		if ArtDeco then
-			ArtDeco.FillDecoPanel(btnX, btnY, btnW, btnH, bgCol, 8)
-			ArtDeco.DrawDecoFrame(btnX, btnY, btnW, btnH, borderCol, 8)
-		else
-			draw.RoundedBox(8, btnX, btnY, btnW, btnH, bgCol)
-			surface.SetDrawColor(borderCol)
-			surface.DrawOutlinedRect(btnX, btnY, btnW, btnH, 2)
-		end
-
-		-- Button text with shadow
-		draw.SimpleText("Understood", "Arcana_Ancient", btnX + btnW * 0.5 + 1, btnY + btnH * 0.5 + 1,
-			Color(0, 0, 0, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		draw.SimpleText("Understood", "Arcana_Ancient", btnX + btnW * 0.5, btnY + btnH * 0.5,
-			Color(255, 230, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-		-- Handle click
-		if hovered and input.IsMouseDown(MOUSE_LEFT) then
-			if not self._clickHandled then
-				self._clickHandled = true
-				self:CloseTeachingPanel()
-			end
-		else
-			self._clickHandled = false
-		end
+	-- Show the "Understood" button when animation completes
+	if IsValid(self.understoodButton) then
+		self.understoodButton:SetVisible(self.fadeProgress >= 1)
 	end
 end
 
