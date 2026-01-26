@@ -27,6 +27,7 @@ include("arcana/environments.lua")
 include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
 include("arcana/soul_mode.lua")
+include("arcana/tutorial.lua")
 
 if SERVER then
 	include("arcana/mana_crystals.lua")
@@ -38,11 +39,6 @@ if CLIENT then
 	include("arcana/hud.lua")
 	include("arcana/spell_browser.lua")
 	include("arcana/voice_activation.lua")
-	include("arcana/tutorial.lua")
-
-	-- Optional: Include tutorial examples and auto-triggers
-	-- Uncomment the line below to enable automatic tutorial popups
-	-- include("arcana/tutorial_example.lua")
 end
 
 local function includePath(path)
