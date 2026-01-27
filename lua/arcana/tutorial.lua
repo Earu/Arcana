@@ -323,6 +323,7 @@ function Tutorial:CreateTree(sequence)
 	self.tree = ClientsideModel("models/props/cs_militia/tree_large_militia.mdl", RENDERGROUP_OPAQUE)
 	if not IsValid(self.tree) then return end
 
+	self.tree:SetNoDraw(true)
 	self.tree:SetModelScale(0.25)
 
 	-- Position tree in front of player
@@ -450,6 +451,10 @@ function Tutorial:StartSequence(sequence)
 	end)
 
 	hook.Add("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent", function()
+		if shouldHide() then return true end
+	end)
+
+	hook.Add("PreDrawViewModel", "Arcana_TutorialViewModels", function()
 		if shouldHide() then return true end
 	end)
 
@@ -696,6 +701,7 @@ function Tutorial:EndSequence()
 	hook.Remove("PreDrawOpaqueRenderables", "Arcana_TutorialRender")
 	hook.Remove("PreDrawSkyBox", "Arcana_TutorialSkybox")
 	hook.Remove("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent")
+	hook.Remove("PreDrawViewModels", "Arcana_TutorialViewModels")
 	hook.Remove("ShouldDrawLocalPlayer", "Arcana_TutorialShouldDrawLocalPlayer")
 	hook.Remove("CalcView", "Arcana_TutorialView")
 	hook.Remove("HUDPaint", "Arcana_TutorialHUD")
