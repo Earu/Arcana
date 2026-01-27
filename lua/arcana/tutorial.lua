@@ -537,16 +537,16 @@ function Tutorial:UpdateMovement()
 	self.keyRight = self.keyRight or input.LookupBinding("+moveright")
 
 	-- Check continuous key states
-	if self.keyForward and input.IsKeyDown(self.keyForward) then
+	if self.keyForward and input.IsKeyDown(input.GetKeyCode(self.keyForward)) then
 		moveDir = moveDir + forward
 	end
-	if self.keyBackward and input.IsKeyDown(self.keyBackward) then
+	if self.keyBackward and input.IsKeyDown(input.GetKeyCode(self.keyBackward)) then
 		moveDir = moveDir - forward
 	end
-	if self.keyLeft and input.IsKeyDown(self.keyLeft) then
+	if self.keyLeft and input.IsKeyDown(input.GetKeyCode(self.keyLeft)) then
 		moveDir = moveDir - right
 	end
-	if self.keyRight and input.IsKeyDown(self.keyRight) then
+	if self.keyRight and input.IsKeyDown(input.GetKeyCode(self.keyRight)) then
 		moveDir = moveDir + right
 	end
 
