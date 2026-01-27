@@ -531,17 +531,22 @@ function Tutorial:UpdateMovement()
 
 	local moveDir = Vector(0, 0, 0)
 
+	self.keyForward = self.keyForward or input.LookupBinding("+forward")
+	self.keyBackward = self.keyBackward or input.LookupBinding("+backward")
+	self.keyLeft = self.keyLeft or input.LookupBinding("+moveleft")
+	self.keyRight = self.keyRight or input.LookupBinding("+moveright")
+
 	-- Check continuous key states
-	if input.IsKeyDown(KEY_W) then
+	if self.keyForward and input.IsKeyDown(self.keyForward) then
 		moveDir = moveDir + forward
 	end
-	if input.IsKeyDown(KEY_S) then
+	if self.keyBackward and input.IsKeyDown(self.keyBackward) then
 		moveDir = moveDir - forward
 	end
-	if input.IsKeyDown(KEY_A) then
+	if self.keyLeft and input.IsKeyDown(self.keyLeft) then
 		moveDir = moveDir - right
 	end
-	if input.IsKeyDown(KEY_D) then
+	if self.keyRight and input.IsKeyDown(self.keyRight) then
 		moveDir = moveDir + right
 	end
 
@@ -849,6 +854,10 @@ function Tutorial:Think()
 		end
 	end
 
+	if self.showingPanel and not vgui.CursorVisible() then
+		gui.EnableScreenClicker(true)
+	end
+
 	-- Update ambient music volume
 	self:UpdateAmbientMusic(dt)
 end
@@ -883,9 +892,6 @@ function Tutorial:RenderTutorial()
 	if self.phase ~= "tutorial" and self.phase ~= "fade_from_black" and
 	   self.phase ~= "show_panel" and self.phase ~= "fade_to_white" then return end
 
-	-- Forcefully clear any world rendering artifacts
-	render.Clear(0, 0, 0, 255, true, true)
-
 	-- Set up rendering from simulated position
 	local eyePos = self.simulatedPos + Vector(0, 0, 64)
 	local eyeAng = self.simulatedAng
@@ -906,6 +912,9 @@ end
 -- Draw the skybox cube
 function Tutorial:DrawSkyboxCube(eyePos)
 	if not self.cubeFaces then return end
+
+	-- Forcefully clear any world rendering artifacts
+	render.Clear(0, 0, 0, 255, true, true)
 
 	render.OverrideDepthEnable(true, true)
 	render.SetLightingMode(2)
