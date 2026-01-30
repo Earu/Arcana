@@ -80,7 +80,7 @@ if SERVER then
 		local coinsOk = true
 
 		if self._coinCost > 0 then
-			coinsOk = (ply.GetCoins and ply:GetCoins() >= self._coinCost) == true
+			coinsOk = Arcane:GetCoins(ply) >= self._coinCost
 		end
 
 		if not coinsOk then
@@ -94,7 +94,7 @@ if SERVER then
 		end
 
 		for itemName, amt in pairs(self._requirements or {}) do
-			local have = ply.GetItemCount and ply:GetItemCount(itemName) or 0
+			local have = Arcane:GetItemCount(ply, itemName)
 
 			if have < (amt or 1) then
 				if Arcane and Arcane.SendErrorNotification then
@@ -108,14 +108,12 @@ if SERVER then
 		end
 
 		-- Consume from the player who activated
-		if self._coinCost > 0 and ply.TakeCoins then
-			ply:TakeCoins(self._coinCost, "Ritual: " .. (self:GetRitualId() or ""))
+		if self._coinCost > 0 then
+			Arcane:TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""))
 		end
 
-		if ply.TakeItem and isfunction(ply.TakeItem) then
-			for itemName, amt in pairs(self._requirements or {}) do
-				ply:TakeItem(itemName, amt)
-			end
+		for itemName, amt in pairs(self._requirements or {}) do
+			Arcane:TakeItem(ply, itemName, amt)
 		end
 
 		-- Tell clients to evolve the circle then remove the entity after a short delay

@@ -1,4 +1,3 @@
-AddCSLuaFile()
 require("shader_to_gma")
 
 if SERVER then

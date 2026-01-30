@@ -325,7 +325,7 @@ if SERVER then
 			end
 		end
 
-		local coins = (ply.GetCoins and ply:GetCoins()) or 0
+		local coins = Arcane:GetCoins(ply)
 		if coins < sumCoins then
 			if Arcane and Arcane.SendErrorNotification then
 				Arcane:SendErrorNotification(ply, "Insufficient coins")
@@ -335,7 +335,7 @@ if SERVER then
 		end
 
 		for name, amt in pairs(itemTotals) do
-			local have = (ply.GetItemCount and ply:GetItemCount(name)) or 0
+			local have = Arcane:GetItemCount(ply, name)
 
 			if have < amt then
 				if Arcane and Arcane.SendErrorNotification then
@@ -348,11 +348,11 @@ if SERVER then
 
 
 		-- Deduct currency/items up front
-		if sumCoins > 0 and ply.TakeCoins then
-			ply:TakeCoins(sumCoins)
+		if sumCoins > 0 then
+			Arcane:TakeCoins(ply, sumCoins)
 		end
 		for name, amt in pairs(itemTotals) do
-			if ply.TakeItem then ply:TakeItem(name, amt) end
+			Arcane:TakeItem(ply, name, amt)
 		end
 
 		local chance = ent:ComputeSuccessChance(ply)
@@ -864,8 +864,8 @@ if CLIENT then
 			ArtDeco.FillDecoPanel(4, 0, w - 8, h, ArtDeco.Colors.decoPanel, 12)
 			ArtDeco.DrawDecoFrame(4, 0, w - 8, h, ArtDeco.Colors.gold, 12)
 			-- Gather player amounts
-			local haveCoins = (IsValid(ply) and ply.GetCoins and ply:GetCoins()) or 0
-			local haveShards = (IsValid(ply) and ply.GetItemCount and ply:GetItemCount("mana_crystal_shard")) or 0
+			local haveCoins = Arcane:GetCoins(ply)
+			local haveShards = Arcane:GetItemCount(ply, "mana_crystal_shard")
 
 			-- Draw helper
 			local function drawBar(x, y, bw, bh, label, have, need, fillCol)

@@ -1,5 +1,3 @@
-AddCSLuaFile()
-
 -- Astral Vault
 -- Store enchanted weapons in a personal astral inventory and summon them later
 local Arcane = _G.Arcane or {}
@@ -82,7 +80,6 @@ if SERVER then
 	end
 
 	local function readVault(ply, callback)
-		if not ensureVaultTable() then return end
 		if not IsValid(ply) then return end
 
 		local sid = ply:SteamID64()
@@ -90,6 +87,12 @@ if SERVER then
 			callback(true, Arcane.AstralVaultCache[sid])
 			return
 		end
+
+		-- Allow third-party override
+		local handled = Arcane.RunHook("ReadAstralVault", ply, callback)
+		if handled == true then return end
+
+		if not ensureVaultTable() then return end
 
 		local function decode(json)
 			json = json or "[]"
@@ -100,59 +103,48 @@ if SERVER then
 			return {}
 		end
 
-		if _G.co and _G.db then
-			_G.co(function()
-				local rows = _G.db.Query("SELECT * FROM arcane_astral_vault WHERE steamid = $1 LIMIT 1", sql.SQLStr(sid, true))
-				if rows == false or rows == nil then callback(false, {}) return end
+		-- Fallback to SQLite
+		local q = string.format("SELECT * FROM arcane_astral_vault WHERE steamid = '%s' LIMIT 1;", sql.SQLStr(sid, true))
+		local rows = sql.Query(q)
+		if rows == false then callback(false, {}) return end
 
-				local items = {}
-				if istable(rows) and rows[1] then items = decode(rows[1].items) end
-				Arcane.AstralVaultCache[sid] = items
-				callback(true, items)
-			end)
-		else
-			local q = string.format("SELECT * FROM arcane_astral_vault WHERE steamid = '%s' LIMIT 1;", sql.SQLStr(sid, true))
-			local rows = sql.Query(q)
-			if rows == false then callback(false, {}) return end
-
-			local items = {}
-			if istable(rows) and rows[1] then items = decode(rows[1].items) end
-			Arcane.AstralVaultCache[sid] = items
-			callback(true, items)
-		end
+		local items = {}
+		if istable(rows) and rows[1] then items = decode(rows[1].items) end
+		Arcane.AstralVaultCache[sid] = items
+		callback(true, items)
 	end
 
 	local function writeVault(ply, items)
-		if not ensureVaultTable() then return end
 		if not IsValid(ply) then return end
 
 		local sid = ply:SteamID64()
 		Arcane.AstralVaultCache[sid] = items or {}
+
+		-- Allow third-party override
+		local handled = Arcane.RunHook("WriteAstralVault", ply, items)
+		if handled == true then return end
+
+		if not ensureVaultTable() then return end
+
 		local json = sql.SQLStr(util.TableToJSON(items or {}) or "[]")
 		local id = sql.SQLStr(sid, true)
 
-		if _G.co and _G.db then
-			_G.co(function()
-				_G.db.Query([[INSERT INTO arcane_astral_vault(steamid, items)
-				VALUES($1, $2) ON CONFLICT (steamid) DO UPDATE SET items = EXCLUDED.items]], id, json)
-			end)
-		else
-			local q = string.format("INSERT OR REPLACE INTO arcane_astral_vault (steamid, items) VALUES ('%s', %s);", id, json)
-			sql.Query(q)
-		end
+		-- Fallback to SQLite
+		local q = string.format("INSERT OR REPLACE INTO arcane_astral_vault (steamid, items) VALUES ('%s', %s);", id, json)
+		sql.Query(q)
 	end
 
 	local function canAfford(ply, coins, shards)
-		local haveCoins = (ply.GetCoins and ply:GetCoins()) or 0
-		local haveShards = (ply.GetItemCount and ply:GetItemCount("mana_crystal_shard")) or 0
+		local haveCoins = Arcane:GetCoins(ply)
+		local haveShards = Arcane:GetItemCount(ply, "mana_crystal_shard")
 		if haveCoins < (coins or 0) then return false, "Insufficient coins" end
 		if haveShards < (shards or 0) then return false, "Missing item: mana_crystal_shard" end
 		return true
 	end
 
 	local function charge(ply, coins, shards, reason)
-		if coins and coins > 0 and ply.TakeCoins then ply:TakeCoins(coins, reason or "Astral Vault") end
-		if shards and shards > 0 and ply.TakeItem then ply:TakeItem("mana_crystal_shard", shards, reason or "Astral Vault") end
+		if coins and coins > 0 then Arcane:TakeCoins(ply, coins, reason or "Astral Vault") end
+		if shards and shards > 0 then Arcane:TakeItem(ply, "mana_crystal_shard", shards, reason or "Astral Vault") end
 	end
 
 	local function sendOpen(ply, items)
@@ -558,8 +550,8 @@ if CLIENT then
 			summon.Think = function(pnl)
 				if not it then pnl:SetEnabled(false) return end
 				local lp = LocalPlayer()
-				local haveCoins = (IsValid(lp) and lp.GetCoins and lp:GetCoins()) or 0
-				local haveShards = (IsValid(lp) and lp.GetItemCount and lp:GetItemCount("mana_crystal_shard")) or 0
+				local haveCoins = Arcane:GetCoins(lp)
+				local haveShards = Arcane:GetItemCount(lp, "mana_crystal_shard")
 				local needCoins = tonumber(VAULT_CFG.SUMMON_COINS) or 0
 				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
 				local ok = (haveCoins >= needCoins) and (haveShards >= needShards)
@@ -703,8 +695,8 @@ if CLIENT then
 			local hasWeapon = IsValid(lp) and IsValid(lp:GetActiveWeapon())
 			local items = VAULT.items or {}
 			local hasRoom = (#items) < (tonumber(VAULT_CFG.MAX_SLOTS) or 0)
-			local haveCoins = (IsValid(lp) and lp.GetCoins and lp:GetCoins()) or 0
-			local haveShards = (IsValid(lp) and lp.GetItemCount and lp:GetItemCount("mana_crystal_shard")) or 0
+			local haveCoins = Arcane:GetCoins(lp)
+			local haveShards = Arcane:GetItemCount(lp, "mana_crystal_shard")
 			local needCoins = tonumber(VAULT_CFG.STORE_COINS) or 0
 			local needShards = tonumber(VAULT_CFG.STORE_SHARDS) or 0
 			local ok = hasWeapon and hasRoom and (haveCoins >= needCoins) and (haveShards >= needShards)
