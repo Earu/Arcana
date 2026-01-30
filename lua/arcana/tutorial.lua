@@ -105,6 +105,8 @@ Tutorial.simulatedVel = Vector(0, 0, 0)
 Tutorial.interactionDistance = 100
 Tutorial.showingPanel = false
 Tutorial.currentSequence = nil
+Tutorial.currentNode = nil
+Tutorial.currentVoiceSound = nil
 
 -- Greek text morphing
 Tutorial.morphProgress = 0
@@ -113,11 +115,21 @@ Tutorial.greekText = ""
 Tutorial.finalText = ""
 
 --[[
-	Sequence format:
+	Sequence format (Conversation Tree):
 	{
-		teachingText = "This is what the player will learn",
-		onEnter = function() end, -- Optional callback when sequence starts
-		onComplete = function() end -- Optional callback when sequence completes
+		nodes = {
+			["node_id"] = {
+				text = "Dialogue text here",
+				voice = "path/to/voice.ogg", -- Optional voice file
+				choices = {
+					{ text = "Choice 1", next = "next_node_id" },
+					{ text = "Choice 2", next = "another_node_id" },
+				},
+			}
+		},
+		startNode = "node_id",
+		onEnter = function() end,
+		onComplete = function() end
 	}
 ]]
 
@@ -366,6 +378,19 @@ function Tutorial:UpdateAmbientMusic(dt)
 		targetVolume = 0 -- Keep silent when returning to reality
 	end
 
+	-- Check if voice is still playing
+	if self.voicePlaying and self.currentVoiceSound then
+		if not IsValid(self.currentVoiceSound) then
+			self.voicePlaying = false
+			self.currentVoiceSound = nil
+		end
+	end
+
+	-- Lower ambient music when voice is playing
+	if self.voicePlaying then
+		targetVolume = targetVolume * 0.3 -- Reduce to 30% when voice is playing
+	end
+
 	-- Smoothly interpolate volume
 	self.ambientCurrentVolume = Lerp(dt * 2, self.ambientCurrentVolume, targetVolume)
 	self.ambientSound:ChangeVolume(self.ambientCurrentVolume, 0)
@@ -381,10 +406,7 @@ end
 
 -- Start a tutorial sequence
 function Tutorial:StartSequence(sequence)
-	if self.active then
-		ErrorNoHalt("[Arcana Tutorial] Cannot start sequence - tutorial already active!\n")
-		return false
-	end
+	if self.active then return false end
 
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return false end
@@ -432,8 +454,8 @@ function Tutorial:StartSequence(sequence)
 	self.showingPanel = false
 	self.fadeProgress = 0
 
-	-- Store full text for line-by-line gradient reveal
-	self.finalText = sequence.teachingText or "Welcome to Arcana"
+	-- Initialize conversation tree
+	self.currentNode = sequence.startNode or "start"
 
 	local function shouldHide()
 		return self.phase == "tutorial" or self.phase == "fade_from_black" or self.phase == "fade_to_white" or self.phase == "show_panel"
@@ -531,7 +553,7 @@ function Tutorial:UpdateMovement()
 	local moveDir = Vector(0, 0, 0)
 
 	self.keyForward = self.keyForward or input.LookupBinding("+forward")
-	self.keyBackward = self.keyBackward or input.LookupBinding("+backward")
+	self.keyBackward = self.keyBackward or input.LookupBinding("+back")
 	self.keyLeft = self.keyLeft or input.LookupBinding("+moveleft")
 	self.keyRight = self.keyRight or input.LookupBinding("+moveright")
 
@@ -582,74 +604,222 @@ function Tutorial:PlayFootsteps()
 	self.nextFootstep = now + 0.45 -- Slightly slower footstep interval
 end
 
--- Try to interact with tree
 -- Show the teaching panel
 function Tutorial:ShowTeachingPanel()
 	self.showingPanel = true
 	self.fadeProgress = 0
 	self.fadeStart = CurTime()
 
-	-- Calculate duration: ~2 seconds per line for comfortable reading
-	-- We'll estimate line count based on text length
+	-- Get current node data
+	local nodeData = self:GetCurrentNodeData()
+	if not nodeData then
+		ErrorNoHalt("[Arcana Tutorial] Invalid node data!\n")
+		return
+	end
+
+	-- Store text for display
+	self.finalText = nodeData.text or "..."
+
+	-- Calculate duration: ~4 seconds per line for comfortable reading
 	local estimatedCharsPerLine = 60
 	local estimatedLines = math.max(1, math.ceil(#self.finalText / estimatedCharsPerLine))
-	self.fadeDuration = estimatedLines * 2.0
+	self.fadeDuration = estimatedLines * 4.0
+
+	-- Play voice if available
+	self:PlayNodeVoice(nodeData)
 
 	-- Enable mouse cursor
 	gui.EnableScreenClicker(true)
 
-	-- Create the "Understood" button
-	self:CreateUnderstoodButton()
+	-- Get choices (or default "Understood" choice)
+	local choices = nodeData.choices
+	if not choices or #choices == 0 then
+		choices = {{ text = "Understood", next = nil }}
+	end
+
+	-- Create choice buttons
+	self:CreateChoiceButtons(choices)
 end
 
--- Create the "Understood" button
-function Tutorial:CreateUnderstoodButton()
-	if IsValid(self.understoodButton) then
-		self.understoodButton:Remove()
+-- Get current node data from conversation tree
+function Tutorial:GetCurrentNodeData()
+	if not self.currentSequence or not self.currentSequence.nodes then return nil end
+
+	local nodeId = self.currentNode or self.currentSequence.startNode
+	return self.currentSequence.nodes[nodeId]
+end
+
+-- Play voice for current node
+function Tutorial:PlayNodeVoice(nodeData)
+	-- Stop any currently playing voice
+	self:StopNodeVoice()
+
+	-- Play new voice if available
+	if nodeData.voice and IsValid(self.tree) then
+		local voicePath = "sound/" .. nodeData.voice
+
+		sound.PlayFile(voicePath, "mono noblock", function(channel, errorID, errorName)
+			if IsValid(channel) then
+				self.currentVoiceSound = channel
+
+				-- Position at tree
+				if IsValid(self.tree) then
+					channel:SetPos(self.tree:GetPos())
+				end
+
+				-- Set high volume and enable 3D
+				channel:SetVolume(3.0) -- Much louder than CSoundPatch
+				channel:Play()
+
+				-- Lower ambient music while voice is playing
+				self.voicePlaying = true
+			else
+				ErrorNoHalt("[Arcana Tutorial] Failed to play voice: " .. tostring(errorName) .. "\n")
+			end
+		end)
 	end
+end
+
+-- Stop any playing voice
+function Tutorial:StopNodeVoice()
+	if self.currentVoiceSound and IsValid(self.currentVoiceSound) then
+		self.currentVoiceSound:Stop()
+		self.currentVoiceSound = nil
+	end
+	self.voicePlaying = false
+end
+
+-- Create choice buttons (list style with art deco outline on hover)
+function Tutorial:CreateChoiceButtons(choices)
+	-- Remove any existing buttons
+	if self.choiceButtons then
+		for _, btn in ipairs(self.choiceButtons) do
+			if IsValid(btn) then
+				btn:Remove()
+			end
+		end
+	end
+	self.choiceButtons = {}
 
 	local scrW, scrH = ScrW(), ScrH()
 	local panelW, panelH = 1000, 600
 	local panelY = (scrH - panelH) * 0.5
 	local padding = 60
-	local btnW, btnH = 180, 50
-	local btnX = (scrW - btnW) * 0.5
-	local btnY = panelY + panelH - btnH - padding
+	local btnSpacing = 12
+	local btnHeight = 45
+	local btnWidth = panelW - padding * 2
+	local startY = panelY + panelH - padding - (#choices * (btnHeight + btnSpacing)) + btnSpacing
 
-	self.understoodButton = vgui.Create("DButton")
-	self.understoodButton:SetPos(btnX, btnY)
-	self.understoodButton:SetSize(btnW, btnH)
-	self.understoodButton:SetText("")
-	self.understoodButton:SetCursor("hand")
-	self.understoodButton:SetVisible(false) -- Will be shown when animation completes
+	for i, choice in ipairs(choices) do
+		local btnX = (scrW - btnWidth) * 0.5
+		local btnY = startY + (i - 1) * (btnHeight + btnSpacing)
 
-	-- Custom paint function
-	self.understoodButton.Paint = function(pnl, w, h)
-		local hovered = pnl:IsHovered()
+		local btn = vgui.Create("DButton")
+		btn:SetPos(btnX, btnY)
+		btn:SetSize(btnWidth, btnHeight)
+		btn:SetText("")
+		btn:SetCursor("hand")
+		btn:SetVisible(false) -- Will be shown when animation completes
 
-		-- Button background with golden theme using ArtDeco
-		local bgCol = hovered and Color(220, 180, 70, 200) or Color(180, 140, 50, 150)
-		local borderCol = Color(140, 100, 30, 255)
+		-- Store choice data
+		btn.choiceData = choice
 
-		if ArtDeco then
-			ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, borderCol, 8)
-		else
-			draw.RoundedBox(8, 0, 0, w, h, bgCol)
-			surface.SetDrawColor(borderCol)
-			surface.DrawOutlinedRect(0, 0, w, h, 2)
+		-- Custom paint function with list item style
+		btn.Paint = function(pnl, w, h)
+			local hovered = pnl:IsHovered()
+
+			-- Background with subtle fill
+			local bgCol = hovered and Color(220, 180, 70, 100) or Color(0, 0, 0, 80)
+			local outlineCol = hovered and Color(220, 180, 70, 255) or Color(180, 140, 50, 150)
+
+			if ArtDeco then
+				-- Use art deco styling - always show background and outline
+				ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 4)
+				ArtDeco.DrawDecoFrame(0, 0, w, h, outlineCol, 4)
+			else
+				-- Fallback styling
+				draw.RoundedBox(4, 0, 0, w, h, bgCol)
+				surface.SetDrawColor(outlineCol)
+				surface.DrawOutlinedRect(0, 0, w, h, 2)
+			end
+
+			-- Bullet point (list style)
+			local bulletX = 20
+			local bulletY = h * 0.5
+			local bulletSize = 4
+			draw.RoundedBox(bulletSize, bulletX - bulletSize / 2, bulletY - bulletSize / 2, bulletSize, bulletSize,
+				hovered and Color(255, 230, 150) or Color(220, 180, 70))
+
+			-- Choice text with shadow
+			local textX = 40
+			draw.SimpleText(choice.text, "Arcana_Ancient", textX + 1, h * 0.5 + 1,
+				Color(0, 0, 0, 180), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText(choice.text, "Arcana_Ancient", textX, h * 0.5,
+				hovered and Color(255, 230, 150) or Color(220, 180, 70), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
-		-- Button text with shadow
-		draw.SimpleText("Understood", "Arcana_Ancient", w * 0.5 + 1, h * 0.5 + 1,
-			Color(0, 0, 0, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		draw.SimpleText("Understood", "Arcana_Ancient", w * 0.5, h * 0.5,
-			Color(255, 230, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		btn.DoClick = function()
+			self:OnChoiceSelected(choice)
+		end
+
+		table.insert(self.choiceButtons, btn)
+	end
+end
+
+-- Handle choice selection
+function Tutorial:OnChoiceSelected(choice)
+	-- If no next node, close the panel (end of conversation)
+	if not choice.next then
+		self:CloseTeachingPanel()
+		return
 	end
 
-	self.understoodButton.DoClick = function()
-		self:CloseTeachingPanel()
+	-- Stop current voice
+	self:StopNodeVoice()
+
+	-- Remove current buttons
+	if self.choiceButtons then
+		for _, btn in ipairs(self.choiceButtons) do
+			if IsValid(btn) then
+				btn:Remove()
+			end
+		end
+		self.choiceButtons = nil
 	end
+
+	-- Navigate to next node
+	self.currentNode = choice.next
+
+	-- Reset fade progress for new text
+	self.fadeProgress = 0
+	self.fadeStart = CurTime()
+
+	-- Get new node data
+	local nodeData = self:GetCurrentNodeData()
+	if not nodeData then
+		ErrorNoHalt("[Arcana Tutorial] Invalid node: " .. tostring(choice.next) .. "\n")
+		return
+	end
+
+	-- Update text
+	self.finalText = nodeData.text or "..."
+
+	-- Recalculate fade duration
+	local estimatedCharsPerLine = 60
+	local estimatedLines = math.max(1, math.ceil(#self.finalText / estimatedCharsPerLine))
+	self.fadeDuration = estimatedLines * 4.0
+
+	-- Play voice for new node
+	self:PlayNodeVoice(nodeData)
+
+	-- Get choices (or default "Understood" choice)
+	local choices = nodeData.choices
+	if not choices or #choices == 0 then
+		choices = {{ text = "Understood", next = nil }}
+	end
+
+	-- Create new buttons
+	self:CreateChoiceButtons(choices)
 end
 
 -- Close teaching panel and transition back
@@ -659,10 +829,17 @@ function Tutorial:CloseTeachingPanel()
 	self.fadeProgress = 0
 	self.fadeStart = CurTime()
 
-	-- Remove the button
-	if IsValid(self.understoodButton) then
-		self.understoodButton:Remove()
-		self.understoodButton = nil
+	-- Stop voice
+	self:StopNodeVoice()
+
+	-- Remove choice buttons
+	if self.choiceButtons then
+		for _, btn in ipairs(self.choiceButtons) do
+			if IsValid(btn) then
+				btn:Remove()
+			end
+		end
+		self.choiceButtons = nil
 	end
 
 	-- Disable mouse cursor
@@ -687,10 +864,17 @@ function Tutorial:EndSequence()
 		self.tree = nil
 	end
 
-	-- Remove the button if it exists
-	if IsValid(self.understoodButton) then
-		self.understoodButton:Remove()
-		self.understoodButton = nil
+	-- Stop voice
+	self:StopNodeVoice()
+
+	-- Remove choice buttons
+	if self.choiceButtons then
+		for _, btn in ipairs(self.choiceButtons) do
+			if IsValid(btn) then
+				btn:Remove()
+			end
+		end
+		self.choiceButtons = nil
 	end
 
 	-- Clean up particles and materials
@@ -715,6 +899,7 @@ function Tutorial:EndSequence()
 	hook.Remove("PlayerFootstep", "Arcana_TutorialFootstep")
 
 	self.currentSequence = nil
+	self.currentNode = nil
 end
 
 -- Think hook
@@ -729,10 +914,20 @@ function Tutorial:Think()
 		-- Close any open panels
 		if self.showingPanel then
 			self.showingPanel = false
-			if IsValid(self.understoodButton) then
-				self.understoodButton:Remove()
-				self.understoodButton = nil
+
+			-- Stop voice
+			self:StopNodeVoice()
+
+			-- Remove choice buttons
+			if self.choiceButtons then
+				for _, btn in ipairs(self.choiceButtons) do
+					if IsValid(btn) then
+						btn:Remove()
+					end
+				end
+				self.choiceButtons = nil
 			end
+
 			gui.EnableScreenClicker(false)
 		end
 
@@ -1332,9 +1527,13 @@ function Tutorial:DrawTeachingPanel(scrW, scrH)
 		end
 	end
 
-	-- Show the "Understood" button when animation completes
-	if IsValid(self.understoodButton) then
-		self.understoodButton:SetVisible(self.fadeProgress >= 1)
+	-- Show buttons when animation completes
+	if self.choiceButtons then
+		for _, btn in ipairs(self.choiceButtons) do
+			if IsValid(btn) then
+				btn:SetVisible(self.fadeProgress >= 1)
+			end
+		end
 	end
 end
 
