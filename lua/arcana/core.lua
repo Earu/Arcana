@@ -1,5 +1,3 @@
-AddCSLuaFile()
-
 local Arcane = _G.Arcane or {}
 _G.Arcane = Arcane
 
@@ -15,6 +13,8 @@ local function runHook(name, ...)
 	if not success then return nil end
 	return a, b, c, d, e, f
 end
+
+Arcane.RunHook = runHook
 
 -- Client-side stub for autocomplete and help so players see the command
 if CLIENT then
@@ -270,54 +270,32 @@ if SERVER then
 	local function ensureDatabase()
 		if ensured then return ensured end
 
-		if _G.co and _G.db then
-			-- if we have postgres use it
-			_G.co(function()
-				_G.db.Query([[CREATE TABLE IF NOT EXISTS arcane_players (
-					steamid	VARCHAR(255) PRIMARY KEY,
-					xp BIGINT NOT NULL DEFAULT 0,
-					level BIGINT NOT NULL DEFAULT 1,
-					knowledge_points BIGINT NOT NULL DEFAULT 1,
-					unlocked_spells TEXT NOT NULL DEFAULT '[]',
-					quickspell_slots TEXT NOT NULL DEFAULT '[]',
-					selected_quickslot INTEGER NOT NULL DEFAULT 1,
-					last_save BIGINT NOT NULL DEFAULT 0
-				)]])
-			end)
-
-			ensured = true
-
-			return ensured
-		else
-			-- fallback to sqlite
-			if sql.TableExists("arcane_players") then
-				ensured = true
-
-				return ensured
-			end
-
-			local ok = sql.Query([[CREATE TABLE IF NOT EXISTS arcane_players (
-				steamid	TEXT PRIMARY KEY,
-				xp INTEGER NOT NULL DEFAULT 0,
-				level INTEGER NOT NULL DEFAULT 1,
-				knowledge_points INTEGER NOT NULL DEFAULT 1,
-				unlocked_spells TEXT NOT NULL DEFAULT '[]',
-				quickspell_slots TEXT NOT NULL DEFAULT '[]',
-				selected_quickslot INTEGER NOT NULL DEFAULT 1,
-				last_save INTEGER NOT NULL DEFAULT 0
-			);]])
-
-			if ok == false then
-				dbLogError("CREATE TABLE arcane_players failed")
-				ensured = false
-
-				return ensured
-			end
-
+		if sql.TableExists("arcane_players") then
 			ensured = true
 
 			return ensured
 		end
+
+		local ok = sql.Query([[CREATE TABLE IF NOT EXISTS arcane_players (
+			steamid	TEXT PRIMARY KEY,
+			xp INTEGER NOT NULL DEFAULT 0,
+			level INTEGER NOT NULL DEFAULT 1,
+			knowledge_points INTEGER NOT NULL DEFAULT 1,
+			unlocked_spells TEXT NOT NULL DEFAULT '[]',
+			quickspell_slots TEXT NOT NULL DEFAULT '[]',
+			selected_quickslot INTEGER NOT NULL DEFAULT 1,
+			last_save INTEGER NOT NULL DEFAULT 0
+		);]])
+
+		if ok == false then
+			dbLogError("CREATE TABLE arcane_players failed")
+			ensured = false
+
+			return ensured
+		end
+
+		ensured = true
+		return ensured
 	end
 
 	local function serializeUnlockedSpells(unlocked)
@@ -384,6 +362,9 @@ if SERVER then
 	end
 
 	function Arcane:SavePlayerDataToSQL(ply, data)
+		local handled = runHook("SavePlayerDataToSQL", ply, data)
+		if handled == true then return end
+
 		if not ensureDatabase() then return end
 
 		local sid = IsValid(ply) and ply:SteamID64() or nil
@@ -435,48 +416,25 @@ if SERVER then
 			return merged_xp, merged_level, merged_unlocked, merged_quick, merged_selected
 		end
 
-		if _G.co and _G.db then
-			-- if we have postgres use it
-			_G.co(function()
-				-- Read existing row to merge conservatively
-				local existing = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
-				local mxp, mlevel, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(existing) and existing[1] or nil)
-				local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
-				local quick = sql.SQLStr(serializeQuickslots(mquick))
-				local upsert = [[
-					INSERT INTO arcane_players(steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save)
-					VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-					ON CONFLICT (steamid) DO UPDATE SET
-						xp = EXCLUDED.xp,
-						level = EXCLUDED.level,
-						knowledge_points = EXCLUDED.knowledge_points,
-						unlocked_spells = EXCLUDED.unlocked_spells,
-						quickspell_slots = EXCLUDED.quickspell_slots,
-						selected_quickslot = EXCLUDED.selected_quickslot,
-						last_save = EXCLUDED.last_save
-				]]
-				_G.db.Query(upsert, steamid, mxp, mlevel, incoming_kp, unlocked, quick, mselected, lastsave)
-			end)
+		local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+		local mxp, mlevel, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
+		local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
+		local quick = sql.SQLStr(serializeQuickslots(mquick))
+		local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, incoming_kp, unlocked, quick, mselected, lastsave)
+		local ok = sql.Query(q)
 
-			return
-		else
-			-- fallback to sqlite
-			local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
-			local mxp, mlevel, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
-			local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
-			local quick = sql.SQLStr(serializeQuickslots(mquick))
-			local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, incoming_kp, unlocked, quick, mselected, lastsave)
-			local ok = sql.Query(q)
-
-			if ok == false then
-				dbLogError("SavePlayerDataToSQL failed")
-			end
+		if ok == false then
+			dbLogError("SavePlayerDataToSQL failed")
 		end
 	end
 
 	function Arcane:LoadPlayerDataFromSQL(ply, callback)
-		if not ensureDatabase() then return nil end
 		if not IsValid(ply) then return end
+
+		local handled = runHook("LoadPlayerDataFromSQL", ply, callback)
+		if handled == true then return end
+
+		if not ensureDatabase() then return nil end
 
 		local rawSid = ply:SteamID64()
 		Arcane.SaveBlockedBySteamID[rawSid] = true
@@ -510,51 +468,25 @@ if SERVER then
 			end)
 		end
 
-		if _G.co and _G.db then
-			-- if we have postgres use it
-			_G.co(function()
-				local rows = _G.db.Query("SELECT * FROM arcane_players WHERE steamid = $1 LIMIT 1", steamid)
-				if rows == false or rows == nil then
-					scheduleRetry()
-					return
-				end
-
-				if istable(rows) and #rows < 1 then
-					-- No existing row: treat as success with defaults and allow saving
-					Arcane.SaveBlockedBySteamID[rawSid] = nil
-					Arcane.RetryStateBySteamID[rawSid] = nil
-
-					local defaults = CreateDefaultPlayerData()
-					callback(true, defaults)
-
-					Arcane:SavePlayerDataToSQL(ply, defaults)
-					return
-				end
-
-				processData(rows[1])
-			end)
-		else
-			-- fallback to sqlite
-			rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
-			if rows == false then
-				dbLogError("LoadPlayerDataFromSQL failed")
-				scheduleRetry()
-				return
-			end
-
-			if not rows or not rows[1] then
-				Arcane.SaveBlockedBySteamID[rawSid] = nil
-				Arcane.RetryStateBySteamID[rawSid] = nil
-
-				local defaults = CreateDefaultPlayerData()
-				callback(true, defaults)
-
-				Arcane:SavePlayerDataToSQL(ply, defaults)
-				return
-			end
-
-			processData(rows[1])
+		rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+		if rows == false then
+			dbLogError("LoadPlayerDataFromSQL failed")
+			scheduleRetry()
+			return
 		end
+
+		if not rows or not rows[1] then
+			Arcane.SaveBlockedBySteamID[rawSid] = nil
+			Arcane.RetryStateBySteamID[rawSid] = nil
+
+			local defaults = CreateDefaultPlayerData()
+			callback(true, defaults)
+
+			Arcane:SavePlayerDataToSQL(ply, defaults)
+			return
+		end
+
+		processData(rows[1])
 	end
 end
 
@@ -1143,10 +1075,10 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 
 	-- Apply costs
 	if spell.cost_type == Arcane.COST_TYPES.COINS then
-		local canPayWithCoins = ply.GetCoins and ply.TakeCoins and (ply:GetCoins() >= spell.cost_amount)
+		local canPayWithCoins = Arcane:GetCoins(ply) >= spell.cost_amount
 
 		if canPayWithCoins then
-			ply:TakeCoins(spell.cost_amount, "Spell: " .. spell.name)
+			Arcane:TakeCoins(ply, spell.cost_amount, "Spell: " .. spell.name)
 		else
 			-- Fallback: pay with health as real damage
 			local dmg = DamageInfo()
@@ -1295,10 +1227,6 @@ end
 -- Player Meta Extensions for Arcane-specific data only
 local PLAYER = FindMetaTable("Player")
 
--- Note: This system assumes you already have:
--- PLAYER:GetCoins(), PLAYER:TakeCoins(amount, reason), PLAYER:GiveCoins(amount, reason)
--- PLAYER:GetItemCount(itemName), PLAYER:TakeItem(itemName, amount, reason), PLAYER:GiveItem(itemName, amount, reason)
--- If your methods have different names, you'll need to update the calls in the spell/ritual casting functions
 function PLAYER:GetArcaneLevel()
 	return Arcane:GetPlayerData(self).level
 end

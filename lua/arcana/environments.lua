@@ -1,5 +1,3 @@
-AddCSLuaFile()
-
 local Arcane = _G.Arcane or {}
 _G.Arcane = Arcane
 

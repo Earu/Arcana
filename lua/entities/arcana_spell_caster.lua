@@ -118,7 +118,7 @@ if SERVER then
 
 		-- Check if owner can afford the spell (we'll consume resources later)
 		if spell.cost_type == Arcane.COST_TYPES.COINS then
-			local canPayWithCoins = owner.GetCoins and owner.TakeCoins and (owner:GetCoins() >= spell.cost_amount)
+			local canPayWithCoins = Arcane:GetCoins(owner) >= spell.cost_amount
 			if not canPayWithCoins and owner:Health() < spell.cost_amount then
 				return false, "Owner cannot afford spell cost"
 			end
@@ -135,7 +135,7 @@ if SERVER then
 		end
 
 		-- Hook validation
-		local ok, reason = hook.Run("Arcana_CanCastSpell", owner, spellId)
+		local ok, reason = Arcane.RunHook("CanCastSpell", owner, spellId)
 		if ok == false then return false, reason or "Cannot cast spell" end
 
 		return true
@@ -234,10 +234,10 @@ if SERVER then
 
 		-- Apply costs to owner
 		if spell.cost_type == Arcane.COST_TYPES.COINS then
-			local canPayWithCoins = owner.GetCoins and owner.TakeCoins and (owner:GetCoins() >= spell.cost_amount)
+			local canPayWithCoins = Arcane:GetCoins(owner) >= spell.cost_amount
 
 			if canPayWithCoins then
-				owner:TakeCoins(spell.cost_amount, "Spell Caster: " .. spell.name)
+				Arcane:TakeCoins(owner, spell.cost_amount, "Spell Caster: " .. spell.name)
 			else
 				-- Fallback: pay with health
 				local dmg = DamageInfo()
@@ -280,7 +280,7 @@ if SERVER then
 			success = false
 		end
 
-		hook.Run("Arcana_CastSpell", owner, spellId, nil, data, context, success)
+		Arcane.RunHook("CastSpell", owner, spellId, nil, data, context, success)
 
 		if success then
 			if spell.on_success then
@@ -296,7 +296,7 @@ if SERVER then
 				spell.on_failure(owner, nil, data)
 			end
 
-			hook.Run("Arcana_CastSpellFailure", owner, spellId, nil, data, context)
+			Arcane.RunHook("CastSpellFailure", owner, spellId, nil, data, context)
 
 			net.Start("Arcane_SpellFailed", true)
 			net.WriteEntity(self)

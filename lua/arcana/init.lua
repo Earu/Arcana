@@ -12,6 +12,7 @@ if SERVER then
 	AddCSLuaFile("arcana/astral_vault.lua")
 	AddCSLuaFile("arcana/soul_mode.lua")
 	AddCSLuaFile("arcana/tutorial.lua")
+	AddCSLuaFile("arcana/third_party.lua")
 
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
@@ -28,6 +29,7 @@ include("arcana/mana_network.lua")
 include("arcana/astral_vault.lua")
 include("arcana/soul_mode.lua")
 include("arcana/tutorial.lua")
+include("arcana/third_party.lua")
 
 if SERVER then
 	include("arcana/mana_crystals.lua")
@@ -56,25 +58,6 @@ includePath("arcana/status")
 includePath("arcana/environments")
 includePath("arcana/spells")
 includePath("arcana/enchantments")
-
-local function applyFallback(tbl, name, fallback)
-	if not tbl[name] then
-		tbl[name] = fallback
-	end
-end
-
--- testing
-hook.Add("InitPostEntity", "Arcana_Testing", function()
-	local PLY = FindMetaTable("Player")
-
-	applyFallback(PLY, "GetCoins", function(amount) return 2e99 end)
-	applyFallback(PLY, "TakeCoins", function(amount, reason) end)
-	applyFallback(PLY, "GiveCoins", function(amount, reason) end)
-
-	applyFallback(PLY, "GetItemCount", function(itemClass) return 2e99 end)
-	applyFallback(PLY, "TakeItem", function(itemClass, amount, reason) end)
-	applyFallback(PLY, "GiveItem", function(itemClass, amount, reason) end)
-end)
 
 if SERVER then
 	-- Starter spell for new players
