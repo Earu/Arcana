@@ -1472,15 +1472,12 @@ function Tutorial:DrawTeachingPanel(scrW, scrH)
 			if lineY >= textY and lineY < (textY + maxTextHeight) then
 				if lineIdx < currentLineIndex then
 					-- Fully visible line with shadow for engraved effect
-					-- Draw shadow first (darker, slightly offset)
 					draw.DrawText(line, "Arcana_AncientLarge", textX + 2, lineY + 2,
 						Color(0, 0, 0, 180), TEXT_ALIGN_LEFT)
-					-- Draw golden text
 					draw.DrawText(line, "Arcana_AncientLarge", textX, lineY,
 						Color(220, 180, 70, 255), TEXT_ALIGN_LEFT)
 				elseif lineIdx == currentLineIndex then
 					-- Currently revealing line with gradient effect
-					-- Build character position array first for accurate positioning
 					local chars = {}
 					local currentX = 0
 					for i = 1, #line do
@@ -1497,7 +1494,7 @@ function Tutorial:DrawTeachingPanel(scrW, scrH)
 
 					local totalLineWidth = currentX
 					local revealPosition = totalLineWidth * currentLineProgress
-					local gradientWidth = 150 -- Wider gradient for smoother effect
+					local gradientWidth = 50 -- Tighter gradient for continuous feel
 
 					-- Draw each character with calculated alpha and shadow
 					for _, charData in ipairs(chars) do
@@ -1512,11 +1509,9 @@ function Tutorial:DrawTeachingPanel(scrW, scrH)
 						end
 
 						if alpha > 0 then
-							-- Draw shadow (darker, slightly offset)
 							local shadowAlpha = math.floor(alpha * 0.7)
 							draw.DrawText(charData.char, "Arcana_AncientLarge", textX + charData.x + 2, lineY + 2,
 								Color(0, 0, 0, shadowAlpha), TEXT_ALIGN_LEFT)
-							-- Draw golden text
 							draw.DrawText(charData.char, "Arcana_AncientLarge", textX + charData.x, lineY,
 								Color(220, 180, 70, alpha), TEXT_ALIGN_LEFT)
 						end
