@@ -157,7 +157,7 @@ if CLIENT then
 	function ENT:Think()
 		if CurTime() > self.NextRumble then
 			self.NextRumble = CurTime() + math.Rand(3, 6)
-			self:EmitSound("ambient/levels/citadel/portal_close" .. math.random(1, 3) .. ".wav", 80, 80)
+			self:EmitSound("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", 80, 70)
 		end
 
 		-- Grow over time (reaches full size at 20 seconds, max lifetime)
