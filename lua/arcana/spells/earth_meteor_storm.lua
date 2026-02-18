@@ -598,65 +598,6 @@ if CLIENT then
 				meteorStormCastingData[caster] = nil
 			end)
 		end
-
-		-- Brief whiteout flash effect (only for players looking at the impact area or caster)
-		local climaxFlashData = {
-			startTime = CurTime(),
-			center = center,
-			radius = radius,
-			caster = caster
-		}
-
-		hook.Add("RenderScreenspaceEffects", "Arcana_MeteorStorm_ClimaxFlash", function()
-			local ply = LocalPlayer()
-			if not IsValid(ply) then return end
-			local elapsed = CurTime() - climaxFlashData.startTime
-
-			if elapsed < 0.4 then
-				-- Caster always sees full effect
-				local viewFalloff = 1
-
-				if ply ~= climaxFlashData.caster then
-					-- Check if player is looking towards the impact area
-					local eyePos = ply:EyePos()
-					local dirToCenter = (climaxFlashData.center - eyePos):GetNormalized()
-					local viewDir = ply:GetAimVector()
-					-- Dot product: 1 = looking directly at, 0 = perpendicular, -1 = looking away
-					local dot = viewDir:Dot(dirToCenter)
-					-- Only show effect if looking somewhat towards it (within ~90 degree cone)
-					if dot < 0.2 then return end -- Not looking at it
-					-- Smooth falloff based on how directly they're looking at it
-					-- 1.0 at center of view, fades to 0 at edges
-					viewFalloff = math.Clamp((dot - 0.2) / 0.8, 0, 1)
-				end
-
-				-- Flash intensity over time
-				local alpha = 1
-
-				if elapsed < 0.1 then
-					alpha = elapsed / 0.1 -- Fade in
-				else
-					alpha = 1 - ((elapsed - 0.1) / 0.3) -- Fade out
-				end
-
-				-- Apply view-based falloff
-				alpha = alpha * viewFalloff
-
-				DrawColorModify({
-					["$pp_colour_addr"] = 0.3 * alpha,
-					["$pp_colour_addg"] = 0.2 * alpha,
-					["$pp_colour_addb"] = 0.1 * alpha,
-					["$pp_colour_brightness"] = 0.2 * alpha,
-					["$pp_colour_contrast"] = 1 + (0.3 * alpha),
-					["$pp_colour_colour"] = 1,
-					["$pp_colour_mulr"] = 0,
-					["$pp_colour_mulg"] = 0,
-					["$pp_colour_mulb"] = 0
-				})
-			else
-				hook.Remove("RenderScreenspaceEffects", "Arcana_MeteorStorm_ClimaxFlash")
-			end
-		end)
 	end)
 
 	-- Initial VFX: Sky darkening and warning circles
@@ -1083,62 +1024,6 @@ if CLIENT then
 			local alpha = (1 - progress) * 180
 			render.SetMaterial(matRing)
 			render.DrawQuadEasy(fissure.pos + Vector(0, 0, 1), Vector(0, 0, 1), currentRadius, currentRadius, Color(180, 90, 30, alpha), 0)
-		end
-	end)
-
-	-- Sky darkening effect (only for players looking at the impact area)
-	hook.Add("RenderScreenspaceEffects", "Arcana_MeteorStorm_Darken", function()
-		local ply = LocalPlayer()
-		if not IsValid(ply) then return end
-
-		for instanceId, data in pairs(darkeningData) do
-			local elapsed = CurTime() - data.startTime
-			local totalDuration = data.endTime - data.startTime
-			-- Gradual darkening in first 3 seconds, then maintain, then fade out in last 2 seconds
-			local fadeInDur = 3
-			local fadeOutStart = totalDuration - 2
-			local targetIntensity = 0
-
-			if elapsed < fadeInDur then
-				targetIntensity = (elapsed / fadeInDur) * 0.4
-			elseif elapsed < fadeOutStart then
-				targetIntensity = 0.4
-			else
-				local fadeOutProgress = (elapsed - fadeOutStart) / 2
-				targetIntensity = 0.4 * (1 - fadeOutProgress)
-			end
-
-			-- View-based falloff: only darken sky if looking towards the impact
-			local eyePos = ply:EyePos()
-			local dirToCenter = (data.center - eyePos):GetNormalized()
-			local viewDir = ply:GetAimVector()
-			-- Dot product: 1 = looking directly at, 0 = perpendicular, -1 = looking away
-			local dot = viewDir:Dot(dirToCenter)
-			-- Only show darkening if looking somewhat upward/towards it
-			if dot < 0.1 then continue end -- Not looking at it
-			-- Smooth falloff based on how directly they're looking at it
-			local viewFalloff = math.Clamp((dot - 0.1) / 0.9, 0, 1)
-			targetIntensity = targetIntensity * viewFalloff
-			data.intensity = Lerp(0.1, data.intensity, targetIntensity)
-
-			-- Apply darkening
-			if data.intensity > 0.01 then
-				local tab = {
-					["$pp_colour_addr"] = 0,
-					["$pp_colour_addg"] = 0,
-					["$pp_colour_addb"] = 0,
-					["$pp_colour_brightness"] = -data.intensity,
-					["$pp_colour_contrast"] = 1 + data.intensity * 0.3,
-					["$pp_colour_colour"] = 1 - data.intensity * 0.2,
-					["$pp_colour_mulr"] = 0,
-					["$pp_colour_mulg"] = 0,
-					["$pp_colour_mulb"] = 0
-				}
-
-				DrawColorModify(tab)
-				-- Orange tint
-				DrawBloom(0.3 * data.intensity, data.intensity * 2, 3, 3, 2, 0.8, 0.5, 0.3, 0.2)
-			end
 		end
 	end)
 
