@@ -1,5 +1,127 @@
 if SERVER then
 	util.AddNetworkString("Arcana_Blackhole_Climax")
+
+	-- Server-side dark star tracking for vaporization
+	local darkStarServerData = {}
+
+	-- Hook into casting start to begin dark star vaporization
+	hook.Add("Arcana_BeginCasting", "Arcana_Blackhole_ServerDarkStar", function(caster, spellId)
+		if spellId ~= "blackhole" then return end
+		if not IsValid(caster) then return end
+
+		-- Get spell data to retrieve cast time
+		local spell = Arcane.RegisteredSpells[spellId]
+		if not spell then return end
+		local castTime = spell.cast_time or 25
+
+		-- Dark star appears at 8 seconds
+		timer.Simple(8, function()
+			if not IsValid(caster) then return end
+
+			local targetPos = Arcane:ResolveGroundTarget(caster, 1000)
+			if not targetPos then return end
+
+			darkStarServerData[caster] = {
+				pos = targetPos + Vector(0, 0, 200),
+				startTime = CurTime(),
+				radius = 20,
+				targetRadius = 900,
+				growthDuration = castTime - 8,
+				active = true
+			}
+
+			-- Vaporization check timer
+			local vaporizeTimer = "Arcana_Blackhole_Vaporize_" .. caster:EntIndex()
+			timer.Create(vaporizeTimer, 0.1, 0, function()
+				if not IsValid(caster) or not darkStarServerData[caster] then
+					timer.Remove(vaporizeTimer)
+					return
+				end
+
+				local data = darkStarServerData[caster]
+				if not data.active then
+					timer.Remove(vaporizeTimer)
+					return
+				end
+
+				-- Update dark star position to follow ground target
+				local currentTargetPos = Arcane:ResolveGroundTarget(caster, 1000)
+				if currentTargetPos then
+					data.pos = currentTargetPos + Vector(0, 0, 200)
+				end
+
+				-- Calculate current radius based on growth
+				local elapsed = CurTime() - data.startTime
+				local growthProgress = math.Clamp(elapsed / data.growthDuration, 0, 1)
+				local smoothGrowth = math.pow(growthProgress, 2.5)
+				local currentRadius = Lerp(smoothGrowth, data.radius, data.targetRadius)
+
+				-- Check for entities within radius
+				local ents = ents.FindInSphere(data.pos, currentRadius)
+				for _, ent in ipairs(ents) do
+					if IsValid(ent) and ent ~= caster then
+						local isValidTarget = false
+
+						-- Check if it's a player
+						if ent:IsPlayer() and ent:Alive() then
+							isValidTarget = true
+						end
+
+						-- Check if it's an NPC
+						if ent:IsNPC() and ent:Health() > 0 then
+							isValidTarget = true
+						end
+
+						-- Check if it's a NextBot
+						if ent:IsNextBot() and ent:Health() > 0 then
+							isValidTarget = true
+						end
+
+						if isValidTarget then
+							-- Instant vaporization damage
+							local dmgInfo = DamageInfo()
+							dmgInfo:SetDamage(ent:Health() + 100)
+							dmgInfo:SetAttacker(caster)
+							dmgInfo:SetInflictor(caster)
+							dmgInfo:SetDamageType(DMG_DISSOLVE)
+							dmgInfo:SetDamagePosition(data.pos)
+							ent:TakeDamageInfo(dmgInfo)
+
+							-- Vaporization effect
+							local ed = EffectData()
+							ed:SetOrigin(ent:GetPos() + Vector(0, 0, 40))
+							ed:SetScale(2)
+							util.Effect("cball_explode", ed, true, true)
+
+							-- Sound effect
+							sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", ent:GetPos(), 80, 150)
+							sound.Play("ambient/energy/weld" .. math.random(1, 2) .. ".wav", ent:GetPos(), 75, 80)
+						end
+					end
+				end
+			end)
+
+			-- Stop vaporization when dark star collapses (at cast completion)
+			timer.Simple(castTime - 8, function()
+				if darkStarServerData[caster] then
+					darkStarServerData[caster].active = false
+					darkStarServerData[caster] = nil
+				end
+				timer.Remove(vaporizeTimer)
+			end)
+		end)
+	end)
+
+	-- Cleanup on spell failure
+	hook.Add("Arcana_CastSpellFailure", "Arcana_Blackhole_ServerCleanup", function(caster, spellId)
+		if spellId ~= "blackhole" then return end
+
+		if darkStarServerData[caster] then
+			darkStarServerData[caster] = nil
+		end
+
+		timer.Remove("Arcana_Blackhole_Vaporize_" .. caster:EntIndex())
+	end)
 end
 
 Arcane:RegisterSpell({
@@ -54,7 +176,7 @@ Arcane:RegisterSpell({
 		timer.Simple(0.3, function()
 			sound.Play("ambient/levels/labs/teleport_preblast_suckin1.wav", targetPos, 118, 45)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", targetPos, 115, 40)
-			sound.Play("ambient/machines/machine_whine1.wav", targetPos, 110, 180)
+			--sound.Play("ambient/machines/machine_whine1.wav", targetPos, 110, 180)
 		end)
 
 		-- Stage 3: Building tension (0.5s)
@@ -67,7 +189,7 @@ Arcane:RegisterSpell({
 		-- Stage 4: Critical point (0.7s)
 		timer.Simple(0.7, function()
 			sound.Play("ambient/atmosphere/cave_hit" .. math.random(1, 6) .. ".wav", targetPos, 120, 30)
-			sound.Play("ambient/machines/machine_whine1.wav", targetPos, 118, 200)
+			--sound.Play("ambient/machines/machine_whine1.wav", targetPos, 118, 200)
 			sound.Play("weapons/physcannon/physcannon_charge.wav", targetPos, 115, 80)
 			sound.Play("ambient/energy/weld" .. math.random(1, 2) .. ".wav", targetPos, 112, 50)
 		end)
@@ -1078,7 +1200,6 @@ if CLIENT then
 
 			-- Initial void opening sound
 			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", caster:GetPos(), 90, 60)
-			--sound.Play("ambient/atmosphere/tone_quiet.wav", caster:GetPos(), 88, 55)
 			util.ScreenShake(caster:GetPos(), 4, 90, 0.5, 400)
 		end
 
@@ -1176,19 +1297,16 @@ if CLIENT then
 				-- Dark star charging sounds
 				timer.Simple(0, function()
 					if not IsValid(caster) then return end
-					caster:EmitSound("ambient/machines/machine_whine1.wav", 90, 140, 0.6)
 					caster:EmitSound("ambient/energy/zap1.wav", 88, 100, 0.5)
 				end)
 
 				timer.Simple(3, function()
 					if not IsValid(caster) or not darkStarData[caster] then return end
 					caster:EmitSound("weapons/physcannon/physcannon_charge.wav", 92, 90, 0.7)
-					--caster:EmitSound("ambient/atmosphere/tone_quiet.wav", 85, 45, 0.6)
 				end)
 
 				timer.Simple(6, function()
 					if not IsValid(caster) or not darkStarData[caster] then return end
-					caster:EmitSound("ambient/machines/machine_whine1.wav", 95, 160, 0.8)
 					caster:EmitSound("ambient/energy/weld1.wav", 90, 50, 0.7)
 				end)
 
@@ -1367,7 +1485,6 @@ if CLIENT then
 		-- Sound design: Build tension with void/gravitational theme
 		timer.Simple(0, function()
 			if not IsValid(caster) then return end
-			--sound.Play("ambient/atmosphere/tone_quiet.wav", caster:GetPos(), 87, 65)
 			sound.Play("ambient/atmosphere/cave_hit1.wav", caster:GetPos(), 85, 60)
 		end)
 
@@ -1401,20 +1518,10 @@ if CLIENT then
 			util.ScreenShake(caster:GetPos(), 15, 170, 2.5, 800)
 		end)
 
-		-- Periodic void distortion sounds (ambient tension) - fewer, less noisy
-		local soundSteps = math.floor(castTime / 5)
-		for step = 1, soundSteps do
-			timer.Simple(step * 5, function()
-				if not IsValid(caster) or not blackholeCastingData[caster] then return end
-				--sound.Play("ambient/atmosphere/tone_quiet.wav", caster:GetPos(), 82, math.random(55, 70))
-			end)
-		end
-
 		-- Cleanup when cast completes or fails
 		timer.Simple(castTime + 2.0, function()
 			-- Stop any lingering sounds
 			if IsValid(caster) then
-				--caster:StopSound("ambient/atmosphere/tone_quiet.wav")
 				caster:StopSound("ambient/atmosphere/cave_hit1.wav")
 				caster:StopSound("ambient/atmosphere/cave_hit2.wav")
 				caster:StopSound("ambient/atmosphere/cave_hit3.wav")
@@ -1428,7 +1535,6 @@ if CLIENT then
 				caster:StopSound("ambient/atmosphere/hole_hit5.wav")
 				caster:StopSound("ambient/levels/citadel/portal_close1.wav")
 				caster:StopSound("weapons/physcannon/energy_sing_explosion2.wav")
-				caster:StopSound("ambient/machines/machine_whine1.wav")
 				caster:StopSound("weapons/physcannon/physcannon_charge.wav")
 				caster:StopSound("ambient/energy/weld1.wav")
 				caster:StopSound("ambient/energy/weld2.wav")
@@ -1464,7 +1570,6 @@ if CLIENT then
 
 		-- Stop any lingering sounds
 		if IsValid(caster) then
-			--caster:StopSound("ambient/atmosphere/tone_quiet.wav")
 			caster:StopSound("ambient/atmosphere/cave_hit1.wav")
 			caster:StopSound("ambient/atmosphere/cave_hit2.wav")
 			caster:StopSound("ambient/atmosphere/cave_hit3.wav")
@@ -1478,7 +1583,6 @@ if CLIENT then
 			caster:StopSound("ambient/atmosphere/hole_hit5.wav")
 			caster:StopSound("ambient/levels/citadel/portal_close1.wav")
 			caster:StopSound("weapons/physcannon/energy_sing_explosion2.wav")
-			caster:StopSound("ambient/machines/machine_whine1.wav")
 			caster:StopSound("weapons/physcannon/physcannon_charge.wav")
 			caster:StopSound("ambient/energy/weld1.wav")
 			caster:StopSound("ambient/energy/weld2.wav")
