@@ -23,6 +23,7 @@ if SERVER then
 
 			darkStarServerData[caster] = {
 				pos = targetPos + Vector(0, 0, 200),
+				lerpedPos = targetPos,
 				startTime = CurTime(),
 				radius = 20,
 				targetRadius = 900,
@@ -44,11 +45,14 @@ if SERVER then
 					return
 				end
 
-				-- Update dark star position to follow ground target
-				local currentTargetPos = Arcane:ResolveGroundTarget(caster, 1000)
-				if currentTargetPos then
-					data.pos = currentTargetPos + Vector(0, 0, 200)
-				end
+			-- Update dark star position with lerp so it drags toward the aim
+			local currentTargetPos = Arcane:ResolveGroundTarget(caster, 1000)
+			if currentTargetPos then
+				local lerpedGroundPos = data.lerpedPos or currentTargetPos
+				lerpedGroundPos = LerpVector(0.006, lerpedGroundPos, currentTargetPos)
+				data.lerpedPos = lerpedGroundPos
+				data.pos = lerpedGroundPos + Vector(0, 0, 200)
+			end
 
 				-- Calculate current radius based on growth
 				local elapsed = CurTime() - data.startTime
@@ -1169,18 +1173,25 @@ if CLIENT then
 		local startTime = CurTime()
 
 		-- Store casting data
+		local initialTargetPos = Arcane:ResolveGroundTarget(caster, 1000) or caster:GetPos()
 		blackholeCastingData[caster] = {
 			startTime = startTime,
 			circles = {},
-			satellites = {}
+			satellites = {},
+			lerpedPos = initialTargetPos
 		}
 
-		-- Ground target indicator (follows aim)
+		-- Ground target indicator (follows aim) using lerped position
 		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = color,
 			size = 1000,
 			intensity = 100,
-			positionResolver = function(c) return Arcane:ResolveGroundTarget(c, 1000) end
+			positionResolver = function(c)
+				if not blackholeCastingData[c] then
+					return Arcane:ResolveGroundTarget(c, 1000)
+				end
+				return blackholeCastingData[c].lerpedPos
+			end
 		})
 
 		-- PHASE 1: Initial void formation (0s) - Ground circle
@@ -1283,7 +1294,7 @@ if CLIENT then
 			end
 
 			-- Create dark star visual above target position (grows until climax)
-			local targetPos = Arcane:ResolveGroundTarget(caster, 1000)
+			local targetPos = blackholeCastingData[caster] and blackholeCastingData[caster].lerpedPos or Arcane:ResolveGroundTarget(caster, 1000)
 			if targetPos then
 				darkStarData[caster] = {
 					pos = targetPos + Vector(0, 0, 200),
@@ -1411,11 +1422,16 @@ if CLIENT then
 				end
 			end
 
-			-- Update dark star position to follow ground target
+			-- Update lerped ground position (used by following circle and dark star)
+			local rawTargetPos = Arcane:ResolveGroundTarget(caster, 1000)
+			if rawTargetPos then
+				data.lerpedPos = LerpVector(FrameTime() * 0.4, data.lerpedPos or rawTargetPos, rawTargetPos)
+			end
+
+			-- Update dark star to follow lerped position
 			if darkStarData[caster] and darkStarData[caster].active then
-				local targetPos = Arcane:ResolveGroundTarget(caster, 1000)
-				if targetPos then
-					darkStarData[caster].pos = targetPos + Vector(0, 0, 200)
+				if data.lerpedPos then
+					darkStarData[caster].pos = data.lerpedPos + Vector(0, 0, 200)
 				end
 			end
 		end)
