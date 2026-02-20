@@ -705,7 +705,7 @@ if CLIENT then
 				local circle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, stackHeights[i]), Angle(0, 0, 0), color, stackIntensities[i], stackSizes[i], castTime - delay, 3)
 
 				if circle and circle.StartEvolving then
-					circle:StartEvolving(castTime - delay, true)
+					circle:StartEvolving(castTime - delay)
 
 					circles[#circles + 1] = {
 						circle = circle,
@@ -743,7 +743,7 @@ if CLIENT then
 			local circle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, stackHeights[4]), Angle(0, 0, 0), color, stackIntensities[4], stackSizes[4], castTime - circle4Delay, 3)
 
 			if circle and circle.StartEvolving then
-				circle:StartEvolving(castTime - circle4Delay, true)
+				circle:StartEvolving(castTime - circle4Delay)
 
 				circles[#circles + 1] = {
 					circle = circle,
@@ -767,7 +767,7 @@ if CLIENT then
 			local circle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, stackHeights[5]), Angle(0, 0, 0), color, stackIntensities[5], stackSizes[5], castTime - circle5Delay, 3)
 
 			if circle and circle.StartEvolving then
-				circle:StartEvolving(castTime - circle5Delay, true)
+				circle:StartEvolving(castTime - circle5Delay)
 
 				circles[#circles + 1] = {
 					circle = circle,
@@ -826,7 +826,7 @@ if CLIENT then
 				local satCircle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, midSatelliteHeight), Angle(90, math.deg(baseAngle), 0), color, 4, midSatelliteSize, remainingTime, 2)
 
 				if satCircle and satCircle.StartEvolving then
-					satCircle:StartEvolving(remainingTime, true)
+					satCircle:StartEvolving(remainingTime)
 
 					midSatelliteCircles[#midSatelliteCircles + 1] = {
 						circle = satCircle,
@@ -963,7 +963,7 @@ if CLIENT then
 				local satCircle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, satelliteHeight), Angle(45, math.deg(baseAngle), 0), color, 5, satelliteSize, castTime - delay, 2) -- 45 deg upward
 
 				if satCircle and satCircle.StartEvolving then
-					satCircle:StartEvolving(castTime - delay, true)
+					satCircle:StartEvolving(castTime - delay)
 
 					satelliteCircles[#satelliteCircles + 1] = {
 						circle = satCircle,

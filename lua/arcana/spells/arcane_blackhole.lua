@@ -1234,7 +1234,7 @@ if CLIENT then
 				)
 
 				if circle and circle.StartEvolving then
-					circle:StartEvolving(castTime - delay, true)
+					circle:StartEvolving(castTime - delay)
 					table.insert(blackholeCastingData[caster].circles, circle)
 
 					-- Void distortion sound per circle
@@ -1287,7 +1287,7 @@ if CLIENT then
 				)
 
 				if satCircle and satCircle.StartEvolving then
-					satCircle:StartEvolving(castTime - 8, true)
+					satCircle:StartEvolving(castTime - 8)
 					satData.circle = satCircle
 					table.insert(blackholeCastingData[caster].satellites, satData)
 				end
