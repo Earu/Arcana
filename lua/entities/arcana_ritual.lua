@@ -282,7 +282,7 @@ if CLIENT then
 		if not IsValid(ent) then return end
 
 		if ent._circle then
-			ent._circle:StartEvolving(math.max(0.1, duration or 2.0), true)
+			ent._circle:StartEvolving(math.max(0.1, duration or 2.0), -1) -- upward
 		end
 
 		-- Animate the client-side bands scale so they pulse on activation

@@ -681,7 +681,7 @@ if CLIENT then
 			local groundCircle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, 2), Angle(0, 0, 0), color, 6, 150, castTime, 2)
 
 			if groundCircle and groundCircle.StartEvolving then
-				groundCircle:StartEvolving(castTime, true)
+				groundCircle:StartEvolving(castTime, 1) -- upward
 
 				circles[#circles + 1] = {
 					circle = groundCircle,
@@ -1606,6 +1606,19 @@ if CLIENT then
 			auraParticles = {}
 		end)
 
+		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+			color = Color(170, 220, 255, 255), -- Bright blue-white/cyan matching the spell's theme
+			size = MAX_BEAM_RADIUS, -- 2000 - shows the full impact radius
+			intensity = 150,
+			positionResolver = function(c)
+				return Arcane:ResolveGroundTarget(c, 1000)
+			end
+		})
+
+		if caster == LocalPlayer() then
+			resetHUDState()
+		end
+
 		return true -- We've handled the visuals
 	end)
 
@@ -2386,13 +2399,6 @@ if CLIENT then
 		end
 	end)
 
-	-- Start HUD when casting begins
-	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_StartHUD", function(caster, spellId, castTime, targetPos)
-		if spellId ~= "fallen_down" then return end
-		if caster ~= LocalPlayer() then return end
-		resetHUDState()
-	end)
-
 	-- Main HUD rendering
 	hook.Add("HUDPaint", "Arcana_FallenDown_CasterHUD", function()
 		local ply = LocalPlayer()
@@ -2837,19 +2843,5 @@ if CLIENT then
 		}
 
 		return view
-	end)
-
-	-- Casting circle to indicate where the spell will land and its size
-	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_TargetCircle", function(caster, spellId, castTime, _forwardLike)
-		if spellId ~= "fallen_down" then return end
-
-		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
-			color = Color(170, 220, 255, 255), -- Bright blue-white/cyan matching the spell's theme
-			size = MAX_BEAM_RADIUS, -- 2000 - shows the full impact radius
-			intensity = 150,
-			positionResolver = function(c)
-				return Arcane:ResolveGroundTarget(c, 1000)
-			end
-		})
 	end)
 end

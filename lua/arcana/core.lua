@@ -1384,7 +1384,7 @@ if CLIENT then
 		if handled == true then return end
 
 		local isSpellCaster = caster:GetClass() == "arcana_spell_caster"
-		local pos, ang, size
+		local pos, ang, size, direction
 
 		if isSpellCaster then
 			pos = caster:WorldSpaceCenter() + caster:GetForward() * 30
@@ -1403,6 +1403,8 @@ if CLIENT then
 				ang = caster:EyeAngles()
 				ang:RotateAroundAxis(ang:Right(), 90)
 				size = 30
+			else
+				direction = -1 -- upward only if ground circle
 			end
 		end
 
@@ -1422,7 +1424,7 @@ if CLIENT then
 
 		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
 		if circle and circle.StartEvolving then
-			circle:StartEvolving(castTime, true)
+			circle:StartEvolving(castTime, direction)
 		end
 
 		-- Track as the current casting circle for this caster
@@ -1766,7 +1768,7 @@ if CLIENT then
 		if not circle then return false end
 
 		if circle.StartEvolving then
-			circle:StartEvolving(castTime, true)
+			circle:StartEvolving(castTime, 1) -- upward direction
 		end
 
 		-- Follow the caster's aim position until cast ends

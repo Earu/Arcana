@@ -1044,9 +1044,6 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.intensity = math_max(1, intensity or 3)
 	circle.size = math_max(10, size or 100)
 	circle.lineWidth = math_max(1, lineWidth or 2)
-	-- When true, rings only evolve upward (positive height) — use for ground-level circles
-	-- so rings never clip below the floor surface
-	circle.upOnly = false
 	-- Animation properties
 	circle.isAnimated = false
 	circle.startTime = CurTime()
@@ -1185,9 +1182,7 @@ function MagicCircle:Update(deltaTime)
 			local target = 0
 
 			if i > 2 and i <= self.lastVisible then
-				-- upOnly: all rings rise above the origin plane so ground circles
-				-- never render rings beneath the floor surface
-				local sign = self.upOnly and -1 or ((i % 2 == 0) and 1 or -1)
+				local sign = self.evolveDirection or ((i % 2 == 0) and 1 or -1)
 				local span = math.max(1, self.lastVisible - 2)
 				local fraction = math.Clamp((i - 2) / span, 0, 1)
 				-- Larger depth range proportional to circle size
@@ -1296,7 +1291,7 @@ end
 
 -- Start evolving the circle over the given duration.
 -- This progressively reveals rings (logarithmically) and animates their height (depth).
-function MagicCircle:StartEvolving(duration, upOnly)
+function MagicCircle:StartEvolving(duration, direction)
 	self.isEvolving = true
 	self.evolveStart = CurTime()
 	self.evolveDuration = math.max(0.1, duration or 1)
@@ -1304,8 +1299,8 @@ function MagicCircle:StartEvolving(duration, upOnly)
 	self.enableRingSounds = true
 
 	-- Allow the caller to override the upOnly flag set at construction time
-	if upOnly ~= nil then
-		self.upOnly = upOnly == true
+	if isnumber(direction) then
+		self.evolveDirection = direction
 	end
 
 	-- If the circle has already been drawn (it was showing all rings in static mode),
