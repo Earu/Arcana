@@ -1072,7 +1072,7 @@ if CLIENT then
 				local circle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, height), Angle(0, 0, 0), color, 3 + i, stackSizes[i], castTime - (i * 1.3), 2)
 
 				if circle and circle.StartEvolving then
-					circle:StartEvolving(castTime - (i * 1.3), true)
+					circle:StartEvolving(castTime - (i * 1.3))
 					table.insert(meteorStormCastingData[caster].circles, circle)
 					-- Thump sound for each stacked circle (increasing intensity)
 					local pitch = 75 + (i * 3) -- Deeper for lower circles
@@ -1116,7 +1116,7 @@ if CLIENT then
 				local satCircle = MagicCircle.CreateMagicCircle(initialPos, facingAngle, color, 3, 40, castTime - 3, 1)
 
 				if satCircle and satCircle.StartEvolving then
-					satCircle:StartEvolving(castTime - 3, true)
+					satCircle:StartEvolving(castTime - 3)
 					satData.circle = satCircle
 					table.insert(meteorStormCastingData[caster].satellites, satData)
 				end

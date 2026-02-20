@@ -1044,6 +1044,9 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.intensity = math_max(1, intensity or 3)
 	circle.size = math_max(10, size or 100)
 	circle.lineWidth = math_max(1, lineWidth or 2)
+	-- When true, rings only evolve upward (positive height) — use for ground-level circles
+	-- so rings never clip below the floor surface
+	circle.upOnly = false
 	-- Animation properties
 	circle.isAnimated = false
 	circle.startTime = CurTime()
@@ -1054,6 +1057,9 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.isFading = false
 	circle.fadeStart = 0
 	circle.fadeDuration = 0.3
+	-- Set to true on the first Draw call; used by StartEvolving to decide whether
+	-- to preserve current ring visibility or start the ring-by-ring appearance animation
+	circle._hasBeenDrawn = false
 	-- Evolving-cast state
 	circle.isEvolving = false
 	circle.evolveStart = 0
@@ -1179,7 +1185,9 @@ function MagicCircle:Update(deltaTime)
 			local target = 0
 
 			if i > 2 and i <= self.lastVisible then
-				local sign = (i % 2 == 0) and 1 or -1
+				-- upOnly: all rings rise above the origin plane so ground circles
+				-- never render rings beneath the floor surface
+				local sign = self.upOnly and -1 or ((i % 2 == 0) and 1 or -1)
 				local span = math.max(1, self.lastVisible - 2)
 				local fraction = math.Clamp((i - 2) / span, 0, 1)
 				-- Larger depth range proportional to circle size
@@ -1204,6 +1212,7 @@ end
 
 function MagicCircle:Draw()
 	if not self.isActive then return end
+	self._hasBeenDrawn = true
 	render.SetColorMaterial()
 	local currentTime = CurTime()
 	-- Apply fade alpha if fading
@@ -1287,17 +1296,35 @@ end
 
 -- Start evolving the circle over the given duration.
 -- This progressively reveals rings (logarithmically) and animates their height (depth).
-function MagicCircle:StartEvolving(duration)
+function MagicCircle:StartEvolving(duration, upOnly)
 	self.isEvolving = true
 	self.evolveStart = CurTime()
 	self.evolveDuration = math.max(0.1, duration or 1)
 	self.baseVisible = 2
-	self.lastVisible = 2
 	self.enableRingSounds = true
 
-	-- Initialize first two rings to baseline
+	-- Allow the caller to override the upOnly flag set at construction time
+	if upOnly ~= nil then
+		self.upOnly = upOnly == true
+	end
+
+	-- If the circle has already been drawn (it was showing all rings in static mode),
+	-- preserve full visibility so no rings disappear mid-scene. The height animation
+	-- still plays; only the ring-by-ring appearance animation is skipped.
+	-- For freshly created circles (never drawn yet), start from 2 so the appearance
+	-- animation reveals rings one by one as intended.
+	if self._hasBeenDrawn then
+		self.lastVisible = #self.rings
+	else
+		self.lastVisible = 2
+	end
+
+	-- Initialize first two rings to baseline height; leave the rest at their
+	-- current height so already-visible rings don't snap to zero
 	for i, ring in ipairs(self.rings) do
-		ring.height = (i <= 2) and 0 or ring.height
+		if i <= 2 then
+			ring.height = 0
+		end
 	end
 end
 
