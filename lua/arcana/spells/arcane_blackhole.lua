@@ -1206,7 +1206,7 @@ if CLIENT then
 		)
 
 		if groundCircle and groundCircle.StartEvolving then
-			groundCircle:StartEvolving(castTime, true)
+			groundCircle:StartEvolving(castTime, 1) -- upward
 			table.insert(blackholeCastingData[caster].circles, groundCircle)
 
 			-- Initial void opening sound

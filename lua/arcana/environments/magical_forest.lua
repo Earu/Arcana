@@ -641,7 +641,7 @@ if CLIENT then
 		local color = Color(110, 40, 200, 255) -- deep purple
 		local circle = MagicCircle.CreateMagicCircle(pos + Vector(0, 0, 0.5), ang, color, 3, size, duration, 2)
 		if circle and circle.StartEvolving then
-			circle:StartEvolving(duration, true)
+			circle:StartEvolving(duration, 1) -- upward
 		end
 	end)
 end

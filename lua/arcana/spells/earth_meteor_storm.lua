@@ -1053,7 +1053,7 @@ if CLIENT then
 		local groundCircle = MagicCircle.CreateMagicCircle(caster:GetPos() + Vector(0, 0, 2), Angle(0, 0, 0), color, 4, 80, castTime, 2)
 
 		if groundCircle and groundCircle.StartEvolving then
-			groundCircle:StartEvolving(castTime, true)
+			groundCircle:StartEvolving(castTime, 1) -- upward
 			table.insert(meteorStormCastingData[caster].circles, groundCircle)
 			-- Initial thump
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 88, 80)
