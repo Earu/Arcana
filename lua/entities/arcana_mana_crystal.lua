@@ -287,8 +287,10 @@ if CLIENT then
 	local MAX_RENDER_DIST = 2000 * 2000
 	local RENDER_MAX_DIST = 2000
 	local FADE_WINDOW = 600
+	local SPAWN_FADE_DURATION = 1.5
 	function ENT:Initialize()
 		self._origColor = self:GetColor() or Color(255, 255, 255)
+		self._spawnTime = CurTime()
 
 		-- Particle FX state
 		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
@@ -352,7 +354,8 @@ if CLIENT then
 		if EyePos():DistToSqr(self:GetPos()) > MAX_RENDER_DIST then return end
 
 		local now = CurTime()
-		if now >= (self._fxNextAbsorb or 0) then
+		local spawnAge = now - (self._spawnTime or now)
+		if now >= (self._fxNextAbsorb or 0) and spawnAge >= SPAWN_FADE_DURATION * 0.5 then
 			self:_SpawnAbsorbParticles()
 			self._fxNextAbsorb = now + 0.06
 		end
@@ -377,15 +380,24 @@ if CLIENT then
 			fade = math.Clamp(1 - (dist - (RENDER_MAX_DIST - FADE_WINDOW)) / FADE_WINDOW, 0, 1)
 		end
 
+		local elapsed = CurTime() - (self._spawnTime or CurTime())
+		local spawnFade = math.Clamp(elapsed / SPAWN_FADE_DURATION, 0, 1)
+		-- Smoothstep for a gentle ease-in
+		spawnFade = spawnFade * spawnFade * (3 - 2 * spawnFade)
+
+		if spawnFade <= 0 then return end
+
 		if SHADER_MAT then
 			if isFar then
+				render_SetBlend(spawnFade)
 				self:DrawModel()
+				render_SetBlend(1)
 			else
 				render_UpdateScreenEffectTexture()
 				render_OverrideDepthEnable(true, true) -- no Z write
 
 				-- draw base model underneath at a low alpha to unify color
-				local baseUnderAlpha = 0.9 * fade
+				local baseUnderAlpha = 0.9 * fade * spawnFade
 				if baseUnderAlpha > 0 then
 					render_SetBlend(baseUnderAlpha)
 					self:DrawModel()
@@ -395,7 +407,7 @@ if CLIENT then
 				-- draw refractive passes with distance-based fade
 				local PASSES = 4 -- try 3–6
 				local baseDisp = 0.5 * (0.6 + 0.4 * fade)
-				local perPassOpacity = (1 / PASSES) * fade
+				local perPassOpacity = (1 / PASSES) * fade * spawnFade
 
 				-- start from current screen
 				local scr = render_GetScreenEffectTexture()
@@ -427,13 +439,15 @@ if CLIENT then
 
 				-- crossfade in the base model as shader fades out
 				if fade < 1 then
-					render_SetBlend(1 - fade)
+					render_SetBlend((1 - fade) * spawnFade)
 					self:DrawModel()
 					render_SetBlend(1)
 				end
 			end
 		else
+			render_SetBlend(spawnFade)
 			self:DrawModel()
+			render_SetBlend(1)
 		end
 
 		if not isFar then
@@ -444,7 +458,7 @@ if CLIENT then
 				dl.r = curColor.r
 				dl.g = curColor.g
 				dl.b = curColor.b
-				dl.brightness = 6
+				dl.brightness = 6 * spawnFade
 				dl.Decay = 100
 				dl.Size = math.max(160, self:GetAbsorbRadius() * 0.3)
 				dl.DieTime = CurTime() + 0.1
