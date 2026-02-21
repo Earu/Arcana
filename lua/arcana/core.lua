@@ -643,7 +643,6 @@ end
 function Arcane:StartCasting(ply, spellId)
 	if not IsValid(ply) then return false end
 	local canCast, reason = self:CanCastSpell(ply, spellId)
-
 	if not canCast then
 		if SERVER then
 			Arcane:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
@@ -653,8 +652,15 @@ function Arcane:StartCasting(ply, spellId)
 	end
 
 	local spell = self.RegisteredSpells[spellId]
-	local castTime = math.max(0.1, spell.cast_time or 0)
+	if spell.is_divine_pact and spell.cost_type == Arcane.COST_TYPES.COINS and Arcane:GetCoins(ply) <= spell.cost_amount then
+		if SERVER then
+			Arcane:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. "Insufficient coins")
+		end
 
+		return false -- Divine Pacts require coins and can damage while casting so we are stricter about it
+	end
+
+	local castTime = math.max(0.1, spell.cast_time or 0)
 	local pdata = self:GetPlayerData(ply)
 	if pdata then
 		pdata.casting_until = CurTime() + castTime
