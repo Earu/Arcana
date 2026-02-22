@@ -1057,6 +1057,9 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	-- Set to true on the first Draw call; used by StartEvolving to decide whether
 	-- to preserve current ring visibility or start the ring-by-ring appearance animation
 	circle._hasBeenDrawn = false
+	-- When true, all rings are always drawn regardless of lastVisible (which only
+	-- controls the staggered height animation, not visibility)
+	circle._preserveVisibility = false
 	-- Evolving-cast state
 	circle.isEvolving = false
 	circle.evolveStart = 0
@@ -1219,7 +1222,9 @@ function MagicCircle:Draw()
 
 	-- Draw all rings
 	local count = #self.rings
-	local maxToDraw = self.isEvolving and math.max(self.baseVisible, self.lastVisible) or count
+	-- _preserveVisibility: rings were already on screen when evolving started; keep them
+	-- all visible while lastVisible still gates the staggered height animation
+	local maxToDraw = (self.isEvolving and not self._preserveVisibility) and math.max(self.baseVisible, self.lastVisible) or count
 
 	for i = 1, math.min(count, maxToDraw) do
 		local ring = self.rings[i]
@@ -1304,22 +1309,19 @@ function MagicCircle:StartEvolving(duration, direction)
 	end
 
 	-- If the circle has already been drawn (it was showing all rings in static mode),
-	-- preserve full visibility so no rings disappear mid-scene. The height animation
-	-- still plays; only the ring-by-ring appearance animation is skipped.
-	-- For freshly created circles (never drawn yet), start from 2 so the appearance
-	-- animation reveals rings one by one as intended.
+	-- set _preserveVisibility so Draw always renders the full ring set. lastVisible
+	-- still starts at 2 and grows normally, so the height animation is staggered
+	-- ring-by-ring just like it is for freshly created circles — but no ring ever
+	-- disappears because Draw ignores lastVisible for the visibility count.
 	if self._hasBeenDrawn then
-		self.lastVisible = #self.rings
-	else
-		self.lastVisible = 2
+		self._preserveVisibility = true
 	end
+	self.lastVisible = 2
 
-	-- Initialize first two rings to baseline height; leave the rest at their
-	-- current height so already-visible rings don't snap to zero
-	for i, ring in ipairs(self.rings) do
-		if i <= 2 then
-			ring.height = 0
-		end
+	-- Reset all ring heights to 0 so the staggered height animation starts from a
+	-- clean baseline for every ring (including ones that were already on screen)
+	for _, ring in ipairs(self.rings) do
+		ring.height = 0
 	end
 end
 
