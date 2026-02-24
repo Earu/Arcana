@@ -168,15 +168,6 @@ SWEP.WorldModelOffset = {
 
 }
 
--- First-person (viewmodel) placement for the clientside grimoire model
-SWEP.ViewModelOffset = {
-	-- tweak these to taste; units are in viewmodel local space
-	pos = Vector(3.2, 1.2, -2.0),
-	-- rotate so the book sits naturally in the palm
-	ang = Angle(0, -90, 0),
-	size = 0.85
-}
-
 function SWEP:DrawWorldModel()
 	local owner = self:GetOwner()
 
@@ -300,58 +291,7 @@ end
 
 -- Client-side grimoire menu
 if CLIENT then
-	---------------------------------------------------------------------------
-	-- First-person rendering of the grimoire attached to the right hand
-	---------------------------------------------------------------------------
-	function SWEP:EnsureViewModelBook()
-		if IsValid(self.VMBook) then return end
-
-		self.VMBook = ClientsideModel(self.WorldModel)
-		if not IsValid(self.VMBook) then return end
-
-		self.VMBook:SetNoDraw(true)
-	end
-
-	function SWEP:PostDrawViewModel(vm, weapon, ply)
-		-- Ensure we have a book model to draw
-		self:EnsureViewModelBook()
-		if not IsValid(self.VMBook) then return end
-		local boneId = vm:LookupBone("ValveBiped.Bip01_R_Hand")
-		if not boneId then return end
-		local matrix = vm:GetBoneMatrix(boneId)
-		if not matrix then return end
-		local pos = matrix:GetTranslation()
-		local ang = matrix:GetAngles()
-		-- Apply positional offset in the hand's local space
-		pos = pos + ang:Forward() * (self.ViewModelOffset.pos.x or 0) + ang:Right() * (self.ViewModelOffset.pos.y or 0) + ang:Up() * (self.ViewModelOffset.pos.z or 0)
-		-- Apply angular offsets
-		local a = self.ViewModelOffset.ang or angle_zero
-
-		if a then
-			ang:RotateAroundAxis(ang:Up(), a.y or 0)
-			ang:RotateAroundAxis(ang:Right(), a.p or 0)
-			ang:RotateAroundAxis(ang:Forward(), a.r or 0)
-		end
-
-		self.VMBook:SetRenderOrigin(pos)
-		self.VMBook:SetRenderAngles(ang)
-		self.VMBook:SetModelScale(self.ViewModelOffset.size or 1.0, 0)
-		self.VMBook:DrawModel()
-		self.VMBook:SetRenderOrigin()
-		self.VMBook:SetRenderAngles()
-	end
-
-	-- Clean up clientside book when the weapon is hidden/removed
 	function SWEP:OnRemove()
-		if IsValid(self.VMBook) then
-			self.VMBook:Remove()
-			self.VMBook = nil
-		end
-	end
-
-	function SWEP:ViewModelDrawn(vm)
-		-- Explicitly keep default vm drawing (hands) enabled; book is drawn
-		-- in PostDrawViewModel above.
 	end
 
 	-- Reusable color objects to avoid allocation overhead in draw calls
