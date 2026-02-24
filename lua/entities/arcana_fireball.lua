@@ -45,6 +45,7 @@ if SERVER then
 			spr:SetKeyValue("rendercolor", string.format("%d %d %d", color.r, color.g, color.b))
 			spr:SetKeyValue("rendermode", "9")
 			spr:SetKeyValue("scale", tostring(scale))
+			spr:SetPos(parent:GetPos())
 			spr:SetParent(parent)
 			spr:Spawn()
 			spr:Activate()
