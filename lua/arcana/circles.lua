@@ -1422,8 +1422,7 @@ hook.Add("Think", "MagicCircleManager_Update", function()
 	MagicCircleManager:Update()
 end)
 
-hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox, is3dSkybox)
-	if isSkybox or is3dSkybox then return end
+hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(isDepth, isSkybox, is3dSkybox)
 	MagicCircleManager:Draw()
 end)
 

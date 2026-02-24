@@ -157,8 +157,6 @@ function SWEP:Reload()
 end
 
 function SWEP:Think()
-	-- Continuous grimoire effects could go here
-	-- For example, subtle magical particles or glowing effects
 end
 
 -- World model attachment to player's right hand
