@@ -1143,7 +1143,10 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		if SERVER and Arcane.ManaCrystals and Arcane.ManaCrystals.ReportMagicUse then
 			local ctxPos = (context and context.circlePos) or (IsValid(ply) and (ply:GetPos() + Vector(0, 0, 2))) or nil
 			if ctxPos then
-				Arcane.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, context)
+				-- Pass cooldown info to prevent spam farming with short-cooldown spells
+				local reportContext = table.Copy(context or {})
+				reportContext.cooldown = spell.cooldown or Arcane.Config.DEFAULT_SPELL_COOLDOWN or 1.0
+				Arcane.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, reportContext)
 			end
 		end
 	else

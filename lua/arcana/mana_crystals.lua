@@ -8,17 +8,21 @@ if SERVER then
 	M.Config = M.Config or {
 		hotspotJoinRadius = 2000,    -- distance to merge reports into an existing hotspot
 		hotspotDecayPerSecond = 6,  -- how fast hotspot intensity decays
-		hotspotSpawnThreshold = 40, -- intensity required to attempt a spawn
+		hotspotSpawnThreshold = 70, -- intensity required to attempt a spawn (increased from 40)
 		hotspotTrimBelow = 4,       -- remove hotspots below this intensity
 
 		crystalSearchRadius = 2000,  -- try to find/grow an existing crystal within this distance
-		crystalGrowthPerCast = 6,   -- growth points added per cast nearby
+		crystalGrowthPerCast = 6,   -- growth points added per cast nearby (base value)
 		crystalSpawnInitialGrowth = 6, -- initial growth given to freshly spawned crystals
 		crystalMaxScale = 2.2,      -- maximum model scale
 		crystalMinScale = 0.35,     -- starting model scale
 		crystalMaxPerArea = 2,      -- limit new spawns if too many are near
 		areaLimitRadius = 2000,      -- radius to count nearby crystals for the area limit
 		hotspotSpawnCooldown = 10,   -- minimum seconds between spawns per hotspot
+
+		-- Cooldown scaling: spells with shorter cooldowns contribute less to crystal growth
+		cooldownReference = 1.0,    -- reference cooldown (seconds) for full contribution
+		cooldownScalingFactor = 0.7, -- how much cooldown affects growth (0-1, higher = more impact)
 
 		-- Corruption area grouping
 		regionRadius = 2000,          -- radius used to group positions into a corruption area cell
@@ -147,6 +151,20 @@ if SERVER then
 		if not isvector(pos) then return end
 		local cfg = self.Config
 		local now = CurTime()
+
+		-- Calculate growth contribution based on spell cooldown
+		-- Shorter cooldown spells contribute less to prevent spam farming
+		local spellCooldown = tonumber(context and context.cooldown) or cfg.cooldownReference or 1.0
+		local refCooldown = cfg.cooldownReference or 1.0
+		local scaleFactor = cfg.cooldownScalingFactor or 0.7
+
+		-- Growth formula: base * (scaled_ratio + (1-scale) to ensure minimum contribution)
+		-- Example: 0.5s cooldown with 0.7 scaleFactor -> contributes ~53% of base growth
+		-- Example: 2.0s cooldown with 0.7 scaleFactor -> contributes ~88% of base growth
+		local cooldownRatio = math.Clamp(spellCooldown / refCooldown, 0.1, 3.0)
+		local growthMultiplier = (cooldownRatio * scaleFactor) + (1 - scaleFactor)
+		local growthAmount = cfg.crystalGrowthPerCast * growthMultiplier
+
 		-- Merge into an existing hotspot or create new
 		local h = findNearestHotspot(pos, cfg.hotspotJoinRadius)
 		if not h then
@@ -155,13 +173,13 @@ if SERVER then
 		end
 
 		-- Increase intensity and timestamp
-		h.value = (h.value or 0) + cfg.crystalGrowthPerCast
+		h.value = (h.value or 0) + growthAmount
 		h.touched = now
 
 		-- First, try to grow an existing crystal nearby
 		local crystal = findCrystalNear(h.pos, cfg.crystalSearchRadius)
 		if IsValid(crystal) and crystal.AddCrystalGrowth then
-			crystal:AddCrystalGrowth(cfg.crystalGrowthPerCast)
+			crystal:AddCrystalGrowth(growthAmount)
 			return
 		end
 
