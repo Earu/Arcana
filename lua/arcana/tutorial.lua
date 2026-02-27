@@ -49,12 +49,10 @@ local function initTreeShaderMaterial()
 	})
 end
 
-if system.IsWindows() then
-	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
-		initTreeShaderMaterial()
-	else
-		hook.Add("ShaderMounted", "arcana_tree_crystal_dispersion", initTreeShaderMaterial)
-	end
+if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+	initTreeShaderMaterial()
+else
+	hook.Add("ShaderMounted", "arcana_tree_crystal_dispersion", initTreeShaderMaterial)
 end
 
 -- Tutorial state
