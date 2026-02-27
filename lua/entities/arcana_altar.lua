@@ -815,7 +815,7 @@ if CLIENT then
 						return
 					end
 
-					net.Start("Arcane_UnlockSpell")
+					net.Start("Arcana_UnlockSpell")
 					net.WriteString(item.id)
 					net.SendToServer()
 					surface.PlaySound("buttons/button14.wav")
@@ -919,7 +919,7 @@ if CLIENT then
 							return
 						end
 
-						net.Start("Arcane_UnlockSpell")
+						net.Start("Arcana_UnlockSpell")
 						net.WriteString(item.id)
 						net.SendToServer()
 						surface.PlaySound("buttons/button14.wav")

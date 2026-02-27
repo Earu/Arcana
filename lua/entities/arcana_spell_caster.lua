@@ -180,7 +180,7 @@ if SERVER then
 		local size = 30
 
 
-		net.Start("Arcane_BeginCasting", true)
+		net.Start("Arcana_BeginCasting", true)
 		net.WriteEntity(self)
 		net.WriteString(spellId)
 		net.WriteFloat(castTime)
@@ -205,7 +205,7 @@ if SERVER then
 					Arcane:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
 				end
 
-				net.Start("Arcane_SpellFailed", true)
+				net.Start("Arcana_SpellFailed", true)
 				net.WriteEntity(self)
 				net.WriteString(spellId)
 				net.WriteFloat(castTime)
@@ -296,13 +296,13 @@ if SERVER then
 				spell.on_failure(owner, nil, data)
 			end
 
-			Arcane.RunHook("CastSpellFailure", owner, spellId, nil, data, context)
+		Arcane.RunHook("CastSpellFailure", owner, spellId, nil, data, context)
 
-			net.Start("Arcane_SpellFailed", true)
-			net.WriteEntity(self)
-			net.WriteString(spellId)
-			net.WriteFloat(castTime)
-			net.Broadcast()
+		net.Start("Arcana_SpellFailed", true)
+		net.WriteEntity(self)
+		net.WriteString(spellId)
+		net.WriteFloat(castTime)
+		net.Broadcast()
 		end
 
 		self.CastingUntil = 0
