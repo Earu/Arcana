@@ -94,7 +94,7 @@ if SERVER then
 	function Arcane.Inventory:SyncToClient(ply)
 		if not IsValid(ply) then return end
 		local data = self:Get(ply)
-		net.Start("Arcane_InventorySync")
+		net.Start("Arcana_InventorySync")
 		net.WriteUInt(data.coins, 32)
 		local itemsJson = util.TableToJSON(data.items) or "{}"
 		net.WriteString(itemsJson)
@@ -144,11 +144,11 @@ if SERVER then
 	end
 
 	-- Player lifecycle hooks
-	hook.Add("Arcana_LoadedPlayerData", "Arcane_InventorySyncOnLoad", function(ply)
+	hook.Add("Arcana_LoadedPlayerData", "Arcana_InventorySyncOnLoad", function(ply)
 		Arcane.Inventory:SyncToClient(ply)
 	end)
 
-	hook.Add("PlayerDisconnected", "Arcane_InventorySave", function(ply)
+	hook.Add("PlayerDisconnected", "Arcana_InventorySave", function(ply)
 		Arcane.Inventory:Save(ply)
 		Arcane.Inventory.Cache[ply:SteamID64()] = nil
 	end)
@@ -159,7 +159,7 @@ if SERVER then
 		end
 	end)
 
-	util.AddNetworkString("Arcane_InventorySync")
+	util.AddNetworkString("Arcana_InventorySync")
 end
 
 -- ============================================================================
@@ -169,7 +169,7 @@ if CLIENT then
 	Arcane.Inventory = Arcane.Inventory or {}
 	Arcane.Inventory.LocalCache = Arcane.Inventory.LocalCache or {coins = 0, items = {}}
 
-	net.Receive("Arcane_InventorySync", function()
+	net.Receive("Arcana_InventorySync", function()
 		local coins = net.ReadUInt(32)
 		local itemsJson = net.ReadString()
 		local ok, items = pcall(util.JSONToTable, itemsJson)
@@ -427,7 +427,7 @@ if CLIENT then
 		return panel
 	end
 
-	hook.Add("OnContextMenuOpen", "Arcane_InventoryShow", function()
+	hook.Add("OnContextMenuOpen", "Arcana_InventoryShow", function()
 		local panel = IsValid(Arcane.Inventory.Panel) and Arcane.Inventory.Panel or createInventoryPanel()
 		if IsValid(panel) then
 			local shouldDraw = Arcane.RunHook("ShouldDrawInventory")
@@ -441,7 +441,7 @@ if CLIENT then
 		end
 	end)
 
-	hook.Add("OnContextMenuClose", "Arcane_InventoryHide", function()
+	hook.Add("OnContextMenuClose", "Arcana_InventoryHide", function()
 		if IsValid(Arcane.Inventory.Panel) then
 			Arcane.Inventory.Panel:SetVisible(false)
 		end

@@ -47,7 +47,7 @@ if CLIENT then
 			return
 		end
 
-		net.Start("Arcane_ConsoleCastSpell")
+		net.Start("Arcana_ConsoleCastSpell")
 		net.WriteString(spellId)
 		net.SendToServer()
 	end, arcanaAutoComplete, "Cast an Arcana spell: arcana <spellId>")
@@ -554,17 +554,17 @@ end
 
 -- Networking helpers
 if SERVER then
-	util.AddNetworkString("Arcane_FullSync")
-	util.AddNetworkString("Arcane_SetQuickslot")
-	util.AddNetworkString("Arcane_SetSelectedQuickslot")
-	util.AddNetworkString("Arcane_BeginCasting")
-	util.AddNetworkString("Arcane_PlayCastGesture")
-	util.AddNetworkString("Arcane_SpellFailed")
+	util.AddNetworkString("Arcana_FullSync")
+	util.AddNetworkString("Arcana_SetQuickslot")
+	util.AddNetworkString("Arcana_SetSelectedQuickslot")
+	util.AddNetworkString("Arcana_BeginCasting")
+	util.AddNetworkString("Arcana_PlayCastGesture")
+	util.AddNetworkString("Arcana_SpellFailed")
 	util.AddNetworkString("Arcana_AttachBandVFX")
 	util.AddNetworkString("Arcana_ClearBandVFX")
-	util.AddNetworkString("Arcane_ConsoleCastSpell")
-	util.AddNetworkString("Arcane_ErrorNotification")
-	util.AddNetworkString("Arcane_SpellUnlocked")
+	util.AddNetworkString("Arcana_ConsoleCastSpell")
+	util.AddNetworkString("Arcana_ErrorNotification")
+	util.AddNetworkString("Arcana_SpellUnlocked")
 
 	function Arcane:SyncPlayerData(ply)
 		if not IsValid(ply) then return end
@@ -580,7 +580,7 @@ if SERVER then
 			selected_quickslot = data.selected_quickslot,
 		}
 
-		net.Start("Arcane_FullSync")
+		net.Start("Arcana_FullSync")
 		net.WriteTable(payload)
 		net.Send(ply)
 
@@ -592,14 +592,14 @@ if SERVER then
 	function Arcane:SendErrorNotification(ply, msg)
 		if not IsValid(ply) then return end
 		--ply:EmitSound("buttons/button8.wav", 100, 120)
-		net.Start("Arcane_ErrorNotification")
+		net.Start("Arcana_ErrorNotification")
 		net.WriteString(msg)
 		net.Send(ply)
 	end
 end
 
 if CLIENT then
-	net.Receive("Arcane_ErrorNotification", function()
+	net.Receive("Arcana_ErrorNotification", function()
 		local msg = net.ReadString()
 		Arcane:Print(msg)
 		notification.AddLegacy(msg, NOTIFY_ERROR, 5)
@@ -626,7 +626,7 @@ function Arcane:InterruptSpell(ply, spellId)
 		timer.Remove(timerName)
 
 		-- Notify clients to fail the spell visuals
-		net.Start("Arcane_SpellFailed", true)
+		net.Start("Arcana_SpellFailed", true)
 		net.WriteEntity(ply)
 		net.WriteString(spellId)
 		net.WriteFloat(0)
@@ -675,14 +675,14 @@ function Arcane:StartCasting(ply, spellId)
 		local gesture = forwardLike and ACT_SIGNAL_FORWARD or ACT_GMOD_GESTURE_BECON
 
 		if gesture then
-			net.Start("Arcane_PlayCastGesture", true)
+			net.Start("Arcana_PlayCastGesture", true)
 			net.WriteEntity(ply)
 			net.WriteInt(gesture, 16)
 			net.Broadcast()
 		end
 
 		-- Tell clients to show evolving circle for this cast
-		net.Start("Arcane_BeginCasting", true)
+		net.Start("Arcana_BeginCasting", true)
 		net.WriteEntity(ply)
 		net.WriteString(spellId)
 		net.WriteFloat(castTime)
@@ -704,7 +704,7 @@ function Arcane:StartCasting(ply, spellId)
 			-- Re-check basic conditions before executing
 			local ok, _ = self:CanCastSpell(ply, spellId)
 			if not ok then
-				net.Start("Arcane_SpellFailed", true)
+				net.Start("Arcana_SpellFailed", true)
 				net.WriteEntity(ply)
 				net.WriteString(spellId)
 				net.WriteFloat(castTime)
@@ -773,7 +773,7 @@ function Arcane:GiveXP(ply, amount, reason)
 
 	-- Network update
 	if SERVER then
-		net.Start("Arcane_XPUpdate")
+		net.Start("Arcana_XPUpdate")
 		net.WriteUInt(data.xp, 32)
 		net.WriteUInt(data.level, 16)
 		net.WriteUInt(amount, 32)
@@ -822,7 +822,7 @@ function Arcane:LevelUp(ply, oldLevel, newLevel)
 	-- Notify player
 	if SERVER then
 		-- Network level up notification
-		net.Start("Arcane_LevelUp")
+		net.Start("Arcana_LevelUp")
 		net.WriteUInt(newLevel, 16)
 		net.WriteUInt(data.knowledge_points, 16)
 		net.Send(ply)
@@ -1158,7 +1158,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 
 		-- Notify clients to break down the casting circle visuals
 		if SERVER then
-			net.Start("Arcane_SpellFailed", true)
+			net.Start("Arcana_SpellFailed", true)
 			net.WriteEntity(ply)
 			net.WriteString(spellId)
 			net.WriteFloat((context and context.castTime) or 0)
@@ -1221,7 +1221,7 @@ function Arcane:UnlockSpell(ply, spellId, force)
 		self:SyncPlayerData(ply)
 
 		-- Tell the unlocking client to show an on-screen announcement & play a sound
-		net.Start("Arcane_SpellUnlocked")
+		net.Start("Arcana_SpellUnlocked")
 		net.WriteString(spellId)
 		net.WriteString(spell.name or spellId)
 		net.Send(ply)
@@ -1254,18 +1254,18 @@ end
 
 -- Networking
 if SERVER then
-	util.AddNetworkString("Arcane_XPUpdate")
-	util.AddNetworkString("Arcane_LevelUp")
-	util.AddNetworkString("Arcane_UnlockSpell")
+	util.AddNetworkString("Arcana_XPUpdate")
+	util.AddNetworkString("Arcana_LevelUp")
+	util.AddNetworkString("Arcana_UnlockSpell")
 
 	-- Handle spell unlocking
-	net.Receive("Arcane_UnlockSpell", function(len, ply)
+	net.Receive("Arcana_UnlockSpell", function(len, ply)
 		local spellId = net.ReadString()
 		Arcane:UnlockSpell(ply, spellId)
 	end)
 
 	-- Handle client-forwarded console cast: "arcana <spellId>"
-	net.Receive("Arcane_ConsoleCastSpell", function(_, ply)
+	net.Receive("Arcana_ConsoleCastSpell", function(_, ply)
 		if not IsValid(ply) then return end
 		local raw = net.ReadString() or ""
 		local spellId = string.lower(string.Trim(raw))
@@ -1282,7 +1282,7 @@ if SERVER then
 	end)
 
 	-- Assign a spell to a quickslot
-	net.Receive("Arcane_SetQuickslot", function(_, ply)
+	net.Receive("Arcana_SetQuickslot", function(_, ply)
 		local slotIndex = math.Clamp(net.ReadUInt(4), 1, 8)
 		local spellId = net.ReadString()
 		local data = Arcane:GetPlayerData(ply)
@@ -1294,7 +1294,7 @@ if SERVER then
 	end)
 
 	-- Select the active quickslot
-	net.Receive("Arcane_SetSelectedQuickslot", function(_, ply)
+	net.Receive("Arcana_SetSelectedQuickslot", function(_, ply)
 		local slotIndex = math.Clamp(net.ReadUInt(4), 1, 8)
 		local data = Arcane:GetPlayerData(ply)
 		data.selected_quickslot = slotIndex
@@ -1305,7 +1305,7 @@ end
 
 -- Client-side receivers to keep local state in sync
 if CLIENT then
-	net.Receive("Arcane_XPUpdate", function()
+	net.Receive("Arcana_XPUpdate", function()
 		local xp = net.ReadUInt(32)
 		local level = net.ReadUInt(16)
 		local xpGained = net.ReadUInt(32)
@@ -1327,7 +1327,7 @@ if CLIENT then
 		end
 	end)
 
-	net.Receive("Arcane_LevelUp", function()
+	net.Receive("Arcana_LevelUp", function()
 		local newLevel = net.ReadUInt(16)
 		local newKnowledgeTotal = net.ReadUInt(16)
 		local ply = LocalPlayer()
@@ -1346,7 +1346,7 @@ if CLIENT then
 		runHook("ClientLevelUp", prevLevel, newLevel, knowledgeDelta)
 	end)
 
-	net.Receive("Arcane_FullSync", function()
+	net.Receive("Arcana_FullSync", function()
 		local payload = net.ReadTable()
 		if not payload then return end
 		local ply = LocalPlayer()
@@ -1374,7 +1374,7 @@ if CLIENT then
 	end)
 
 	-- Show evolving circle while a spell is being cast
-	net.Receive("Arcane_BeginCasting", function()
+	net.Receive("Arcana_BeginCasting", function()
 		local caster = net.ReadEntity()
 		local spellId = net.ReadString()
 		local castTime = net.ReadFloat()
@@ -1440,7 +1440,7 @@ if CLIENT then
 		caster._ArcanaCastingCircle = circle
 
 		-- While casting, continuously follow the caster so visuals stay attached
-		local followHook = "Arcane_FollowCasting_" .. tostring(caster)
+		local followHook = "Arcana_FollowCasting_" .. tostring(caster)
 		hook.Remove("Think", followHook)
 
 		hook.Add("Think", followHook, function()
@@ -1489,7 +1489,7 @@ if CLIENT then
 	end)
 
 	-- On spell failure, break down the tracked circle for the caster (works for both players and entities)
-	net.Receive("Arcane_SpellFailed", function()
+	net.Receive("Arcana_SpellFailed", function()
 		local caster = net.ReadEntity()
 		local spellId = net.ReadString()
 		local castTime = net.ReadFloat() or 0
@@ -1513,7 +1513,7 @@ if CLIENT then
 	end)
 
 	-- Play cast gesture locally for a given player
-	net.Receive("Arcane_PlayCastGesture", function()
+	net.Receive("Arcana_PlayCastGesture", function()
 		local ply = net.ReadEntity()
 		local gesture = net.ReadInt(16)
 		if not IsValid(ply) or not gesture then return end
@@ -1623,11 +1623,11 @@ if SERVER then
 	-- Hooks
 	local justSpawned = {}
 
-	hook.Add("PlayerInitialSpawn", "Arcane_PlayerJoin", function(ply)
+	hook.Add("PlayerInitialSpawn", "Arcana_PlayerJoin", function(ply)
 		justSpawned[ply] = true
 	end)
 
-	hook.Add("SetupMove", "Arcane_PlayerJoin", function(ply, _, ucmd)
+	hook.Add("SetupMove", "Arcana_PlayerJoin", function(ply, _, ucmd)
 		if justSpawned[ply] and not ucmd:IsForced() then
 			justSpawned[ply] = nil
 
@@ -1638,7 +1638,7 @@ if SERVER then
 		end
 	end)
 
-	hook.Add("PlayerDeath", "Arcane_InterruptOnDeath", function(victim)
+	hook.Add("PlayerDeath", "Arcana_InterruptOnDeath", function(victim)
 		-- Interrupt any active spell casting
 		local pdata = Arcane:GetPlayerData(victim)
 		if pdata and pdata.casting_spell then
@@ -1646,7 +1646,7 @@ if SERVER then
 		end
 	end)
 
-	hook.Add("PlayerDisconnected", "Arcane_PlayerLeave", function(ply)
+	hook.Add("PlayerDisconnected", "Arcana_PlayerLeave", function(ply)
 		-- Interrupt any active spell casting
 		local pdata = Arcane:GetPlayerData(ply)
 		if pdata and pdata.casting_spell then
@@ -1723,8 +1723,8 @@ if SERVER then
 		end
 	end
 
-	hook.Add("InitPostEntity", "Arcane_SpawnAltar", SpawnMapEntities)
-	hook.Add("PostCleanupMap", "Arcane_SpawnAltar", SpawnMapEntities)
+	hook.Add("InitPostEntity", "Arcana_SpawnAltar", SpawnMapEntities)
+	hook.Add("PostCleanupMap", "Arcana_SpawnAltar", SpawnMapEntities)
 end
 
 -- Public helper to sync a weapon's applied enchantment IDs to clients via NWString

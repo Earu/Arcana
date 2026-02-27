@@ -430,7 +430,7 @@ if CLIENT then
 				-- Update locally for instant feedback
 				local pdata = Arcane:GetPlayerData(owner)
 				pdata.selected_quickslot = self.RadialHoverSlot
-				net.Start("Arcane_SetSelectedQuickslot")
+				net.Start("Arcana_SetSelectedQuickslot")
 				net.WriteUInt(self.RadialHoverSlot, 4)
 				net.SendToServer()
 			end
@@ -673,14 +673,14 @@ if CLIENT then
 				-- Select the quickslot
 				local pdata = Arcane:GetPlayerData(owner)
 				pdata.selected_quickslot = slotIndex
-				net.Start("Arcane_SetSelectedQuickslot")
+				net.Start("Arcana_SetSelectedQuickslot")
 				net.WriteUInt(slotIndex, 4)
 				net.SendToServer()
 			elseif mc == MOUSE_RIGHT then
 				-- Remove spell from the quickslot
 				local pdata = Arcane:GetPlayerData(owner)
 				pdata.quickspell_slots[slotIndex] = nil
-				net.Start("Arcane_SetQuickslot")
+				net.Start("Arcana_SetQuickslot")
 				net.WriteUInt(slotIndex, 4)
 				net.WriteString("") -- Empty string clears the slot
 				net.SendToServer()
@@ -694,7 +694,7 @@ if CLIENT then
 				local slotIndex = pnl._hoverSlot or 1
 				local pdata2 = Arcane:GetPlayerData(owner)
 				pdata2.quickspell_slots[slotIndex] = sid
-				net.Start("Arcane_SetQuickslot")
+				net.Start("Arcana_SetQuickslot")
 				net.WriteUInt(slotIndex, 4)
 				net.WriteString(sid)
 				net.SendToServer()
@@ -816,7 +816,7 @@ if CLIENT then
 
 			castBtn.DoClick = function()
 				-- Request server to cast this spell
-				net.Start("Arcane_ConsoleCastSpell")
+				net.Start("Arcana_ConsoleCastSpell")
 				net.WriteString(item.id)
 				net.SendToServer()
 
@@ -964,7 +964,7 @@ if CLIENT then
 				castBtn:SetCursor("hand")
 
 				castBtn.DoClick = function()
-					net.Start("Arcane_ConsoleCastSpell")
+					net.Start("Arcana_ConsoleCastSpell")
 					net.WriteString(item.id)
 					net.SendToServer()
 
@@ -1113,7 +1113,7 @@ if CLIENT then
 				end
 
 				row.DoClick = function(pnl)
-					net.Start("Arcane_ConsoleCastSpell")
+					net.Start("Arcana_ConsoleCastSpell")
 					net.WriteString(item.id)
 					net.SendToServer()
 					local ctrlDown = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
@@ -1128,7 +1128,7 @@ if CLIENT then
 				castBtn:SetSize(72, 28)
 
 				castBtn.DoClick = function(pnl)
-					net.Start("Arcane_ConsoleCastSpell")
+					net.Start("Arcana_ConsoleCastSpell")
 					net.WriteString(item.id)
 					net.SendToServer()
 					local ctrlDown = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)

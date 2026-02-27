@@ -73,7 +73,7 @@ local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId
 	surface.PlaySound(snd)
 end
 
-net.Receive("Arcane_SpellUnlocked", function()
+net.Receive("Arcana_SpellUnlocked", function()
 	local _id = net.ReadString()
 	local name = net.ReadString()
 	local cost = 0
