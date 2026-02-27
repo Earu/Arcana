@@ -1349,7 +1349,7 @@ if CLIENT then
 					end
 
 					-- Info tooltip icon
-					local infoIcon = ArtDeco.CreateInfoIcon(row, ench.description or "No description available", 320, 64)
+					local infoIcon = ArtDeco.CreateInfoIcon(row, ench.description or "No description available", 320)
 
 					-- Plain cost text under the name
 					local costLbl = vgui.Create("DLabel", row)

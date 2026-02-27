@@ -355,12 +355,10 @@ if CLIENT then
 
 				if itemDef.model then
 					local modelPanel = vgui.Create("DModelPanel", itemCard)
-					modelPanel:SetSize(math.floor(100 / scale), math.floor(70 / scale))
-					modelPanel:SetPos(math.floor(5 / scale), math.floor(5 / scale))
+					modelPanel:SetSize(itemCardW, itemCardH)
+					modelPanel:SetPos(0, 0)
+					modelPanel:SetMouseInputEnabled(false)
 					modelPanel:SetModel(itemDef.model)
-					modelPanel:SetFOV(50)
-					modelPanel:SetCamPos(Vector(25, 25, 25))
-					modelPanel:SetLookAt(Vector(0, 0, 0))
 
 					local ent = modelPanel:GetEntity()
 					if IsValid(ent) then
@@ -370,6 +368,19 @@ if CLIENT then
 						if itemDef.color then
 							ent:SetColor(itemDef.color)
 						end
+
+						local mins, maxs = ent:GetRenderBounds()
+						local size = maxs - mins
+						local radius = math.max(size.x, size.y, size.z)
+						local center = (mins + maxs) / 2
+
+						local fov = 50
+						local distance = radius / math.tan(math.rad(fov / 2))
+						distance = distance * 0.75
+
+						modelPanel:SetFOV(fov)
+						modelPanel:SetCamPos(center + Vector(distance, distance, distance * 0.5))
+						modelPanel:SetLookAt(center)
 					end
 
 					if itemDef.entityClass then
@@ -392,9 +403,6 @@ if CLIENT then
 					end
 
 					modelPanel.LayoutEntity = function(pnl, entity)
-						if entity.SetAngles then
-							entity:SetAngles(Angle(0, RealTime() * 40, 0))
-						end
 					end
 				end
 
@@ -405,6 +413,7 @@ if CLIENT then
 				label:SetTextColor(ArtDeco.Colors.textBright)
 				label:SetText(itemDef.name)
 				label:SetContentAlignment(5)
+				label:SetMouseInputEnabled(false)
 
 				local countLabel = vgui.Create("DLabel", itemCard)
 				countLabel:SetPos(math.floor(5 / scale), math.floor(86 / scale))
@@ -413,9 +422,11 @@ if CLIENT then
 				countLabel:SetTextColor(ArtDeco.Colors.textDim)
 				countLabel:SetText("x" .. count)
 				countLabel:SetContentAlignment(5)
+				countLabel:SetMouseInputEnabled(false)
 
 				itemCard:SetCursor("hand")
-				ArtDeco.AddTooltip(itemCard, itemDef.description, math.floor(250 / scale), math.floor(50 / scale))
+				local tooltipText = ("%s (x%d)\n\n%s"):format(itemDef.name, count, itemDef.description)
+				ArtDeco.AddTooltip(itemCard, tooltipText, math.floor(250 / scale), nil)
 			end
 		end
 
