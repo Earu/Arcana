@@ -453,16 +453,26 @@ if CLIENT then
 			if IsValid(panel.tooltip) then return end
 
 		local tooltip = vgui.Create("DLabel")
-		tooltip:SetSize(tooltipWidth or 300, tooltipHeight or 60)
+		local width = tooltipWidth or 300
+		local vertPadding = 8
+		local horzPadding = 8
+
+		tooltip:SetWide(width)
+		tooltip:SetTall(9999)
 		tooltip:SetWrap(true)
 		tooltip:SetText(text or "")
 		tooltip:SetFont("Arcana_AncientSmall")
 		tooltip:SetTextColor(ArtDeco.Colors.textBright)
+		tooltip:SetContentAlignment(7)
 		tooltip:SetDrawOnTop(true)
 		tooltip:SetMouseInputEnabled(false)
 		tooltip:SetKeyboardInputEnabled(false)
 		tooltip:NoClipping(true)
-		tooltip:SetTextInset(8, 0)
+		tooltip:SetTextInset(horzPadding, vertPadding)
+		tooltip:SizeToContentsY(20)
+
+		local height = tooltip:GetTall()
+		tooltip:SetSize(width, height)
 
 		tooltip.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoBg, 8)
@@ -508,7 +518,7 @@ if CLIENT then
 	-- @param tooltipWidth Width of tooltip (default: 300)
 	-- @param tooltipHeight Height of tooltip (default: 60)
 	-- @return The info icon panel
-	function ArtDeco.CreateInfoIcon(parent, text, tooltipWidth, tooltipHeight)
+	function ArtDeco.CreateInfoIcon(parent, text, tooltipWidth)
 		local infoIcon = vgui.Create("DPanel", parent)
 		infoIcon:SetSize(20, 20)
 		infoIcon:SetCursor("hand")
@@ -536,7 +546,7 @@ if CLIENT then
 			draw.SimpleText("i", "Arcana_Ancient", cx, cy, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
-		ArtDeco.AddTooltip(infoIcon, text or "No description available", tooltipWidth, tooltipHeight)
+		ArtDeco.AddTooltip(infoIcon, text or "No description available", tooltipWidth)
 
 		return infoIcon
 	end

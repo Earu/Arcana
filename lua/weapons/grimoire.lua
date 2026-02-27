@@ -791,7 +791,7 @@ if CLIENT then
 			row.SpellId = item.id
 			row:Droppable("arcana_spell")
 			-- Create info icon for spell description tooltip
-			local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+			local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300)
 			infoIcon:SetPos(0, 0) -- Will be positioned in PerformLayout
 
 			row.Paint = function(pnl, w, h)
@@ -913,7 +913,7 @@ if CLIENT then
 				row.SpellId = item.id
 				row:Droppable("arcana_spell")
 
-				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300)
 				infoIcon:SetPos(0, 0)
 
 				row.Paint = function(pnl, w, h)
@@ -1079,7 +1079,7 @@ if CLIENT then
 				row.SpellId = item.id
 				row:Droppable("arcana_spell")
 
-				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300)
 				infoIcon:SetPos(0, 0)
 
 				row.Paint = function(pnl, w, h)

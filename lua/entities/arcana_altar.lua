@@ -754,7 +754,7 @@ if CLIENT then
 				row:SetTall(60)
 				row:DockMargin(0, 0, 0, 8)
 				-- Create info icon for spell description tooltip
-				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300)
 				infoIcon:SetPos(0, 0) -- Will be positioned in PerformLayout
 
 				local ROW_BG_COLOR = ArtDeco.Colors.cardIdle
@@ -850,7 +850,7 @@ if CLIENT then
 					row:SetTall(68)
 					row:DockMargin(0, 0, 0, 8)
 					-- Create info icon for spell description tooltip
-					local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300, 60)
+					local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300)
 					infoIcon:SetPos(0, 0) -- Will be positioned in PerformLayout
 
 					row.Paint = function(pnl, w, h)
