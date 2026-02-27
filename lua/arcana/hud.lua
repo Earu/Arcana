@@ -3,14 +3,14 @@
 if not CLIENT then return end
 
 -- Create HUD namespace
-Arcane.HUD = Arcane.HUD or {}
+Arcana.HUD = Arcana.HUD or {}
 
 -- Local reference cache
 local function getData()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return nil end
 
-	return Arcane:GetPlayerData(ply)
+	return Arcana:GetPlayerData(ply)
 end
 
 -- Reusable color objects to avoid allocation overhead in draw calls
@@ -35,8 +35,8 @@ local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId
 
 	-- Check if this is a Divine Pact
 	local isDivine = false
-	if spellId and Arcane.RegisteredSpells[spellId] then
-		isDivine = Arcane.RegisteredSpells[spellId].is_divine_pact == true
+	if spellId and Arcana.RegisteredSpells[spellId] then
+		isDivine = Arcana.RegisteredSpells[spellId].is_divine_pact == true
 	end
 
 	unlockAnnounce.isDivinePact = isDivine
@@ -78,8 +78,8 @@ net.Receive("Arcana_SpellUnlocked", function()
 	local name = net.ReadString()
 	local cost = 0
 
-	if Arcane.RegisteredSpells[_id] then
-		cost = tonumber(Arcane.RegisteredSpells[_id].knowledge_cost or 0) or 0
+	if Arcana.RegisteredSpells[_id] then
+		cost = tonumber(Arcana.RegisteredSpells[_id].knowledge_cost or 0) or 0
 	end
 
 	showUnlockAnnouncement("spell", name, -cost, _id)
@@ -98,7 +98,7 @@ local levelAnnounce = {
 }
 
 -- Direct callback for level-up announcements (called by core, bypasses hooks)
-function Arcane.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
+function Arcana.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
 	levelAnnounce.active = true
 	levelAnnounce.startedAt = CurTime()
 	levelAnnounce.endsAt = CurTime() + 4.5
@@ -109,7 +109,7 @@ function Arcane.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
 end
 
 -- Direct callback for XP gain announcements (called by core, bypasses hooks)
-function Arcane.HUD.ShowXPAnnouncement(ply, amount, reason)
+function Arcana.HUD.ShowXPAnnouncement(ply, amount, reason)
 	if not IsValid(ply) or ply ~= LocalPlayer() then return end
 
 	-- Add new notification to the stack
@@ -121,7 +121,7 @@ function Arcane.HUD.ShowXPAnnouncement(ply, amount, reason)
 	})
 end
 
--- Casting state (client-only) fed by Arcane_BeginCasting
+-- Casting state (client-only) fed by Arcana_BeginCasting
 local activeCast = {
 	spellId = nil,
 	startedAt = 0,
@@ -129,7 +129,7 @@ local activeCast = {
 }
 
 -- Direct callback for tracking casts (called by core, bypasses hooks)
-function Arcane.HUD.TrackCast(caster, spellId, castTime)
+function Arcana.HUD.TrackCast(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 	activeCast.spellId = spellId
 	activeCast.startedAt = CurTime()
@@ -137,7 +137,7 @@ function Arcane.HUD.TrackCast(caster, spellId, castTime)
 end
 
 -- Direct callback for tracking cast failures (called by core, bypasses hooks)
-function Arcane.HUD.TrackCastFailure(caster, spellId, castTime)
+function Arcana.HUD.TrackCastFailure(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 
 	-- reset the casting bar if spell fails
@@ -173,7 +173,7 @@ local function drawCastingBar(scrW, scrH)
 	surface.DrawRect(x + 2, y + 2, math.floor((barW - 4) * progress), barH - 4)
 	-- Label
 	local remain = math.max(0, activeCast.endsAt - now)
-	local spellName = Arcane.RegisteredSpells[activeCast.spellId] and Arcane.RegisteredSpells[activeCast.spellId].name or activeCast.spellId
+	local spellName = Arcana.RegisteredSpells[activeCast.spellId] and Arcana.RegisteredSpells[activeCast.spellId].name or activeCast.spellId
 	local label = string.format("%s  %.1fs", spellName or "", remain)
 	draw.SimpleText(label, "Arcana_AncientSmall", x + barW * 0.5, y + barH + 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
 end
@@ -186,8 +186,8 @@ local function drawCooldownStack(scrW, scrH)
 	local entries = {}
 
 	for sid, untilTs in pairs(cds) do
-		if untilTs and untilTs > now and Arcane.RegisteredSpells[sid] then
-			local sp = Arcane.RegisteredSpells[sid]
+		if untilTs and untilTs > now and Arcana.RegisteredSpells[sid] then
+			local sp = Arcana.RegisteredSpells[sid]
 			local remain = untilTs - now
 
 			table.insert(entries, {

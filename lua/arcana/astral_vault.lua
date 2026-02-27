@@ -1,6 +1,6 @@
 -- Astral Vault
 -- Store enchanted weapons in a personal astral inventory and summon them later
-local Arcane = _G.Arcane or {}
+local Arcana = _G.Arcana or {}
 
 -- Networking
 if SERVER then
@@ -40,7 +40,7 @@ local HL2_MODELS = {
 
 -- Utility: fetch enchantment ids from a weapon entity, stable order
 local function collectEnchantIds(wep)
-	local set = Arcane and Arcane.GetEntityEnchantments and Arcane:GetEntityEnchantments(wep) or {}
+	local set = Arcana and Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
 	local out = {}
 	for id, on in pairs(set) do if on then out[#out + 1] = id end end
 	table.sort(out)
@@ -49,7 +49,7 @@ end
 
 -- SERVER: persistence layer (separate, compact table)
 if SERVER then
-	Arcane.AstralVaultCache = Arcane.AstralVaultCache or {}
+	Arcana.AstralVaultCache = Arcana.AstralVaultCache or {}
 
 	local ensured = false
 	local function ensureVaultTable()
@@ -83,13 +83,13 @@ if SERVER then
 		if not IsValid(ply) then return end
 
 		local sid = ply:SteamID64()
-		if Arcane.AstralVaultCache[sid] then
-			callback(true, Arcane.AstralVaultCache[sid])
+		if Arcana.AstralVaultCache[sid] then
+			callback(true, Arcana.AstralVaultCache[sid])
 			return
 		end
 
 		-- Allow third-party override
-		local handled = Arcane.RunHook("ReadAstralVault", ply, callback)
+		local handled = Arcana.RunHook("ReadAstralVault", ply, callback)
 		if handled == true then return end
 
 		if not ensureVaultTable() then return end
@@ -110,7 +110,7 @@ if SERVER then
 
 		local items = {}
 		if istable(rows) and rows[1] then items = decode(rows[1].items) end
-		Arcane.AstralVaultCache[sid] = items
+		Arcana.AstralVaultCache[sid] = items
 		callback(true, items)
 	end
 
@@ -118,10 +118,10 @@ if SERVER then
 		if not IsValid(ply) then return end
 
 		local sid = ply:SteamID64()
-		Arcane.AstralVaultCache[sid] = items or {}
+		Arcana.AstralVaultCache[sid] = items or {}
 
 		-- Allow third-party override
-		local handled = Arcane.RunHook("WriteAstralVault", ply, items)
+		local handled = Arcana.RunHook("WriteAstralVault", ply, items)
 		if handled == true then return end
 
 		if not ensureVaultTable() then return end
@@ -135,16 +135,16 @@ if SERVER then
 	end
 
 	local function canAfford(ply, coins, shards)
-		local haveCoins = Arcane:GetCoins(ply)
-		local haveShards = Arcane:GetItemCount(ply, "mana_crystal_shard")
+		local haveCoins = Arcana:GetCoins(ply)
+		local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
 		if haveCoins < (coins or 0) then return false, "Insufficient coins" end
 		if haveShards < (shards or 0) then return false, "Missing item: mana_crystal_shard" end
 		return true
 	end
 
 	local function charge(ply, coins, shards, reason)
-		if coins and coins > 0 then Arcane:TakeCoins(ply, coins, reason or "Astral Vault") end
-		if shards and shards > 0 then Arcane:TakeItem(ply, "mana_crystal_shard", shards, reason or "Astral Vault") end
+		if coins and coins > 0 then Arcana:TakeCoins(ply, coins, reason or "Astral Vault") end
+		if shards and shards > 0 then Arcana:TakeItem(ply, "mana_crystal_shard", shards, reason or "Astral Vault") end
 	end
 
 	local function sendOpen(ply, items)
@@ -180,12 +180,12 @@ if SERVER then
 		readVault(ply, function(_, items)
 			items = items or {}
 			if #items >= VAULT_CFG.MAX_SLOTS then
-				if Arcane.SendErrorNotification then Arcane:SendErrorNotification(ply, "Astral vault is full") end
+				if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, "Astral vault is full") end
 				return
 			end
 
 			local ok, reason = canAfford(ply, VAULT_CFG.STORE_COINS, VAULT_CFG.STORE_SHARDS)
-			if not ok then if Arcane.SendErrorNotification then Arcane:SendErrorNotification(ply, reason) end return end
+			if not ok then if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, reason) end return end
 
 			charge(ply, VAULT_CFG.STORE_COINS, VAULT_CFG.STORE_SHARDS, "Astral Vault Imprint")
 
@@ -218,7 +218,7 @@ if SERVER then
 			if not entry then return end
 
 			local ok, reason = canAfford(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS)
-			if not ok then if Arcane.SendErrorNotification then Arcane:SendErrorNotification(ply, reason) end return end
+			if not ok then if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, reason) end return end
 
 			local cls = entry.class
 			local swep = list.Get("Weapon")[cls]
@@ -241,10 +241,10 @@ if SERVER then
 				if not IsValid(newWep) then return end
 
 				for _, id in ipairs(entry.enchant_ids or {}) do
-					Arcane:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
+					Arcana:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
 				end
 
-				Arcane:SyncWeaponEnchantNW(newWep)
+				Arcana:SyncWeaponEnchantNW(newWep)
 				ply:SelectWeapon(cls)
 			end)
 		end)
@@ -283,7 +283,7 @@ if CLIENT then
 		local idx = tonumber(args and args[1] or 0) or 0
 		idx = math.floor(idx)
 		if idx < 1 or idx > (tonumber(6) or 6) then
-			Arcane:Print("Usage: arcana_vault_summon <1-6>")
+			Arcana:Print("Usage: arcana_vault_summon <1-6>")
 			return
 		end
 
@@ -367,7 +367,7 @@ if CLIENT then
 	local function getEnchantDisplayList(ids)
 		local out = {}
 		for _, id in ipairs(ids or {}) do
-			local e = Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[id]
+			local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 			out[#out + 1] = (e and e.name) or tostring(id)
 		end
 		table.sort(out)
@@ -503,13 +503,13 @@ if CLIENT then
 
 			-- Render enchant rings using the shared helper in a valid 3D context for DModelPanel
 			function model:PostDrawModel(ent)
-				if Arcane and Arcane.RenderEnchantBandsForEntity then
+				if Arcana and Arcana.RenderEnchantBandsForEntity then
 					local count = self._EnchantCount or 3
 					local ply = LocalPlayer()
 					local col = ply.GetWeaponColor and ply:GetWeaponColor():ToColor() or COLOR_GOLD
 					local style = "axis"
 
-					Arcane:RenderEnchantBandsForEntity(ent, count, col, style)
+					Arcana:RenderEnchantBandsForEntity(ent, count, col, style)
 				end
 			end
 
@@ -549,9 +549,9 @@ if CLIENT then
 			-- Live affordability check for summon
 			summon.Think = function(pnl)
 				if not it then pnl:SetEnabled(false) return end
-				local lp = LocalPlayer()
-				local haveCoins = Arcane:GetCoins(lp)
-				local haveShards = Arcane:GetItemCount(lp, "mana_crystal_shard")
+			local lp = LocalPlayer()
+			local haveCoins = Arcana:GetCoins(lp)
+			local haveShards = Arcana:GetItemCount(lp, "mana_crystal_shard")
 				local needCoins = tonumber(VAULT_CFG.SUMMON_COINS) or 0
 				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
 				local ok = (haveCoins >= needCoins) and (haveShards >= needShards)
@@ -695,8 +695,8 @@ if CLIENT then
 			local hasWeapon = IsValid(lp) and IsValid(lp:GetActiveWeapon())
 			local items = VAULT.items or {}
 			local hasRoom = (#items) < (tonumber(VAULT_CFG.MAX_SLOTS) or 0)
-			local haveCoins = Arcane:GetCoins(lp)
-			local haveShards = Arcane:GetItemCount(lp, "mana_crystal_shard")
+			local haveCoins = Arcana:GetCoins(lp)
+			local haveShards = Arcana:GetItemCount(lp, "mana_crystal_shard")
 			local needCoins = tonumber(VAULT_CFG.STORE_COINS) or 0
 			local needShards = tonumber(VAULT_CFG.STORE_SHARDS) or 0
 			local ok = hasWeapon and hasRoom and (haveCoins >= needCoins) and (haveShards >= needShards)

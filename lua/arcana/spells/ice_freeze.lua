@@ -1,13 +1,13 @@
 -- Freeze: Launch a fast ice bolt that applies Frost status on hit
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "freeze",
 	name = "Freeze",
 	description = "Launch a fast ice bolt that chills and slows the first target it hits.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 3,
 	knowledge_cost = 2,
 	cooldown = 5.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 35,
 	cast_time = 0.5,
 	range = 1400,

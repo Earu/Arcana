@@ -1,9 +1,9 @@
--- Arcane Spear Beam
+-- Arcana Spear Beam
 -- Shared server and client logic for arcane spear beam effects
 -- Used by both arcane_spear spell and arcane_rounds enchantment
 
-Arcane = Arcane or {}
-Arcane.Common = Arcane.Common or {}
+Arcana = Arcana or {}
+Arcana.Common = Arcana.Common or {}
 
 if SERVER then
 	util.AddNetworkString("Arcana_SpearBeam")
@@ -18,7 +18,7 @@ if SERVER then
 	--   - splashRadius: number (default 100)
 	--   - splashDamage: number (default 18)
 	--   - filter: table of entities to ignore (default {attacker})
-	function Arcane.Common.SpearBeam(attacker, origin, direction, options)
+	function Arcana.Common.SpearBeam(attacker, origin, direction, options)
 		if not SERVER then return end
 		if not IsValid(attacker) then return end
 		if not isvector(origin) or not isvector(direction) then return end
@@ -63,7 +63,7 @@ if SERVER then
 
 			-- Splash damage around impact
 			if splashDamage > 0 and splashRadius > 0 then
-				Arcane:BlastDamage(attacker, attacker, hitPos, splashRadius, splashDamage, DMG_DISSOLVE, true)
+				Arcana:BlastDamage(attacker, attacker, hitPos, splashRadius, splashDamage, DMG_DISSOLVE, true)
 			end
 		end
 

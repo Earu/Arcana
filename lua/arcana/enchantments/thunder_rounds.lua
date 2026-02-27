@@ -38,7 +38,7 @@ end
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
 	local baseDamage = 60
-	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
+	Arcana:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
 
 	local candidates = {}
 	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do
@@ -124,7 +124,7 @@ local function isMeleeHoldType(wep)
 	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "thunder_rounds",
 	name = "Thunder Rounds",
 	description = "Each bullet impact calls a lightning AoE, chaining to nearby foes.",

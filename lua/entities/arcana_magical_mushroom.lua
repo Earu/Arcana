@@ -88,8 +88,8 @@ if SERVER then
 		ply._arcanaNextMushroomTrip = CurTime() + self.TripCooldown
 
 		local dur = self.TripCooldown
-		if Arcane and Arcane.Status and Arcane.Status.SporeHigh and Arcane.Status.SporeHigh.Apply then
-			Arcane.Status.SporeHigh.Apply(ply, { duration = dur, intensity = 0.25 })
+		if Arcana and Arcana.Status and Arcana.Status.SporeHigh and Arcana.Status.SporeHigh.Apply then
+			Arcana.Status.SporeHigh.Apply(ply, { duration = dur, intensity = 0.25 })
 		end
 
 		self:EmitSound("ambient/levels/canals/windchime2.wav", 70, 120)

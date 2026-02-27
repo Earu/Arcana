@@ -1,12 +1,12 @@
-Arcane:RegisterRitualSpell({
+Arcana:RegisterRitualSpell({
 	id = "ritual_of_thunder",
 	name = "Ritual: Thunder",
 	description = "A ritual that summons a thunder cloud.",
-	category = Arcane.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 5,
 	knowledge_cost = 1,
 	cooldown = 60 * 10,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 100,
 	cast_time = 10,
 	cast_anim = "becon",

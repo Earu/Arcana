@@ -1,8 +1,8 @@
-local Arcane = _G.Arcane or {}
-_G.Arcane = Arcane
+local Arcana = _G.Arcana or {}
+_G.Arcana = Arcana
 
-Arcane.Environments = Arcane.Environments or {}
-local Envs = Arcane.Environments
+Arcana.Environments = Arcana.Environments or {}
+local Envs = Arcana.Environments
 
 Envs.Registered = Envs.Registered or {}
 Envs.Active = Envs.Active or nil -- { id=..., origin=Vector, owner=Player, started=CurTime(), expires=CurTime()+lifetime, spawned={entities...}, timers={...} }

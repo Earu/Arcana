@@ -42,15 +42,15 @@ local function applyOrRefreshPoisonSlow(ply, duration)
 	end
 end
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "poison_cloud",
 	name = "Poison Cloud",
 	description = "Deploy a lingering toxic cloud that poisons and slows enemies inside.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 6,
 	knowledge_cost = 3,
 	cooldown = 12.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 35,
 	cast_time = 1.0,
 	range = 900,
@@ -66,7 +66,7 @@ Arcane:RegisterSpell({
 		local perTickDamage = 8
 		local slowRefresh = 1.2
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local pos = Arcane:ResolveGroundTarget(srcEnt, 900) + Vector(0, 0, 8)
+		local pos = Arcana:ResolveGroundTarget(srcEnt, 900) + Vector(0, 0, 8)
 
 		local cloud = ents.Create("prop_physics")
 		if not IsValid(cloud) then return false end
@@ -177,12 +177,12 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_PoisonCloud_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "poison_cloud" then return end
 
-		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(140, 220, 80, 255),
 			size = 24,
 			intensity = 3,
 			positionResolver = function(c)
-				return Arcane:ResolveGroundTarget(c, 900)
+				return Arcana:ResolveGroundTarget(c, 900)
 			end
 		})
 	end)

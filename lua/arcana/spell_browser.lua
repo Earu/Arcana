@@ -1,14 +1,14 @@
 if not CLIENT then return end
 
-local Arcane = _G.Arcane or {}
+local Arcana = _G.Arcana or {}
 
 -- Opens a developer spell browser listing all registered spells and their metadata
 local function OpenSpellBrowser()
-	if not Arcane or not Arcane.RegisteredSpells then return end
+	if not Arcana or not Arcana.RegisteredSpells then return end
 
-	if IsValid(Arcane._SpellBrowser) then
-		Arcane._SpellBrowser:MakePopup()
-		Arcane._SpellBrowser:Center()
+	if IsValid(Arcana._SpellBrowser) then
+		Arcana._SpellBrowser:MakePopup()
+		Arcana._SpellBrowser:Center()
 		return
 	end
 
@@ -20,7 +20,7 @@ local function OpenSpellBrowser()
 	frame:ShowCloseButton(false)
 	frame:DockPadding(0, 0, 0, 0)
 	frame:DockMargin(0, 0, 0, 0)
-	Arcane._SpellBrowser = frame
+	Arcana._SpellBrowser = frame
 
 	-- Frame styling
 	local bgCol = Color(22, 18, 14, 245)
@@ -101,10 +101,10 @@ local function OpenSpellBrowser()
 	categoryBox:SetSortItems(false)
 	categoryBox:AddChoice("All Categories", "__all__", true)
 
-	-- Build categories from Arcane.CATEGORIES and any found on spells
+	-- Build categories from Arcana.CATEGORIES and any found on spells
 	local seenCats = {}
-	if Arcane.CATEGORIES then
-		for _, c in pairs(Arcane.CATEGORIES) do
+	if Arcana.CATEGORIES then
+		for _, c in pairs(Arcana.CATEGORIES) do
 			if not seenCats[c] then
 				categoryBox:AddChoice(string.upper(string.Left(c, 1)) .. string.sub(c, 2), c)
 				seenCats[c] = true
@@ -112,7 +112,7 @@ local function OpenSpellBrowser()
 		end
 	end
 
-	for _, sp in pairs(Arcane.RegisteredSpells or {}) do
+	for _, sp in pairs(Arcana.RegisteredSpells or {}) do
 		local c = sp.category
 		if c and not seenCats[c] then
 			categoryBox:AddChoice(string.upper(string.Left(c, 1)) .. string.sub(c, 2), c)
@@ -282,13 +282,13 @@ local function OpenSpellBrowser()
 		local total = 0
 		local shown = 0
 		local totalKP = 0
-		for sid, sp in pairs(Arcane.RegisteredSpells or {}) do
+		for sid, sp in pairs(Arcana.RegisteredSpells or {}) do
 			total = total + 1
 			local name = sp.name or sid
 			local cat = sp.category or ""
 			local lvl = numberOr(1, sp.level_required)
 			local kp = numberOr(1, sp.knowledge_cost)
-			local cd = numberOr(Arcane.Config and Arcane.Config.DEFAULT_SPELL_COOLDOWN or 0, sp.cooldown)
+			local cd = numberOr(Arcana.Config and Arcana.Config.DEFAULT_SPELL_COOLDOWN or 0, sp.cooldown)
 			local ct = numberOr(0, sp.cast_time)
 			local ctype = sp.cost_type or ""
 			local camount = numberOr(0, sp.cost_amount)

@@ -146,7 +146,7 @@ local function detachHook(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "thundering_reach",
 	name = "Thundering Reach",
 	description = "Unleash a line of thunder on melee swing, damaging foes ahead.",

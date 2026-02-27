@@ -1,13 +1,13 @@
--- Arcane Missiles: Launch three homing projectiles that prefer the target closest to the caster's aim
-Arcane:RegisterSpell({
+-- Arcana Missiles: Launch three homing projectiles that prefer the target closest to the caster's aim
+Arcana:RegisterSpell({
 	id = "arcane_missiles",
 	name = "Arcane Missiles",
 	description = "Launch three homing bolts that seek your aimed target.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 13,
 	knowledge_cost = 4,
 	cooldown = 6.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 55,
 	cast_time = 0.7,
 	range = 1200,
@@ -23,7 +23,7 @@ Arcane:RegisterSpell({
 		local aim = srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward()
 
 		-- Launch missiles using shared API
-		Arcane.Common.LaunchMissiles(caster, origin, aim, {
+		Arcana.Common.LaunchMissiles(caster, origin, aim, {
 			count = 3,
 			delay = 0.06
 		})

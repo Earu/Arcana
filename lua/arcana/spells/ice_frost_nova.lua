@@ -2,15 +2,15 @@ if SERVER then
 	util.AddNetworkString("Arcana_FrostNovaBurst")
 end
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "frost_nova",
 	name = "Frost Nova",
 	description = "Release a burst of freezing air around you, damaging and slowing nearby foes.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 16,
 	knowledge_cost = 3,
 	cooldown = 11.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 120,
 	cast_time = 0.9,
 	range = 0,
@@ -29,7 +29,7 @@ Arcane:RegisterSpell({
 		local slowDuration = 3.5
 
 		-- VFX: bands around caster
-		Arcane:SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
+		Arcana:SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
 			{
 				radius = radius * 0.35,
 				height = 18,
@@ -80,7 +80,7 @@ Arcane:RegisterSpell({
 			end
 
 			-- Apply slow via shared Frost status
-			Arcane.Status.Frost.Apply(ent, {
+			Arcana.Status.Frost.Apply(ent, {
 				slowMult = slowMult,
 				duration = slowDuration,
 				vfxTag = "frost_slow",

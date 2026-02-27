@@ -52,9 +52,9 @@ if SERVER then
 		self:SetNWBool("Arcana_ReceivingMana", false)
 
 		-- Register into ManaNetwork as a consumer
-		local Arcane = _G.Arcane or {}
-		if Arcane.ManaNetwork and Arcane.ManaNetwork.RegisterConsumer then
-			Arcane.ManaNetwork:RegisterConsumer(self, {range = 700})
+		local Arcana = _G.Arcana or {}
+		if Arcana.ManaNetwork and Arcana.ManaNetwork.RegisterConsumer then
+			Arcana.ManaNetwork:RegisterConsumer(self, {range = 700})
 		end
 	end
 
@@ -108,7 +108,7 @@ if SERVER then
 
 		-- Capture existing enchantments on player's weapon
 		local transferIds = {}
-		local map = Arcane:GetEntityEnchantments(orig)
+		local map = Arcana:GetEntityEnchantments(orig)
 		for id, _ in pairs(map or {}) do
 			transferIds[#transferIds + 1] = id
 		end
@@ -143,10 +143,10 @@ if SERVER then
 
 		-- Re-apply enchantments to new entity and sync
 		for _, id in ipairs(transferIds) do
-			Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
+			Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
 		end
 
-		Arcane:SyncWeaponEnchantNW(wep)
+		Arcana:SyncWeaponEnchantNW(wep)
 
 		-- Keep a snapshot for fallback re-give
 		ent._containedEnchantIds = table.Copy(transferIds)
@@ -219,11 +219,11 @@ if SERVER then
 				local newWep = ply.GetWeapon and ply:GetWeapon(cls) or nil
 				if IsValid(newWep) then
 					local ids = ent._containedEnchantIds or {}
-					for _, id in ipairs(ids) do
-						Arcane:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
-					end
+				for _, id in ipairs(ids) do
+					Arcana:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
+				end
 
-					Arcane:SyncWeaponEnchantNW(newWep)
+				Arcana:SyncWeaponEnchantNW(newWep)
 				end
 				ply:SelectWeapon(cls)
 			end)
@@ -246,15 +246,15 @@ if SERVER then
 
 		local wep = ent:GetContainedWeapon()
 		if not IsValid(wep) then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Deposit a weapon first")
+			if Arcana and Arcana.SendErrorNotification then
+				Arcana:SendErrorNotification(ply, "Deposit a weapon first")
 			end
 
 			return
 		end
 
 		-- Collect unique enchantments, drop duplicates or ones already present
-		local targetCurrent = Arcane and Arcane.GetEntityEnchantments and Arcane:GetEntityEnchantments(wep) or {}
+		local targetCurrent = Arcana and Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
 		local selected = {}
 		for _, id in ipairs(list) do
 			if not targetCurrent[id] then
@@ -286,7 +286,7 @@ if SERVER then
 		-- Validate applicability and aggregate costs
 		local enchs = {}
 		for _, id in ipairs(idsOrdered) do
-			local e = Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[id]
+			local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 
 			if e then
 				table.insert(enchs, {
@@ -301,8 +301,8 @@ if SERVER then
 				local ok, reason = pcall(it.ench.can_apply, ply, wep)
 
 				if not ok or reason == false then
-					if Arcane and Arcane.SendErrorNotification then
-						Arcane:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. tostring(reason or "invalid"))
+					if Arcana and Arcana.SendErrorNotification then
+						Arcana:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. tostring(reason or "invalid"))
 					end
 
 					return
@@ -325,21 +325,21 @@ if SERVER then
 			end
 		end
 
-		local coins = Arcane:GetCoins(ply)
+		local coins = Arcana:GetCoins(ply)
 		if coins < sumCoins then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Insufficient coins")
+			if Arcana and Arcana.SendErrorNotification then
+				Arcana:SendErrorNotification(ply, "Insufficient coins")
 			end
 
 			return
 		end
 
 		for name, amt in pairs(itemTotals) do
-			local have = Arcane:GetItemCount(ply, name)
+			local have = Arcana:GetItemCount(ply, name)
 
 			if have < amt then
-				if Arcane and Arcane.SendErrorNotification then
-					Arcane:SendErrorNotification(ply, "Missing item: " .. tostring(name))
+				if Arcana and Arcana.SendErrorNotification then
+					Arcana:SendErrorNotification(ply, "Missing item: " .. tostring(name))
 				end
 
 				return
@@ -349,10 +349,10 @@ if SERVER then
 
 		-- Deduct currency/items up front
 		if sumCoins > 0 then
-			Arcane:TakeCoins(ply, sumCoins)
+			Arcana:TakeCoins(ply, sumCoins)
 		end
 		for name, amt in pairs(itemTotals) do
-			Arcane:TakeItem(ply, name, amt)
+			Arcana:TakeItem(ply, name, amt)
 		end
 
 		local chance = ent:ComputeSuccessChance(ply)
@@ -360,7 +360,7 @@ if SERVER then
 		for _, it in ipairs(enchs) do
 			local hasMana = (ent._receivingUntil or 0) > CurTime()
 			if math.Rand(0, 1) <= chance then
-				Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
+				Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
 				successes = successes + 1
 			end
 		end
@@ -373,7 +373,7 @@ if SERVER then
 
 		-- Refresh stored enchantment IDs snapshot on the contained weapon
 		if IsValid(wep) then
-			local cur = Arcane:GetEntityEnchantments(wep)
+			local cur = Arcana:GetEntityEnchantments(wep)
 			local arr = {}
 			for id, _ in pairs(cur or {}) do arr[#arr + 1] = id end
 			ent._containedEnchantIds = arr
@@ -748,7 +748,7 @@ if CLIENT then
 
 
 	local function getEnchantmentsList()
-		return Arcane and Arcane.RegisteredEnchantments or {}
+		return Arcana and Arcana.RegisteredEnchantments or {}
 	end
 
 	local HL2_MODELS = {
@@ -828,7 +828,7 @@ if CLIENT then
 			needCoins, needShards = 0, 0
 			for id, on in pairs(selected) do
 				if on then
-					local e = Arcane and Arcane.RegisteredEnchantments and Arcane.RegisteredEnchantments[id]
+					local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 					if e then
 						needCoins = needCoins + (tonumber(e.cost_coins or 0) or 0)
 						for _, it in ipairs(e.cost_items or {}) do
@@ -864,8 +864,8 @@ if CLIENT then
 			ArtDeco.FillDecoPanel(4, 0, w - 8, h, ArtDeco.Colors.decoPanel, 12)
 			ArtDeco.DrawDecoFrame(4, 0, w - 8, h, ArtDeco.Colors.gold, 12)
 			-- Gather player amounts
-			local haveCoins = Arcane:GetCoins(ply)
-			local haveShards = Arcane:GetItemCount(ply, "mana_crystal_shard")
+			local haveCoins = Arcana:GetCoins(ply)
+			local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
 
 			-- Draw helper
 			local function drawBar(x, y, bw, bh, label, have, need, fillCol)
@@ -1423,9 +1423,9 @@ function ENT:ComputeSuccessChance(ply)
 		return base
 	end
 
-	-- Scale from base (25%) up to 80% at max Arcane level
-	local playerLevel = ply:GetArcaneLevel() or 0
-	local maxLevel = ((Arcane.Config and Arcane.Config.MAX_LEVEL) or 100) / 1.75
+	-- Scale from base (25%) up to 80% at max Arcana level
+	local playerLevel = Arcana:GetLevel(ply) or 0
+	local maxLevel = ((Arcana.Config and Arcana.Config.MAX_LEVEL) or 100) / 1.75
 	local t = math.Clamp(playerLevel / math.max(1, maxLevel), 0, 1)
 	local maxCap = 0.80
 	local chance = base + (maxCap - base) * t

@@ -1,12 +1,12 @@
-Arcane:RegisterRitualSpell({
+Arcana:RegisterRitualSpell({
 	id = "ritual_of_corruption",
 	name = "Ritual: Corruption",
 	description = "Perform a ritual that increases corruption nearby or creates a new corrupted area.",
-	category = Arcane.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 17,
 	knowledge_cost = 6,
 	cooldown = 60 * 20,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 100,
 	cast_time = 10.0,
 	cast_anim = "becon",

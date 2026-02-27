@@ -2,15 +2,15 @@ hook.Add("InitPostEntity", "arcana_blood_ritual", function()
 	local ores = _G.ms and _G.ms.Ores
 	if not ores then return end
 
-	Arcane:RegisterRitualSpell({
+	Arcana:RegisterRitualSpell({
 		id = "ritual_of_blood",
 		name = "Ritual: Blood",
 		description = "A ritual that summons a dark entity.",
-		category = Arcane.CATEGORIES.UTILITY,
+		category = Arcana.CATEGORIES.UTILITY,
 		level_required = 12,
 		knowledge_cost = 5,
 		cooldown = 60 * 60,
-		cost_type = Arcane.COST_TYPES.COINS,
+		cost_type = Arcana.COST_TYPES.COINS,
 		cost_amount = 100,
 		cast_time = 10,
 		cast_anim = "becon",

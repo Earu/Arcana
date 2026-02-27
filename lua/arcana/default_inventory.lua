@@ -5,12 +5,12 @@
 -- Implements the functions defined in third_party.lua
 -- ============================================================================
 
-local Arcane = _G.Arcane or {}
+local Arcana = _G.Arcana or {}
 
-Arcane.Inventory = Arcane.Inventory or {}
+Arcana.Inventory = Arcana.Inventory or {}
 
 -- Item definitions for display purposes
-Arcane.Inventory.Items = {
+Arcana.Inventory.Items = {
 	["mana_crystal_shard"] = {
 		name = "Crystal Shard",
 		description = "A crystallized fragment of pure magical energy.",
@@ -71,27 +71,27 @@ if SERVER then
 		end
 	end
 
-	Arcane.Inventory.Cache = Arcane.Inventory.Cache or {}
+	Arcana.Inventory.Cache = Arcana.Inventory.Cache or {}
 
-	function Arcane.Inventory:Get(ply)
+	function Arcana.Inventory:Get(ply)
 		if not IsValid(ply) then return {coins = 0, items = {}} end
 		local sid = ply:SteamID64()
-		if not Arcane.Inventory.Cache[sid] then
-			Arcane.Inventory.Cache[sid] = getInventoryData(sid)
+		if not Arcana.Inventory.Cache[sid] then
+			Arcana.Inventory.Cache[sid] = getInventoryData(sid)
 		end
-		return Arcane.Inventory.Cache[sid]
+		return Arcana.Inventory.Cache[sid]
 	end
 
-	function Arcane.Inventory:Save(ply)
+	function Arcana.Inventory:Save(ply)
 		if not IsValid(ply) then return end
 		local sid = ply:SteamID64()
-		local data = Arcane.Inventory.Cache[sid]
+		local data = Arcana.Inventory.Cache[sid]
 		if data then
 			saveInventoryData(sid, data)
 		end
 	end
 
-	function Arcane.Inventory:SyncToClient(ply)
+	function Arcana.Inventory:SyncToClient(ply)
 		if not IsValid(ply) then return end
 		local data = self:Get(ply)
 		net.Start("Arcana_InventorySync")
@@ -102,60 +102,60 @@ if SERVER then
 	end
 
 	-- Override default functions with actual implementation
-	function Arcane:GiveCoins(ply, amount, reason)
+	function Arcana:GiveCoins(ply, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
-		local inv = Arcane.Inventory:Get(ply)
+		local inv = Arcana.Inventory:Get(ply)
 		inv.coins = inv.coins + amount
-		Arcane.Inventory:SyncToClient(ply)
-		Arcane.RunHook("CoinsGiven", ply, amount, reason)
+		Arcana.Inventory:SyncToClient(ply)
+		Arcana.RunHook("CoinsGiven", ply, amount, reason)
 		return true
 	end
 
-	function Arcane:TakeCoins(ply, amount, reason)
+	function Arcana:TakeCoins(ply, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
-		local inv = Arcane.Inventory:Get(ply)
+		local inv = Arcana.Inventory:Get(ply)
 		if inv.coins < amount then return false end
 		inv.coins = inv.coins - amount
-		Arcane.Inventory:SyncToClient(ply)
-		Arcane.RunHook("CoinsTaken", ply, amount, reason)
+		Arcana.Inventory:SyncToClient(ply)
+		Arcana.RunHook("CoinsTaken", ply, amount, reason)
 		return true
 	end
 
-	function Arcane:GiveItem(ply, itemClass, amount, reason)
+	function Arcana:GiveItem(ply, itemClass, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
-		local inv = Arcane.Inventory:Get(ply)
+		local inv = Arcana.Inventory:Get(ply)
 		inv.items[itemClass] = (inv.items[itemClass] or 0) + amount
-		Arcane.Inventory:SyncToClient(ply)
-		Arcane.RunHook("ItemGiven", ply, itemClass, amount, reason)
+		Arcana.Inventory:SyncToClient(ply)
+		Arcana.RunHook("ItemGiven", ply, itemClass, amount, reason)
 		return true
 	end
 
-	function Arcane:TakeItem(ply, itemClass, amount, reason)
+	function Arcana:TakeItem(ply, itemClass, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
-		local inv = Arcane.Inventory:Get(ply)
+		local inv = Arcana.Inventory:Get(ply)
 		if (inv.items[itemClass] or 0) < amount then return false end
 		inv.items[itemClass] = inv.items[itemClass] - amount
 		if inv.items[itemClass] <= 0 then
 			inv.items[itemClass] = nil
 		end
-		Arcane.Inventory:SyncToClient(ply)
-		Arcane.RunHook("ItemTaken", ply, itemClass, amount, reason)
+		Arcana.Inventory:SyncToClient(ply)
+		Arcana.RunHook("ItemTaken", ply, itemClass, amount, reason)
 		return true
 	end
 
 	-- Player lifecycle hooks
 	hook.Add("Arcana_LoadedPlayerData", "Arcana_InventorySyncOnLoad", function(ply)
-		Arcane.Inventory:SyncToClient(ply)
+		Arcana.Inventory:SyncToClient(ply)
 	end)
 
 	hook.Add("PlayerDisconnected", "Arcana_InventorySave", function(ply)
-		Arcane.Inventory:Save(ply)
-		Arcane.Inventory.Cache[ply:SteamID64()] = nil
+		Arcana.Inventory:Save(ply)
+		Arcana.Inventory.Cache[ply:SteamID64()] = nil
 	end)
 
 	timer.Create("Arcana_InventoryAutosave", 120, 0, function()
 		for _, ply in ipairs(player.GetAll()) do
-			Arcane.Inventory:Save(ply)
+			Arcana.Inventory:Save(ply)
 		end
 	end)
 
@@ -166,14 +166,14 @@ end
 -- CLIENT-SIDE: Cache and UI
 -- ============================================================================
 if CLIENT then
-	Arcane.Inventory = Arcane.Inventory or {}
-	Arcane.Inventory.LocalCache = Arcane.Inventory.LocalCache or {coins = 0, items = {}}
+	Arcana.Inventory = Arcana.Inventory or {}
+	Arcana.Inventory.LocalCache = Arcana.Inventory.LocalCache or {coins = 0, items = {}}
 
 	net.Receive("Arcana_InventorySync", function()
 		local coins = net.ReadUInt(32)
 		local itemsJson = net.ReadString()
 		local ok, items = pcall(util.JSONToTable, itemsJson)
-		Arcane.Inventory.LocalCache = {
+		Arcana.Inventory.LocalCache = {
 			coins = coins,
 			items = (ok and istable(items)) and items or {}
 		}
@@ -182,11 +182,11 @@ if CLIENT then
 	-- ============================================================================
 	-- ART DECO INVENTORY UI
 	-- ============================================================================
-	Arcane.Inventory.Panel = nil
+	Arcana.Inventory.Panel = nil
 
 	local function createInventoryPanel()
-		if IsValid(Arcane.Inventory.Panel) then
-			Arcane.Inventory.Panel:Remove()
+		if IsValid(Arcana.Inventory.Panel) then
+			Arcana.Inventory.Panel:Remove()
 		end
 
 		local panel = vgui.Create("DPanel")
@@ -239,7 +239,7 @@ if CLIENT then
 			local titleW = surface.GetTextSize(titleText)
 			draw.SimpleText(titleText, "Arcana_DecoTitle", 0, 0, ArtDeco.Colors.paleGold, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 
-			local coins = Arcane.Inventory.LocalCache.coins or 0
+			local coins = Arcana.Inventory.LocalCache.coins or 0
 			local chipText = string.Comma(coins)
 			surface.SetFont("Arcana_Ancient")
 			local cw, ch = surface.GetTextSize(chipText)
@@ -295,7 +295,7 @@ if CLIENT then
 
 		local function refreshItems()
 			scroll:Clear()
-			local items = Arcane.Inventory.LocalCache.items or {}
+			local items = Arcana.Inventory.LocalCache.items or {}
 
 			local gridContainer = vgui.Create("DPanel", scroll)
 			gridContainer:Dock(TOP)
@@ -328,7 +328,7 @@ if CLIENT then
 				local itemData = itemList[i]
 				local itemClass = itemData and itemData.class
 				local count = itemData and itemData.count
-				local itemDef = itemClass and (Arcane.Inventory.Items[itemClass] or {
+				local itemDef = itemClass and (Arcana.Inventory.Items[itemClass] or {
 					name = itemClass,
 					description = "",
 					model = "models/props_junk/cardboard_box004a.mdl"
@@ -419,8 +419,8 @@ if CLIENT then
 			end
 		end
 
-		Arcane.Inventory.Panel = panel
-		Arcane.Inventory.RefreshItems = refreshItems
+		Arcana.Inventory.Panel = panel
+		Arcana.Inventory.RefreshItems = refreshItems
 
 		refreshItems()
 
@@ -428,22 +428,22 @@ if CLIENT then
 	end
 
 	hook.Add("OnContextMenuOpen", "Arcana_InventoryShow", function()
-		local panel = IsValid(Arcane.Inventory.Panel) and Arcane.Inventory.Panel or createInventoryPanel()
+		local panel = IsValid(Arcana.Inventory.Panel) and Arcana.Inventory.Panel or createInventoryPanel()
 		if IsValid(panel) then
-			local shouldDraw = Arcane.RunHook("ShouldDrawInventory")
+			local shouldDraw = Arcana.RunHook("ShouldDrawInventory")
 			if shouldDraw == false then return end
 
 			panel:SetVisible(true)
 			panel:MoveToFront()
-			if Arcane.Inventory.RefreshItems then
-				Arcane.Inventory.RefreshItems()
+			if Arcana.Inventory.RefreshItems then
+				Arcana.Inventory.RefreshItems()
 			end
 		end
 	end)
 
 	hook.Add("OnContextMenuClose", "Arcana_InventoryHide", function()
-		if IsValid(Arcane.Inventory.Panel) then
-			Arcane.Inventory.Panel:SetVisible(false)
+		if IsValid(Arcana.Inventory.Panel) then
+			Arcana.Inventory.Panel:SetVisible(false)
 		end
 	end)
 end
@@ -451,22 +451,22 @@ end
 -- ============================================================================
 -- SHARED: Default Getter Functions
 -- ============================================================================
-function Arcane:GetCoins(ply)
+function Arcana:GetCoins(ply)
 	if SERVER then
-		local inv = Arcane.Inventory:Get(ply)
+		local inv = Arcana.Inventory:Get(ply)
 		return inv.coins
 	else
-		return Arcane.Inventory.LocalCache.coins
+		return Arcana.Inventory.LocalCache.coins
 	end
 end
 
-function Arcane:GetItemCount(ply, itemClass)
+function Arcana:GetItemCount(ply, itemClass)
 	if SERVER then
-		local inv = Arcane.Inventory:Get(ply)
+		local inv = Arcana.Inventory:Get(ply)
 		return inv.items[itemClass] or 0
 	else
-		return (Arcane.Inventory.LocalCache.items or {})[itemClass] or 0
+		return (Arcana.Inventory.LocalCache.items or {})[itemClass] or 0
 	end
 end
 
-return Arcane
+return Arcana

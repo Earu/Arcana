@@ -1,12 +1,12 @@
-Arcane:RegisterRitualSpell({
+Arcana:RegisterRitualSpell({
 	id = "ritual_of_purification",
 	name = "Ritual: Purification",
 	description = "Perform a ritual to cleanse corruption in the area.",
-	category = Arcane.CATEGORIES.PROTECTION,
+	category = Arcana.CATEGORIES.PROTECTION,
 	level_required = 5,
 	knowledge_cost = 3,
 	cooldown = 25,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 6000,
 	cast_time = 10.0,
 	on_activate = function(selfEnt, activatingPly, caster)

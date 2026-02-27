@@ -23,9 +23,9 @@ local function playAegisVFX(ply)
 	if not IsValid(ply) then return end
 
 	-- Multi-ring band similar to arcane_barrier, scaled to player bounds
-	Arcane:ClearBandVFX(ply, "duelist_aegis_fx")
+	Arcana:ClearBandVFX(ply, "duelist_aegis_fx")
 	local r = math.max(ply:OBBMaxs():Unpack()) * 0.6
-	Arcane:SendAttachBandVFX(ply, Color(142, 120, 225), 28, 2, {
+	Arcana:SendAttachBandVFX(ply, Color(142, 120, 225), 28, 2, {
 		{
 			radius = r * 0.95,
 			height = 6,
@@ -121,7 +121,7 @@ local function detachHook(ply, wep, state)
 	state._aegisUntil = 0
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "duelist_aegis",
 	name = "Duelist's Aegis",
 	description = "After dealing melee damage, ignore non-melee damage for 2s while wielding this weapon.",

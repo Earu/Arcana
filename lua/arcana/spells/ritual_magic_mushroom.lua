@@ -1,6 +1,6 @@
 local COOLDOWN_TIME = (20 * 60)
 
-if Arcane then
+if Arcana then
 	local ACCEPTABLE_SURFACE_TYPES = {
 		[MAT_GRASS] = true,
 		[MAT_DIRT] = true,
@@ -8,15 +8,15 @@ if Arcane then
 		[MAT_SNOW] = true,
 	}
 
-	Arcane:RegisterRitualSpell({
+	Arcana:RegisterRitualSpell({
 		id = "ritual_magical_mushroom",
 		name = "Ritual: Magical Mushroom",
 		description = "Summons a magical mushroom.",
-		category = Arcane.CATEGORIES.UTILITY,
+		category = Arcana.CATEGORIES.UTILITY,
 		level_required = 10,
 		knowledge_cost = 3,
 		cooldown = COOLDOWN_TIME,
-		cost_type = Arcane.COST_TYPES.COINS,
+		cost_type = Arcana.COST_TYPES.COINS,
 		cost_amount = 3000,
 		cast_time = 4.0,
 		ritual_color = Color(50, 130, 50),
@@ -43,7 +43,7 @@ if Arcane then
 
 				SafeRemoveEntityDelayed(mushroom, COOLDOWN_TIME)
 			else
-				Arcane:SendErrorNotification(activatingPly, "Ritual failed: Mushroom was not summoned")
+				Arcana:SendErrorNotification(activatingPly, "Ritual failed: Mushroom was not summoned")
 				return
 			end
 

@@ -3,15 +3,15 @@ if SERVER then
 end
 
 -- Earth Shatter: Smash the ground to send a devastating seismic shockwave
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "earth_shatter",
 	name = "Earth Shatter",
 	description = "Smash the ground, fracturing earth in a wide radius and hurling foes away.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 17,
 	knowledge_cost = 4,
 	cooldown = 13.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 180,
 	cast_time = 0.9,
 	range = 0,

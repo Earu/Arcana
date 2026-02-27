@@ -38,7 +38,7 @@ if SERVER then
 
     local function tryPickup(self, ply)
         if not IsValid(self) or not IsValid(ply) or not ply:IsPlayer() then return false end
-        Arcane:GiveItem(ply, "solidified_spores", 1)
+        Arcana:GiveItem(ply, "solidified_spores", 1)
         self:EmitSound("physics/flesh/flesh_bloody_break.wav", 60, 180, 0.6)
 
         local ed = EffectData()

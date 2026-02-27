@@ -1,7 +1,7 @@
 -- Floating Islands environment definition
 -- Creates floating islands with flat tops and rocky bottoms
 
-local Envs = Arcane.Environments
+local Envs = Arcana.Environments
 local MOSS_MAT = "models/props_wasteland/rocks02a"
 local ROCKY_MAT = "models/Cliffs/Rocks02"
 

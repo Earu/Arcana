@@ -14,7 +14,7 @@ local function fireArcaneSpear(caster, origin, dir)
 	if not IsValid(caster) then return end
 
 	-- Use the shared spear beam API
-	Arcane.Common.SpearBeam(caster, origin, dir, {
+	Arcana.Common.SpearBeam(caster, origin, dir, {
 		maxDist = 2000,
 		damage = 55,
 		splashRadius = 80,
@@ -61,7 +61,7 @@ local function detachHook(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "arcane_rounds",
 	name = "Arcane Rounds",
 	description = "Each bullet also launches an arcane spear from around you.",

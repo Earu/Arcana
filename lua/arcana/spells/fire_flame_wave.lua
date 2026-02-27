@@ -1,13 +1,13 @@
 -- Flame Wave: A sweeping cone of fire that ignites and damages enemies
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "flame_wave",
 	name = "Flame Wave",
 	description = "Unleash a sweeping cone of flame, burning enemies ahead.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 9,
 	knowledge_cost = 3,
 	cooldown = 6.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 40,
 	cast_time = 0.7,
 	range = 900,

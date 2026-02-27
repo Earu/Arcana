@@ -1,5 +1,5 @@
-local Arcane = _G.Arcane or {}
-_G.Arcane = Arcane
+local Arcana = _G.Arcana or {}
+_G.Arcana = Arcana
 
 -- ============================================================================
 -- THIRD-PARTY INTEGRATION GUIDE
@@ -29,13 +29,13 @@ if SERVER then
 		@return boolean - true if successful, false otherwise
 
 		Example override:
-		function Arcane:GiveCoins(ply, amount, reason)
+		function Arcana:GiveCoins(ply, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			ply:addMoney(amount) -- DarkRP example
 			return true
 		end
 	]]
-	function Arcane:GiveCoins(ply, amount, reason)
+	function Arcana:GiveCoins(ply, amount, reason)
 		-- Default implementation in default_inventory.lua
 	end
 
@@ -47,14 +47,14 @@ if SERVER then
 		@return boolean - true if successful, false if insufficient coins
 
 		Example override:
-		function Arcane:TakeCoins(ply, amount, reason)
+		function Arcana:TakeCoins(ply, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			if ply:getDarkRPVar("money") < amount then return false end
 			ply:addMoney(-amount) -- DarkRP example
 			return true
 		end
 	]]
-	function Arcane:TakeCoins(ply, amount, reason)
+	function Arcana:TakeCoins(ply, amount, reason)
 		-- Default implementation in default_inventory.lua
 	end
 
@@ -67,13 +67,13 @@ if SERVER then
 		@return boolean - true if successful, false otherwise
 
 		Example override:
-		function Arcane:GiveItem(ply, itemClass, amount, reason)
+		function Arcana:GiveItem(ply, itemClass, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			ply:PS2_AddItem(itemClass, amount) -- PointShop 2 example
 			return true
 		end
 	]]
-	function Arcane:GiveItem(ply, itemClass, amount, reason)
+	function Arcana:GiveItem(ply, itemClass, amount, reason)
 		-- Default implementation in default_inventory.lua
 	end
 
@@ -86,14 +86,14 @@ if SERVER then
 		@return boolean - true if successful, false if insufficient items
 
 		Example override:
-		function Arcane:TakeItem(ply, itemClass, amount, reason)
+		function Arcana:TakeItem(ply, itemClass, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			if ply:PS2_GetItemCount(itemClass) < amount then return false end
 			ply:PS2_RemoveItem(itemClass, amount) -- PointShop 2 example
 			return true
 		end
 	]]
-	function Arcane:TakeItem(ply, itemClass, amount, reason)
+	function Arcana:TakeItem(ply, itemClass, amount, reason)
 		-- Default implementation in default_inventory.lua
 	end
 end
@@ -110,7 +110,7 @@ end
 	@return number - Amount of coins (or 0 if none)
 
 	Example override:
-	function Arcane:GetCoins(ply)
+	function Arcana:GetCoins(ply)
 		if SERVER then
 			return ply:getDarkRPVar("money") or 0 -- DarkRP example
 		else
@@ -118,7 +118,7 @@ end
 		end
 	end
 ]]
-function Arcane:GetCoins(ply)
+function Arcana:GetCoins(ply)
 	-- Default implementation in default_inventory.lua
 	return 0
 end
@@ -130,7 +130,7 @@ end
 	@return number - Amount of items (or 0 if none)
 
 	Example override:
-	function Arcane:GetItemCount(ply, itemClass)
+	function Arcana:GetItemCount(ply, itemClass)
 		if SERVER then
 			return ply:PS2_GetItemCount(itemClass) or 0 -- PointShop 2 example
 		else
@@ -138,7 +138,7 @@ end
 		end
 	end
 ]]
-function Arcane:GetItemCount(ply, itemClass)
+function Arcana:GetItemCount(ply, itemClass)
 	-- Default implementation in default_inventory.lua
 	return 0
 end
@@ -150,20 +150,20 @@ end
 
 	--- DarkRP Integration ---
 	hook.Add("Initialize", "YourAddon_ArcanaCompat", function()
-		function Arcane:GiveCoins(ply, amount, reason)
+		function Arcana:GiveCoins(ply, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			ply:addMoney(amount)
 			return true
 		end
 
-		function Arcane:TakeCoins(ply, amount, reason)
+		function Arcana:TakeCoins(ply, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			if ply:getDarkRPVar("money") < amount then return false end
 			ply:addMoney(-amount)
 			return true
 		end
 
-		function Arcane:GetCoins(ply)
+		function Arcana:GetCoins(ply)
 			if SERVER then
 				return IsValid(ply) and ply:getDarkRPVar("money") or 0
 			else
@@ -174,7 +174,7 @@ end
 
 	--- Custom MySQL/Database System ---
 	hook.Add("Initialize", "YourAddon_ArcanaCompat", function()
-		function Arcane:GiveCoins(ply, amount, reason)
+		function Arcana:GiveCoins(ply, amount, reason)
 			if not IsValid(ply) or amount <= 0 then return false end
 			YourDB:AddCoins(ply:SteamID64(), amount)
 			return true
@@ -229,7 +229,7 @@ end
 
 		-- Example:
 		-- YourDatabase:LoadVaultData(ply:SteamID64(), function(vaultItems)
-		-- 	Arcane.AstralVaultCache[ply:SteamID64()] = vaultItems
+		-- 	Arcana.AstralVaultCache[ply:SteamID64()] = vaultItems
 		-- 	callback(true, vaultItems)
 		-- end)
 

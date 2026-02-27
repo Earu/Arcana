@@ -1,8 +1,8 @@
-local Arcane = _G.Arcane or {}
+local Arcana = _G.Arcana or {}
 
 if SERVER then
-	Arcane.ManaCrystals = Arcane.ManaCrystals or {}
-	local M = Arcane.ManaCrystals
+	Arcana.ManaCrystals = Arcana.ManaCrystals or {}
+	local M = Arcana.ManaCrystals
 
 	-- Configuration
 	M.Config = M.Config or {
@@ -406,16 +406,16 @@ if SERVER then
 
 	-- Load state after entities spawn; autosave periodically
 	hook.Add("InitPostEntity", "Arcana_Mana_LoadState", function()
-		if not Arcane or not Arcane.ManaCrystals then return end
-		Arcane.ManaCrystals:LoadState()
+		if not Arcana or not Arcana.ManaCrystals then return end
+		Arcana.ManaCrystals:LoadState()
 	end)
 
 	timer.Create("Arcana_ManaEnvironment_Autosave", 60, 0, function()
-		if not Arcane or not Arcane.ManaCrystals then return end
-		Arcane.ManaCrystals:SaveState()
+		if not Arcana or not Arcana.ManaCrystals then return end
+		Arcana.ManaCrystals:SaveState()
 	end)
 end
 
-return Arcane
+return Arcana
 
 

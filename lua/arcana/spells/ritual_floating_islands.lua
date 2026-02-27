@@ -1,14 +1,14 @@
 if true then return end
 
---[[Arcane:RegisterRitualSpell({
+--[[Arcana:RegisterRitualSpell({
 	id = "ritual_floating_islands",
 	name = "Ritual: Floating Islands",
 	description = "Summons a realm of mystical floating islands suspended in the sky.",
-	category = Arcane.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 25,
 	knowledge_cost = 5,
 	cooldown = 60 * 60,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 15000,
 	cast_time = 10.0,
 	ritual_color = Color(150, 180, 255),
@@ -62,9 +62,9 @@ if true then return end
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
 
-		local Envs = Arcane.Environments
+		local Envs = Arcana.Environments
 		if Envs:IsActive() then
-			Arcane:SendErrorNotification(activatingPly, "Another environment is already active.")
+			Arcana:SendErrorNotification(activatingPly, "Another environment is already active.")
 			return
 		end
 
@@ -72,7 +72,7 @@ if true then return end
 		local spawnPos = selfEnt:GetPos()
 		local ok, reason = Envs:Start("floating_islands", spawnPos, activatingPly)
 		if not ok then
-			Arcane:SendErrorNotification(activatingPly, "Ritual failed: " .. tostring(reason))
+			Arcana:SendErrorNotification(activatingPly, "Ritual failed: " .. tostring(reason))
 			return
 		end
 

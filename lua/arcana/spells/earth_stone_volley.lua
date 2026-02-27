@@ -1,12 +1,12 @@
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "stone_volley",
 	name = "Stone Volley",
 	description = "Summon pebbles above and launch them forward.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,
 	cooldown = 3.5,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 18,
 	cast_time = 0.8,
 	range = 1000,

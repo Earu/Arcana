@@ -22,15 +22,15 @@ local function registerRitual(id, name, description, time, custom_color)
 		end)
 	end
 
-	Arcane:RegisterRitualSpell({
+	Arcana:RegisterRitualSpell({
 		id = id,
 		name = name,
 		description = description,
-		category = Arcane.CATEGORIES.UTILITY,
+		category = Arcana.CATEGORIES.UTILITY,
 		level_required = 10,
 		knowledge_cost = 4,
 		cooldown = 60 * 20,
-		cost_type = Arcane.COST_TYPES.COINS,
+		cost_type = Arcana.COST_TYPES.COINS,
 		cost_amount = 100,
 		cast_time = 1.5,
 		cast_anim = "becon",

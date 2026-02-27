@@ -65,7 +65,7 @@ end
 local function applyLightningDamage(attacker, hitPos, normal)
 	local radius = 180
 	local baseDamage = 75
-	Arcane:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
+	Arcana:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
 
 	-- Chain to up to 3 nearby living targets
 	local candidates = {}
@@ -117,15 +117,15 @@ local function applyLightningDamage(attacker, hitPos, normal)
 	end
 end
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "lightning_strike",
 	name = "Lightning Strike",
 	description = "Call a focused lightning bolt at your aim point, chaining to nearby foes.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 2,
 	knowledge_cost = 2,
 	cooldown = 5.5,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 30,
 	cast_time = 1.0,
 	range = 1500,
@@ -135,7 +135,7 @@ Arcane:RegisterSpell({
 		if not SERVER then return true end
 
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local targetPos = Arcane:ResolveGroundTarget(srcEnt, 1500)
+		local targetPos = Arcana:ResolveGroundTarget(srcEnt, 1500)
 
 		-- Perform 1 strong strike and 2 lighter offset strikes for style
 		local strikes = {
@@ -173,7 +173,7 @@ Arcane:RegisterSpell({
 				if s.power >= 1.0 then
 					applyLightningDamage(caster, targetPos + s.offset, normal)
 				else
-					Arcane:BlastDamage(caster, caster, targetPos + s.offset, 120, 30, DMG_SHOCK, true)
+					Arcana:BlastDamage(caster, caster, targetPos + s.offset, 120, 30, DMG_SHOCK, true)
 				end
 			end)
 		end
@@ -240,18 +240,18 @@ if CLIENT then
 		end
 
 		-- Store lightning bolt for rendering
-		table.insert(Arcane.LightningBolts or {}, {
+		table.insert(Arcana.LightningBolts or {}, {
 			startPos = skyPos,
 			endPos = pos,
 			dieTime = CurTime() + 0.4,
 			startTime = CurTime(),
 			power = power
 		})
-		Arcane.LightningBolts = Arcane.LightningBolts or {}
+		Arcana.LightningBolts = Arcana.LightningBolts or {}
 
 		-- Store bright flash sprite
-		Arcane.LightningFlashes = Arcane.LightningFlashes or {}
-		table.insert(Arcane.LightningFlashes, {
+		Arcana.LightningFlashes = Arcana.LightningFlashes or {}
+		table.insert(Arcana.LightningFlashes, {
 			pos = pos,
 			dieTime = CurTime() + 0.15,
 			startTime = CurTime(),
@@ -278,13 +278,13 @@ if CLIENT then
 		local endPos = net.ReadVector()
 
 		-- Store chain for rendering
-		table.insert(Arcane.LightningChains or {}, {
+		table.insert(Arcana.LightningChains or {}, {
 			startPos = startPos,
 			endPos = endPos,
 			dieTime = CurTime() + 0.3,
 			startTime = CurTime()
 		})
-		Arcane.LightningChains = Arcane.LightningChains or {}
+		Arcana.LightningChains = Arcana.LightningChains or {}
 
 		-- Particles along chain
 		local emitter = ParticleEmitter((startPos + endPos) * 0.5)
@@ -308,18 +308,18 @@ if CLIENT then
 
 	-- Render lightning bolts
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLightning", function()
-		if not Arcane.LightningBolts then Arcane.LightningBolts = {} end
-		if not Arcane.LightningChains then Arcane.LightningChains = {} end
-		if not Arcane.LightningFlashes then Arcane.LightningFlashes = {} end
+		if not Arcana.LightningBolts then Arcana.LightningBolts = {} end
+		if not Arcana.LightningChains then Arcana.LightningChains = {} end
+		if not Arcana.LightningFlashes then Arcana.LightningFlashes = {} end
 
 		local curTime = CurTime()
 
 		-- Render bright flash sprites
-		for i = #Arcane.LightningFlashes, 1, -1 do
-			local flash = Arcane.LightningFlashes[i]
+		for i = #Arcana.LightningFlashes, 1, -1 do
+			local flash = Arcana.LightningFlashes[i]
 
 			if curTime > flash.dieTime then
-				table.remove(Arcane.LightningFlashes, i)
+				table.remove(Arcana.LightningFlashes, i)
 			else
 				local age = curTime - flash.startTime
 				local frac = math.Clamp(age / 0.15, 0, 1)
@@ -340,11 +340,11 @@ if CLIENT then
 		end
 
 		-- Main lightning bolts
-		for i = #Arcane.LightningBolts, 1, -1 do
-			local bolt = Arcane.LightningBolts[i]
+		for i = #Arcana.LightningBolts, 1, -1 do
+			local bolt = Arcana.LightningBolts[i]
 
 			if curTime > bolt.dieTime then
-				table.remove(Arcane.LightningBolts, i)
+				table.remove(Arcana.LightningBolts, i)
 			else
 				local age = curTime - bolt.startTime
 				local frac = 1 - math.Clamp((bolt.dieTime - curTime) / 0.4, 0, 1)
@@ -447,11 +447,11 @@ if CLIENT then
 		end
 
 		-- Chain lightning with thicker beams
-		for i = #Arcane.LightningChains, 1, -1 do
-			local chain = Arcane.LightningChains[i]
+		for i = #Arcana.LightningChains, 1, -1 do
+			local chain = Arcana.LightningChains[i]
 
 			if curTime > chain.dieTime then
-				table.remove(Arcane.LightningChains, i)
+				table.remove(Arcana.LightningChains, i)
 			else
 				local frac = 1 - math.Clamp((chain.dieTime - curTime) / 0.3, 0, 1)
 				local flicker = math.sin(curTime * 60 + chain.startTime * 80) * 0.3 + 0.7
@@ -495,12 +495,12 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "lightning_strike" then return end
 
-		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(170, 200, 255, 255),
 			size = 26,
 			intensity = 4,
 			positionResolver = function(c)
-				return Arcane:ResolveGroundTarget(c, 1500)
+				return Arcana:ResolveGroundTarget(c, 1500)
 			end
 		})
 	end)

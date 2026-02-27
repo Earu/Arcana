@@ -102,8 +102,8 @@ if SERVER then
 				killer = self._lastHurtBy
 			end
 
-			if IsValid(killer) and killer:IsPlayer() and not Arcane:IsPotentialCheater(killer) then
-				Arcane:GiveXP(killer, HEAVY_WISP_XP, "Heavy wisp destroyed")
+			if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
+				Arcana:GiveXP(killer, HEAVY_WISP_XP, "Heavy wisp destroyed")
 			end
 
 			SafeRemoveEntityDelayed(self, 0.1)
