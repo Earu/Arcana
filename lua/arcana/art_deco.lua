@@ -438,6 +438,67 @@ if CLIENT then
 	end
 
 	-- ===========================================================================
+	-- TOOLTIP COMPONENT
+	-- ===========================================================================
+
+	--- Adds tooltip functionality to any panel
+	-- @param panel The panel to add tooltip to
+	-- @param text The tooltip text to display
+	-- @param tooltipWidth Width of tooltip (default: 300)
+	-- @param tooltipHeight Height of tooltip (default: 60)
+	function ArtDeco.AddTooltip(panel, text, tooltipWidth, tooltipHeight)
+		if not IsValid(panel) then return end
+
+		panel.OnCursorEntered = function()
+			if IsValid(panel.tooltip) then return end
+
+		local tooltip = vgui.Create("DLabel")
+		tooltip:SetSize(tooltipWidth or 300, tooltipHeight or 60)
+		tooltip:SetWrap(true)
+		tooltip:SetText(text or "")
+		tooltip:SetFont("Arcana_AncientSmall")
+		tooltip:SetTextColor(ArtDeco.Colors.textBright)
+		tooltip:SetDrawOnTop(true)
+		tooltip:SetMouseInputEnabled(false)
+		tooltip:SetKeyboardInputEnabled(false)
+		tooltip:NoClipping(true)
+		tooltip:SetTextInset(8, 0)
+
+		tooltip.Paint = function(pnl, w, h)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoBg, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
+		end
+
+			panel.tooltip = tooltip
+
+			local function updatePos()
+				if not IsValid(tooltip) then return end
+				local x, y = gui.MousePos()
+				tooltip:SetPos(x + 15, y - 60)
+			end
+
+			updatePos()
+
+			hook.Add("Think", "ArcanaTooltip_" .. tostring(tooltip), function()
+				if not IsValid(tooltip) or not IsValid(panel) then
+					hook.Remove("Think", "ArcanaTooltip_" .. tostring(tooltip))
+					if IsValid(tooltip) then tooltip:Remove() end
+					return
+				end
+				updatePos()
+			end)
+		end
+
+		panel.OnCursorExited = function()
+			if IsValid(panel.tooltip) then
+				hook.Remove("Think", "ArcanaTooltip_" .. tostring(panel.tooltip))
+				panel.tooltip:Remove()
+				panel.tooltip = nil
+			end
+		end
+	end
+
+	-- ===========================================================================
 	-- INFO ICON WITH TOOLTIP COMPONENT
 	-- ===========================================================================
 
@@ -475,55 +536,7 @@ if CLIENT then
 			draw.SimpleText("i", "Arcana_Ancient", cx, cy, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
-		-- Tooltip on hover
-		infoIcon.OnCursorEntered = function()
-			if IsValid(infoIcon.tooltip) then return end
-
-			local tooltip = vgui.Create("DLabel")
-			tooltip:SetSize(tooltipWidth or 300, tooltipHeight or 60)
-			tooltip:SetWrap(true)
-			tooltip:SetText(text or "No description available")
-			tooltip:SetFont("Arcana_AncientSmall")
-			tooltip:SetTextColor(ArtDeco.Colors.textBright)
-			tooltip:SetDrawOnTop(true)
-			tooltip:SetMouseInputEnabled(false)
-			tooltip:SetKeyboardInputEnabled(false)
-			tooltip:NoClipping(true)
-
-			tooltip.Paint = function(pnl, w, h)
-				ArtDeco.FillDecoPanel(-10, 0, w, h, ArtDeco.Colors.decoBg, 8)
-				ArtDeco.DrawDecoFrame(-10, 0, w, h, ArtDeco.Colors.gold, 8)
-			end
-
-			infoIcon.tooltip = tooltip
-
-			-- Position tooltip near cursor
-			local function updatePos()
-				if not IsValid(tooltip) then return end
-				local x, y = gui.MousePos()
-				tooltip:SetPos(x + 15, y - 30)
-			end
-
-			updatePos()
-
-			-- Track cursor movement
-			hook.Add("Think", "ArcanaTooltip_" .. tostring(tooltip), function()
-				if not IsValid(tooltip) or not IsValid(infoIcon) then
-					hook.Remove("Think", "ArcanaTooltip_" .. tostring(tooltip))
-					if IsValid(tooltip) then tooltip:Remove() end
-					return
-				end
-				updatePos()
-			end)
-		end
-
-		infoIcon.OnCursorExited = function()
-			if IsValid(infoIcon.tooltip) then
-				hook.Remove("Think", "ArcanaTooltip_" .. tostring(infoIcon.tooltip))
-				infoIcon.tooltip:Remove()
-				infoIcon.tooltip = nil
-			end
-		end
+		ArtDeco.AddTooltip(infoIcon, text or "No description available", tooltipWidth, tooltipHeight)
 
 		return infoIcon
 	end

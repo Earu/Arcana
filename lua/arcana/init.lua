@@ -13,6 +13,7 @@ if SERVER then
 	AddCSLuaFile("arcana/soul_mode.lua")
 	AddCSLuaFile("arcana/tutorial.lua")
 	AddCSLuaFile("arcana/third_party.lua")
+	AddCSLuaFile("arcana/default_inventory.lua")
 
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
@@ -33,6 +34,7 @@ include("arcana/third_party.lua")
 
 if SERVER then
 	include("arcana/mana_crystals.lua")
+	include("arcana/default_inventory.lua")
 end
 
 if CLIENT then
@@ -41,6 +43,7 @@ if CLIENT then
 	include("arcana/hud.lua")
 	include("arcana/spell_browser.lua")
 	include("arcana/voice_activation.lua")
+	include("arcana/default_inventory.lua")
 end
 
 local function includePath(path)
