@@ -121,9 +121,9 @@ if SERVER then
 		self:_OnScaleChanged(self:GetCrystalScale())
 
 		-- Register as producer in ManaNetwork
-		local Arcane = _G.Arcane or {}
-		if Arcane.ManaNetwork and Arcane.ManaNetwork.RegisterProducer then
-			Arcane.ManaNetwork:RegisterProducer(self, {range = self:GetAbsorbRadius() or 520})
+		local Arcana = _G.Arcana or {}
+		if Arcana.ManaNetwork and Arcana.ManaNetwork.RegisterProducer then
+			Arcana.ManaNetwork:RegisterProducer(self, {range = self:GetAbsorbRadius() or 520})
 		end
 	end
 
@@ -176,9 +176,9 @@ if SERVER then
 		self:EmitSound("physics/glass/glass_largesheet_break1.wav", 70, 100)
 
 		-- Report destruction to corruption system before removal
-		local Arcane = _G.Arcane or {}
-		if Arcane.ManaCrystals and Arcane.ManaCrystals.ReportCrystalDestroyed then
-			Arcane.ManaCrystals:ReportCrystalDestroyed(self)
+		local Arcana = _G.Arcana or {}
+		if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportCrystalDestroyed then
+			Arcana.ManaCrystals:ReportCrystalDestroyed(self)
 		end
 
 		self._shattered = true
@@ -233,9 +233,9 @@ if SERVER then
 
 	-- Register into the ManaNetwork on spawn
 	function ENT:OnRemove()
-		local Arcane = _G.Arcane or {}
-		if Arcane.ManaNetwork and Arcane.ManaNetwork.UnregisterNode then
-			Arcane.ManaNetwork:UnregisterNode(self)
+		local Arcana = _G.Arcana or {}
+		if Arcana.ManaNetwork and Arcana.ManaNetwork.UnregisterNode then
+			Arcana.ManaNetwork:UnregisterNode(self)
 		end
 	end
 

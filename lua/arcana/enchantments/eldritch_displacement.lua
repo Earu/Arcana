@@ -61,9 +61,9 @@ local function blinkVFX(fromPos, toPos, ply)
 	sound.Play("weapons/physcannon/energy_bounce2.wav", toPos, 70, 120)
 
 	-- Brief band ring
-	if Arcane and Arcane.SendAttachBandVFX and IsValid(ply) then
+	if Arcana and Arcana.SendAttachBandVFX and IsValid(ply) then
 		local r = math.max(ply:OBBMaxs():Unpack()) * 0.55
-		Arcane:SendAttachBandVFX(ply, Color(196, 160, 255), 26, 0.4, {
+		Arcana:SendAttachBandVFX(ply, Color(196, 160, 255), 26, 0.4, {
 			{ radius = r * 0.9, height = 4, spin = { p = 0, y = 180, r = 0 }, lineWidth = 2 },
 			{ radius = r * 0.7, height = 3, spin = { p = 0, y = -220, r = 0 }, lineWidth = 2 },
 		}, "eldritch_displacement_fx")
@@ -136,7 +136,7 @@ local function detachHook(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "eldritch_displacement",
 	name = "Eldritch Displacement",
 	description = "On taking damage from others, blink to a random nearby spot and keep your aim.",

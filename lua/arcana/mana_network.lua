@@ -1,9 +1,9 @@
-local Arcane = _G.Arcane or {}
+local Arcana = _G.Arcana or {}
 
 if SERVER then
 	util.AddNetworkString("Arcana_ManaNetwork_Flow")
-	Arcane.ManaNetwork = Arcane.ManaNetwork or {}
-	local MN = Arcane.ManaNetwork
+	Arcana.ManaNetwork = Arcana.ManaNetwork or {}
+	local MN = Arcana.ManaNetwork
 
 	-- Minimal configuration
 	MN.Config = MN.Config or {

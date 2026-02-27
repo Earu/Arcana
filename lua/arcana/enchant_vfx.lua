@@ -706,11 +706,11 @@ end)
 
 -- =========================== HELPERS ===========================
 
-local Arcane = _G.Arcane or {}
-_G.Arcane = Arcane
+local Arcana = _G.Arcana or {}
+_G.Arcana = Arcana
 
 -- Reusable: render rings for an entity in an active 3D context (e.g., PostDrawModel)
-function Arcane:RenderEnchantBandsForEntity(ent, count, color, style)
+function Arcana:RenderEnchantBandsForEntity(ent, count, color, style)
     if not IsValid(ent) or not _G.BandCircle then return end
     count = math.max(1, math.floor(count or 1))
     style = style or "axis"

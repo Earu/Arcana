@@ -4,15 +4,15 @@ local DASH_FORCE = 2000 -- Base propulsion force
 local UPWARD_LIFT = 300 -- Upward component to help with mobility
 local FALL_DAMAGE_IMMUNITY_TIME = 3.0 -- Seconds of fall damage immunity
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "wind_dash",
 	name = "Wind Dash",
 	description = "Propel yourself forward with a powerful gust of wind. Grants temporary immunity to fall damage.",
-	category = Arcane.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 8,
 	knowledge_cost = 2,
 	cooldown = 3.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 25,
 	cast_time = 0.3,
 	range = 0,

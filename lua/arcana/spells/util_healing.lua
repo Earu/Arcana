@@ -1,12 +1,12 @@
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "healing",
 	name = "Healing",
 	description = "Restore a player's health.",
-	category = Arcane.CATEGORIES.PROTECTION,
+	category = Arcana.CATEGORIES.PROTECTION,
 	level_required = 6,
 	knowledge_cost = 2,
 	cooldown = 8.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 25,
 	cast_time = 1.2,
 	range = 400,
@@ -34,7 +34,7 @@ Arcane:RegisterSpell({
 		local healColor = Color(120, 255, 140, 255) -- Golden healing light
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
 
-		Arcane:SendAttachBandVFX(target, healColor, 26, 2.5, {
+		Arcana:SendAttachBandVFX(target, healColor, 26, 2.5, {
 			{
 				radius = r * 0.9,
 				height = 3,

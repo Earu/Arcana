@@ -7,15 +7,15 @@ if SERVER then
 end
 
 -- Meteor Storm: A divine pact granted at level 30 - call down a prolonged meteor storm while the earth ruptures
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "meteor_storm",
 	name = "Meteor Storm",
 	description = "Channel divine power to call down a devastating meteor storm while the earth ruptures beneath your enemies.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 30,
 	knowledge_cost = 8, -- It doesnt cost KPs, but XP scales off this value
 	cooldown = 120.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 500000,
 	cast_time = 12,
 	range = 0,
@@ -28,7 +28,7 @@ Arcane:RegisterSpell({
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local center, normal = Arcane:ResolveGroundTarget(srcEnt, 1500)
+		local center, normal = Arcana:ResolveGroundTarget(srcEnt, 1500)
 		center = center or (srcEnt:GetPos() + Vector(0, 0, 2))
 		normal = normal or Vector(0, 0, 1)
 		local baseRadius = 1400 -- Larger area of effect
@@ -201,7 +201,7 @@ Arcane:RegisterSpell({
 							dmg:SetDamageType(bit.bor(DMG_BLAST, DMG_BURN))
 							dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 							dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-							Arcane:TakeDamageInfo(ent, dmg)
+							Arcana:TakeDamageInfo(ent, dmg)
 							-- Knockback
 							local dir = (ent:WorldSpaceCenter() - groundPos):GetNormalized()
 
@@ -1042,11 +1042,11 @@ if CLIENT then
 		}
 
 		-- Ground target indicator (follows aim)
-		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = color,
 			size = 1400,
 			intensity = 100,
-			positionResolver = function(c) return Arcane:ResolveGroundTarget(c, 1500) end
+			positionResolver = function(c) return Arcana:ResolveGroundTarget(c, 1500) end
 		})
 
 		-- PHASE 1: Initial ground circle at caster's feet (0s)

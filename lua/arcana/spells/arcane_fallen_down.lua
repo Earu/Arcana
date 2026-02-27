@@ -135,7 +135,7 @@ local function startBeamPhase(caster, targetPos)
 					dmg:SetDamageType(DMG_DISSOLVE)
 					dmg:SetAttacker(caster)
 					dmg:SetInflictor(caster)
-					Arcane:TakeDamageInfo(ent, dmg)
+					Arcana:TakeDamageInfo(ent, dmg)
 				else
 					-- Ignite everything else
 					if ent:IsOnFire() == false then
@@ -201,7 +201,7 @@ local function startBeamPhase(caster, targetPos)
 
 		util.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
 		-- Final damage wave
-		Arcane:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS, 200, bit.bor(DMG_BLAST, DMG_DISSOLVE), true)
+		Arcana:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS, 200, bit.bor(DMG_BLAST, DMG_DISSOLVE), true)
 		-- Broadcast final impact wave
 		net.Start("Arcana_FallenDown_ImpactWave", true)
 		net.WriteVector(targetPos)
@@ -256,7 +256,7 @@ local function startBeamPhase(caster, targetPos)
 								dmg:SetDamageType(DMG_CRUSH)
 								dmg:SetAttacker(caster)
 								dmg:SetInflictor(caster)
-								Arcane:TakeDamageInfo(ent, dmg)
+								Arcana:TakeDamageInfo(ent, dmg)
 							end
 						end
 					end
@@ -292,7 +292,7 @@ local function startBeamPhase(caster, targetPos)
 				end)
 
 				-- Final pull damage
-				Arcane:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, bit.bor(DMG_CRUSH, DMG_BLAST), true)
+				Arcana:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, bit.bor(DMG_CRUSH, DMG_BLAST), true)
 				util.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
 				-- Broadcast collapse visuals
 				net.Start("Arcana_FallenDown_VacuumCollapse", true)
@@ -304,15 +304,15 @@ local function startBeamPhase(caster, targetPos)
 	end)
 end
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "fallen_down",
 	name = "Fallen Down",
 	description = "A spell of absolute devastation. Charge for 60 seconds, immobilized by the spell's complexity, then unleash a godly beam from the heavens that obliterates everything in its wake.",
-	category = Arcane.CATEGORIES.COMBAT,
-	level_required = Arcane.Config.MAX_LEVEL,
+	category = Arcana.CATEGORIES.COMBAT,
+	level_required = Arcana.Config.MAX_LEVEL,
 	knowledge_cost = 15, -- It doesnt cost KPs, but XP scales off this value
 	cooldown = 60 * 20, -- 20 minutes
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 5000000,
 	cast_time = CHARGE_TIME,
 	range = 2000,
@@ -329,7 +329,7 @@ Arcane:RegisterSpell({
 		-- (cast function is called AFTER the 60-second charge time)
 		if SERVER then
 			-- Re-check target position at moment of cast completion
-			local finalTarget = Arcane:ResolveGroundTarget(caster, 2000)
+			local finalTarget = Arcana:ResolveGroundTarget(caster, 2000)
 
 			if not finalTarget then
 				cleanupChargingState(caster, true) -- Stop BGM on targeting failure
@@ -1606,12 +1606,12 @@ if CLIENT then
 			auraParticles = {}
 		end)
 
-		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(170, 220, 255, 255), -- Bright blue-white/cyan matching the spell's theme
 			size = MAX_BEAM_RADIUS, -- 2000 - shows the full impact radius
 			intensity = 150,
 			positionResolver = function(c)
-				return Arcane:ResolveGroundTarget(c, 1000)
+				return Arcana:ResolveGroundTarget(c, 1000)
 			end
 		})
 

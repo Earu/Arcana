@@ -41,7 +41,7 @@ if SERVER then
 			phys:EnableGravity(false)
 		end
 
-		Arcane:SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
+		Arcana:SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
 			{
 				radius = 10,
 				height = 3,

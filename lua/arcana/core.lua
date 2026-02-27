@@ -1,7 +1,7 @@
-local Arcane = _G.Arcane or {}
-_G.Arcane = Arcane
+local Arcana = _G.Arcana or {}
+_G.Arcana = Arcana
 
-function Arcane:Print(...)
+function Arcana:Print(...)
 	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), table.concat({...}, " "), "\n")
 end
 
@@ -14,7 +14,7 @@ local function runHook(name, ...)
 	return a, b, c, d, e, f
 end
 
-Arcane.RunHook = runHook
+Arcana.RunHook = runHook
 
 -- Client-side stub for autocomplete and help so players see the command
 if CLIENT then
@@ -22,7 +22,7 @@ if CLIENT then
 		local input = string.lower(string.Trim(stringargs or ""))
 		local out = {}
 
-		for id, sp in pairs(Arcane and Arcane.RegisteredSpells or {}) do
+		for id, sp in pairs(Arcana and Arcana.RegisteredSpells or {}) do
 			local idLower = string.lower(id)
 			local nameLower = string.lower(sp.name or id)
 
@@ -42,7 +42,7 @@ if CLIENT then
 		local spellId = string.lower(string.Trim(raw))
 
 		if spellId == "" then
-			Arcane:Print("Usage: arcana <spellId>")
+			Arcana:Print("Usage: arcana <spellId>")
 
 			return
 		end
@@ -54,7 +54,7 @@ if CLIENT then
 end
 
 -- Configuration
-Arcane.Config = {
+Arcana.Config = {
 	KNOWLEDGE_POINTS_PER_LEVEL = 1,
 	MAX_LEVEL = 100,
 	-- Full XP is awarded at this cast time; shorter casts scale down, longer casts scale up (clamped)
@@ -69,20 +69,20 @@ Arcane.Config = {
 }
 
 -- Storage for registered spells
-Arcane.RegisteredSpells = Arcane.RegisteredSpells or {}
-Arcane.PlayerData = Arcane.PlayerData or {}
+Arcana.RegisteredSpells = Arcana.RegisteredSpells or {}
+Arcana.PlayerData = Arcana.PlayerData or {}
 -- Storage for registered weapon enchantments
-Arcane.RegisteredEnchantments = Arcane.RegisteredEnchantments or {}
+Arcana.RegisteredEnchantments = Arcana.RegisteredEnchantments or {}
 
 -- Spell cost types
-Arcane.COST_TYPES = {
+Arcana.COST_TYPES = {
 	COINS = "coins",
 	HEALTH = "health",
 	ITEMS = "items"
 }
 
 -- Spell/Ritual categories
-Arcane.CATEGORIES = {
+Arcana.CATEGORIES = {
 	COMBAT = "combat",
 	UTILITY = "utility",
 	PROTECTION = "protection",
@@ -92,7 +92,7 @@ Arcane.CATEGORIES = {
 }
 
 -- Enchantment API
-function Arcane:RegisterEnchantment(def)
+function Arcana:RegisterEnchantment(def)
 	if not istable(def) then
 		ErrorNoHalt("RegisterEnchantment requires a table definition\n")
 		return false
@@ -125,8 +125,8 @@ function Arcane:RegisterEnchantment(def)
 		max_stacks = tonumber(def.max_stacks or 1) or 1,
 	}
 
-	Arcane.RegisteredEnchantments[id] = ench
-	Arcane:Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
+	Arcana.RegisteredEnchantments[id] = ench
+	Arcana:Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
 	return true
 end
 
@@ -138,7 +138,7 @@ local function ensureEntityEnchantTable(wep)
 	return wep.ArcanaEnchantments
 end
 
-function Arcane:GetEntityEnchantments(wep)
+function Arcana:GetEntityEnchantments(wep)
 	if not IsValid(wep) then return {} end
 
 	if SERVER then
@@ -166,7 +166,7 @@ function Arcane:GetEntityEnchantments(wep)
 	end
 end
 
-function Arcane:HasEntityEnchantment(wep, enchId)
+function Arcana:HasEntityEnchantment(wep, enchId)
 	local list = self:GetEntityEnchantments(wep)
 	return list[enchId] ~= nil
 end
@@ -183,11 +183,11 @@ local function syncWeaponEnchantNW(wep)
 end
 
 -- Apply/remove on a specific weapon entity instance
-function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
+function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 
-	local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+	local ench = (Arcana.RegisteredEnchantments or {})[enchId]
 	if not ench then return false, "Unknown enchantment" end
 
 	local list = ensureEntityEnchantTable(wep)
@@ -218,11 +218,11 @@ function Arcane:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	return true
 end
 
-function Arcane:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
+function Arcana:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 
-	local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+	local ench = (Arcana.RegisteredEnchantments or {})[enchId]
 	local list = ensureEntityEnchantTable(wep)
 	if not list[enchId] then return false, "Not applied" end
 
@@ -245,7 +245,7 @@ local function CreateDefaultPlayerData()
 	return {
 		xp = 0,
 		level = 1,
-		knowledge_points = Arcane.Config.KNOWLEDGE_POINTS_PER_LEVEL,
+		knowledge_points = Arcana.Config.KNOWLEDGE_POINTS_PER_LEVEL,
 		unlocked_spells = {},
 		spell_cooldowns = {},
 		active_effects = {},
@@ -264,8 +264,8 @@ if SERVER then
 
 	local ensured = false
 	-- Per-player gating to prevent saving until a successful initial DB load
-	Arcane.SaveBlockedBySteamID = Arcane.SaveBlockedBySteamID or {}
-	Arcane.RetryStateBySteamID = Arcane.RetryStateBySteamID or {}
+	Arcana.SaveBlockedBySteamID = Arcana.SaveBlockedBySteamID or {}
+	Arcana.RetryStateBySteamID = Arcana.RetryStateBySteamID or {}
 
 	local function ensureDatabase()
 		if ensured then return ensured end
@@ -361,14 +361,14 @@ if SERVER then
 		return slots
 	end
 
-	function Arcane:SavePlayerDataToSQL(ply, data)
+	function Arcana:SavePlayerDataToSQL(ply, data)
 		local handled = runHook("SavePlayerDataToSQL", ply, data)
 		if handled == true then return end
 
 		if not ensureDatabase() then return end
 
 		local sid = IsValid(ply) and ply:SteamID64() or nil
-		if sid and Arcane.SaveBlockedBySteamID[sid] then return end
+		if sid and Arcana.SaveBlockedBySteamID[sid] then return end
 
 		local steamid = sql.SQLStr(ply:SteamID64(), true)
 		local incoming_xp = tonumber(data.xp) or 0
@@ -428,7 +428,7 @@ if SERVER then
 		end
 	end
 
-	function Arcane:LoadPlayerDataFromSQL(ply, callback)
+	function Arcana:LoadPlayerDataFromSQL(ply, callback)
 		if not IsValid(ply) then return end
 
 		local handled = runHook("LoadPlayerDataFromSQL", ply, callback)
@@ -437,7 +437,7 @@ if SERVER then
 		if not ensureDatabase() then return nil end
 
 		local rawSid = ply:SteamID64()
-		Arcane.SaveBlockedBySteamID[rawSid] = true
+		Arcana.SaveBlockedBySteamID[rawSid] = true
 
 		local function processData(row)
 			local data = CreateDefaultPlayerData()
@@ -448,23 +448,23 @@ if SERVER then
 			data.quickspell_slots = deserializeQuickslots(row.quickspell_slots)
 			data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
 			data.last_save = tonumber(row.last_save) or data.last_save
-			Arcane.SaveBlockedBySteamID[rawSid] = nil
-			Arcane.RetryStateBySteamID[rawSid] = nil
+			Arcana.SaveBlockedBySteamID[rawSid] = nil
+			Arcana.RetryStateBySteamID[rawSid] = nil
 			callback(true, data)
 		end
 
 		local steamid = sql.SQLStr(rawSid, true)
 
 		local function scheduleRetry()
-			local state = Arcane.RetryStateBySteamID[rawSid] or {delay = 1}
-			Arcane.RetryStateBySteamID[rawSid] = state
+			local state = Arcana.RetryStateBySteamID[rawSid] or {delay = 1}
+			Arcana.RetryStateBySteamID[rawSid] = state
 
 			local tname = "Arcana_RetryLoad_" .. tostring(rawSid)
 			timer.Remove(tname)
 			timer.Create(tname, state.delay, 1, function()
 				if not IsValid(ply) then return end
 				state.delay = math.min((state.delay or 1) * 2, 60)
-				Arcane:LoadPlayerDataFromSQL(ply, callback)
+				Arcana:LoadPlayerDataFromSQL(ply, callback)
 			end)
 		end
 
@@ -476,13 +476,13 @@ if SERVER then
 		end
 
 		if not rows or not rows[1] then
-			Arcane.SaveBlockedBySteamID[rawSid] = nil
-			Arcane.RetryStateBySteamID[rawSid] = nil
+			Arcana.SaveBlockedBySteamID[rawSid] = nil
+			Arcana.RetryStateBySteamID[rawSid] = nil
 
 			local defaults = CreateDefaultPlayerData()
 			callback(true, defaults)
 
-			Arcane:SavePlayerDataToSQL(ply, defaults)
+			Arcana:SavePlayerDataToSQL(ply, defaults)
 			return
 		end
 
@@ -491,13 +491,13 @@ if SERVER then
 end
 
 -- Utility Functions
-function Arcane:GetXPRequiredForLevel(level)
+function Arcana:GetXPRequiredForLevel(level)
 	-- New quadratic formula for smoother, more achievable progression
 	-- Designed so that max XP gains of ~100 per action make reaching level 100 feasible
 	return math.floor(1.25 * level * level + 12.5 * level)
 end
 
-function Arcane:GetTotalXPForLevel(level)
+function Arcana:GetTotalXPForLevel(level)
 	local total = 0
 
 	for i = 1, level - 1 do
@@ -508,7 +508,7 @@ function Arcane:GetTotalXPForLevel(level)
 end
 
 -- Player Data Management
-function Arcane:GetPlayerData(ply)
+function Arcana:GetPlayerData(ply)
 	local steamid = ply:SteamID64()
 
 	if not self.PlayerData[steamid] then
@@ -518,11 +518,11 @@ function Arcane:GetPlayerData(ply)
 	return self.PlayerData[steamid]
 end
 
-function Arcane:SavePlayerData(ply)
+function Arcana:SavePlayerData(ply)
 	if not IsValid(ply) then return end
 
 	local sid = ply:SteamID64()
-	if Arcane.SaveBlockedBySteamID[sid] then return end
+	if Arcana.SaveBlockedBySteamID[sid] then return end
 
 	local data = self:GetPlayerData(ply)
 	data.last_save = os.time()
@@ -534,7 +534,7 @@ function Arcane:SavePlayerData(ply)
 	runHook("SavedPlayerData", ply, data)
 end
 
-function Arcane:LoadPlayerData(ply, callback)
+function Arcana:LoadPlayerData(ply, callback)
 	if not IsValid(ply) then return end
 	local steamid = ply:SteamID64()
 
@@ -566,7 +566,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_ErrorNotification")
 	util.AddNetworkString("Arcana_SpellUnlocked")
 
-	function Arcane:SyncPlayerData(ply)
+	function Arcana:SyncPlayerData(ply)
 		if not IsValid(ply) then return end
 		local data = self:GetPlayerData(ply)
 
@@ -589,7 +589,7 @@ if SERVER then
 end
 
 if SERVER then
-	function Arcane:SendErrorNotification(ply, msg)
+	function Arcana:SendErrorNotification(ply, msg)
 		if not IsValid(ply) then return end
 		--ply:EmitSound("buttons/button8.wav", 100, 120)
 		net.Start("Arcana_ErrorNotification")
@@ -601,13 +601,13 @@ end
 if CLIENT then
 	net.Receive("Arcana_ErrorNotification", function()
 		local msg = net.ReadString()
-		Arcane:Print(msg)
+		Arcana:Print(msg)
 		notification.AddLegacy(msg, NOTIFY_ERROR, 5)
 	end)
 end
 
 -- Interrupt an ongoing spell cast
-function Arcane:InterruptSpell(ply, spellId)
+function Arcana:InterruptSpell(ply, spellId)
 	if not IsValid(ply) then return false end
 
 	local pdata = self:GetPlayerData(ply)
@@ -640,21 +640,21 @@ function Arcane:InterruptSpell(ply, spellId)
 end
 
 -- Begin casting with a minimum cast time and broadcast evolving circle
-function Arcane:StartCasting(ply, spellId)
+function Arcana:StartCasting(ply, spellId)
 	if not IsValid(ply) then return false end
 	local canCast, reason = self:CanCastSpell(ply, spellId)
 	if not canCast then
 		if SERVER then
-			Arcane:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
+			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
 		end
 
 		return false
 	end
 
 	local spell = self.RegisteredSpells[spellId]
-	if spell.is_divine_pact and spell.cost_type == Arcane.COST_TYPES.COINS and Arcane:GetCoins(ply) <= spell.cost_amount then
+	if spell.is_divine_pact and spell.cost_type == Arcana.COST_TYPES.COINS and Arcana:GetCoins(ply) <= spell.cost_amount then
 		if SERVER then
-			Arcane:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. "Insufficient coins")
+			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. "Insufficient coins")
 		end
 
 		return false -- Divine Pacts require coins and can damage while casting so we are stricter about it
@@ -743,7 +743,7 @@ function Arcane:StartCasting(ply, spellId)
 end
 
 -- XP and Leveling System
-function Arcane:GiveXP(ply, amount, reason)
+function Arcana:GiveXP(ply, amount, reason)
 	if not IsValid(ply) or amount <= 0 then return false end
 
 	-- we cannot upgrade for more than 4 billion xp
@@ -755,7 +755,7 @@ function Arcane:GiveXP(ply, amount, reason)
 	local oldLevel = data.level
 
 	-- Cap XP at max level
-	local maxXP = self:GetTotalXPForLevel(Arcane.Config.MAX_LEVEL)
+	local maxXP = self:GetTotalXPForLevel(Arcana.Config.MAX_LEVEL)
 	if data.xp >= maxXP then
 		return false -- Already at max XP
 	end
@@ -786,7 +786,7 @@ function Arcane:GiveXP(ply, amount, reason)
 	return true
 end
 
-function Arcane:CalculateLevel(totalXP)
+function Arcana:CalculateLevel(totalXP)
 	local level = 1
 	local xpUsed = 0
 
@@ -800,11 +800,11 @@ function Arcane:CalculateLevel(totalXP)
 	return level
 end
 
-function Arcane:LevelUp(ply, oldLevel, newLevel)
+function Arcana:LevelUp(ply, oldLevel, newLevel)
 	local data = self:GetPlayerData(ply)
 	local levelsGained = newLevel - oldLevel
 	data.level = newLevel
-	data.knowledge_points = data.knowledge_points + (levelsGained * Arcane.Config.KNOWLEDGE_POINTS_PER_LEVEL)
+	data.knowledge_points = data.knowledge_points + (levelsGained * Arcana.Config.KNOWLEDGE_POINTS_PER_LEVEL)
 
 	-- Auto-unlock Divine Pact spells when reaching their level threshold
 	if SERVER then
@@ -835,7 +835,7 @@ function Arcane:LevelUp(ply, oldLevel, newLevel)
 end
 
 -- Spell Registration API
-function Arcane:RegisterSpell(spellData)
+function Arcana:RegisterSpell(spellData)
 	if not spellData.id or not spellData.name or not spellData.cast then
 		ErrorNoHalt("Spell registration requires id, name, and cast function")
 
@@ -847,11 +847,11 @@ function Arcane:RegisterSpell(spellData)
 		id = spellData.id,
 		name = spellData.name,
 		description = spellData.description or "A mysterious spell",
-		category = spellData.category or Arcane.CATEGORIES.UTILITY,
+		category = spellData.category or Arcana.CATEGORIES.UTILITY,
 		level_required = spellData.level_required or 1,
 		knowledge_cost = spellData.knowledge_cost or 1,
-		cooldown = spellData.cooldown or Arcane.Config.DEFAULT_SPELL_COOLDOWN,
-		cost_type = spellData.cost_type or Arcane.COST_TYPES.COINS,
+		cooldown = spellData.cooldown or Arcana.Config.DEFAULT_SPELL_COOLDOWN,
+		cost_type = spellData.cost_type or Arcana.COST_TYPES.COINS,
 		cost_amount = spellData.cost_amount or 10,
 		cast_time = spellData.cast_time or 0, -- Instant by default
 		range = spellData.range or 500,
@@ -873,12 +873,12 @@ function Arcane:RegisterSpell(spellData)
 	}
 
 	self.RegisteredSpells[spell.id] = spell
-	if CLIENT and Arcane.AddTriggerPhrase then
-		Arcane:AddTriggerPhrase(spell.name, spell.id)
+	if CLIENT and Arcana.AddTriggerPhrase then
+		Arcana:AddTriggerPhrase(spell.name, spell.id)
 
 		if istable(spellData.trigger_phrase_aliases) then
 			for _, phrase in ipairs(spellData.trigger_phrase_aliases) do
-				Arcane:AddTriggerPhrase(phrase, spell.id)
+				Arcana:AddTriggerPhrase(phrase, spell.id)
 			end
 		end
 	end
@@ -887,7 +887,7 @@ function Arcane:RegisterSpell(spellData)
 	return true
 end
 
-function Arcane:RegisterRitualSpell(opts)
+function Arcana:RegisterRitualSpell(opts)
 	if not istable(opts) then
 		ErrorNoHalt("RegisterRitualSpell requires an options table\n")
 		return false
@@ -992,7 +992,7 @@ function Arcane:RegisterRitualSpell(opts)
 end
 
 -- Spell Casting System
-function Arcane:CanCastSpell(ply, spellId)
+function Arcana:CanCastSpell(ply, spellId)
 	if not ply:Alive() then return false, "You are dead" end
 	local spell = self.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
@@ -1030,7 +1030,7 @@ end
 
 -- Public helper: Attach BandCircle VFX to an entity (server-side entry)
 if SERVER then
-	function Arcane:SendAttachBandVFX(ent, color, size, duration, bandConfigs, tag)
+	function Arcana:SendAttachBandVFX(ent, color, size, duration, bandConfigs, tag)
 		if not IsValid(ent) then return end
 		net.Start("Arcana_AttachBandVFX", true)
 		net.WriteEntity(ent)
@@ -1054,7 +1054,7 @@ if SERVER then
 		net.Broadcast()
 	end
 
-	function Arcane:ClearBandVFX(ent, tag)
+	function Arcana:ClearBandVFX(ent, tag)
 		if not IsValid(ent) then return end
 		net.Start("Arcana_ClearBandVFX", true)
 		net.WriteEntity(ent)
@@ -1063,13 +1063,13 @@ if SERVER then
 	end
 end
 
-function Arcane:CastSpell(ply, spellId, has_target, context)
+function Arcana:CastSpell(ply, spellId, has_target, context)
 	if not IsValid(ply) then return false end
 	local canCast, reason = self:CanCastSpell(ply, spellId)
 
 	if not canCast then
 		if SERVER then
-			Arcane:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
+			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
 		end
 
 		return false
@@ -1080,11 +1080,11 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 	local takeDamageInfo = ply.ForceTakeDamageInfo or ply.TakeDamageInfo
 
 	-- Apply costs
-	if spell.cost_type == Arcane.COST_TYPES.COINS then
-		local canPayWithCoins = Arcane:GetCoins(ply) >= spell.cost_amount
+	if spell.cost_type == Arcana.COST_TYPES.COINS then
+		local canPayWithCoins = Arcana:GetCoins(ply) >= spell.cost_amount
 
 		if canPayWithCoins then
-			Arcane:TakeCoins(ply, spell.cost_amount, "Spell: " .. spell.name)
+			Arcana:TakeCoins(ply, spell.cost_amount, "Spell: " .. spell.name)
 		else
 			-- Fallback: pay with health as real damage
 			local dmg = DamageInfo()
@@ -1098,7 +1098,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 
 			if spell.cost_amount > 100 then return false, "Insufficient coins" end
 		end
-	elseif spell.cost_type == Arcane.COST_TYPES.HEALTH then
+	elseif spell.cost_type == Arcana.COST_TYPES.HEALTH then
 		-- Health costs are applied as real damage, which can be lethal
 		local dmg = DamageInfo()
 		dmg:SetDamage(spell.cost_amount)
@@ -1125,7 +1125,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 	-- Handle success/failure
 	if success then
 		-- Give XP
-		local baseCast = math.max(0.1, Arcane.Config.XP_BASE_CAST_TIME or 1.0)
+		local baseCast = math.max(0.1, Arcana.Config.XP_BASE_CAST_TIME or 1.0)
 		local castTime = math.max(0.05, tonumber(spell.cast_time) or 0)
 		local ratio = castTime / baseCast
 
@@ -1140,13 +1140,13 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 		end
 
 		-- Report magic usage location for mana crystals
-		if SERVER and Arcane.ManaCrystals and Arcane.ManaCrystals.ReportMagicUse then
+		if SERVER and Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
 			local ctxPos = (context and context.circlePos) or (IsValid(ply) and (ply:GetPos() + Vector(0, 0, 2))) or nil
 			if ctxPos then
 				-- Pass cooldown info to prevent spam farming with short-cooldown spells
 				local reportContext = table.Copy(context or {})
-				reportContext.cooldown = spell.cooldown or Arcane.Config.DEFAULT_SPELL_COOLDOWN or 1.0
-				Arcane.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, reportContext)
+				reportContext.cooldown = spell.cooldown or Arcana.Config.DEFAULT_SPELL_COOLDOWN or 1.0
+				Arcana.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, reportContext)
 			end
 		end
 	else
@@ -1177,7 +1177,7 @@ function Arcane:CastSpell(ply, spellId, has_target, context)
 end
 
 -- Knowledge System
-function Arcane:CanUnlockSpell(ply, spellId)
+function Arcana:CanUnlockSpell(ply, spellId)
 	local spell = self.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
 	local data = self:GetPlayerData(ply)
@@ -1191,13 +1191,13 @@ function Arcane:CanUnlockSpell(ply, spellId)
 	return true
 end
 
-function Arcane:UnlockSpell(ply, spellId, force)
+function Arcana:UnlockSpell(ply, spellId, force)
 	if not force then
 		local canUnlock, reason = self:CanUnlockSpell(ply, spellId)
 
 		if not canUnlock then
 			if SERVER then
-				Arcane:SendErrorNotification(ply, "Cannot unlock spell \"" .. spellId .. "\": " .. reason)
+				Arcana:SendErrorNotification(ply, "Cannot unlock spell \"" .. spellId .. "\": " .. reason)
 			end
 
 			return false
@@ -1233,23 +1233,20 @@ function Arcane:UnlockSpell(ply, spellId, force)
 	return true
 end
 
--- Player Meta Extensions for Arcane-specific data only
-local PLAYER = FindMetaTable("Player")
-
-function PLAYER:GetArcaneLevel()
-	return Arcane:GetPlayerData(self).level
+function Arcana:GetLevel(ply)
+	return self:GetPlayerData(ply).level
 end
 
-function PLAYER:GetArcaneXP()
-	return Arcane:GetPlayerData(self).xp
+function Arcana:GetXP(ply)
+	return self:GetPlayerData(ply).xp
 end
 
-function PLAYER:GetKnowledgePoints()
-	return Arcane:GetPlayerData(self).knowledge_points
+function Arcana:GetKnowledgePoints(ply)
+	return self:GetPlayerData(ply).knowledge_points
 end
 
-function PLAYER:HasSpellUnlocked(spellId)
-	return Arcane:GetPlayerData(self).unlocked_spells[spellId] == true
+function Arcana:HasSpellUnlocked(ply, spellId)
+	return self:GetPlayerData(ply).unlocked_spells[spellId] == true
 end
 
 -- Networking
@@ -1261,7 +1258,7 @@ if SERVER then
 	-- Handle spell unlocking
 	net.Receive("Arcana_UnlockSpell", function(len, ply)
 		local spellId = net.ReadString()
-		Arcane:UnlockSpell(ply, spellId)
+		Arcana:UnlockSpell(ply, spellId)
 	end)
 
 	-- Handle client-forwarded console cast: "arcana <spellId>"
@@ -1270,36 +1267,36 @@ if SERVER then
 		local raw = net.ReadString() or ""
 		local spellId = string.lower(string.Trim(raw))
 		if spellId == "" then return end
-		local canCast, reason = Arcane:CanCastSpell(ply, spellId)
+		local canCast, reason = Arcana:CanCastSpell(ply, spellId)
 
 		if not canCast then
-			Arcane:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
+			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
 
 			return
 		end
 
-		Arcane:StartCasting(ply, spellId)
+		Arcana:StartCasting(ply, spellId)
 	end)
 
 	-- Assign a spell to a quickslot
 	net.Receive("Arcana_SetQuickslot", function(_, ply)
 		local slotIndex = math.Clamp(net.ReadUInt(4), 1, 8)
 		local spellId = net.ReadString()
-		local data = Arcane:GetPlayerData(ply)
-		if not Arcane.RegisteredSpells[spellId] then return end
+		local data = Arcana:GetPlayerData(ply)
+		if not Arcana.RegisteredSpells[spellId] then return end
 		if not data.unlocked_spells[spellId] then return end
 		data.quickspell_slots[slotIndex] = spellId
-		Arcane:SavePlayerData(ply)
-		Arcane:SyncPlayerData(ply)
+		Arcana:SavePlayerData(ply)
+		Arcana:SyncPlayerData(ply)
 	end)
 
 	-- Select the active quickslot
 	net.Receive("Arcana_SetSelectedQuickslot", function(_, ply)
 		local slotIndex = math.Clamp(net.ReadUInt(4), 1, 8)
-		local data = Arcane:GetPlayerData(ply)
+		local data = Arcana:GetPlayerData(ply)
 		data.selected_quickslot = slotIndex
-		Arcane:SavePlayerData(ply)
-		Arcane:SyncPlayerData(ply)
+		Arcana:SavePlayerData(ply)
+		Arcana:SyncPlayerData(ply)
 	end)
 end
 
@@ -1313,14 +1310,14 @@ if CLIENT then
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
 
-		local data = Arcane:GetPlayerData(ply)
+		local data = Arcana:GetPlayerData(ply)
 		data.xp = xp
 		data.level = level
 		-- Use the amount sent directly from the server
 		if xpGained > 0 then
 			-- Call HUD directly to avoid hook interruption
-			if Arcane.HUD and Arcane.HUD.ShowXPAnnouncement then
-				Arcane.HUD.ShowXPAnnouncement(ply, xpGained, reason)
+			if Arcana.HUD and Arcana.HUD.ShowXPAnnouncement then
+				Arcana.HUD.ShowXPAnnouncement(ply, xpGained, reason)
 			end
 			-- Still call hook for third-party addons
 			runHook("PlayerGainedXP", ply, xpGained, reason)
@@ -1332,15 +1329,15 @@ if CLIENT then
 		local newKnowledgeTotal = net.ReadUInt(16)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
-		local data = Arcane:GetPlayerData(ply)
+		local data = Arcana:GetPlayerData(ply)
 		local prevLevel = data.level or 1
 		local prevKnowledge = data.knowledge_points or 0
 		data.level = newLevel
 		data.knowledge_points = newKnowledgeTotal
 		local knowledgeDelta = math.max(0, newKnowledgeTotal - prevKnowledge)
 		-- Call HUD directly to avoid hook interruption
-		if Arcane.HUD and Arcane.HUD.ShowLevelUpAnnouncement then
-			Arcane.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
+		if Arcana.HUD and Arcana.HUD.ShowLevelUpAnnouncement then
+			Arcana.HUD.ShowLevelUpAnnouncement(prevLevel, newLevel, knowledgeDelta)
 		end
 		-- Still call hook for third-party addons
 		runHook("ClientLevelUp", prevLevel, newLevel, knowledgeDelta)
@@ -1351,7 +1348,7 @@ if CLIENT then
 		if not payload then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
-		local data = Arcane:GetPlayerData(ply)
+		local data = Arcana:GetPlayerData(ply)
 		data.xp = payload.xp or data.xp
 		data.level = payload.level or data.level
 		data.knowledge_points = payload.knowledge_points or data.knowledge_points
@@ -1382,8 +1379,8 @@ if CLIENT then
 		if not IsValid(caster) then return end
 
 		-- Call HUD directly to avoid hook interruption
-		if Arcane.HUD and Arcane.HUD.TrackCast then
-			Arcane.HUD.TrackCast(caster, spellId, castTime)
+		if Arcana.HUD and Arcana.HUD.TrackCast then
+			Arcana.HUD.TrackCast(caster, spellId, castTime)
 		end
 
 		if not MagicCircle then return end
@@ -1496,8 +1493,8 @@ if CLIENT then
 		if not IsValid(caster) then return end
 
 		-- Call HUD directly to avoid hook interruption
-		if Arcane.HUD and Arcane.HUD.TrackCastFailure then
-			Arcane.HUD.TrackCastFailure(caster, spellId, castTime)
+		if Arcana.HUD and Arcana.HUD.TrackCastFailure then
+			Arcana.HUD.TrackCastFailure(caster, spellId, castTime)
 		end
 
 		-- Trigger the failure hook on client so spell-specific cleanup can happen
@@ -1631,8 +1628,8 @@ if SERVER then
 		if justSpawned[ply] and not ucmd:IsForced() then
 			justSpawned[ply] = nil
 
-			Arcane:LoadPlayerData(ply, function(data)
-				Arcane:SyncPlayerData(ply)
+			Arcana:LoadPlayerData(ply, function(data)
+				Arcana:SyncPlayerData(ply)
 				runHook("LoadedPlayerData", ply, data)
 			end)
 		end
@@ -1640,26 +1637,26 @@ if SERVER then
 
 	hook.Add("PlayerDeath", "Arcana_InterruptOnDeath", function(victim)
 		-- Interrupt any active spell casting
-		local pdata = Arcane:GetPlayerData(victim)
+		local pdata = Arcana:GetPlayerData(victim)
 		if pdata and pdata.casting_spell then
-			Arcane:InterruptSpell(victim, pdata.casting_spell)
+			Arcana:InterruptSpell(victim, pdata.casting_spell)
 		end
 	end)
 
 	hook.Add("PlayerDisconnected", "Arcana_PlayerLeave", function(ply)
 		-- Interrupt any active spell casting
-		local pdata = Arcane:GetPlayerData(ply)
+		local pdata = Arcana:GetPlayerData(ply)
 		if pdata and pdata.casting_spell then
-			Arcane:InterruptSpell(ply, pdata.casting_spell)
+			Arcana:InterruptSpell(ply, pdata.casting_spell)
 		end
 
 		local sid = IsValid(ply) and ply:SteamID64() or nil
 		if sid then
 			timer.Remove("Arcana_RetryLoad_" .. tostring(sid))
-			Arcane.RetryStateBySteamID[sid] = nil
+			Arcana.RetryStateBySteamID[sid] = nil
 			-- Leave SaveBlockedBySteamID as-is; SavePlayerData will respect it and no-op
 		end
-		Arcane:SavePlayerData(ply)
+		Arcana:SavePlayerData(ply)
 	end)
 
 	local function SpawnAltar()
@@ -1728,13 +1725,13 @@ if SERVER then
 end
 
 -- Public helper to sync a weapon's applied enchantment IDs to clients via NWString
-function Arcane:SyncWeaponEnchantNW(wep)
+function Arcana:SyncWeaponEnchantNW(wep)
 	return syncWeaponEnchantNW(wep)
 end
 
 -- Common position resolver for ground-targeted spells
 -- Works with both players (GetEyeTrace) and entities (util.TraceLine fallback)
-function Arcane:ResolveGroundTarget(caster, maxRange)
+function Arcana:ResolveGroundTarget(caster, maxRange)
 	if not IsValid(caster) then return nil end
 
 	maxRange = maxRange or 1000
@@ -1756,7 +1753,7 @@ end
 -- Helper to create a ground-following magic circle during spell casting (CLIENT)
 -- Used by spells that want custom casting circle visuals that follow the caster's aim
 if CLIENT then
-	function Arcane:CreateFollowingCastCircle(caster, spellId, castTime, options)
+	function Arcana:CreateFollowingCastCircle(caster, spellId, castTime, options)
 		if not IsValid(caster) then return false end
 		if not MagicCircle then return false end
 
@@ -1765,7 +1762,7 @@ if CLIENT then
 		local size = opts.size or 100
 		local intensity = opts.intensity or 4
 		local positionResolver = opts.positionResolver or function(c)
-			return Arcane:ResolveGroundTarget(c)
+			return Arcana:ResolveGroundTarget(c)
 		end
 
 		-- Get initial position
@@ -1820,7 +1817,7 @@ if SERVER then
 		local list = ent.ArcanaEnchantments
 		local owner = (ent.GetOwner and ent:GetOwner()) or nil
 		for enchId, state in pairs(list) do
-			local ench = (Arcane.RegisteredEnchantments or {})[enchId]
+			local ench = (Arcana.RegisteredEnchantments or {})[enchId]
 			if ench and ench.remove then
 				local ok, err = pcall(ench.remove, (IsValid(owner) and owner) or game.GetWorld(), ent, state)
 				if not ok then ErrorNoHalt("Enchantment remove error on entity removal: " .. tostring(err) .. "\n") end
@@ -1830,7 +1827,7 @@ if SERVER then
 	end)
 
 	-- Custom BlastDamage that prefers ForceTakeDamageInfo when available
-	function Arcane:BlastDamage(attacker, inflictor, center, radius, baseDamage, damageType, ignoreAttacker, onChecked)
+	function Arcana:BlastDamage(attacker, inflictor, center, radius, baseDamage, damageType, ignoreAttacker, onChecked)
 		attacker = IsValid(attacker) and attacker or game.GetWorld()
 		inflictor = IsValid(inflictor) and inflictor or attacker
 		radius = math.max(1, tonumber(radius) or 0)
@@ -1857,12 +1854,12 @@ if SERVER then
 			dmg:SetAttacker(attacker)
 			dmg:SetInflictor(inflictor)
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcane:TakeDamageInfo(ent, dmg, onChecked)
+			Arcana:TakeDamageInfo(ent, dmg, onChecked)
 		end
 	end
 
 	-- Wrapper that detects invulnerability
-	function Arcane:TakeDamageInfo(ent, dmginfo, onChecked)
+	function Arcana:TakeDamageInfo(ent, dmginfo, onChecked)
 		if not IsValid(ent) or not ent:IsPlayer() then
 			return ent:TakeDamageInfo(dmginfo)
 		end
@@ -1985,7 +1982,7 @@ if SERVER then
 		end
 	end)
 
-	function Arcane:IsPotentialCheater(ply)
+	function Arcana:IsPotentialCheater(ply)
 		if not IsValid(ply) then return true end
 		if ply.ArcanaInvulnerable then return true end
 		if badEntities[ply] and badEntities[ply] > 0 then return true end
@@ -1993,4 +1990,4 @@ if SERVER then
 	end
 end
 
-return Arcane
+return Arcana

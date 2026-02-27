@@ -1,12 +1,12 @@
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "fireball",
 	name = "Fireball",
 	description = "Launch a blazing orb that explodes and ignites on impact.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,
 	cooldown = 3.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 20,
 	cast_time = 1.0,
 	range = 1200,
@@ -42,7 +42,7 @@ Arcane:RegisterSpell({
 			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 		end
 
-		Arcane:SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {
+		Arcana:SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {
 			{
 				radius = 15,
 				height = 4,

@@ -1,6 +1,6 @@
 -- Shared SporeHigh status: psychedelic trip from consuming solidified spores
-Arcane = Arcane or {}
-Arcane.Status = Arcane.Status or {}
+Arcana = Arcana or {}
+Arcana.Status = Arcana.Status or {}
 
 local SporeHigh = {}
 
@@ -28,7 +28,7 @@ function SporeHigh.Apply(target, options)
     end
 end
 
-Arcane.Status.SporeHigh = SporeHigh
+Arcana.Status.SporeHigh = SporeHigh
 
 if CLIENT then
     local active = false

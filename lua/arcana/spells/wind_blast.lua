@@ -1,13 +1,13 @@
 -- Wind Blast: A powerful radial burst that pushes everything away from the caster
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "wind_blast",
 	name = "Wind Blast",
 	description = "Emit a powerful shock of wind, hurling nearby foes and objects away.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 10,
 	knowledge_cost = 3,
 	cooldown = 8.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 50,
 	cast_time = 0.7,
 	range = 0,

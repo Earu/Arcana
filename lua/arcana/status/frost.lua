@@ -1,6 +1,6 @@
 -- Shared Frost status: applies slowing and chill FX to players, NPCs, and NextBots
-Arcane = Arcane or {}
-Arcane.Status = Arcane.Status or {}
+Arcana = Arcana or {}
+Arcana.Status = Arcana.Status or {}
 
 local Frost = {}
 
@@ -24,7 +24,7 @@ function Frost.Apply(target, options)
 	target.ArcanaFrostSlowUntil = math.max(target.ArcanaFrostSlowUntil or 0, untilTime)
 
 	-- Visual band
-	Arcane:SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
+	Arcana:SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
 		{
 			radius = 18,
 			height = 6,
@@ -91,7 +91,7 @@ function Frost.Apply(target, options)
 			-- cleanup
 			target._ArcanaNPCGroundClamp = nil
 			target._ArcanaLocoClamp = nil
-			Arcane:ClearBandVFX(target, vfxTag)
+			Arcana:ClearBandVFX(target, vfxTag)
 			timer.Remove(timerId)
 
 			return
@@ -128,7 +128,7 @@ function Frost.Apply(target, options)
 	end)
 end
 
-Arcane.Status.Frost = Frost
+Arcana.Status.Frost = Frost
 
 if CLIENT then
 	-- Generic chill FX (breath + vignette) reused by all frost sources

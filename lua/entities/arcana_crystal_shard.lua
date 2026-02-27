@@ -57,7 +57,7 @@ if SERVER then
 	local function tryPickup(self, ply)
 		if not IsValid(self) or not IsValid(ply) or not ply:IsPlayer() then return false end
 		local amount = self:GetShardAmount()
-		Arcane:GiveItem(ply, "mana_crystal_shard", amount)
+		Arcana:GiveItem(ply, "mana_crystal_shard", amount)
 		self:EmitSound("physics/glass/glass_cup_break1.wav", 70, math.random(190, 210), 0.75)
 		local ed = EffectData()
 		ed:SetOrigin(self:WorldSpaceCenter())

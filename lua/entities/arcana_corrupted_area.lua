@@ -373,9 +373,9 @@ if SERVER then
 	function ENT:OnRemove()
 		self:ClearEntities()
 
-		for key, region in pairs(Arcane.ManaCrystals.regions) do
+		for key, region in pairs(Arcana.ManaCrystals.regions) do
 			if region and region.corruptEnt == self then
-				Arcane.ManaCrystals.regions[key] = nil
+				Arcana.ManaCrystals.regions[key] = nil
 				break
 			end
 		end

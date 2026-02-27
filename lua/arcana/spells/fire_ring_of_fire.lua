@@ -3,15 +3,15 @@ if SERVER then
 	util.AddNetworkString("Arcana_RingOfFire_VFX")
 end
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "ring_of_fire",
 	name = "Ring of Fire",
 	description = "Summon a blazing ring that rapidly expands, scorching and igniting foes around you.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 12,
 	knowledge_cost = 3,
 	cooldown = 10.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 80,
 	cast_time = 0.8,
 	range = 0,

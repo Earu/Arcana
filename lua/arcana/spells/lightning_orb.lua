@@ -1,12 +1,12 @@
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "lightning_orb",
 	name = "Lightning Orb",
 	description = "Launch a slow-moving orb of electricity that zaps nearby foes and detonates on impact.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 15,
 	knowledge_cost = 3,
 	cooldown = 10.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 160,
 	cast_time = 1.2,
 	range = 1400,
@@ -41,7 +41,7 @@ Arcane:RegisterSpell({
 		end
 
 		-- Brief casting VFX on the caster
-		Arcane:SendAttachBandVFX(srcEnt, Color(170, 210, 255, 255), 26, 0.8, {
+		Arcana:SendAttachBandVFX(srcEnt, Color(170, 210, 255, 255), 26, 0.8, {
 			{
 				radius = 20,
 				height = 6,

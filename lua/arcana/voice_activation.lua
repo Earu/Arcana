@@ -81,16 +81,16 @@ local function buildGrammar()
 		SPEECH:grammar_state("enabled")
 		SPEECH:rule_state(nil, "active")
 		SPEECH:resume()
-		Arcane:Print("Added", table.Count(triggerPhrases), "trigger phrases to voice activation")
+		Arcana:Print("Added", table.Count(triggerPhrases), "trigger phrases to voice activation")
 	end
 end
 
-function Arcane:AddTriggerPhrase(phrase, spell_id)
+function Arcana:AddTriggerPhrase(phrase, spell_id)
 	triggerPhrases[normalize(phrase)] = spell_id
 	timer.Create("Arcana_VoiceActivation_BuildGrammar", 1, 1, buildGrammar)
 end
 
-function Arcane:RemoveTriggerPhrase(phrase)
+function Arcana:RemoveTriggerPhrase(phrase)
 	triggerPhrases[normalize(phrase)] = nil
 	timer.Create("Arcana_VoiceActivation_BuildGrammar", 1, 1, buildGrammar)
 end
@@ -127,7 +127,7 @@ hook.Add("Think", "Arcana_VoiceActivation", function()
 
 	local num, events, err = SPEECH:events(10)
 	if num == nil then
-		Arcane:Print("ERROR", err)
+		Arcana:Print("ERROR", err)
 		return
 	end
 

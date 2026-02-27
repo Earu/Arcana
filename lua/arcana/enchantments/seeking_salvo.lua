@@ -1,4 +1,4 @@
--- Arcane Missiles Rounds: On firearm shot, launch three homing arcane missiles toward your aim
+-- Arcana Missiles Rounds: On firearm shot, launch three homing arcane missiles toward your aim
 -- Adapted from spells/arcane_missiles.lua and existing enchantment hook patterns
 
 local function isMeleeHoldType(wep)
@@ -32,7 +32,7 @@ local function attachHook(ply, wep, state)
         local aim = caster:GetAimVector()
 
         -- Launch missiles using shared API
-        Arcane.Common.LaunchMissiles(caster, origin, aim, {
+        Arcana.Common.LaunchMissiles(caster, origin, aim, {
             count = 3,
             delay = 0.06
         })
@@ -45,7 +45,7 @@ local function detachHook(ply, wep, state)
     state._hookId = nil
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
     id = "seeking_salvo",
     name = "Seeking Salvo",
     description = "On shot, launches three homing arcane missiles toward your aim.",

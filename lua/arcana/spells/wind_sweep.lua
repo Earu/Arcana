@@ -1,12 +1,12 @@
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "wind_sweep",
 	name = "Wind Sweep",
 	description = "Unleash a violent gust pushing foes away.",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 1,
 	knowledge_cost = 1,
 	cooldown = 4.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 12,
 	cast_time = 0.6,
 	range = 500,

@@ -1,12 +1,12 @@
-Arcane:RegisterRitualSpell({
+Arcana:RegisterRitualSpell({
 	id = "ritual_of_crystal_growth",
 	name = "Ritual: Crystal Growth",
 	description = "A ritual that manifests a large mana crystal from concentrated arcane energy.",
-	category = Arcane.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 10,
 	knowledge_cost = 3,
 	cooldown = 60 * 20, -- 20 minutes
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 500,
 	cast_time = 10,
 	cast_anim = "becon",
@@ -31,7 +31,7 @@ Arcane:RegisterRitualSpell({
 
 		local crystal = ents.Create("arcana_mana_crystal")
 		if not IsValid(crystal) then
-			Arcane:SendErrorNotification(ply, "Failed to create mana crystal.")
+			Arcana:SendErrorNotification(ply, "Failed to create mana crystal.")
 			return
 		end
 

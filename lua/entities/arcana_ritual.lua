@@ -80,12 +80,12 @@ if SERVER then
 		local coinsOk = true
 
 		if self._coinCost > 0 then
-			coinsOk = Arcane:GetCoins(ply) >= self._coinCost
+			coinsOk = Arcana:GetCoins(ply) >= self._coinCost
 		end
 
 		if not coinsOk then
-			if Arcane and Arcane.SendErrorNotification then
-				Arcane:SendErrorNotification(ply, "Insufficient coins")
+			if Arcana and Arcana.SendErrorNotification then
+				Arcana:SendErrorNotification(ply, "Insufficient coins")
 			end
 
 			self:EmitSound("buttons/button8.wav", 60, 110)
@@ -94,11 +94,11 @@ if SERVER then
 		end
 
 		for itemName, amt in pairs(self._requirements or {}) do
-			local have = Arcane:GetItemCount(ply, itemName)
+			local have = Arcana:GetItemCount(ply, itemName)
 
 			if have < (amt or 1) then
-				if Arcane and Arcane.SendErrorNotification then
-					Arcane:SendErrorNotification(ply, "Missing item: " .. tostring(itemName))
+				if Arcana and Arcana.SendErrorNotification then
+					Arcana:SendErrorNotification(ply, "Missing item: " .. tostring(itemName))
 				end
 
 				self:EmitSound("buttons/button8.wav", 60, 110)
@@ -109,11 +109,11 @@ if SERVER then
 
 		-- Consume from the player who activated
 		if self._coinCost > 0 then
-			Arcane:TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""))
+			Arcana:TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""))
 		end
 
 		for itemName, amt in pairs(self._requirements or {}) do
-			Arcane:TakeItem(ply, itemName, amt)
+			Arcana:TakeItem(ply, itemName, amt)
 		end
 
 		-- Tell clients to evolve the circle then remove the entity after a short delay
@@ -124,10 +124,10 @@ if SERVER then
 		net.Broadcast()
 
 		-- Report magic use at ritual activation
-		if Arcane and Arcane.ManaCrystals and Arcane.ManaCrystals.ReportMagicUse then
+		if Arcana and Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
 			local pos = self:GetPos()
 			local rid = self.GetRitualId and self:GetRitualId() or "ritual"
-			Arcane.ManaCrystals:ReportMagicUse(ply, pos, rid, {isRitual = true})
+			Arcana.ManaCrystals:ReportMagicUse(ply, pos, rid, {isRitual = true})
 		end
 
 		timer.Simple(evolveDur + 0.1, function()

@@ -96,15 +96,15 @@ local function findSafeTeleportDestination(ply)
 	return newpos
 end
 
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "teleport",
 	name = "Teleport",
 	description = "Teleport to your aim point within range, finding a safe landing spot.",
-	category = Arcane.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 3,
 	knowledge_cost = 2,
 	cooldown = 0.1,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 30,
 	cast_time = 0.1,
 	range = 0,
@@ -160,7 +160,7 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "teleport" then return end
 
-		Arcane:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(140, 200, 255, 255),
 			size = 18,
 			intensity = 3,
@@ -168,7 +168,7 @@ if CLIENT then
 				if c:IsPlayer() then
 					return findSafeTeleportDestination(c)
 				else
-					return Arcane:ResolveGroundTarget(c, 1000)
+					return Arcana:ResolveGroundTarget(c, 1000)
 				end
 			end
 		})

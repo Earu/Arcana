@@ -24,8 +24,8 @@ local function healAttacker(attacker, amount)
     attacker:SetHealth(newHealth)
 
     -- Brief crimson ring feedback
-    if Arcane and Arcane.SendAttachBandVFX then
-        Arcane:SendAttachBandVFX(attacker, Color(200, 30, 60, 255), 20, 0.25, {
+    if Arcana and Arcana.SendAttachBandVFX then
+        Arcana:SendAttachBandVFX(attacker, Color(200, 30, 60, 255), 20, 0.25, {
             { radius = 14, height = 3, spin = { p = 0, y = 300 * 50, r = 0 }, lineWidth = 2 },
         }, "vampiric_heal")
     end
@@ -71,7 +71,7 @@ local function detachHook(ply, wep, state)
     state._hookId = nil
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
     id = "vampiric_edge",
     name = "Vampiric Edge",
     description = "Melee hits restore health based on damage dealt.",

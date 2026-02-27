@@ -1,6 +1,6 @@
 -- Magical Forest environment definition
 
-local Envs = Arcane.Environments
+local Envs = Arcana.Environments
 local ACCEPTABLE_SURFACE_TYPES = {
 	[MAT_GRASS] = true,
 	[MAT_DIRT] = true,
@@ -402,7 +402,7 @@ local function spawnFairyGrove(ctx)
 		local function schedule(nextDelay)
 			local delay = nextDelay or math.Rand(1.2, 3.6)
 			timer.Create(tname, delay, 1, function()
-				if Arcane.Environments.Active ~= ctx then timer.Remove(tname) return end
+				if Arcana.Environments.Active ~= ctx then timer.Remove(tname) return end
 				if not IsValid(f) then timer.Remove(tname) return end
 
 				local a = math.Rand(0, math.pi * 2)
@@ -553,7 +553,7 @@ local function spawnGraveyard(ctx)
 		end
 
 		timer.Create(timerName, 0.35, 0, function()
-			if Arcane.Environments.Active ~= ctx then timer.Remove(timerName) return end
+			if Arcana.Environments.Active ~= ctx then timer.Remove(timerName) return end
 			-- Cull invalid skeleton refs
 			local alive = {}
 			for _, s in ipairs(activeSkeletons) do if IsValid(s) then alive[#alive + 1] = s end end
@@ -590,7 +590,7 @@ local function spawnGraveyard(ctx)
 			-- Show deep purple activation circle, then spawn
 			broadcastCircle(summonPos, Angle(0, 0, 0), 52, 1.2)
 			timer.Simple(1.0, function()
-				if Arcane.Environments.Active ~= ctx then return end
+				if Arcana.Environments.Active ~= ctx then return end
 
 				local isFlamingSkull = math.random() < 0.05 -- 5% chance to spawn a flaming skull
 				local sk = isFlamingSkull and ents.Create("arcana_flaming_skull") or ents.Create("arcana_skeleton")

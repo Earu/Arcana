@@ -562,13 +562,13 @@ if CLIENT then
 
 	-- Client menu
 	local function BuildEligibleSpellList(ply)
-		if not Arcane or not IsValid(ply) then return {}, {} end
-		local data = Arcane:GetPlayerData(ply)
+		if not Arcana or not IsValid(ply) then return {}, {} end
+		local data = Arcana:GetPlayerData(ply)
 		if not data then return {}, {} end
 		local regularSpells = {}
 		local rituals = {}
 
-		for sid, sp in pairs(Arcane.RegisteredSpells or {}) do
+		for sid, sp in pairs(Arcana.RegisteredSpells or {}) do
 			local already = data.unlocked_spells and data.unlocked_spells[sid]
 			local levelOk = (data.level or 1) >= (sp.level_required or 1)
 			local kpOk = (data.knowledge_points or 0) >= (sp.knowledge_cost or 1)
@@ -606,7 +606,7 @@ if CLIENT then
 	end
 
 	local function OpenAltarMenu(altar)
-		if not Arcane then return end
+		if not Arcana then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
 
@@ -639,7 +639,7 @@ if CLIENT then
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 			draw.SimpleText("ALTAR", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
 			-- Level and Knowledge Points chips (XP progression hidden by request)
-			local data = Arcane:GetPlayerData(ply)
+			local data = Arcana:GetPlayerData(ply)
 
 			if data then
 				-- Level chip
@@ -784,7 +784,7 @@ if CLIENT then
 
 				-- Determine affordability live from current data
 				local function updateEnabled()
-					local d = Arcane:GetPlayerData(ply)
+					local d = Arcana:GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
 					btn:SetEnabled(curKP >= cost)
@@ -803,7 +803,7 @@ if CLIENT then
 				end
 
 				function btn:DoClick()
-					local d = Arcane:GetPlayerData(ply)
+					local d = Arcana:GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
 
@@ -888,7 +888,7 @@ if CLIENT then
 
 					-- Determine affordability live from current data
 					local function updateEnabled()
-						local d = Arcane:GetPlayerData(ply)
+						local d = Arcana:GetPlayerData(ply)
 						local curKP = (d and d.knowledge_points) or 0
 						local cost = sp.knowledge_cost or 1
 						btn:SetEnabled(curKP >= cost)
@@ -907,7 +907,7 @@ if CLIENT then
 					end
 
 					function btn:DoClick()
-						local d = Arcane:GetPlayerData(ply)
+						local d = Arcana:GetPlayerData(ply)
 						local curKP = (d and d.knowledge_points) or 0
 						local cost = sp.knowledge_cost or 1
 
@@ -932,10 +932,10 @@ if CLIENT then
 
 		rebuild()
 		-- Live-rebuild when KP changes while the menu is open
-		local lastKP = (Arcane:GetPlayerData(ply) and Arcane:GetPlayerData(ply).knowledge_points) or 0
+		local lastKP = (Arcana:GetPlayerData(ply) and Arcana:GetPlayerData(ply).knowledge_points) or 0
 
 		function frame:Think()
-			local d = Arcane:GetPlayerData(ply)
+			local d = Arcana:GetPlayerData(ply)
 			local kp = (d and d.knowledge_points) or 0
 
 			if kp ~= lastKP then

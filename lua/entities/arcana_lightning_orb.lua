@@ -212,7 +212,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcane:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), true)
+		Arcana:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), true)
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)
@@ -239,15 +239,15 @@ if CLIENT then
 	local matFlare = Material("effects/blueflare1")
 	local matGlow = Material("sprites/light_glow02_add")
 
-	Arcane.LightningOrbZaps = Arcane.LightningOrbZaps or {}
-	Arcane.LightningOrbExplosions = Arcane.LightningOrbExplosions or {}
+	Arcana.LightningOrbZaps = Arcana.LightningOrbZaps or {}
+	Arcana.LightningOrbExplosions = Arcana.LightningOrbExplosions or {}
 
 	-- Receive zap arcs
 	net.Receive("Arcana_LightningOrbZap", function()
 		local startPos = net.ReadVector()
 		local endPos = net.ReadVector()
 
-		table.insert(Arcane.LightningOrbZaps, {
+		table.insert(Arcana.LightningOrbZaps, {
 			startPos = startPos,
 			endPos = endPos,
 			dieTime = CurTime() + 0.2,
@@ -259,7 +259,7 @@ if CLIENT then
 	net.Receive("Arcana_LightningOrbExplode", function()
 		local pos = net.ReadVector()
 
-		table.insert(Arcane.LightningOrbExplosions, {
+		table.insert(Arcana.LightningOrbExplosions, {
 			pos = pos,
 			dieTime = CurTime() + 0.4,
 			startTime = CurTime()
@@ -310,11 +310,11 @@ if CLIENT then
 		local curTime = CurTime()
 
 		-- Render zap arcs
-		for i = #Arcane.LightningOrbZaps, 1, -1 do
-			local zap = Arcane.LightningOrbZaps[i]
+		for i = #Arcana.LightningOrbZaps, 1, -1 do
+			local zap = Arcana.LightningOrbZaps[i]
 
 			if curTime > zap.dieTime then
-				table.remove(Arcane.LightningOrbZaps, i)
+				table.remove(Arcana.LightningOrbZaps, i)
 			else
 				local frac = 1 - math.Clamp((zap.dieTime - curTime) / 0.2, 0, 1)
 				local flicker = math.sin(curTime * 60 + zap.startTime * 80) * 0.3 + 0.7
@@ -354,11 +354,11 @@ if CLIENT then
 		end
 
 		-- Render explosions
-		for i = #Arcane.LightningOrbExplosions, 1, -1 do
-			local exp = Arcane.LightningOrbExplosions[i]
+		for i = #Arcana.LightningOrbExplosions, 1, -1 do
+			local exp = Arcana.LightningOrbExplosions[i]
 
 			if curTime > exp.dieTime then
-				table.remove(Arcane.LightningOrbExplosions, i)
+				table.remove(Arcana.LightningOrbExplosions, i)
 			else
 				local age = curTime - exp.startTime
 				local frac = math.Clamp(age / 0.4, 0, 1)

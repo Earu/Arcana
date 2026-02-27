@@ -63,7 +63,7 @@ local function isMeleeHoldType(wep)
 	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "endless_munitions",
 	name = "Endless Munitions",
 	description = "This weapon never consumes ammo while equipped; clips auto-refill.",

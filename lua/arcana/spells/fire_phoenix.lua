@@ -198,15 +198,15 @@ if SERVER then
 end
 
 -- Spell registration
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "phoenix",
 	name = "Phoenix",
 	description = "Transform into a blazing phoenix for 24s. Fly swiftly, unleash fireball salvos (LMB) and deadly firebreath (RMB).",
-	category = Arcane.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 40,
 	knowledge_cost = 5,
 	cooldown = 60.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 550000,
 	cast_time = 1.0,
 	range = 0,

@@ -87,7 +87,7 @@ if SERVER then
 	function ENT:CanCastSpellForOwner(owner, spellId)
 		if not IsValid(owner) then return false, "No owner set" end
 
-		local spell = Arcane.RegisteredSpells[spellId]
+		local spell = Arcana.RegisteredSpells[spellId]
 		if not spell then return false, "Spell not found (" .. spellId .. ")" end
 
 		-- Spell casters cannot cast divine pacts or ritual spells
@@ -109,7 +109,7 @@ if SERVER then
 			return false, "Spell on cooldown (" .. spellId .. ")"
 		end
 
-		local data = Arcane:GetPlayerData(owner)
+		local data = Arcana:GetPlayerData(owner)
 
 		-- Check if owner has spell unlocked
 		if not data.unlocked_spells[spellId] then
@@ -117,12 +117,12 @@ if SERVER then
 		end
 
 		-- Check if owner can afford the spell (we'll consume resources later)
-		if spell.cost_type == Arcane.COST_TYPES.COINS then
-			local canPayWithCoins = Arcane:GetCoins(owner) >= spell.cost_amount
+		if spell.cost_type == Arcana.COST_TYPES.COINS then
+			local canPayWithCoins = Arcana:GetCoins(owner) >= spell.cost_amount
 			if not canPayWithCoins and owner:Health() < spell.cost_amount then
 				return false, "Owner cannot afford spell cost"
 			end
-		elseif spell.cost_type == Arcane.COST_TYPES.HEALTH then
+		elseif spell.cost_type == Arcana.COST_TYPES.HEALTH then
 			if owner:Health() < spell.cost_amount then
 				return false, "Owner has insufficient health"
 			end
@@ -135,7 +135,7 @@ if SERVER then
 		end
 
 		-- Hook validation
-		local ok, reason = Arcane.RunHook("CanCastSpell", owner, spellId)
+		local ok, reason = Arcana.RunHook("CanCastSpell", owner, spellId)
 		if ok == false then return false, reason or "Cannot cast spell" end
 
 		return true
@@ -149,13 +149,13 @@ if SERVER then
 		local canCast, reason = self:CanCastSpellForOwner(owner, spellId)
 		if not canCast then
 			if IsValid(owner) and owner:IsPlayer() then
-				Arcane:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
+				Arcana:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
 			end
 
 			return false
 		end
 
-		local spell = Arcane.RegisteredSpells[spellId]
+		local spell = Arcana.RegisteredSpells[spellId]
 		local castTime = math.max(0.1, spell.cast_time or 0)
 
 		self.CastingUntil = CurTime() + castTime
@@ -202,7 +202,7 @@ if SERVER then
 			local canExecute, reason = self:CanCastSpellForOwner(owner, spellId)
 			if not canExecute then
 				if IsValid(owner) and owner:IsPlayer() then
-					Arcane:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
+					Arcana:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
 				end
 
 				net.Start("Arcana_SpellFailed", true)
@@ -229,15 +229,15 @@ if SERVER then
 	function ENT:ExecuteSpell(owner, spellId, spell, castTime, forwardLike, pos, ang, size)
 		if not IsValid(owner) then return end
 
-		local data = Arcane:GetPlayerData(owner)
+		local data = Arcana:GetPlayerData(owner)
 		local takeDamageInfo = owner.ForceTakeDamageInfo or owner.TakeDamageInfo
 
 		-- Apply costs to owner
-		if spell.cost_type == Arcane.COST_TYPES.COINS then
-			local canPayWithCoins = Arcane:GetCoins(owner) >= spell.cost_amount
+		if spell.cost_type == Arcana.COST_TYPES.COINS then
+			local canPayWithCoins = Arcana:GetCoins(owner) >= spell.cost_amount
 
 			if canPayWithCoins then
-				Arcane:TakeCoins(owner, spell.cost_amount, "Spell Caster: " .. spell.name)
+				Arcana:TakeCoins(owner, spell.cost_amount, "Spell Caster: " .. spell.name)
 			else
 				-- Fallback: pay with health
 				local dmg = DamageInfo()
@@ -247,7 +247,7 @@ if SERVER then
 				dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_DIRECT))
 				takeDamageInfo(owner, dmg)
 			end
-		elseif spell.cost_type == Arcane.COST_TYPES.HEALTH then
+		elseif spell.cost_type == Arcana.COST_TYPES.HEALTH then
 			local dmg = DamageInfo()
 			dmg:SetDamage(spell.cost_amount)
 			dmg:SetAttacker(owner)
@@ -280,7 +280,7 @@ if SERVER then
 			success = false
 		end
 
-		Arcane.RunHook("CastSpell", owner, spellId, nil, data, context, success)
+		Arcana.RunHook("CastSpell", owner, spellId, nil, data, context, success)
 
 		if success then
 			if spell.on_success then
@@ -288,15 +288,15 @@ if SERVER then
 			end
 
 			-- Report magic usage location
-			if Arcane.ManaCrystals and Arcane.ManaCrystals.ReportMagicUse then
-				Arcane.ManaCrystals:ReportMagicUse(owner, pos, spellId, context)
+			if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
+				Arcana.ManaCrystals:ReportMagicUse(owner, pos, spellId, context)
 			end
 		else
 			if spell.on_failure then
 				spell.on_failure(owner, nil, data)
 			end
 
-		Arcane.RunHook("CastSpellFailure", owner, spellId, nil, data, context)
+		Arcana.RunHook("CastSpellFailure", owner, spellId, nil, data, context)
 
 		net.Start("Arcana_SpellFailed", true)
 		net.WriteEntity(self)
@@ -339,7 +339,7 @@ if SERVER then
 				if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
 				if not IsValid(owner) then return end
 
-				Arcane:SendErrorNotification(owner, "Spell Caster: No spell ID provided")
+				Arcana:SendErrorNotification(owner, "Spell Caster: No spell ID provided")
 				return
 			end
 
@@ -365,7 +365,7 @@ if SERVER then
 
 			-- Update cast progress
 			if self:GetIsCasting() and self.CastingUntil > CurTime() then
-				local spell = Arcane.RegisteredSpells[self.QueuedSpell]
+				local spell = Arcana.RegisteredSpells[self.QueuedSpell]
 				if spell then
 					local castTime = math.max(0.1, spell.cast_time or 0)
 					local elapsed = castTime - (self.CastingUntil - CurTime())
@@ -436,7 +436,7 @@ end
 if CLIENT then
 	-- Spell Caster Menu
 	local function OpenSpellCasterMenu(caster)
-		if not Arcane then return end
+		if not Arcana then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) or not IsValid(caster) then return end
 
@@ -444,7 +444,7 @@ if CLIENT then
 		if not IsValid(owner) then owner = caster:GetNWEntity("FallbackOwner") end
 		if not IsValid(owner) then return end
 		if owner ~= ply then
-			Arcane:Print("❌ You don't own this Spell Caster")
+			Arcana:Print("❌ You don't own this Spell Caster")
 			return
 		end
 
@@ -521,7 +521,7 @@ if CLIENT then
 			-- Show current selected spell
 			local currentSpell = caster:GetSelectedSpell() or ""
 			if currentSpell ~= "" then
-				local spell = Arcane.RegisteredSpells[currentSpell]
+				local spell = Arcana.RegisteredSpells[currentSpell]
 				if spell then
 					draw.SimpleText("Current: " .. spell.name, "Arcana_AncientSmall", w - 14, 10, ArtDeco.Colors.textDim, TEXT_ALIGN_RIGHT)
 				end
@@ -549,7 +549,7 @@ if CLIENT then
 			-- Show cooldown if applicable
 			local spellId = caster:GetSelectedSpell() or ""
 			if spellId ~= "" and IsValid(ply) then
-				local data = Arcane:GetPlayerData(ply)
+				local data = Arcana:GetPlayerData(ply)
 				if data and data.spell_cooldowns then
 					local cd = data.spell_cooldowns[spellId]
 					if cd and cd > CurTime() then
@@ -598,11 +598,11 @@ if CLIENT then
 
 		local function rebuild()
 			scroll:Clear()
-			local data = Arcane:GetPlayerData(ply)
+			local data = Arcana:GetPlayerData(ply)
 			if not data then return end
 
 			local unlocked = {}
-			for sid, sp in pairs(Arcane.RegisteredSpells) do
+			for sid, sp in pairs(Arcana.RegisteredSpells) do
 				-- Filter out divine pacts and ritual spells
 				if data.unlocked_spells[sid] and not sp.is_divine_pact and not sp.is_ritual then
 					table.insert(unlocked, {id = sid, spell = sp})

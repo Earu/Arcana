@@ -28,7 +28,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	-- Apply slow via shared Frost status
 	local isActor = target:IsPlayer() or target:IsNPC() or (target.IsNextBot and target:IsNextBot())
 	if isActor then
-		Arcane.Status.Frost.Apply(target, {
+		Arcana.Status.Frost.Apply(target, {
 			slowMult = slowMult,
 			duration = slowDuration,
 			vfxTag = "frost_slow",
@@ -90,7 +90,7 @@ local function isMeleeHoldType(wep)
 	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "frostbite_rounds",
 	name = "Frostbite Rounds",
 	description = "Bullets freeze the struck target with chilling slow and cold VFX.",

@@ -82,12 +82,12 @@ function SWEP:Holster()
 end
 
 function SWEP:PrimaryAttack()
-	if not Arcane then return end
+	if not Arcana then return end
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 	-- Resolve selected spell from quickslot if present
 	local selectedSpellId = self.SelectedSpell
-	local pdata = Arcane:GetPlayerData(owner)
+	local pdata = Arcana:GetPlayerData(owner)
 
 	if pdata then
 		local qsIndex = math.Clamp(pdata.selected_quickslot or 1, 1, 8)
@@ -97,26 +97,26 @@ function SWEP:PrimaryAttack()
 
 	if not selectedSpellId then
 		if CLIENT and IsFirstTimePredicted() then
-			Arcane:Print("❌ No spell selected!")
+			Arcana:Print("❌ No spell selected!")
 		end
 
 		return
 	end
 
 	-- Check if spell exists and is unlocked
-	local spell = Arcane.RegisteredSpells[selectedSpellId]
+	local spell = Arcana.RegisteredSpells[selectedSpellId]
 
 	if not spell then
 		if CLIENT and IsFirstTimePredicted() then
-			Arcane:Print("❌ Unknown spell: " .. tostring(selectedSpellId))
+			Arcana:Print("❌ Unknown spell: " .. tostring(selectedSpellId))
 		end
 
 		return
 	end
 
-	if not owner:HasSpellUnlocked(selectedSpellId) then
+	if not Arcana:HasSpellUnlocked(owner, selectedSpellId) then
 		if CLIENT and IsFirstTimePredicted() then
-			Arcane:Print("❌ Spell not unlocked: " .. spell.name)
+			Arcana:Print("❌ Spell not unlocked: " .. spell.name)
 		end
 
 		return
@@ -124,9 +124,9 @@ function SWEP:PrimaryAttack()
 
 	-- Begin casting (server schedules execution after cast time)
 	if SERVER then
-		Arcane:StartCasting(owner, selectedSpellId)
+		Arcana:StartCasting(owner, selectedSpellId)
 		local castTime = math.max(0.1, spell.cast_time or 0)
-		-- Only gate firing by cast time; actual per-spell cooldowns are enforced in Arcane core
+		-- Only gate firing by cast time; actual per-spell cooldowns are enforced in Arcana core
 		self:SetNextPrimaryFire(CurTime() + castTime)
 	else
 		-- Client prediction: throttle based on minimum cast time
@@ -145,7 +145,7 @@ function SWEP:SecondaryAttack()
 end
 
 function SWEP:Reload()
-	if not Arcane then return false end
+	if not Arcana then return false end
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return false end
 
@@ -240,13 +240,13 @@ end
 
 -- Get available spells for the player
 function SWEP:GetAvailableSpells()
-	if not Arcane then return {} end
+	if not Arcana then return {} end
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return {} end
 	local availableSpells = {}
 
-	for spellId, spell in pairs(Arcane.RegisteredSpells) do
-		if owner:HasSpellUnlocked(spellId) then
+	for spellId, spell in pairs(Arcana.RegisteredSpells) do
+		if Arcana:HasSpellUnlocked(owner, spellId) then
 			table.insert(availableSpells, {
 				id = spellId,
 				spell = spell
@@ -278,7 +278,7 @@ function SWEP:CycleSpells()
 end
 
 function SWEP:DrawHUD()
-	if not Arcane then return end
+	if not Arcana then return end
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 	local scrW, scrH = ScrW(), ScrH()
@@ -319,7 +319,7 @@ if CLIENT then
 	function SWEP:GetSelectedFromQuickslot()
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return nil end
-		local data = Arcane:GetPlayerData(owner)
+		local data = Arcana:GetPlayerData(owner)
 		local index = math.Clamp(data.selected_quickslot or 1, 1, 8)
 
 		return data.quickspell_slots[index]
@@ -338,7 +338,7 @@ if CLIENT then
 		local cx, cy = scrW * 0.5, scrH * 0.5
 		local radius = RadialConfig.hud.outerRadius
 		local rInner = radius - RadialConfig.hud.innerGap
-		local data = Arcane:GetPlayerData(owner)
+		local data = Arcana:GetPlayerData(owner)
 		if not data then return end
 
 		-- Ensure cursor is enabled while radial is open
@@ -403,8 +403,8 @@ if CLIENT then
 			draw.SimpleText(tostring(i), "Arcana_Ancient", txNum, tyNum, isHover and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local spellId = data.quickspell_slots[i]
 
-			if spellId and Arcane.RegisteredSpells[spellId] then
-				local sp = Arcane.RegisteredSpells[spellId]
+			if spellId and Arcana.RegisteredSpells[spellId] then
+				local sp = Arcana.RegisteredSpells[spellId]
 				draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", txAbbr, tyAbbr, isHover and ArtDeco.Colors.textBright or ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			else
 				draw.SimpleText("-", "Arcana_AncientLarge", txAbbr, tyAbbr, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -414,8 +414,8 @@ if CLIENT then
 		-- Center hover details: name and cost for the hovered slot
 		local hsId = data.quickspell_slots[hoverSlot]
 
-		if hsId and Arcane.RegisteredSpells[hsId] then
-			local sp = Arcane.RegisteredSpells[hsId]
+		if hsId and Arcana.RegisteredSpells[hsId] then
+			local sp = Arcana.RegisteredSpells[hsId]
 			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			local ct = tostring(sp.cost_type or "")
 			local ca = tonumber(sp.cost_amount or 0) or 0
@@ -428,7 +428,7 @@ if CLIENT then
 		if not input.IsKeyDown(KEY_R) and self.RadialOpen then
 			if self.RadialHoverSlot then
 				-- Update locally for instant feedback
-				local pdata = Arcane:GetPlayerData(owner)
+				local pdata = Arcana:GetPlayerData(owner)
 				pdata.selected_quickslot = self.RadialHoverSlot
 				net.Start("Arcana_SetSelectedQuickslot")
 				net.WriteUInt(self.RadialHoverSlot, 4)
@@ -473,7 +473,7 @@ if CLIENT then
 			local tw = surface.GetTextSize(titleText)
 			draw.SimpleText(titleText, "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
 			-- Level chip next to title
-			local data = Arcane and IsValid(owner) and Arcane:GetPlayerData(owner) or nil
+			local data = Arcana and IsValid(owner) and Arcana:GetPlayerData(owner) or nil
 
 			if data then
 				local chipText = "LVL " .. tostring(data.level or 1)
@@ -493,7 +493,7 @@ if CLIENT then
 				local innerPad = 4
 
 				-- Check if player is at max level
-				local isMaxLevel = data.level >= Arcane.Config.MAX_LEVEL
+				local isMaxLevel = data.level >= Arcana.Config.MAX_LEVEL
 				local progress, xpLabel
 
 				if isMaxLevel then
@@ -502,8 +502,8 @@ if CLIENT then
 					xpLabel = "MAX."
 				else
 					-- Normal XP progression
-					local totalForCurrent = Arcane:GetTotalXPForLevel(data.level)
-					local neededForNext = Arcane:GetXPRequiredForLevel(data.level)
+					local totalForCurrent = Arcana:GetTotalXPForLevel(data.level)
+					local neededForNext = Arcana:GetXPRequiredForLevel(data.level)
 					local xpInto = math.max(0, (data.xp or 0) - totalForCurrent)
 					progress = neededForNext > 0 and math.Clamp(xpInto / neededForNext, 0, 1) or 1
 					xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext) .. " XP"
@@ -597,7 +597,7 @@ if CLIENT then
 			local maxR = math.min(contentW, contentH) * 0.5 - RadialConfig.menu.numberOffset - 6
 			local radius = math.min(RadialConfig.menu.outerRadius, math.max(80, math.floor(maxR)))
 			local rInner = radius - RadialConfig.menu.innerGap
-			local pdata = Arcane:GetPlayerData(owner)
+			local pdata = Arcana:GetPlayerData(owner)
 			local mx, my = pnl:LocalCursorPos()
 			local ang = (math.deg(math.atan2(my - cy, mx - cx)) + 360) % 360
 			local hoverSlot = math.floor(ang / 45) % 8 + 1
@@ -642,8 +642,8 @@ if CLIENT then
 				draw.SimpleText(tostring(i), "Arcana_AncientSmall", tnX, tnY, isHover and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				local sid = pdata.quickspell_slots[i]
 
-				if sid and Arcane.RegisteredSpells[sid] then
-					local sp = Arcane.RegisteredSpells[sid]
+				if sid and Arcana.RegisteredSpells[sid] then
+					local sp = Arcana.RegisteredSpells[sid]
 					draw.SimpleText(string.upper(string.sub(sp.name, 1, 3)), "Arcana_AncientLarge", tx, ty, isHover and ArtDeco.Colors.textBright or ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				else
 					draw.SimpleText("-", "Arcana_AncientLarge", tx, ty, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -653,8 +653,8 @@ if CLIENT then
 			-- Center hover details: name and cost for the hovered slot (matching HUD radial functionality)
 			local hsId = pdata.quickspell_slots[hoverSlot]
 
-			if hsId and Arcane.RegisteredSpells[hsId] then
-				local sp = Arcane.RegisteredSpells[hsId]
+			if hsId and Arcana.RegisteredSpells[hsId] then
+				local sp = Arcana.RegisteredSpells[hsId]
 				draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				local ct = tostring(sp.cost_type or "")
 				local ca = tonumber(sp.cost_amount or 0) or 0
@@ -671,14 +671,14 @@ if CLIENT then
 
 			if mc == MOUSE_LEFT then
 				-- Select the quickslot
-				local pdata = Arcane:GetPlayerData(owner)
+				local pdata = Arcana:GetPlayerData(owner)
 				pdata.selected_quickslot = slotIndex
 				net.Start("Arcana_SetSelectedQuickslot")
 				net.WriteUInt(slotIndex, 4)
 				net.SendToServer()
 			elseif mc == MOUSE_RIGHT then
 				-- Remove spell from the quickslot
-				local pdata = Arcane:GetPlayerData(owner)
+				local pdata = Arcana:GetPlayerData(owner)
 				pdata.quickspell_slots[slotIndex] = nil
 				net.Start("Arcana_SetQuickslot")
 				net.WriteUInt(slotIndex, 4)
@@ -692,7 +692,7 @@ if CLIENT then
 			if dropped and panels and panels[1] and panels[1].SpellId then
 				local sid = panels[1].SpellId
 				local slotIndex = pnl._hoverSlot or 1
-				local pdata2 = Arcane:GetPlayerData(owner)
+				local pdata2 = Arcana:GetPlayerData(owner)
 				pdata2.quickspell_slots[slotIndex] = sid
 				net.Start("Arcana_SetQuickslot")
 				net.WriteUInt(slotIndex, 4)
@@ -737,8 +737,8 @@ if CLIENT then
 		local divinePacts = {}
 		local rituals = {}
 
-		for sid, sp in pairs(Arcane.RegisteredSpells) do
-			if owner:HasSpellUnlocked(sid) then
+		for sid, sp in pairs(Arcana.RegisteredSpells) do
+			if Arcana:HasSpellUnlocked(owner, sid) then
 				local item = {
 					id = sid,
 					spell = sp
@@ -846,7 +846,7 @@ if CLIENT then
 
 			-- Reflect cooldown state in button text/enabled
 			castBtn.Think = function(pnl)
-				local data = Arcane and Arcane:GetPlayerData(owner) or nil
+				local data = Arcana and Arcana:GetPlayerData(owner) or nil
 				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 				if cd and cd > CurTime() then
@@ -1020,7 +1020,7 @@ if CLIENT then
 				end
 
 				castBtn.Think = function(pnl)
-					local data = Arcane and Arcane:GetPlayerData(owner) or nil
+					local data = Arcana and Arcana:GetPlayerData(owner) or nil
 					local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 					if cd and cd > CurTime() then
@@ -1155,7 +1155,7 @@ if CLIENT then
 				end
 
 				castBtn.Think = function(pnl)
-					local data = Arcane and Arcane:GetPlayerData(owner) or nil
+					local data = Arcana and Arcana:GetPlayerData(owner) or nil
 					local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 					if cd and cd > CurTime() then
@@ -1279,7 +1279,7 @@ if CLIENT then
 		if not ply:HasWeapon("grimoire") then return end
 
 		if cookie.GetString("arcana_grimoire_tutorial_completed", "false") == "false" then
-			Arcane:StartTutorialSequence({
+			Arcana:StartTutorialSequence({
 				nodes = NODES,
 				startNode = "START",
 				onEnter = function() end,

@@ -1,9 +1,9 @@
--- Arcane Missile System
+-- Arcana Missile System
 -- Shared logic for launching arcane missiles
 -- Used by both arcane_missiles spell and seeking_salvo enchantment
 
-Arcane = Arcane or {}
-Arcane.Common = Arcane.Common or {}
+Arcana = Arcana or {}
+Arcana.Common = Arcana.Common or {}
 
 if SERVER then
 	-- Select best target for homing missiles
@@ -34,7 +34,7 @@ if SERVER then
 	-- @param options: Table of optional parameters:
 	--   - count: number of missiles (default 3)
 	--   - delay: delay between each missile spawn (default 0.06)
-	function Arcane.Common.LaunchMissiles(caster, origin, aim, options)
+	function Arcana.Common.LaunchMissiles(caster, origin, aim, options)
 		if not SERVER then return end
 		if not IsValid(caster) then return end
 		if not isvector(origin) or not isvector(aim) then return end

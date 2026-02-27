@@ -45,8 +45,8 @@ local function attachDashHook(ply, wep, state)
 			util.Effect("cball_explode", ed, true, true)
 			util.Effect("ManhackSparks", ed, true, true)
 			sound.Play("npc/fast_zombie/claw_strike" .. math.random(1, 3) .. ".wav", impactPos, 85, 110)
-			if Arcane and Arcane.SendAttachBandVFX then
-				Arcane:SendAttachBandVFX(ply, Color(180, 240, 255, 255), 24, 0.4, {
+			if Arcana and Arcana.SendAttachBandVFX then
+				Arcana:SendAttachBandVFX(ply, Color(180, 240, 255, 255), 24, 0.4, {
 					{ radius = 18, height = 4, spin = { p = 0, y = 360 * 40, r = 0 }, lineWidth = 2 },
 					{ radius = 12, height = 3, spin = { p = 0, y = -300 * 40, r = 0 }, lineWidth = 2 },
 				}, "dash_land_fx")
@@ -101,8 +101,8 @@ local function attachDashHook(ply, wep, state)
 		p:SetGroundEntity(NULL)
 
 		-- Quick visual feedback
-		if Arcane and Arcane.SendAttachBandVFX then
-			Arcane:SendAttachBandVFX(p, Color(180, 240, 255, 255), 28, 0.35, {
+		if Arcana and Arcana.SendAttachBandVFX then
+			Arcana:SendAttachBandVFX(p, Color(180, 240, 255, 255), 28, 0.35, {
 				{ radius = 18, height = 4, spin = { p = 0, y = 360 * 50, r = 0 }, lineWidth = 2 },
 				{ radius = 14, height = 3, spin = { p = 0, y = -300 * 50, r = 0 }, lineWidth = 2 },
 			}, "dash_fx")
@@ -129,7 +129,7 @@ local function detachDashHook(ply, wep, state)
 	end
 end
 
-Arcane:RegisterEnchantment({
+Arcana:RegisterEnchantment({
 	id = "dashing_strikes",
 	name = "Dashing Strikes",
 	description = "On melee attack, dash forward toward your aim (1.5s cooldown).",

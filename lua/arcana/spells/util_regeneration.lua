@@ -1,12 +1,12 @@
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "regeneration",
 	name = "Regeneration",
 	description = "Gradually heal over time.",
-	category = Arcane.CATEGORIES.PROTECTION,
+	category = Arcana.CATEGORIES.PROTECTION,
 	level_required = 1,
 	knowledge_cost = 1,
 	cooldown = 10.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 15,
 	cast_time = 0.5,
 	range = 0,
@@ -32,7 +32,7 @@ Arcane:RegisterSpell({
 
 		-- Subtle VFX band
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
-		Arcane:SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
+		Arcana:SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
 			{
 				radius = r * 0.9,
 				height = 3,

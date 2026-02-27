@@ -16,7 +16,7 @@ if SERVER then
 end -- This is a CLIENT-only module
 
 local Tutorial = {}
-Arcane.Tutorial = Tutorial
+Arcana.Tutorial = Tutorial
 
 -- Initialize crystal shader material for tree
 local TREE_SHADER_MAT
@@ -1562,11 +1562,11 @@ function Tutorial:WrapText(text, font, maxWidth)
 end
 
 -- Public API to start a tutorial sequence
-function Arcane:StartTutorialSequence(sequence)
+function Arcana:StartTutorialSequence(sequence)
 	return Tutorial:StartSequence(sequence)
 end
 
 -- Public API to check if tutorial is active
-function Arcane:IsTutorialActive()
+function Arcana:IsTutorialActive()
 	return Tutorial.active
 end

@@ -1,4 +1,4 @@
--- Arcane Barrier: A timed shield that absorbs incoming damage up to a cap
+-- Arcana Barrier: A timed shield that absorbs incoming damage up to a cap
 local BARRIER_COLOR = Color(142, 120, 225)
 
 -- Internal helpers
@@ -8,7 +8,7 @@ local function clearBarrier(ply)
 	ply._arcanaBarrierUntil = nil
 
 	if SERVER then
-		Arcane:ClearBandVFX(ply, "spell_barrier")
+		Arcana:ClearBandVFX(ply, "spell_barrier")
 	end
 
 	if CLIENT then return end
@@ -46,7 +46,7 @@ if SERVER then
 			ent._arcanaBarrierNextPing = CurTime() + 0.15
 			local r = math.max(ent:OBBMaxs():Unpack()) * 0.55
 
-			Arcane:SendAttachBandVFX(ent, BARRIER_COLOR, 28, 0.25, {
+			Arcana:SendAttachBandVFX(ent, BARRIER_COLOR, 28, 0.25, {
 				{
 					radius = r * 0.85,
 					height = 4,
@@ -70,7 +70,7 @@ if SERVER then
 			ed:SetOrigin(ent:WorldSpaceCenter())
 			util.Effect("GlassImpact", ed, true, true)
 			-- Clear barrier VFX instantly on shatter
-			Arcane:ClearBandVFX(ent, "spell_barrier")
+			Arcana:ClearBandVFX(ent, "spell_barrier")
 		end
 	end)
 
@@ -85,15 +85,15 @@ if SERVER then
 end
 
 -- Spell registration
-Arcane:RegisterSpell({
+Arcana:RegisterSpell({
 	id = "arcane_barrier",
 	name = "Arcane Barrier",
 	description = "Summon a protective shield that absorbs damage for a short time.",
-	category = Arcane.CATEGORIES.PROTECTION,
+	category = Arcana.CATEGORIES.PROTECTION,
 	level_required = 5, -- push above level 3 as requested
 	knowledge_cost = 3,
 	cooldown = 18.0,
-	cost_type = Arcane.COST_TYPES.COINS,
+	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 45,
 	cast_time = 1.0,
 	range = 0,
@@ -108,7 +108,7 @@ Arcane:RegisterSpell({
 		if CLIENT then return true end
 		local duration = 120
 		-- Capacity scales slightly with level: 60 base + 6 per level, capped
-		local level = Arcane:GetPlayerData(caster).level or 1
+		local level = Arcana:GetPlayerData(caster).level or 1
 		local capacity = math.Clamp(60 + (level * 6), 60, 1000)
 		caster._arcanaBarrierHP = capacity
 		caster._arcanaBarrierUntil = CurTime() + duration
@@ -116,7 +116,7 @@ Arcane:RegisterSpell({
 		sound.Play("items/suitchargeok1.wav", caster:WorldSpaceCenter(), 70, 120, 0.7)
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.6
 
-		Arcane:SendAttachBandVFX(caster, BARRIER_COLOR, 34, duration, {
+		Arcana:SendAttachBandVFX(caster, BARRIER_COLOR, 34, duration, {
 			{
 				radius = r * 0.95,
 				height = 6,
