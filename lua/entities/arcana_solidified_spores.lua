@@ -164,3 +164,12 @@ if CLIENT then
         end
     end
 end
+
+hook.Add("Initialize", "arcana_solidified_spores_item", function()
+	Arcana:RegisterItem("solidified_spores", {
+		name = "Solidified Spores",
+		description = "A solidified mass of spores. Fairies enjoy them.",
+		model = "models/props_hive/larval_essence.mdl",
+		color = Color(120, 200, 120),
+	})
+end)
