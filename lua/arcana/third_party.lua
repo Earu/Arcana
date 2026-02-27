@@ -15,6 +15,55 @@ _G.Arcana = Arcana
 
 --[[
 	==========================================================================
+	ITEMS - Register custom items for the inventory
+	==========================================================================
+]]
+
+--[[
+	Register an item for display in the inventory
+	@param itemClass string - Unique identifier for the item (e.g., "mana_crystal_shard")
+	@param itemData table - Item definition containing:
+		- name: Display name of the item
+		- description: Tooltip description
+		- model: Path to the 3D model
+		- material: (optional) Material override for the model
+		- color: (optional) Color tint for the model
+		- draw: (optional) Custom draw function(modelPanel, w, h) for advanced rendering
+
+	Example usage:
+	Arcana:RegisterItem("mystic_gem", {
+		name = "Mystic Gem",
+		description = "A rare gemstone with mysterious properties.",
+		model = "models/props_junk/rock001a.mdl",
+		color = Color(255, 100, 255)
+	})
+
+	Example with custom rendering:
+	Arcana:RegisterItem("glowing_orb", {
+		name = "Glowing Orb",
+		description = "An orb that pulses with energy.",
+		model = "models/hunter/misc/sphere025x025.mdl",
+		draw = function(modelPanel, w, h)
+			-- Custom 3D rendering code here
+		end
+	})
+
+	Example override (third-party):
+	local oldRegisterItem = Arcana.RegisterItem
+	function Arcana:RegisterItem(itemClass, itemData)
+		-- Add your custom logic here
+		print("Registering item:", itemClass)
+
+		-- Call original function
+		oldRegisterItem(self, itemClass, itemData)
+	end
+]]
+function Arcana:RegisterItem(itemClass, itemData)
+	-- Default implementation in default_inventory.lua
+end
+
+--[[
+	==========================================================================
 	COINS - Used for spell costs, enchantments, and rituals
 	ITEMS - Used for rituals and enchantments
 	==========================================================================

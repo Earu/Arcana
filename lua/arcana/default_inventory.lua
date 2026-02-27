@@ -10,16 +10,69 @@ local Arcana = _G.Arcana or {}
 Arcana.Inventory = Arcana.Inventory or {}
 
 -- Item definitions for display purposes
-Arcana.Inventory.Items = {
-	["mana_crystal_shard"] = {
-		name = "Crystal Shard",
-		description = "A crystallized fragment of pure magical energy.",
-		model = "models/props_debris/concrete_chunk05g.mdl",
-		material = "models/shiny",
-		color = Color(120, 200, 255),
-		entityClass = "arcana_crystal_shard"
-	},
-}
+Arcana.Inventory.Items = Arcana.Inventory.Items or {}
+
+-- Register an item for display in the inventory
+-- @param itemClass string - Unique identifier for the item
+-- @param itemData table - Item definition with name, description, model, etc.
+function Arcana:RegisterItem(itemClass, itemData)
+	if not itemClass or not itemData then
+		ErrorNoHalt("[Arcana] RegisterItem: Invalid itemClass or itemData\n")
+		return
+	end
+
+	Arcana.Inventory.Items[itemClass] = itemData
+	Arcana.RunHook("ItemRegistered", itemClass, itemData)
+end
+
+-- ============================================================================
+-- DEFAULT RITUAL ITEMS
+-- ============================================================================
+-- Register default items used in rituals
+
+Arcana:RegisterItem("poison", {
+	name = "Poison Vial",
+	description = "A vial containing toxic liquid.",
+	model = "models/props_junk/garbage_glassbottle001a.mdl",
+	color = Color(100, 200, 100)
+})
+
+Arcana:RegisterItem("radioactive", {
+	name = "Radioactive Material",
+	description = "Highly radioactive material. Handle with extreme caution.",
+	model = "models/props_c17/oildrum001.mdl",
+	color = Color(255, 220, 0)
+})
+
+Arcana:RegisterItem("battery", {
+	name = "Battery",
+	description = "A charged battery crackling with electrical energy.",
+	model = "models/Items/car_battery01.mdl"
+})
+
+Arcana:RegisterItem("waterbottle", {
+	name = "Water Bottle",
+	description = "A bottle of pure water.",
+	model = "models/props_junk/garbage_plasticbottle003a.mdl",
+})
+
+Arcana:RegisterItem("banana", {
+	name = "Banana",
+	description = "A ripe banana. Full of potassium.",
+	model = "models/props/cs_italy/bananna.mdl"
+})
+
+Arcana:RegisterItem("melon", {
+	name = "Melon",
+	description = "A fresh, juicy melon.",
+	model = "models/props_junk/watermelon01.mdl"
+})
+
+Arcana:RegisterItem("orange", {
+	name = "Orange",
+	description = "A bright orange citrus fruit.",
+	model = "models/props/cs_italy/orange.mdl"
+})
 
 -- ============================================================================
 -- SERVER-SIDE: SQLite Persistence
@@ -108,6 +161,13 @@ if SERVER then
 		inv.coins = inv.coins + amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("CoinsGiven", ply, amount, reason)
+		
+		-- Send notification to client
+		net.Start("Arcana_CoinsGained")
+		net.WriteUInt(amount, 32)
+		net.WriteString(reason or "")
+		net.Send(ply)
+		
 		return true
 	end
 
@@ -118,6 +178,13 @@ if SERVER then
 		inv.coins = inv.coins - amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("CoinsTaken", ply, amount, reason)
+		
+		-- Send notification to client
+		net.Start("Arcana_CoinsTaken")
+		net.WriteUInt(amount, 32)
+		net.WriteString(reason or "")
+		net.Send(ply)
+		
 		return true
 	end
 
@@ -127,6 +194,14 @@ if SERVER then
 		inv.items[itemClass] = (inv.items[itemClass] or 0) + amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("ItemGiven", ply, itemClass, amount, reason)
+		
+		-- Send notification to client
+		net.Start("Arcana_ItemGained")
+		net.WriteString(itemClass)
+		net.WriteUInt(amount, 32)
+		net.WriteString(reason or "")
+		net.Send(ply)
+		
 		return true
 	end
 
@@ -140,6 +215,14 @@ if SERVER then
 		end
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("ItemTaken", ply, itemClass, amount, reason)
+		
+		-- Send notification to client
+		net.Start("Arcana_ItemTaken")
+		net.WriteString(itemClass)
+		net.WriteUInt(amount, 32)
+		net.WriteString(reason or "")
+		net.Send(ply)
+		
 		return true
 	end
 
@@ -160,6 +243,10 @@ if SERVER then
 	end)
 
 	util.AddNetworkString("Arcana_InventorySync")
+	util.AddNetworkString("Arcana_CoinsGained")
+	util.AddNetworkString("Arcana_CoinsTaken")
+	util.AddNetworkString("Arcana_ItemGained")
+	util.AddNetworkString("Arcana_ItemTaken")
 end
 
 -- ============================================================================
@@ -177,6 +264,40 @@ if CLIENT then
 			coins = coins,
 			items = (ok and istable(items)) and items or {}
 		}
+	end)
+
+	net.Receive("Arcana_CoinsGained", function()
+		local amount = net.ReadUInt(32)
+		local reason = net.ReadString()
+		if Arcana.HUD and Arcana.HUD.ShowCoinsGainedAnnouncement then
+			Arcana.HUD.ShowCoinsGainedAnnouncement(LocalPlayer(), amount, reason)
+		end
+	end)
+
+	net.Receive("Arcana_CoinsTaken", function()
+		local amount = net.ReadUInt(32)
+		local reason = net.ReadString()
+		if Arcana.HUD and Arcana.HUD.ShowCoinsTakenAnnouncement then
+			Arcana.HUD.ShowCoinsTakenAnnouncement(LocalPlayer(), amount, reason)
+		end
+	end)
+
+	net.Receive("Arcana_ItemGained", function()
+		local itemClass = net.ReadString()
+		local amount = net.ReadUInt(32)
+		local reason = net.ReadString()
+		if Arcana.HUD and Arcana.HUD.ShowItemGainedAnnouncement then
+			Arcana.HUD.ShowItemGainedAnnouncement(LocalPlayer(), itemClass, amount, reason)
+		end
+	end)
+
+	net.Receive("Arcana_ItemTaken", function()
+		local itemClass = net.ReadString()
+		local amount = net.ReadUInt(32)
+		local reason = net.ReadString()
+		if Arcana.HUD and Arcana.HUD.ShowItemTakenAnnouncement then
+			Arcana.HUD.ShowItemTakenAnnouncement(LocalPlayer(), itemClass, amount, reason)
+		end
 	end)
 
 	-- ============================================================================
@@ -383,26 +504,19 @@ if CLIENT then
 						modelPanel:SetLookAt(center)
 					end
 
-					if itemDef.entityClass then
-						local entTable = scripted_ents.Get(itemDef.entityClass)
-						if entTable and entTable.Draw and entTable.DrawGlow then
-							function modelPanel:Paint(w, h)
-								if not IsValid(self.Entity) then return end
+					if itemDef.draw then
+						function modelPanel:Paint(w, h)
+							itemDef.draw(self, w, h)
+						end
 
-								local x, y = self:LocalToScreen(0, 0)
-								local ang = (self.vLookatPos - self.vCamPos):Angle()
-
-								cam.Start3D(self.vCamPos, ang, self.fFOV, x, y, w, h, 5, 4096)
-
-								entTable.Draw(self.Entity)
-								entTable.DrawGlow(self.Entity)
-
-								cam.End3D()
+						modelPanel.LayoutEntity = function(pnl, entity)
+						end
+					else
+						modelPanel.LayoutEntity = function(pnl, entity)
+							if entity.SetAngles then
+								entity:SetAngles(Angle(0, RealTime() * 40, 0))
 							end
 						end
-					end
-
-					modelPanel.LayoutEntity = function(pnl, entity)
 					end
 				end
 

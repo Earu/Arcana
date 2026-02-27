@@ -310,3 +310,27 @@ if CLIENT then
 		render.SetLightingMode(0)
 	end
 end
+
+hook.Add("Initialize", "arcana_crystal_shard_item", function()
+	Arcana:RegisterItem("mana_crystal_shard", {
+		name = "Crystal Shard",
+		description = "A crystallized fragment of pure magical energy.",
+		model = "models/props_debris/concrete_chunk05g.mdl",
+		material = "models/shiny",
+		color = Color(120, 200, 255),
+		draw = function(modelPanel, w, h)
+			if not IsValid(modelPanel.Entity) then return end
+
+			local entTable = scripted_ents.Get("arcana_crystal_shard")
+			if not entTable or not entTable.Draw or not entTable.DrawGlow then return end
+
+			local x, y = modelPanel:LocalToScreen(0, 0)
+			local ang = (modelPanel.vLookatPos - modelPanel.vCamPos):Angle()
+
+			cam.Start3D(modelPanel.vCamPos, ang, modelPanel.fFOV, x, y, w, h, 5, 4096)
+			entTable.Draw(modelPanel.Entity)
+			entTable.DrawGlow(modelPanel.Entity)
+			cam.End3D()
+		end
+	})
+end)

@@ -109,7 +109,7 @@ if SERVER then
 
 		-- Consume from the player who activated
 		if self._coinCost > 0 then
-			Arcana:TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""))
+			Arcana:TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
 		end
 
 		for itemName, amt in pairs(self._requirements or {}) do

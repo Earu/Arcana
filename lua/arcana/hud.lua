@@ -17,6 +17,7 @@ end
 local _tempTextCol = Color(236, 230, 220, 255)
 local _tempSubCol = Color(222, 198, 120, 255)
 local _tempShadowCol = Color(0, 0, 0, 255)
+local _tempMainCol = Color(255, 255, 255, 255)
 
 -- Unlock announcement state
 local unlockAnnounce = {
@@ -85,8 +86,8 @@ net.Receive("Arcana_SpellUnlocked", function()
 	showUnlockAnnouncement("spell", name, -cost, _id)
 end)
 
--- XP gain announcement stack (multiple notifications can be active)
-local xpAnnounceStack = {}
+-- Notification stack (XP, coins, items - multiple notifications can be active)
+local notificationStack = {}
 
 -- Level-up / Knowledge announcement state
 local levelAnnounce = {
@@ -113,10 +114,71 @@ function Arcana.HUD.ShowXPAnnouncement(ply, amount, reason)
 	if not IsValid(ply) or ply ~= LocalPlayer() then return end
 
 	-- Add new notification to the stack
-	table.insert(xpAnnounceStack, {
+	table.insert(notificationStack, {
+		type = "xp",
 		startedAt = CurTime(),
-		endsAt = CurTime() + 2.5,
+		endsAt = CurTime() + 3.5,
 		amount = amount or 0,
+		reason = reason or ""
+	})
+end
+
+-- Direct callback for coin gain announcements
+function Arcana.HUD.ShowCoinsGainedAnnouncement(ply, amount, reason)
+	if not IsValid(ply) or ply ~= LocalPlayer() then return end
+
+	table.insert(notificationStack, {
+		type = "coins_gained",
+		startedAt = CurTime(),
+		endsAt = CurTime() + 3.5,
+		amount = amount or 0,
+		reason = reason or ""
+	})
+end
+
+-- Direct callback for coin loss announcements
+function Arcana.HUD.ShowCoinsTakenAnnouncement(ply, amount, reason)
+	if not IsValid(ply) or ply ~= LocalPlayer() then return end
+
+	table.insert(notificationStack, {
+		type = "coins_taken",
+		startedAt = CurTime(),
+		endsAt = CurTime() + 3.5,
+		amount = amount or 0,
+		reason = reason or ""
+	})
+end
+
+-- Direct callback for item gain announcements
+function Arcana.HUD.ShowItemGainedAnnouncement(ply, itemClass, amount, reason)
+	if not IsValid(ply) or ply ~= LocalPlayer() then return end
+
+	local itemDef = Arcana.Inventory.Items[itemClass]
+	local itemName = itemDef and itemDef.name or itemClass
+
+	table.insert(notificationStack, {
+		type = "item_gained",
+		startedAt = CurTime(),
+		endsAt = CurTime() + 3.5,
+		amount = amount or 0,
+		itemName = itemName,
+		reason = reason or ""
+	})
+end
+
+-- Direct callback for item loss announcements
+function Arcana.HUD.ShowItemTakenAnnouncement(ply, itemClass, amount, reason)
+	if not IsValid(ply) or ply ~= LocalPlayer() then return end
+
+	local itemDef = Arcana.Inventory.Items[itemClass]
+	local itemName = itemDef and itemDef.name or itemClass
+
+	table.insert(notificationStack, {
+		type = "item_taken",
+		startedAt = CurTime(),
+		endsAt = CurTime() + 3.5,
+		amount = amount or 0,
+		itemName = itemName,
 		reason = reason or ""
 	})
 end
@@ -228,27 +290,29 @@ local function drawCooldownStack(scrW, scrH)
 	end
 end
 
-local function drawXPAnnouncement(scrW, scrH)
-	if #xpAnnounceStack == 0 then return end
+local coinIcon = Material("icon16/coins.png")
+
+local function drawNotifications(scrW, scrH)
+	if #notificationStack == 0 then return end
 	local now = CurTime()
 
 	-- Remove expired notifications
-	for i = #xpAnnounceStack, 1, -1 do
-		if now >= xpAnnounceStack[i].endsAt then
-			table.remove(xpAnnounceStack, i)
+	for i = #notificationStack, 1, -1 do
+		if now >= notificationStack[i].endsAt then
+			table.remove(notificationStack, i)
 		end
 	end
 
-	if #xpAnnounceStack == 0 then return end
+	if #notificationStack == 0 then return end
 
 	-- Position in middle-right
 	local baseX = scrW - 30
 	local baseY = scrH * 0.5
 	local rowHeight = 30
-	local startY = baseY - ((#xpAnnounceStack - 1) * rowHeight * 0.5)
+	local startY = baseY - ((#notificationStack - 1) * rowHeight * 0.5)
 
 	-- Draw each notification in the stack
-	for i, notify in ipairs(xpAnnounceStack) do
+	for i, notify in ipairs(notificationStack) do
 		local y = startY + ((i - 1) * rowHeight)
 
 		-- Fade in/out
@@ -260,32 +324,71 @@ local function drawXPAnnouncement(scrW, scrH)
 		-- Text alpha: fades in/out
 		local textAlpha = math.floor(255 * math.min(fadeIn, fadeOut))
 
+		-- Format text based on notification type
+		local mainText
+		if notify.type == "xp" then
+			mainText = "+" .. string.Comma(notify.amount) .. " XP"
+			_tempMainCol.r = ArtDeco.Colors.paleGold.r
+			_tempMainCol.g = ArtDeco.Colors.paleGold.g
+			_tempMainCol.b = ArtDeco.Colors.paleGold.b
+		elseif notify.type == "coins_gained" then
+			mainText = "+" .. string.Comma(notify.amount)
+			_tempMainCol.r = 255
+			_tempMainCol.g = 215
+			_tempMainCol.b = 100
+		elseif notify.type == "coins_taken" then
+			mainText = "-" .. string.Comma(notify.amount)
+			_tempMainCol.r = 200
+			_tempMainCol.g = 100
+			_tempMainCol.b = 100
+		elseif notify.type == "item_gained" then
+			mainText = "+" .. string.Comma(notify.amount) .. "x " .. notify.itemName
+			_tempMainCol.r = 150
+			_tempMainCol.g = 220
+			_tempMainCol.b = 150
+		elseif notify.type == "item_taken" then
+			mainText = "-" .. string.Comma(notify.amount) .. "x " .. notify.itemName
+			_tempMainCol.r = 200
+			_tempMainCol.g = 100
+			_tempMainCol.b = 100
+		end
+
 		-- Calculate text widths for dynamic sizing
 		surface.SetFont("Arcana_Ancient")
-		local xpText = "+" .. string.Comma(notify.amount) .. " XP"
-		local xpTextW, _ = surface.GetTextSize(xpText)
+		local mainTextW, _ = surface.GetTextSize(mainText)
 
 		local reasonText = (notify.reason and notify.reason ~= "") and notify.reason or ""
 		local reasonTextW, _ = surface.GetTextSize(reasonText)
 
-		-- Diamond spacing
-		local diamondSpace = 20
+		-- Diamond/Icon spacing
+		local iconSpace = 20
 
 		-- Set text colors with proper alpha
 		_tempTextCol.a = textAlpha
-		_tempSubCol.a = textAlpha
 		_tempShadowCol.a = textAlpha
+		_tempMainCol.a = textAlpha
 
-		-- XP amount (right side) with stronger shadow
-		draw.SimpleText(xpText, "Arcana_Ancient", baseX + 2, y + 2, _tempShadowCol, TEXT_ALIGN_RIGHT)
-		draw.SimpleText(xpText, "Arcana_Ancient", baseX, y, _tempSubCol, TEXT_ALIGN_RIGHT)
+		-- Draw coin icon for coin notifications
+		if notify.type == "coins_gained" or notify.type == "coins_taken" then
+			local iconSize = 16
+			local iconX = baseX - mainTextW - iconSize - 4
+			local iconY = y + 2
+			surface.SetDrawColor(255, 255, 255, textAlpha)
+			surface.SetMaterial(coinIcon)
+			surface.DrawTexturedRect(iconX, iconY, iconSize, iconSize)
+		end
 
-		-- Diamond separator position
-		local diamondX = baseX - xpTextW - (diamondSpace / 2)
+		-- Main text (right side) with shadow
+		draw.SimpleText(mainText, "Arcana_Ancient", baseX + 2, y + 2, _tempShadowCol, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(mainText, "Arcana_Ancient", baseX, y, _tempMainCol, TEXT_ALIGN_RIGHT)
+
+		-- Diamond separator position (offset for coin icon if present)
+		local extraOffset = (notify.type == "coins_gained" or notify.type == "coins_taken") and 20 or 0
+		local diamondX = baseX - mainTextW - (iconSpace / 2) - extraOffset
 		local diamondY = y + 10
 
 		if reasonTextW > 0 then
-			-- Diamond shadow (stronger)
+			-- Diamond shadow
 			draw.NoTexture()
 			surface.SetDrawColor(0, 0, 0, textAlpha)
 			local d = 4
@@ -318,9 +421,9 @@ local function drawXPAnnouncement(scrW, scrH)
 			}
 			surface.DrawPoly(pts3)
 
-			-- Reason (left side) with stronger shadow
-			draw.SimpleText(reasonText, "Arcana_Ancient", diamondX - (diamondSpace / 2) + 2, y + 2, _tempShadowCol, TEXT_ALIGN_RIGHT)
-			draw.SimpleText(reasonText, "Arcana_Ancient", diamondX - (diamondSpace / 2), y, _tempTextCol, TEXT_ALIGN_RIGHT)
+			-- Reason (left side) with shadow
+			draw.SimpleText(reasonText, "Arcana_Ancient", diamondX - (iconSpace / 2) + 2, y + 2, _tempShadowCol, TEXT_ALIGN_RIGHT)
+			draw.SimpleText(reasonText, "Arcana_Ancient", diamondX - (iconSpace / 2), y, _tempTextCol, TEXT_ALIGN_RIGHT)
 		end
 	end
 end
@@ -494,7 +597,7 @@ hook.Add("HUDPaint", "Arcana_GlobalHUD", function()
 	local scrW, scrH = ScrW(), ScrH()
 	drawUnlockAnnouncement(scrW, scrH)
 	drawLevelAnnouncement(scrW, scrH)
-	drawXPAnnouncement(scrW, scrH)
+	drawNotifications(scrW, scrH)
 	drawCastingBar(scrW, scrH)
 	drawCooldownStack(scrW, scrH)
 end)
