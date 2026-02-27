@@ -9,8 +9,8 @@ if SERVER then
 	resource.AddFile("materials/entities/grimoire.png")
 
 	-- add the sound files for the tutorial
-	for _, f in ipairs(file.Find("sound/arcana/tutorial/grimoire/*.wav", "GAME")) do
-		resource.AddFile("sound/arcana/tutorial/grimoire/" .. f)
+	for _, f in ipairs(file.Find("sound/arcana/tutorials/grimoire/*.wav", "GAME")) do
+		resource.AddFile("sound/arcana/tutorials/grimoire/" .. f)
 	end
 end
 

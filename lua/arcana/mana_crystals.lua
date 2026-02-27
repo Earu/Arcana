@@ -415,7 +415,3 @@ if SERVER then
 		Arcana.ManaCrystals:SaveState()
 	end)
 end
-
-return Arcana
-
-

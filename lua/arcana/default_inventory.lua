@@ -161,13 +161,13 @@ if SERVER then
 		inv.coins = inv.coins + amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("CoinsGiven", ply, amount, reason)
-		
+
 		-- Send notification to client
 		net.Start("Arcana_CoinsGained")
 		net.WriteUInt(amount, 32)
 		net.WriteString(reason or "")
 		net.Send(ply)
-		
+
 		return true
 	end
 
@@ -178,13 +178,13 @@ if SERVER then
 		inv.coins = inv.coins - amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("CoinsTaken", ply, amount, reason)
-		
+
 		-- Send notification to client
 		net.Start("Arcana_CoinsTaken")
 		net.WriteUInt(amount, 32)
 		net.WriteString(reason or "")
 		net.Send(ply)
-		
+
 		return true
 	end
 
@@ -194,14 +194,14 @@ if SERVER then
 		inv.items[itemClass] = (inv.items[itemClass] or 0) + amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("ItemGiven", ply, itemClass, amount, reason)
-		
+
 		-- Send notification to client
 		net.Start("Arcana_ItemGained")
 		net.WriteString(itemClass)
 		net.WriteUInt(amount, 32)
 		net.WriteString(reason or "")
 		net.Send(ply)
-		
+
 		return true
 	end
 
@@ -215,14 +215,14 @@ if SERVER then
 		end
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("ItemTaken", ply, itemClass, amount, reason)
-		
+
 		-- Send notification to client
 		net.Start("Arcana_ItemTaken")
 		net.WriteString(itemClass)
 		net.WriteUInt(amount, 32)
 		net.WriteString(reason or "")
 		net.Send(ply)
-		
+
 		return true
 	end
 
@@ -593,5 +593,3 @@ function Arcana:GetItemCount(ply, itemClass)
 		return (Arcana.Inventory.LocalCache.items or {})[itemClass] or 0
 	end
 end
-
-return Arcana

@@ -1989,5 +1989,3 @@ if SERVER then
 		return false
 	end
 end
-
-return Arcana
