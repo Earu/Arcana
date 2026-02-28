@@ -412,7 +412,7 @@ if CLIENT then
 			surface.DrawRect(0, 0, w, h)
 		end
 
-		local greekGlyphs = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"}
+		local runicGlyphs = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
 		local function refreshItems()
 			scroll:Clear()
@@ -463,7 +463,7 @@ if CLIENT then
 						ArtDeco.FillDecoPanel(0, 0, w, h, ColorAlpha(ArtDeco.Colors.decoPanel, 100), math.floor(6 / scale))
 						ArtDeco.DrawDecoFrame(0, 0, w, h, ColorAlpha(ArtDeco.Colors.brassInner, 80), math.floor(6 / scale))
 
-						local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
+						local glyph = runicGlyphs[((i - 1) % #runicGlyphs) + 1]
 						draw.SimpleText(glyph, "Arcana_AncientGlyph", w / 2, h / 2, ColorAlpha(ArtDeco.Colors.brassInner, 60), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 					else
 						local isHovered = pnl:IsHovered()

@@ -9,7 +9,7 @@ ENT.RenderGroup = RENDERGROUP_TRANSLUCENT
 ENT.PhysgunDisabled = true
 ENT.ms_notouch = true
 
-local GLYPHS = {"Γ", "Δ", "Θ", "Λ", "Ξ", "Π", "Σ", "Φ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ξ", "π", "φ", "ψ", "ω"}
+local GLYPHS = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "LaserTime")
@@ -312,14 +312,14 @@ if CLIENT then
 	local COL_DEEPBLUE = Color(97, 97, 97)
 
 	surface.CreateFont("Arcana_WispGlyph", {
-		font = "Arial",
+		font = Arcana.RUNIC_FONT,
 		size = 120,
 		weight = 900,
 		antialias = true
 	})
 
 	surface.CreateFont("Arcana_WispGlyphSmall", {
-		font = "Arial",
+		font = Arcana.RUNIC_FONT,
 		size = 60,
 		weight = 500,
 		antialias = true

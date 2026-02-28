@@ -194,11 +194,12 @@ if CLIENT then
 	local ambientSound
 	local windupSound
 
-	local greekRunes = {
-		"α","β","γ","δ","ε","ζ","η","θ","ι","κ","λ","μ",
-		"ν","ξ","ο","π","ρ","σ","τ","υ","φ","χ","ψ","ω",
-		"Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ",
-		"Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω",
+	local runicGlyphs = {
+		"a","b","c","d","e","f","g","h","i","j","k","l",
+		"m","n","o","p","q","r","s","t","u","v","w","x",
+		"y","z","A","B","C","D","E","F","G","H","I","J",
+		"K","L","M","N","O","P","Q","R","S","T","U","V",
+		"W","X","Y","Z",
 	}
 
 	-- 3D glyphs anchored to the soul (replicates altar glyph feel, white runes)
@@ -231,7 +232,7 @@ if CLIENT then
 		local orbitRadius = math.Rand(0, 10)
 		local orbitSpeed = math.Rand(-4, 4)
 		local orbitPhase = math.Rand(0, math.pi * 2)
-		local ch = greekRunes[math.random(1, #greekRunes)]
+		local ch = runicGlyphs[math.random(1, #runicGlyphs)]
 		local alpha = math.random(90, 160)
 
 		-- occasional subtle ambient whisper near the soul

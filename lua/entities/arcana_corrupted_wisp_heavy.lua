@@ -270,17 +270,17 @@ end
 
 if CLIENT then
 	local SPRITE_MAT = Material("sprites/light_glow02_add")
-	local GLYPHS = {"Γ", "Δ", "Θ", "Λ", "Ξ", "Π", "Σ", "Φ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ξ", "π", "φ", "ψ", "ω"}
+	local GLYPHS = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
 	surface.CreateFont("Arcana_HeavyGlyph", {
-		font = "Arial",
+		font = Arcana.RUNIC_FONT,
 		size = 300,
 		weight = 900,
 		antialias = true
 	})
 
 	surface.CreateFont("Arcana_HeavyGlyphSmall", {
-		font = "Arial",
+		font = Arcana.RUNIC_FONT,
 		size = 90,
 		weight = 600,
 		antialias = true
