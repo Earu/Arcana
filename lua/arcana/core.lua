@@ -64,8 +64,6 @@ Arcana.Config = {
 	-- Spell Configuration
 	DEFAULT_SPELL_COOLDOWN = 1.0,
 	RITUAL_CASTING_TIME = 10.0,
-	-- Database
-	DATABASE_FILE = "arcane_data.txt"
 }
 
 -- Visual Configuration
