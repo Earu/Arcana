@@ -43,6 +43,10 @@ local function attachHook(ply, wep, state)
         local attacker = dmginfo:GetAttacker()
         if not IsValid(attacker) or not attacker:IsPlayer() then return end
 
+        if IsValid(wep:GetOwner()) then
+            ply = wep:GetOwner()
+        end
+
         -- Must be this weapon's wielder and this specific weapon currently active
         if attacker ~= ply then return end
 

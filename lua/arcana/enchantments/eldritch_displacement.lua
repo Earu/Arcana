@@ -78,6 +78,10 @@ local function attachHook(ply, wep, state)
 
 	-- When the wielder takes damage from others, blink to a random safe spot, keep aim
 	hook.Add("EntityTakeDamage", state._hookId, function(victim, dmginfo)
+		if IsValid(wep:GetOwner()) then
+			ply = wep:GetOwner()
+		end
+
 		if not IsValid(victim) or victim ~= ply then return end
 		local now = CurTime()
 		if now < (state._nextAllowed or 0) then return end
