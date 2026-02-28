@@ -81,6 +81,10 @@ local function attachHook(ply, wep, state)
 		if not IsValid(dmginfo) then return end
 		local now = CurTime()
 
+		if IsValid(wep:GetOwner()) then
+			ply = wep:GetOwner()
+		end
+
 		-- Grant Aegis when this player deals melee damage with this weapon
 		local attacker = dmginfo:GetAttacker()
 		if IsValid(attacker) and attacker == ply then
