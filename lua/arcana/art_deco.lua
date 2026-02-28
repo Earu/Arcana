@@ -39,7 +39,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("Arcana_AncientGlyph", {
-		font = "Arial",
+		font = Arcana.RUNIC_FONT,
 		size = 60,
 		weight = 900,
 		antialias = true,

@@ -69,29 +69,29 @@ MagicCircle.__index = MagicCircle
 local Ring = {}
 Ring.__index = Ring
 
--- Ancient Greek symbols/runes for type 2 rings
-local GREEK_RUNES = {
-	"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ",
-	"Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π",
-	"ρ", "σ", "τ", "υ", "φ", "χ", "ψ", "ω"
+-- Runic symbols for type 2 rings
+local RUNIC_GLYPHS = {
+	"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
+	"U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n",
+	"o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
 }
 
--- Ancient Greek magical phrases and words for circular text
-local GREEK_PHRASES = {
-	"αβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξασαβραξας",
-	"αγιοσαγιοσαγιοσισχυροσισχυροσισχυροσαθανατοσαθανατοσαθανατοσ",
-	"αλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγααλφαωμεγα",
-	"θεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσιςθεοσφιλοσσοφιαγνωσις",
-	"κοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμακοσμοςλογοςψυχηπνευμα",
-	"φωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθειαφωςζωηαληθεια",
-	"αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",
-	"ουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσαπυραηρουρανοςγηθαλασσα"
+-- Runic magical phrases and words for circular text
+local RUNIC_PHRASES = {
+	"ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS",
+	"HOLY HOLY HOLY MIGHTY MIGHTY MIGHTY IMMORTAL IMMORTAL IMMORTAL",
+	"ALPHA OMEGA ALPHA OMEGA ALPHA OMEGA ALPHA OMEGA ALPHA OMEGA",
+	"DIVINE LOVE WISDOM KNOWLEDGE DIVINE LOVE WISDOM KNOWLEDGE DIVINE",
+	"COSMOS WORD SOUL SPIRIT COSMOS WORD SOUL SPIRIT COSMOS WORD SOUL",
+	"LIGHT LIFE TRUTH LIGHT LIFE TRUTH LIGHT LIFE TRUTH LIGHT LIFE",
+	"BEGINNING AND END BEGINNING AND END BEGINNING AND END BEGINNING",
+	"HEAVEN EARTH SEA FIRE AIR HEAVEN EARTH SEA FIRE AIR HEAVEN EARTH"
 }
 
 -- Combined phrases array for random selection
 local ALL_MYSTICAL_PHRASES = {}
 
-for _, phrase in ipairs(GREEK_PHRASES) do
+for _, phrase in ipairs(RUNIC_PHRASES) do
 	table_insert(ALL_MYSTICAL_PHRASES, phrase)
 end
 
@@ -108,7 +108,7 @@ local RING_TYPES = {
 local function GetRandomRune()
 	local allSymbols = {}
 
-	for _, rune in ipairs(GREEK_RUNES) do
+	for _, rune in ipairs(RUNIC_GLYPHS) do
 		table_insert(allSymbols, rune)
 	end
 
@@ -1442,28 +1442,28 @@ end
 
 -- Create custom fonts for magic circles (high resolution)
 surface.CreateFont("MagicCircle_Small", {
-	font = "Arial",
+	font = Arcana.RUNIC_FONT,
 	size = 64,
 	weight = 500,
 	antialias = true,
 })
 
 surface.CreateFont("MagicCircle_Medium", {
-	font = "Arial",
+	font = Arcana.RUNIC_FONT,
 	size = 96,
 	weight = 600,
 	antialias = true,
 })
 
 surface.CreateFont("MagicCircle_Large", {
-	font = "Arial",
+	font = Arcana.RUNIC_FONT,
 	size = 128,
 	weight = 700,
 	antialias = true,
 })
 
 surface.CreateFont("MagicCircle_Rune", {
-	font = "Arial",
+	font = Arcana.RUNIC_FONT,
 	size = 80,
 	weight = 800,
 	antialias = true,

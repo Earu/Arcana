@@ -360,11 +360,29 @@ if CLIENT then
 	-- ============================================================================
 	-- FIRST-PERSON HUD FOR CASTER
 	-- ============================================================================
-	-- Ancient Greek character sets (GMod compatible)
-	local RUNES = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω", "α", "β", "γ", "δ", "ε", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "ο", "π", "ρ", "σ", "ς", "τ", "υ", "φ", "χ", "ψ", "ω"}
+	-- Create custom runic fonts for the spell HUD
+	if not _G["_fallendown_font_console"] then
+		surface.CreateFont("Arcana_FallenDown_Console", {
+			font = Arcana.RUNIC_FONT,
+			size = 32,
+			weight = 600,
+			antialias = true
+		})
+		_G["_fallendown_font_console"] = true
+	end
 
-	-- Uppercase Greek
-	-- Lowercase Greek
+	if not _G["_fallendown_font_matrix"] then
+		surface.CreateFont("Arcana_FallenDown_Matrix", {
+			font = Arcana.RUNIC_FONT,
+			size = 28,
+			weight = 600,
+			antialias = true
+		})
+		_G["_fallendown_font_matrix"] = true
+	end
+
+	-- Runic character sets
+	local RUNES = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
 	local SYSTEM_MESSAGES = {">>> PROTOCOL GAMMA-5 INITIATED", ">>> OVERRIDE SEQUENCE ACTIVE", ">>> MANA FLUX STABILIZING", ">>> DIMENSIONAL ANCHOR LOCKED", ">>> REALITY BREACH IMMINENT", ">>> ARCANE MATRIX SYNCHRONIZING", ">>> SUPER-TIER AUTHORIZATION GRANTED", ">>> WARNING: POWER LEVELS CRITICAL", ">>> VOID SIGNATURE DETECTED", ">>> FAILSAFE PROTOCOLS DISABLED"}
 
 	-- Terminal state for Phase 1
@@ -2440,7 +2458,7 @@ if CLIENT then
 		-- PHASE 1: Terminal-style rune loading (0-20s or until complete)
 		-- ==========================================
 		if not phase1Complete then
-			surface.SetFont("DermaLarge")
+			surface.SetFont("Arcana_FallenDown_Console")
 			local currentTime = CurTime()
 			local terminalY = scrH * 0.15
 			local lineHeight = 30
@@ -2514,14 +2532,14 @@ if CLIENT then
 
 				local displayText = string.sub(line.text, 1, line.currentLength)
 
-				-- Draw with shadow for better visibility
-				if line.isSystem then
-					draw.SimpleText(displayText, "DermaLarge", scrW * 0.1 + 2, yOffset + 2, Color(0, 0, 0, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP) -- Shadow
-					draw.SimpleText(displayText, "DermaLarge", scrW * 0.1, yOffset, Color(100, 126, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-				else
-					draw.SimpleText(displayText, "DermaLarge", scrW * 0.1 + 2, yOffset + 2, Color(0, 0, 0, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP) -- Shadow
-					draw.SimpleText(displayText, "DermaLarge", scrW * 0.1, yOffset, Color(170, 220, 255, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-				end
+			-- Draw with shadow for better visibility
+			if line.isSystem then
+				draw.SimpleText(displayText, "DermaLarge", scrW * 0.1 + 2, yOffset + 2, Color(0, 0, 0, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP) -- Shadow
+				draw.SimpleText(displayText, "DermaLarge", scrW * 0.1, yOffset, Color(100, 126, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+			else
+				draw.SimpleText(displayText, "Arcana_FallenDown_Console", scrW * 0.1 + 2, yOffset + 2, Color(0, 0, 0, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP) -- Shadow
+				draw.SimpleText(displayText, "Arcana_FallenDown_Console", scrW * 0.1, yOffset, Color(170, 220, 255, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+			end
 
 				yOffset = yOffset + lineHeight
 				-- Stop rendering if we go off screen
@@ -2582,25 +2600,25 @@ if CLIENT then
 					end
 
 					if line.isSystem then
-						-- Draw multiple ghost copies for more chaos
-						if transitionProgress > 0.3 then
-							draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch - rgbSeparation, baseY, Color(255, 0, 0, fadeAlpha * 0.5), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-							draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch + rgbSeparation, baseY, Color(0, 255, 255, fadeAlpha * 0.5), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-						end
-
-						-- Main text with shadow
-						draw.SimpleText(displayText, "DermaLarge", baseX + 2 + xGlitch, baseY + 2, Color(0, 0, 0, fadeAlpha * 0.8), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch, baseY, Color(100, 126, 255, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-					else
-						-- Draw multiple ghost copies for more chaos
-						if transitionProgress > 0.3 then
-							draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch - rgbSeparation, baseY, Color(255, 0, 0, fadeAlpha * 0.4), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-							draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch + rgbSeparation, baseY, Color(0, 255, 255, fadeAlpha * 0.4), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-						end
-
-						draw.SimpleText(displayText, "DermaLarge", baseX + 2 + xGlitch, baseY + 2, Color(0, 0, 0, fadeAlpha * 0.8), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch, baseY, Color(170, 220, 255, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					-- Draw multiple ghost copies for more chaos
+					if transitionProgress > 0.3 then
+						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch - rgbSeparation, baseY, Color(255, 0, 0, fadeAlpha * 0.5), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+						draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch + rgbSeparation, baseY, Color(0, 255, 255, fadeAlpha * 0.5), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 					end
+
+					-- Main text with shadow
+					draw.SimpleText(displayText, "DermaLarge", baseX + 2 + xGlitch, baseY + 2, Color(0, 0, 0, fadeAlpha * 0.8), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					draw.SimpleText(displayText, "DermaLarge", baseX + xGlitch, baseY, Color(100, 126, 255, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+				else
+					-- Draw multiple ghost copies for more chaos
+					if transitionProgress > 0.3 then
+						draw.SimpleText(displayText, "Arcana_FallenDown_Console", baseX + xGlitch - rgbSeparation, baseY, Color(255, 0, 0, fadeAlpha * 0.4), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+						draw.SimpleText(displayText, "Arcana_FallenDown_Console", baseX + xGlitch + rgbSeparation, baseY, Color(0, 255, 255, fadeAlpha * 0.4), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					end
+
+					draw.SimpleText(displayText, "Arcana_FallenDown_Console", baseX + 2 + xGlitch, baseY + 2, Color(0, 0, 0, fadeAlpha * 0.8), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+					draw.SimpleText(displayText, "Arcana_FallenDown_Console", baseX + xGlitch, baseY, Color(170, 220, 255, fadeAlpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+				end
 
 					yOffset = yOffset + lineHeight
 					if yOffset > scrH * 0.85 then break end
@@ -2640,10 +2658,10 @@ if CLIENT then
 				end
 			end
 
-			-- Update and draw matrix streams (background) - GOING UP
-			surface.SetFont("DermaLarge")
+		-- Update and draw matrix streams (background) - GOING UP
+		surface.SetFont("Arcana_FallenDown_Matrix")
 
-			for _, stream in ipairs(matrixStreams) do
+		for _, stream in ipairs(matrixStreams) do
 				stream.y = stream.y - stream.speed * FrameTime() * (1 + phaseProgress * 2) -- Negative = up
 
 				-- Reset when goes off top
@@ -2657,14 +2675,14 @@ if CLIENT then
 					local yPos = stream.y + i * 30 -- Positive offset = trail below
 					local alpha = math.max(0, 150 - i * 10) * (0.5 + phaseProgress * 0.5) * transitionFade
 					-- Chromatic aberration - grows stronger with phase progress
-					local aberrationOffset = phaseProgress * 8 -- Up to 8 pixels separation
-					-- Red channel (left)
-					draw.SimpleText(rune, "DermaLarge", stream.x - aberrationOffset, yPos, Color(255, 0, 0, alpha * 0.6), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-					-- Cyan channel (right)
-					draw.SimpleText(rune, "DermaLarge", stream.x + aberrationOffset, yPos, Color(0, 255, 255, alpha * 0.6), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-					-- Main blue channel (center) with shadow
-					draw.SimpleText(rune, "DermaLarge", stream.x + 2, yPos + 2, Color(0, 0, 0, alpha * 0.8), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-					draw.SimpleText(rune, "DermaLarge", stream.x, yPos, Color(170, 220, 255, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				local aberrationOffset = phaseProgress * 8 -- Up to 8 pixels separation
+				-- Red channel (left)
+				draw.SimpleText(rune, "Arcana_FallenDown_Matrix", stream.x - aberrationOffset, yPos, Color(255, 0, 0, alpha * 0.6), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				-- Cyan channel (right)
+				draw.SimpleText(rune, "Arcana_FallenDown_Matrix", stream.x + aberrationOffset, yPos, Color(0, 255, 255, alpha * 0.6), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				-- Main blue channel (center) with shadow
+				draw.SimpleText(rune, "Arcana_FallenDown_Matrix", stream.x + 2, yPos + 2, Color(0, 0, 0, alpha * 0.8), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(rune, "Arcana_FallenDown_Matrix", stream.x, yPos, Color(170, 220, 255, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				end
 			end
 
@@ -2720,9 +2738,9 @@ if CLIENT then
 
 					if not _G["_fallendown_font_" .. fontName] then
 						surface.CreateFont(fontName, {
-							font = "Arial",
-							size = unstableSize,
-							weight = 700,
+							font = Arcana.RUNIC_FONT,
+							size = unstableSize / 2,
+							weight = 500,
 							antialias = true
 						})
 
@@ -2749,7 +2767,7 @@ if CLIENT then
 			end
 		elseif phase1Complete and elapsed >= CHARGE_TIME - 5 then
 			-- ==========================================
-			-- PHASE 3: White screen + Alpha/Omega (last 5 seconds)
+			-- PHASE 3: White screen + ALPHA/OMEGA (last 5 seconds)
 			-- ==========================================
 			local climaxProgress = (elapsed - (CHARGE_TIME - 5)) / 5
 			-- DRAMATIC FOV EXPLOSION for Phase 3
@@ -2761,7 +2779,7 @@ if CLIENT then
 			surface.SetDrawColor(255, 255, 255, whiteAlpha)
 			surface.DrawRect(0, 0, scrW, scrH)
 
-			-- Draw ABSOLUTELY MASSIVE ALPHA and OMEGA symbols in black (140% of screen - goes off-screen!)
+			-- Draw ABSOLUTELY MASSIVE ALPHA and OMEGA words in black (140% of screen - goes off-screen!)
 			if whiteAlpha > 150 then
 				local symbolAlpha = math.min(255, (climaxProgress - 0.5) * 400)
 				-- Create ABSOLUTELY MASSIVE font (140% of screen height - dominates everything!)
@@ -2770,19 +2788,19 @@ if CLIENT then
 
 				if not _G["_fallendown_font_alphaomega"] then
 					surface.CreateFont(fontName, {
-						font = "Arial",
+						font = Arcana.RUNIC_FONT,
 						size = massiveSize,
-						weight = 900, -- Ultra bold
+						weight = 500,
 						antialias = true
 					})
 
 					_G["_fallendown_font_alphaomega"] = true
 				end
 
-				-- Alpha (Α) on left side - centered to show more of the character
-				draw.SimpleText("Α", fontName, scrW * 0.3, scrH * 0.5, Color(0, 0, 0, symbolAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				-- Omega (Ω) on right side - centered to show more of the character
-				draw.SimpleText("Ω", fontName, scrW * 0.7, scrH * 0.5, Color(0, 0, 0, symbolAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			-- ALPHA on left side - centered to show more of the character
+			draw.SimpleText("ALPHA", fontName, scrW * 0.3, scrH * 0.5, Color(0, 0, 0, symbolAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			-- OMEGA on right side - centered to show more of the character
+			draw.SimpleText("OMEGA", fontName, scrW * 0.7, scrH * 0.5, Color(0, 0, 0, symbolAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 		elseif phase1Complete and elapsed >= CHARGE_TIME - 0.3 then
 			-- ==========================================
@@ -2797,21 +2815,21 @@ if CLIENT then
 			local impactSize = scrH * 1.6
 			local impactFont = "FallenDown_Impact"
 
-			if not _G["_fallendown_font_impact"] then
-				surface.CreateFont(impactFont, {
-					font = "Arial",
-					size = impactSize,
-					weight = 900,
-					antialias = true
-				})
+		if not _G["_fallendown_font_impact"] then
+			surface.CreateFont(impactFont, {
+				font = Arcana.RUNIC_FONT,
+				size = impactSize,
+				weight = 500,
+				antialias = true
+			})
 
 				_G["_fallendown_font_impact"] = true
 			end
 
 			-- Symbols flash with inverted colors (white on black)
 			local flashAlpha = math.sin(impactProgress * math.pi * 3) * 255 -- Multiple flashes
-			draw.SimpleText("Α", impactFont, scrW * 0.3, scrH * 0.5, Color(255, 255, 255, flashAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			draw.SimpleText("Ω", impactFont, scrW * 0.7, scrH * 0.5, Color(255, 255, 255, flashAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("ALPHA", impactFont, scrW * 0.3, scrH * 0.5, Color(255, 255, 255, flashAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("OMEGA", impactFont, scrW * 0.7, scrH * 0.5, Color(255, 255, 255, flashAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 	end)
 

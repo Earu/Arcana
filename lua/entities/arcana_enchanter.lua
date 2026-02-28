@@ -643,17 +643,17 @@ if CLIENT then
 	end
 
 	-- UI-only glyph helpers to enrich the circle visuals (standalone from circles.lua)
-	local GREEK_PHRASES = {"αβραξαςαβραξαςαβραξαςαβραξαςαβραξαςαβραξας", "θεοσγνωσιςφωςζωηαληθειακοσμοςψυχηπνευμα", "αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",}
+	local RUNIC_PHRASES = {"ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS", "DIVINE LIGHT WISDOM TRUTH COSMOS SOUL SPIRIT", "BEGINNING AND END BEGINNING AND END BEGINNING",}
 
-	local ARABIC_PHRASES = {"بسماللهالرحمنالرحيمبسماللهالرحمنالرحيم", "اللهنورسماواتوالارضاللهنورسماواتوالارض", "سبحاناللهوبحمدهسبحاناللهالعظيمسبحانالله",}
+	local MYSTICAL_PHRASES = {"IN THE NAME OF THE MOST GRACIOUS THE MOST MERCIFUL", "THE DIVINE LIGHT OF THE HEAVENS AND THE EARTH", "GLORY BE TO THE INFINITE GLORY BE TO THE ETERNAL",}
 
 	local GLYPH_PHRASES = {}
 
-	for _, p in ipairs(GREEK_PHRASES) do
+	for _, p in ipairs(RUNIC_PHRASES) do
 		table.insert(GLYPH_PHRASES, p)
 	end
 
-	for _, p in ipairs(ARABIC_PHRASES) do
+	for _, p in ipairs(MYSTICAL_PHRASES) do
 		table.insert(GLYPH_PHRASES, p)
 	end
 
@@ -964,7 +964,7 @@ if CLIENT then
 			local bandOuterOut = radius * 0.79
 			thickCircle(bandOuterOut, 1)
 			thickCircle(bandOuterIn, 1)
-			local phraseOuter = GREEK_PHRASES[1 + (math.floor(t * 0.02) % #GREEK_PHRASES)]
+			local phraseOuter = RUNIC_PHRASES[1 + (math.floor(t * 0.02) % #RUNIC_PHRASES)]
 			UI_DrawGlyphRing(cx, cy, bandOuterMid, "MagicCircle_Small", phraseOuter, 0.30, 64, Color(220, 200, 150, 235), t * 0.08)
 
 			-- Inner glyph band (slightly larger)
@@ -973,7 +973,7 @@ if CLIENT then
 			local bandInnerOut = radius * 0.61
 			thickCircle(bandInnerOut, 1)
 			thickCircle(bandInnerIn, 1)
-			local phraseInner = ARABIC_PHRASES[1 + (math.floor(t * 0.015 + 1) % #ARABIC_PHRASES)]
+			local phraseInner = MYSTICAL_PHRASES[1 + (math.floor(t * 0.015 + 1) % #MYSTICAL_PHRASES)]
 			UI_DrawGlyphRing(cx, cy, bandInnerMid, "MagicCircle_Small", phraseInner, 0.26, 48, Color(220, 200, 150, 210), -t * 0.06)
 		end
 

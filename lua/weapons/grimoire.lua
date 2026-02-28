@@ -297,8 +297,8 @@ if CLIENT then
 	-- Reusable color objects to avoid allocation overhead in draw calls
 	local _tempGoldFill = Color(198, 160, 74, 24)
 
-	-- Greek glyphs for subtle face accents
-	local greekGlyphs = {"Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ", "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"}
+	-- Runic glyphs for subtle face accents
+	local runicGlyphs = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 
 	-- Shared radial layout config
 	local RadialConfig = {
@@ -363,7 +363,7 @@ if CLIENT then
 			local rGlyph = rInner + (radius - rInner) * 0.35
 			local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
 			local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
-			local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
+			local glyph = runicGlyphs[((i - 1) % #runicGlyphs) + 1]
 			draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(21, 20, 14, 190), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
@@ -613,7 +613,7 @@ if CLIENT then
 				local rGlyph = rInner + (radius - rInner) * 0.35
 				local gx = math.floor(cx + math.cos(mid) * rGlyph + 0.5)
 				local gy = math.floor(cy + math.sin(mid) * rGlyph + 0.5)
-				local glyph = greekGlyphs[((i - 1) % #greekGlyphs) + 1]
+				local glyph = runicGlyphs[((i - 1) % #runicGlyphs) + 1]
 				draw.SimpleText(glyph, "Arcana_AncientGlyph", gx, gy, Color(21, 20, 14, 190), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 

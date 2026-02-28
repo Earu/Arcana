@@ -117,13 +117,13 @@ if CLIENT then
 	local glyphParticles = {}
 
 	local GLYPH_PHRASES = {
-		"αβραξασθεοσγνωσιςφωςζωηαληθειακοσμοςψυχηπνευμα",
-		"αρχηκαιτελοςαρχηκαιτελοςαρχηκαιτελος",
-		"τῶνπροστεταγμένωνκυρίουπνευμακαιγραφή",
-		"ΜῆνινἄειδεΠηληϑύροςὀκνεῖτονἄστελλον",
-		"ἐνΧαίδεριςὀκνοπαντίδυναμιςἐστίν",
-		"Ἀτρεΐδαςἄρ'ἵηκεΠοτειδεύς",
-		"ἨριφάειςΤρῶεςἵστετοκλυτόν",
+		"ABRAXAS DIVINE WISDOM LIGHT LIFE TRUTH COSMOS SOUL SPIRIT",
+		"BEGINNING AND END BEGINNING AND END BEGINNING AND END",
+		"BY THE ORDAINED COMMAND OF THE LORD SPIRIT AND SCRIPTURE",
+		"THE WRATH OF THE SON OF PELEUS SING O MUSE",
+		"IN THE HALLS OF CHAOS THE POWER IS ETERNAL",
+		"THE SONS OF ATREUS SENT FORTH BY THE GODS",
+		"THE SHINING TROJANS STOOD FAST IN GLORY",
 	}
 
 	local VECTOR_UP = Vector(0, 0, 1)

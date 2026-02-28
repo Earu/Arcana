@@ -345,7 +345,7 @@ local function OpenSpellBrowser()
 				end
 			end
 		end
-		setStatusText(string.format("%d shown / %d total   |   Σ KP %d", shown, total, totalKP))
+		setStatusText(string.format("%d shown / %d total   |   TOTAL KP %d", shown, total, totalKP))
 		list:SortByColumn(4, false)
 	end
 

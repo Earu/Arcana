@@ -117,7 +117,7 @@ if CLIENT then
 		self._circle = nil
 		self._band = nil
 		self._glowMat = Material("sprites/light_glow02_add")
-		self._topGlyphPhrase = "αβραξασ  θεοσ  γνωσις  φως  ζωη  αληθεια  κοσμος  ψυχη  πνευμα  "
+		self._topGlyphPhrase = "ABRAXAS  DIVINE  WISDOM  LIGHT  LIFE  TRUTH  COSMOS  SOUL  SPIRIT  "
 		self._lastThink = CurTime()
 		-- Ambient loop state (only for the altar spawned by core.lua)
 		self._ambient = nil

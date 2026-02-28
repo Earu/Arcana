@@ -68,6 +68,9 @@ Arcana.Config = {
 	DATABASE_FILE = "arcane_data.txt"
 }
 
+-- Visual Configuration
+Arcana.RUNIC_FONT = "Pulsian" -- The base font to use for all runic/mystical text
+
 -- Storage for registered spells
 Arcana.RegisteredSpells = Arcana.RegisteredSpells or {}
 Arcana.PlayerData = Arcana.PlayerData or {}

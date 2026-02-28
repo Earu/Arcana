@@ -14,6 +14,8 @@ if SERVER then
 	AddCSLuaFile("arcana/tutorial.lua")
 	AddCSLuaFile("arcana/default_inventory.lua")
 
+	resource.AddFile("resource/fonts/pulsian.ttf")
+
 	resource.AddFile("sound/arcana/arcane_1.ogg")
 	resource.AddFile("sound/arcana/arcane_2.ogg")
 	resource.AddFile("sound/arcana/arcane_3.ogg")
