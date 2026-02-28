@@ -3,7 +3,7 @@ ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Brazier"
 ENT.Category = "Arcana"
-ENT.Spawnable = true
+ENT.Spawnable = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.Author = "Earu"
 
