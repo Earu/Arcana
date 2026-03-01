@@ -464,19 +464,22 @@ if CLIENT then
 						ArtDeco.DrawDecoFrame(0, 0, w, h, ColorAlpha(ArtDeco.Colors.brassInner, 80), math.floor(6 / scale))
 
 						local glyph = runicGlyphs[((i - 1) % #runicGlyphs) + 1]
-						draw.SimpleText(glyph, "Arcana_AncientGlyph", w / 2, h / 2, ColorAlpha(ArtDeco.Colors.brassInner, 60), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-					else
-						local isHovered = pnl:IsHovered()
-						ArtDeco.FillDecoPanel(0, 0, w, h, isHovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.decoPanel, math.floor(6 / scale))
-						ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.brassInner, math.floor(6 / scale))
-					end
+						draw.SimpleText(glyph, "Arcana_AncientGlyph", w / 2, h / 2, ColorAlpha(ArtDeco.Colors.brassInner, 10), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				else
+					local isHovered = pnl:IsHovered()
+					ArtDeco.FillDecoPanel(0, 0, w, h, isHovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.decoPanel, math.floor(6 / scale))
+					ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.brassInner, math.floor(6 / scale))
+
+					local glyph = runicGlyphs[((i - 1) % #runicGlyphs) + 1]
+					draw.SimpleText(glyph, "Arcana_AncientGlyph", w / 2, h / 2, ColorAlpha(ArtDeco.Colors.brassInner, 10), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				end
 				end
 
 				if not itemData then continue end
 
 				if itemDef.model then
 					local modelPanel = vgui.Create("DModelPanel", itemCard)
-					modelPanel:SetSize(itemCardW, itemCardH)
+					modelPanel:SetSize(itemCardW, math.floor(66 / scale))
 					modelPanel:SetPos(0, 0)
 					modelPanel:SetMouseInputEnabled(false)
 					modelPanel:SetModel(itemDef.model)

@@ -1,6 +1,7 @@
 if SERVER then
     AddCSLuaFile()
     util.AddNetworkString("Arcana_Phoenix_FlameFX")
+    util.AddNetworkString("Arcana_Phoenix_FireballVFX")
 end
 
 SWEP.PrintName = "Phoenix Talons"
@@ -69,6 +70,10 @@ function SWEP:PrimaryAttack()
                 ent:LaunchTowards(dir)
             end
         end
+        net.Start("Arcana_Phoenix_FireballVFX", true)
+        net.WriteVector(basePos)
+        net.WriteVector(aim:Forward())
+        net.Broadcast()
         owner:EmitSound("ambient/fire/gascan_ignite1.wav", 70, 110)
     end
 
