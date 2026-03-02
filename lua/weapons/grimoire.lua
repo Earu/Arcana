@@ -460,7 +460,7 @@ if CLIENT then
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
-			ArtDeco.DrawBlurRect(x, y, frame:GetWide(), frame:GetTall(), 4, 8, 255)
+			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8, 255)
 		end)
 
 		frame.Paint = function(pnl, w, h)
