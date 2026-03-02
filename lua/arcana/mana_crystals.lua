@@ -10,6 +10,7 @@ if SERVER then
 		hotspotDecayPerSecond = 6,  -- how fast hotspot intensity decays
 		hotspotSpawnThreshold = 70, -- intensity required to attempt a spawn (increased from 40)
 		hotspotTrimBelow = 4,       -- remove hotspots below this intensity
+		hotspotDecayGracePeriod = 600, -- seconds before decay starts after last magic use (10 minutes)
 
 		crystalSearchRadius = 2000,  -- try to find/grow an existing crystal within this distance
 		crystalGrowthPerCast = 6,   -- growth points added per cast nearby (base value)
@@ -168,13 +169,14 @@ if SERVER then
 		-- Merge into an existing hotspot or create new
 		local h = findNearestHotspot(pos, cfg.hotspotJoinRadius)
 		if not h then
-			h = {pos = pos, value = 0, touched = now}
+			h = {pos = pos, value = 0, touched = now, _lastIncrease = now}
 			table.insert(self.hotspots, h)
 		end
 
 		-- Increase intensity and timestamp
 		h.value = (h.value or 0) + growthAmount
 		h.touched = now
+		h._lastIncrease = now
 
 		-- First, try to grow an existing crystal nearby
 		local crystal = findCrystalNear(h.pos, cfg.crystalSearchRadius)
@@ -388,7 +390,8 @@ if SERVER then
 		for _, h in ipairs(data.hotspots or {}) do
 			local pos = decodeVector(h.pos or {})
 			local value = tonumber(h.value) or 0
-			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, touched = CurTime()}
+			local now = CurTime()
+			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, touched = now, _lastIncrease = now}
 		end
 
 		-- Restore crystals
@@ -413,5 +416,30 @@ if SERVER then
 	timer.Create("Arcana_ManaEnvironment_Autosave", 60, 0, function()
 		if not Arcana or not Arcana.ManaCrystals then return end
 		Arcana.ManaCrystals:SaveState()
+	end)
+
+	-- Hotspot decay timer (similar to corruption decay)
+	timer.Create("Arcana_ManaEnvironment_HotspotDecay", 1, 0, function()
+		if not Arcana or not Arcana.ManaCrystals then return end
+
+		local cfg = Arcana.ManaCrystals.Config
+		local now = CurTime()
+		local decayGrace = cfg.hotspotDecayGracePeriod or 600
+
+		for i = #Arcana.ManaCrystals.hotspots, 1, -1 do
+			local h = Arcana.ManaCrystals.hotspots[i]
+			local timeSinceIncrease = now - (h._lastIncrease or h.touched or now)
+
+			-- Only decay if grace period has passed since last magic use
+			if timeSinceIncrease >= decayGrace then
+				-- Apply decay
+				h.value = math.max(0, (h.value or 0) - cfg.hotspotDecayPerSecond)
+			end
+
+			-- Remove hotspots below threshold
+			if (h.value or 0) <= cfg.hotspotTrimBelow then
+				table.remove(Arcana.ManaCrystals.hotspots, i)
+			end
+		end
 	end)
 end
