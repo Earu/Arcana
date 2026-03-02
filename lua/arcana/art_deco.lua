@@ -82,7 +82,7 @@ if CLIENT then
 	-- ===========================================================================
 	local blurMat = Material("pp/blurscreen")
 
-	--- Draws a blurred rectangle region
+	--- Draws a blurred rectangle region with clipped corners matching DecoFrame
 	-- @param x X position
 	-- @param y Y position
 	-- @param w Width
@@ -90,19 +90,55 @@ if CLIENT then
 	-- @param layers Number of blur layers (default: 4)
 	-- @param density Blur density (default: 8)
 	-- @param alpha Alpha value (optional, not currently used but kept for API compatibility)
-	function ArtDeco.DrawBlurRect(x, y, w, h, layers, density, alpha)
-		surface.SetMaterial(blurMat)
-		surface.SetDrawColor(255, 255, 255)
+	-- @param corner Corner clip size (default: 12)
+	function ArtDeco.DrawBlurRect(x, y, w, h, layers, density, alpha, corner)
+		local c = math.max(8, corner or 12)
+		local numLayers = layers or 4
+		local blurDensity = density or 8
+
+		-- Step 1: Create stencil mask for clipped corners
+		render.SetStencilEnable(true)
+		render.ClearStencil()
+		render.SetStencilReferenceValue(1)
+		render.SetStencilCompareFunction(STENCILCOMPARISONFUNCTION_ALWAYS)
+		render.SetStencilPassOperation(STENCILOPERATION_REPLACE)
+		render.SetStencilWriteMask(1)
+
+		-- Draw the clipped corner shape to the stencil buffer
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, 1)
+		local pts = {
+			{x = x + c, y = y},
+			{x = x + w - c, y = y},
+			{x = x + w, y = y + c},
+			{x = x + w, y = y + h - c},
+			{x = x + w - c, y = y + h},
+			{x = x + c, y = y + h},
+			{x = x, y = y + h - c},
+			{x = x, y = y + c},
+		}
+		surface.DrawPoly(pts)
+
+		-- Step 2: Set up stencil test to only draw where mask equals 1
+		render.SetStencilCompareFunction(STENCILCOMPARISONFUNCTION_EQUAL)
+		render.SetStencilPassOperation(STENCILOPERATION_KEEP)
+
+		-- Step 3: Set up scissor rect to limit blur sampling/drawing to our region
 		render.SetScissorRect(x, y, x + w, y + h, true)
 
-		for i = 1, (layers or 4) do
-			blurMat:SetFloat("$blur", (i / (layers or 4)) * (density or 8))
+		-- Step 4: Draw blur layers
+		surface.SetMaterial(blurMat)
+		surface.SetDrawColor(255, 255, 255, 255)
+
+		for i = 1, numLayers do
+			blurMat:SetFloat("$blur", (i / numLayers) * blurDensity)
 			blurMat:Recompute()
 			render.UpdateScreenEffectTexture()
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 		end
 
 		render.SetScissorRect(0, 0, 0, 0, false)
+		render.SetStencilEnable(false)
 	end
 
 	-- ===========================================================================
