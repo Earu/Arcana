@@ -1424,12 +1424,14 @@ if CLIENT then
 		end
 
 		local intensity = 3
+		local seed
 
 		if isstring(spellId) and #spellId > 0 then
 			intensity = 2 + (#spellId % 3)
+			seed = tonumber(util.CRC(spellId))
 		end
 
-		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
+		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2, seed)
 		if circle and circle.StartEvolving then
 			circle:StartEvolving(castTime, direction)
 		end
@@ -1771,7 +1773,8 @@ if CLIENT then
 		if not pos then return false end
 
 		local ang = Angle(0, 0, 0)
-		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2)
+		local seed = (isstring(spellId) and #spellId > 0) and tonumber(util.CRC(spellId)) or nil
+		local circle = MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, castTime, 2, seed)
 		if not circle then return false end
 
 		if circle.StartEvolving then

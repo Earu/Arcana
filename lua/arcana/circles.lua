@@ -1035,7 +1035,7 @@ function Ring:RT_DrawStarRing2D()
 end
 
 -- MagicCircle class implementation
-function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
+function MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)
 	local circle = setmetatable({}, MagicCircle)
 	-- Core properties
 	circle.position = pos or Vector(0, 0, 0)
@@ -1044,6 +1044,7 @@ function MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
 	circle.intensity = math_max(1, intensity or 3)
 	circle.size = math_max(10, size or 100)
 	circle.lineWidth = math_max(1, lineWidth or 2)
+	circle.seed = seed
 	-- Animation properties
 	circle.isAnimated = false
 	circle.startTime = CurTime()
@@ -1079,6 +1080,11 @@ end
 
 function MagicCircle:GenerateRings()
 	self.rings = self.rings or {}
+
+	if self.seed then
+		math.randomseed(self.seed)
+	end
+
 	-- Calculate number of rings based on intensity
 	local ringCount = math_max(4, math_min(self.intensity + math_random(1, 3), 8))
 
@@ -1131,6 +1137,10 @@ function MagicCircle:GenerateRings()
 	local glowRing = Ring.new(RING_TYPES.SIMPLE_LINE, self.size * 0.1, 0, math_random() * 120 - 60, math_random() > 0.5 and 1 or -1)
 	glowRing.lineWidth = self.lineWidth -- Apply the magic circle's line width
 	table_insert(self.rings, glowRing)
+
+	if self.seed then
+		math.randomseed(SysTime())
+	end
 end
 
 function MagicCircle:Update(deltaTime)
@@ -1432,8 +1442,8 @@ function MagicCircle.DrawMagicCircle(pos, ang, color, intensity, size, lineWidth
 	circle:Draw()
 end
 
-function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duration, lineWidth)
-	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
+function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duration, lineWidth, seed)
+	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)
 	circle:SetAnimated(duration or 5)
 	MagicCircleManager:Add(circle)
 

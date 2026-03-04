@@ -327,7 +327,9 @@ if CLIENT then
 		if not self._circle then
 			local pos = self:GetPos() + VECTOR_SLIGHTLY_ABOVE
 			local ang = Angle(0, 180, 180)
-			self._circle = MagicCircle.new(pos, ang, color, 100, 100, 2)
+			local ritualId = self:GetRitualId()
+			local seed = (isstring(ritualId) and #ritualId > 0) and tonumber(util.CRC(ritualId)) or nil
+			self._circle = MagicCircle.new(pos, ang, color, 100, 100, 2, seed)
 			MagicCircleManager:Add(self._circle)
 		end
 
