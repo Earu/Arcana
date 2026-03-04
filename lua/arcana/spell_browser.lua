@@ -186,6 +186,7 @@ local function OpenSpellBrowser()
 		"ID",
 		"Name",
 		"Category",
+		"Type",
 		"Level",
 		"KP",
 		"Cooldown",
@@ -287,7 +288,17 @@ local function OpenSpellBrowser()
 			local name = sp.name or sid
 			local cat = sp.category or ""
 			local lvl = numberOr(1, sp.level_required)
-			local kp = numberOr(1, sp.knowledge_cost)
+			local isDivinePact = sp.is_divine_pact == true
+			local isRitual = sp.is_ritual == true
+			-- Determine spell type display
+			local spellType = "Spell"
+			if isDivinePact then
+				spellType = "Divine Pact"
+			elseif isRitual then
+				spellType = "Ritual"
+			end
+			-- Divine pact spells don't require knowledge points - they're granted at level
+			local kpDisplay = isDivinePact and "--" or numberOr(1, sp.knowledge_cost)
 			local cd = numberOr(Arcana.Config and Arcana.Config.DEFAULT_SPELL_COOLDOWN or 0, sp.cooldown)
 			local ct = numberOr(0, sp.cast_time)
 			local ctype = sp.cost_type or ""
@@ -300,17 +311,31 @@ local function OpenSpellBrowser()
 				continue
 			end
 
-			local line = list:AddLine(sid, name, cat, lvl, kp, cd, ct, ctype, camount, range, isProj, hasTarget)
-			if line and lvl > 1 then
-				line:SetSortValue(4, lvl)
+			local line = list:AddLine(sid, name, cat, spellType, lvl, kpDisplay, cd, ct, ctype, camount, range, isProj, hasTarget)
+			if line then
+				if lvl > 1 then
+					line:SetSortValue(5, lvl)
+				end
+				-- For sorting, divine pacts should sort as 0 KP cost
+				if isDivinePact then
+					line:SetSortValue(6, 0)
+				end
 			end
 
 			if line then
 				shown = shown + 1
-				totalKP = totalKP + kp
+				if not isDivinePact then
+					totalKP = totalKP + numberOr(1, sp.knowledge_cost)
+				end
 				local idx = #list:GetLines()
 				local alt = (idx % 2 == 0)
 				local stripe = categoryStripe[string.lower(cat or "")] or Color(100, 100, 100)
+				-- Divine pact spells get a golden stripe to indicate their special status
+				if isDivinePact then
+					stripe = Color(255, 215, 0) -- Gold for divine pacts
+				elseif isRitual then
+					stripe = Color(150, 100, 255) -- Purple for rituals
+				end
 				line.Paint = function(pnl, w, h)
 					if pnl:IsHovered() or pnl:IsSelected() then
 						surface.SetDrawColor(rowHover)
@@ -324,7 +349,7 @@ local function OpenSpellBrowser()
 				end
 
 				-- align numeric columns to center for readability
-				local centers = {4, 5, 6, 7, 9, 10, 11, 12}
+				local centers = {5, 6, 7, 8, 10, 11, 12, 13}
 				for _, colIdx in ipairs(centers) do
 					if line.Columns and line.Columns[colIdx] then
 						line.Columns[colIdx]:SetContentAlignment(5)
@@ -343,10 +368,28 @@ local function OpenSpellBrowser()
 						end
 					end
 				end
+
+				-- Divine pact spells: color the Type and KP columns gold and set tooltip
+				if isDivinePact then
+					if line.Columns and line.Columns[4] then
+						local typeLabel = line.Columns[4]
+						if IsValid(typeLabel) then
+							typeLabel:SetTextColor(Color(255, 215, 0))
+							typeLabel:SetTooltip("Divine Pact: Unlocked automatically at level " .. lvl .. " (no knowledge points required)")
+						end
+					end
+					if line.Columns and line.Columns[6] then
+						local kpLabel = line.Columns[6]
+						if IsValid(kpLabel) then
+							kpLabel:SetTextColor(Color(255, 215, 0))
+							kpLabel:SetTooltip("Divine Pact: Unlocked automatically at level " .. lvl .. " (no knowledge points required)")
+						end
+					end
+				end
 			end
 		end
-		setStatusText(string.format("%d shown / %d total   |   TOTAL KP %d", shown, total, totalKP))
-		list:SortByColumn(4, false)
+		setStatusText(string.format("%d shown / %d total   |   TOTAL KP %d (Divine Pacts excluded)", shown, total, totalKP))
+		list:SortByColumn(5, false)
 	end
 
 	local function triggerPopulate()
