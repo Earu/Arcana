@@ -20,13 +20,7 @@ SWEP.Purpose = "A mystical tome containing powerful spells and rituals"
 SWEP.Instructions = "LMB: Cast | RMB: Open Grimoire | R: Quick Radial"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
--- Use the default citizen arms as the first-person viewmodel and draw the
--- grimoire ourselves attached to the right hand. Using the world model as a
--- viewmodel makes it float in the camera.
-SWEP.ViewModel = "models/weapons/c_arms_citizen.mdl"
 SWEP.WorldModel = "models/arcana/models/arcana/Grimoire.mdl"
-SWEP.ViewModelFOV = 62
-SWEP.UseHands = true
 SWEP.Primary.ClipSize = -1
 SWEP.Primary.DefaultClip = -1
 SWEP.Primary.Automatic = false
@@ -43,6 +37,10 @@ SWEP.SlotPos = 1
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
 SWEP.HoldType = "slam"
+SWEP.ViewModel = "models/arcana/models/arcana/Grimoire.mdl"
+-- ViewModelFOV controls the FOV of the dedicated viewmodel camera pass.
+-- A value of 70 gives a natural book-in-hand appearance at typical screen FOVs.
+SWEP.ViewModelFOV = 70
 -- Grimoire-specific properties
 SWEP.SelectedSpell = "fireball"
 SWEP.MenuOpen = false
@@ -157,6 +155,42 @@ function SWEP:Reload()
 end
 
 function SWEP:Think()
+end
+
+-- Viewmodel offset table – tune these to taste in-game.
+-- pos: forward / right / up offset from the eye origin (world units).
+-- ang: pitch / yaw / roll applied after the base eye angle.
+-- scale: uniform scale applied to the viewmodel entity.
+SWEP.ViewModelOffset = {
+	pos   = Vector(12, 9, -9),
+	ang   = Angle(-85, 175, 175),
+	scale = 0.38,
+}
+
+-- Called every frame while this weapon is active; draws the first-person book.
+-- The engine has already set up a dedicated viewmodel camera (using ViewModelFOV)
+-- before this hook fires, so no manual cam.Start3D / FOV compensation is needed.
+function SWEP:DrawViewModel()
+	local vm = self:GetOwner():GetViewModel()
+	if not IsValid(vm) then return end
+	vm:SetModelScale(self.ViewModelOffset.scale, 0)
+	vm:DrawModel()
+end
+
+-- Positions and orients the viewmodel entity each frame.
+-- pos/ang arrive as the eye origin/angle; we shift them by our offset table.
+function SWEP:GetViewModelPosition(pos, ang)
+	local off = self.ViewModelOffset
+	pos = pos
+		+ ang:Forward() * off.pos.x
+		+ ang:Right()   * off.pos.y
+		+ ang:Up()      * off.pos.z
+
+	ang:RotateAroundAxis(ang:Up(),      off.ang.y)
+	ang:RotateAroundAxis(ang:Right(),   off.ang.p)
+	ang:RotateAroundAxis(ang:Forward(), off.ang.r)
+
+	return pos, ang
 end
 
 -- World model attachment to player's right hand
@@ -1191,6 +1225,77 @@ if CLIENT then
 			end
 		end
 	end
+
+	-- For forward-like spells cast by the local player in first person, override the default
+	-- world-space circle and instead anchor it to the grimoire viewmodel so it looks like
+	-- the magic is emerging from the open book pages.
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_GrimoireViewmodelCircle", function(caster, spellId, castTime, forwardLike)
+		if not forwardLike then return end
+		if not IsValid(caster) or caster ~= LocalPlayer() then return end
+		-- Only apply in first-person (ShouldDrawLocalPlayer returns true in third-person)
+		if caster:ShouldDrawLocalPlayer() then return end
+
+		local wep = caster:GetActiveWeapon()
+		if not IsValid(wep) or wep:GetClass() ~= "grimoire" then return end
+		if not MagicCircle then return end
+
+		-- Compute a world-space position that visually sits on the grimoire pages.
+		-- Because the viewmodel uses ViewModelFOV = 70 while the world uses the player's actual
+		-- FOV, we derive the position purely from the eye ray so it scales correctly with any FOV.
+		-- The right/up offsets (world units) are kept small so the circle is close/readable.
+		local function getBookCirclePosAng()
+			local eyePos = caster:EyePos()
+			local eyeAng = caster:EyeAngles()
+			-- Small forward push so the circle is visible and not clipping the camera
+			local pos = eyePos
+				+ eyeAng:Forward() * 18
+				+ eyeAng:Right()   * 7
+				+ eyeAng:Up()      * (-5)
+			-- Orient the circle to face the player (lie flat relative to the eye direction)
+			local ang = Angle(eyeAng.p, eyeAng.y, eyeAng.r)
+			ang:RotateAroundAxis(ang:Right(), 90)
+			return pos, ang
+		end
+
+		local initPos, initAng = getBookCirclePosAng()
+		local color = caster.GetWeaponColor and caster:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
+		local intensity = 2 + (#spellId % 3)
+		local seed = tonumber(util.CRC(spellId))
+		local size = 22
+
+		local circle = MagicCircle.CreateMagicCircle(initPos, initAng, color, intensity, size, castTime, 2, seed)
+		if not circle then return true end
+
+		if circle.StartEvolving then
+			circle:StartEvolving(castTime)
+		end
+
+		-- Store so the existing SpellFailed receiver in core.lua can clean it up
+		caster._ArcanaCastingCircle = circle
+
+		local followHook = "Arcana_GrimoireBookCircle_" .. tostring(caster)
+		hook.Remove("Think", followHook)
+
+		hook.Add("Think", followHook, function()
+			if not IsValid(caster) then
+				hook.Remove("Think", followHook)
+				return
+			end
+
+			local c = caster._ArcanaCastingCircle
+			if not c or not c.IsActive or not c:IsActive() then
+				hook.Remove("Think", followHook)
+				return
+			end
+
+			local newPos, newAng = getBookCirclePosAng()
+			c.position = newPos
+			c.angles   = newAng
+			c.size     = size
+		end)
+
+		return true -- suppress the default world-space forward circle
+	end)
 
 	local NODES = {
 		START = {
