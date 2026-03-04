@@ -23,6 +23,8 @@ if SERVER then
 	util.AddNetworkString("Arcana_SpellCaster_SetSpell")
 	util.AddNetworkString("Arcana_SpellCaster_CastFromMenu")
 
+	resource.AddFile("materials/entities/arcana_spell_caster.png")
+
 	function ENT:Initialize()
 		self:SetModel("models/hunter/blocks/cube025x025x025.mdl")
 		self:SetMaterial("arcana/pattern")
