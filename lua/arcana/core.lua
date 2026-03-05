@@ -724,8 +724,13 @@ function Arcana:StartCasting(ply, spellId)
 
 			if forwardLike then
 				local maxsNow = ply:OBBMaxs()
-				ctxPos = ply:GetPos() + ply:GetForward() * maxsNow.x * 1.5 + ply:GetUp() * maxsNow.z / 2
-				ctxAng = ply:EyeAngles()
+				local eyePos = ply:EyePos()
+				local eyeAng = ply:EyeAngles()
+				local eyeFwd = eyeAng:Forward()
+				local dist = maxsNow.x * 2.5
+				local tr = util.TraceLine({ start = eyePos, endpos = eyePos + eyeFwd * dist, filter = ply, mask = MASK_SOLID_BRUSHONLY })
+				ctxPos = tr.Hit and (tr.HitPos - eyeFwd * 2) or (eyePos + eyeFwd * dist)
+				ctxAng = eyeAng
 				ctxAng:RotateAroundAxis(ctxAng:Right(), 90)
 				ctxSize = 30
 			end
@@ -1404,13 +1409,18 @@ if CLIENT then
 			ang = Angle(0, 180, 180)
 			size = 60
 
-			if forwardLike then
-				local maxs = caster:OBBMaxs()
-				pos = caster:GetPos() + caster:GetForward() * maxs.x * 1.5 + caster:GetUp() * maxs.z / 2
-				ang = caster:EyeAngles()
-				ang:RotateAroundAxis(ang:Right(), 90)
-				size = 30
-			else
+		if forwardLike then
+			local maxs = caster:OBBMaxs()
+			local eyePos = caster:EyePos()
+			local eyeAng = caster:EyeAngles()
+			local eyeFwd = eyeAng:Forward()
+			local dist = maxs.x * 2.5
+			local tr = util.TraceLine({ start = eyePos, endpos = eyePos + eyeFwd * dist, filter = caster, mask = MASK_SOLID_BRUSHONLY })
+			pos = tr.Hit and (tr.HitPos - eyeFwd * 2) or (eyePos + eyeFwd * dist)
+			ang = eyeAng
+			ang:RotateAroundAxis(ang:Right(), 90)
+			size = 30
+		else
 				direction = -1 -- upward only if ground circle
 			end
 		end
@@ -1473,13 +1483,18 @@ if CLIENT then
 				newAng = Angle(0, 180, 180)
 				newSize = size
 
-				if forwardLike then
-					local maxsF = caster:OBBMaxs()
-					newPos = caster:GetPos() + caster:GetForward() * maxsF.x * 1.5 + caster:GetUp() * maxsF.z / 2
-					newAng = caster:EyeAngles()
-					newAng:RotateAroundAxis(newAng:Right(), 90)
-					newSize = 30
-				end
+			if forwardLike then
+				local maxsF = caster:OBBMaxs()
+				local eyePos = caster:EyePos()
+				local eyeAng = caster:EyeAngles()
+				local eyeFwd = eyeAng:Forward()
+				local dist = maxsF.x * 2.5
+				local tr = util.TraceLine({ start = eyePos, endpos = eyePos + eyeFwd * dist, filter = caster, mask = MASK_SOLID_BRUSHONLY })
+				newPos = tr.Hit and (tr.HitPos - eyeFwd * 2) or (eyePos + eyeFwd * dist)
+				newAng = eyeAng
+				newAng:RotateAroundAxis(newAng:Right(), 90)
+				newSize = 30
+			end
 			end
 
 			c.position = newPos
