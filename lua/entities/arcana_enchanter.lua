@@ -590,7 +590,7 @@ if CLIENT then
 
 		local wep = self:GetContainedWeapon()
 		if not IsValid(wep) then return end
-		if not _G.BandCircle then return end
+		if not BandCircle then return end
 
 		local pos = wep:WorldSpaceCenter()
 		local ang = self:GetAngles()
