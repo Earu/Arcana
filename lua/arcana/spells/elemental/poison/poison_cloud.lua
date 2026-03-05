@@ -152,9 +152,7 @@ Arcana:RegisterSpell({
 	}
 })
 
-if SERVER then
-	util.AddNetworkString("Arcana_PoisonCloud")
-end
+-- Network string registered in arcana/init.lua
 
 if CLIENT then
 	local activeEmitters = {}

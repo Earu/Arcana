@@ -1,12 +1,4 @@
-local function isMeleeHoldType(wep)
-	if not IsValid(wep) then return false end
-
-	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-	if not isstring(ht) then return false end
-
-	ht = string.lower(ht)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
-end
+local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
 
 -- Fire an arcane spear beam starting from a given origin and along a direction
 local function fireArcaneSpear(caster, origin, dir)

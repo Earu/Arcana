@@ -1,10 +1,4 @@
-if SERVER then
-	util.AddNetworkString("Arcana_MeteorStorm_Climax")
-	util.AddNetworkString("Arcana_MeteorStorm_InitialVFX")
-	util.AddNetworkString("Arcana_MeteorStorm_MeteorStrike")
-	util.AddNetworkString("Arcana_MeteorStorm_FinalImpact")
-	util.AddNetworkString("Arcana_MeteorStorm_Fissure")
-end
+-- Network strings registered in arcana/init.lua
 
 -- Meteor Storm: A divine pact granted at level 30 - call down a prolonged meteor storm while the earth ruptures
 Arcana:RegisterSpell({
@@ -600,6 +594,7 @@ if CLIENT then
 		end
 	end)
 
+	local MagicCircle = Arcana.Circle.MagicCircle
 	-- Initial VFX: Sky darkening and warning circles
 	net.Receive("Arcana_MeteorStorm_InitialVFX", function()
 		local center = net.ReadVector()

@@ -36,10 +36,12 @@ if SERVER then
 		return addProducer(ent, range)
 	end
 
-	function MN:RegisterConsumer(ent, _opts)
+	function MN:RegisterConsumer(ent, opts)
 		if not IsValid(ent) then return nil end
 
-		local rec = {ent = ent}
+		opts = opts or {}
+		local range = tonumber(opts.range or MN.Config.defaultRange) or MN.Config.defaultRange
+		local rec = {ent = ent, range = range}
 		MN._nodes[ent] = rec
 		MN._consumers[#MN._consumers + 1] = rec
 		ent:CallOnRemove("Arcana_MN_Unregister", function(e)
@@ -131,7 +133,7 @@ if CLIENT then
 	local VECTOR_ZERO = Vector(0, 0, 0)
 	local COLOR_WHITE = Color(255, 255, 255)
 
-	local function pickGlyph(idx)
+	local function glyphCharAt(idx)
 		local phrase = GLYPH_PHRASES[(idx % #GLYPH_PHRASES) + 1]
 		local len = (utf8 and utf8.len and utf8.len(phrase)) or #phrase
 		if len < 1 then return "*" end
@@ -148,7 +150,7 @@ if CLIENT then
 	end
 
 	local function randomPointOnOBBSurface(ent)
-		if not IsValid(ent) then return ent:WorldSpaceCenter() end
+		if not IsValid(ent) then return Vector(0, 0, 0) end
 		local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
 		local axis = math.random(1, 3)
 		local pos = VECTOR_ZERO
@@ -211,7 +213,7 @@ if CLIENT then
 							endPos = toPos,
 							startTime = now + startDelay,
 							duration = dur,
-							char = pickGlyph(gi + math.floor(now * 13)),
+							char = glyphCharAt(gi + math.floor(now * 13)),
 							baseColor = Color(baseColor.r, baseColor.g, baseColor.b, 255),
 							size = math.Rand(10, 16)
 						}

@@ -28,17 +28,9 @@ Arcana:RegisterSpell({
 		local ent = ents.Create("arcana_lightning_orb")
 		if not IsValid(ent) then return false end
 		ent:SetPos(startPos)
-		ent:SetSpellOwner(caster)
 		ent:Spawn()
 		ent:Activate()
-
-		if ent.CPPISetOwner then
-			ent:CPPISetOwner(caster)
-		end
-
-		if ent.LaunchTowards then
-			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
-		end
+		Arcana.Common.LaunchProjectile(ent, caster, srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 
 		-- Brief casting VFX on the caster
 		Arcana:SendAttachBandVFX(srcEnt, Color(170, 210, 255, 255), 26, 0.8, {

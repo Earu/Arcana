@@ -85,9 +85,7 @@ Arcana:RegisterSpell({
 	}
 })
 
-if SERVER then
-	util.AddNetworkString("Arcana_WindBlast")
-end
+-- Network string registered in arcana/init.lua
 
 if CLIENT then
 	net.Receive("Arcana_WindBlast", function()

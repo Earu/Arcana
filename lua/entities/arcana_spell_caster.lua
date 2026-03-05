@@ -286,16 +286,16 @@ if SERVER then
 
 		if success then
 			if spell.on_success then
-				spell.on_success(owner, nil, data)
+				spell.on_success(owner, nil, data, context)
 			end
 
-			-- Report magic usage location
-			if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
-				Arcana.ManaCrystals:ReportMagicUse(owner, pos, spellId, context)
-			end
+			-- Fire hook so optional subsystems (e.g. ManaCrystals) can react.
+			local reportContext = table.Copy(context or {})
+			reportContext.cooldown = spell.cooldown or Arcana.Config.DEFAULT_SPELL_COOLDOWN or 1.0
+			Arcana.RunHook("SpellCastSucceeded", owner, spellId, pos, reportContext)
 		else
 			if spell.on_failure then
-				spell.on_failure(owner, nil, data)
+				spell.on_failure(owner, nil, data, context)
 			end
 
 		Arcana.RunHook("CastSpellFailure", owner, spellId, nil, data, context)

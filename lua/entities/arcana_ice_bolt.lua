@@ -36,23 +36,7 @@ if SERVER then
 		self:SetMaterial("models/debug/debugwhite")
 		util.SpriteTrail(self, 0, Color(170, 220, 255, 220), true, 12, 1, 0.35, 1 / 128, "trails/smoke.vmt")
 
-		local function addSprite(parent, model, color, scale, name)
-			local spr = ents.Create("env_sprite")
-			if not IsValid(spr) then return end
-
-			spr:SetKeyValue("model", model)
-			spr:SetKeyValue("rendercolor", string.format("%d %d %d", color.r, color.g, color.b))
-			spr:SetKeyValue("rendermode", "9")
-			spr:SetKeyValue("scale", tostring(scale))
-			spr:SetParent(parent)
-			spr:Spawn()
-			spr:Activate()
-
-			parent:CallOnRemove(name or ("ArcanaIceSprite_" .. model), function(_, s)
-				if IsValid(s) then s:Remove() end
-			end, spr)
-		end
-
+		local addSprite = Arcana.Common.AddEntitySprite
 		addSprite(self, "sprites/blueflare1.vmt", Color(180, 230, 255), 0.35, "ArcanaIce_S1")
 		addSprite(self, "sprites/light_glow02_add.vmt", Color(160, 210, 255), 0.55, "ArcanaIce_S2")
 		self.Created = CurTime()
@@ -71,16 +55,7 @@ if SERVER then
 		end
 	end
 
-	local function isSolidNonTrigger(ent)
-		if not IsValid(ent) then return false end
-		if ent:IsWorld() then return true end
-
-		local solid = ent.GetSolid and ent:GetSolid() or SOLID_NONE
-		if solid == SOLID_NONE then return false end
-
-		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
-		return bit.band(flags, FSOLID_TRIGGER) == 0
-	end
+	local isSolidNonTrigger = Arcana.Common.IsSolidNonTrigger
 
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end

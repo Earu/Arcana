@@ -30,7 +30,6 @@ Arcana:RegisterSpell({
 			filter = {srcEnt, caster}
 		})
 
-		-- Play sound effects
 		caster:EmitSound("arcana/arcane_1.ogg", 80, 120)
 		caster:EmitSound("arcana/arcane_2.ogg", 80, 120)
 		caster:EmitSound("weapons/physcannon/superphys_launch1.wav", 80, 120)

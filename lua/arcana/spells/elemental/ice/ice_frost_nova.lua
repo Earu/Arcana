@@ -1,6 +1,4 @@
-if SERVER then
-	util.AddNetworkString("Arcana_FrostNovaBurst")
-end
+-- Network string registered in arcana/init.lua
 
 Arcana:RegisterSpell({
 	id = "frost_nova",
