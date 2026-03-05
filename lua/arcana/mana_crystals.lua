@@ -419,8 +419,9 @@ if SERVER then
 	end)
 
 	-- React to successful spell casts without requiring core.lua to know our API.
-	hook.Add("SpellCastSucceeded", "ManaCrystals_ReportMagicUse", function(ply, spellId, ctxPos, reportContext)
+	hook.Add("Arcana_SpellCastSucceeded", "ManaCrystals_ReportMagicUse", function(ply, spellId, ctxPos, reportContext)
 		if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
+			print("ReportMagicUse", ply, spellId, ctxPos, reportContext)
 			Arcana.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, reportContext)
 		end
 	end)
