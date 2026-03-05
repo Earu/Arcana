@@ -1,5 +1,8 @@
 -- Phoenix Form: Transforms the caster into a fiery bird with flight and fire attacks
--- Network strings registered in arcana/init.lua
+if SERVER then
+	util.AddNetworkString("Arcana_Phoenix_Start")
+	util.AddNetworkString("Arcana_Phoenix_Stop")
+end
 
 local PHX_DURATION = 24.0
 local PHX_SPEED = 1200

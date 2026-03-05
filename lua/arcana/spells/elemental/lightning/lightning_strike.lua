@@ -1,6 +1,9 @@
 local LIGHTNING_COLOR = Color(170, 200, 255)
 
--- Network strings registered in arcana/init.lua alongside other spell strings
+if SERVER then
+	util.AddNetworkString("Arcana_LightningStrike")
+	util.AddNetworkString("Arcana_LightningChain")
+end
 
 local function spawnTeslaBurst(pos)
 	return Arcana.Common.SpawnTeslaBurst(pos, {

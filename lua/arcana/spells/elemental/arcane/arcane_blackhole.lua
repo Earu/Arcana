@@ -1,4 +1,4 @@
--- Network string registered in arcana/init.lua
+if SERVER then util.AddNetworkString("Arcana_Blackhole_Climax") end
 
 -- Server-side dark star tracking for vaporization (file-scope so on_register closures can access it)
 local darkStarServerData = {}

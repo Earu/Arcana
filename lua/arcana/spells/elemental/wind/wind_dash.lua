@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("Arcana_WindDash") end
+
 -- Wind Dash
 -- Propel the caster forward in their aim direction with wind magic, negating fall damage
 local DASH_FORCE = 2000 -- Base propulsion force

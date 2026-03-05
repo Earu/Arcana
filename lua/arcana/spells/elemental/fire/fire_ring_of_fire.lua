@@ -1,5 +1,5 @@
 -- Ring of Fire: A rapidly expanding ring that scorches and ignites nearby foes
--- Network string registered in arcana/init.lua
+if SERVER then util.AddNetworkString("Arcana_RingOfFire_VFX") end
 
 Arcana:RegisterSpell({
 	id = "ring_of_fire",

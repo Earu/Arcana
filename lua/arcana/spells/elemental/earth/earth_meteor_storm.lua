@@ -1,4 +1,10 @@
--- Network strings registered in arcana/init.lua
+if SERVER then
+	util.AddNetworkString("Arcana_MeteorStorm_Climax")
+	util.AddNetworkString("Arcana_MeteorStorm_InitialVFX")
+	util.AddNetworkString("Arcana_MeteorStorm_MeteorStrike")
+	util.AddNetworkString("Arcana_MeteorStorm_FinalImpact")
+	util.AddNetworkString("Arcana_MeteorStorm_Fissure")
+end
 
 -- Meteor Storm: A divine pact granted at level 30 - call down a prolonged meteor storm while the earth ruptures
 Arcana:RegisterSpell({

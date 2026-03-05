@@ -89,31 +89,6 @@ includePath("arcana/spells/utility")
 includePath("arcana/enchantments")
 
 if SERVER then
-	-- Spell-specific network strings centralized here so auditing is easy.
-	util.AddNetworkString("Arcana_PoisonCloud")
-	util.AddNetworkString("Arcana_WindSweep")
-	util.AddNetworkString("Arcana_WindDash")
-	util.AddNetworkString("Arcana_FrostNovaBurst")
-	util.AddNetworkString("Arcana_FallenDown_BeamStart")
-	util.AddNetworkString("Arcana_FallenDown_BeamTick")
-	util.AddNetworkString("Arcana_FallenDown_ImpactWave")
-	util.AddNetworkString("Arcana_FallenDown_VacuumImplosion")
-	util.AddNetworkString("Arcana_FallenDown_VacuumCollapse")
-	util.AddNetworkString("Arcana_FallenDown_BGM")
-	util.AddNetworkString("Arcana_Blackhole_Climax")
-	util.AddNetworkString("Arcana_MeteorStorm_Climax")
-	util.AddNetworkString("Arcana_MeteorStorm_InitialVFX")
-	util.AddNetworkString("Arcana_MeteorStorm_MeteorStrike")
-	util.AddNetworkString("Arcana_MeteorStorm_FinalImpact")
-	util.AddNetworkString("Arcana_MeteorStorm_Fissure")
-	util.AddNetworkString("Arcana_Phoenix_Start")
-	util.AddNetworkString("Arcana_Phoenix_Stop")
-	util.AddNetworkString("Arcana_EarthShatter_VFX")
-	util.AddNetworkString("Arcana_WindBlast")
-	util.AddNetworkString("Arcana_LightningStrike")
-	util.AddNetworkString("Arcana_LightningChain")
-	util.AddNetworkString("Arcana_RingOfFire_VFX")
-
 	-- Starter spell for new players
 	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function(wep, ply)
 		if wep:GetClass() == "grimoire" and IsValid(ply) then
