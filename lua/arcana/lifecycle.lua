@@ -5,10 +5,6 @@ assert(Arcana and Arcana.RunHook, "lifecycle.lua requires core.lua to be loaded 
 local Arcana = Arcana
 
 if SERVER then
-	-- Arcana.RunHook is the canonical xpcall-protected hook runner exported by core.lua.
-	-- Using it here ensures a throwing subscriber cannot crash the lifecycle handler.
-	local runHook = function(name, ...) return Arcana.RunHook(name, ...) end
-
 	-- Load player data on first actual movement (avoids loading during initial spawn limbo)
 	local justSpawned = {}
 
@@ -21,7 +17,7 @@ if SERVER then
 			justSpawned[ply] = nil
 
 			Arcana:LoadPlayerData(ply, function(data)
-				runHook("LoadedPlayerData", ply, data)
+				Arcana.RunHook("LoadedPlayerData", ply, data)
 			end)
 		end
 	end)
