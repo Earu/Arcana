@@ -285,7 +285,7 @@ local function buildBandRings(bc, ringCount, style, p)
 end
 
 local function createBandsForWeapon(wep, count, style)
-	if not _G.BandCircle then return nil end
+	if not BandCircle then return nil end
 	if count <= 0 then return nil end
 	local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
 	style = style or "axis"
@@ -529,7 +529,7 @@ local function pruneViewModelVFX()
 end
 
 local function createBandsForViewModel(wep, count, style)
-	if not _G.BandCircle then return nil end
+	if not BandCircle then return nil end
 	count = math.max(1, math.floor(count))
 	local owner = IsValid(wep) and wep:GetOwner() or LocalPlayer()
 	local col = getPhysgunColorFor(wep)
@@ -645,7 +645,7 @@ end)
 
 -- Reusable: render rings for an entity in an active 3D context (e.g., PostDrawModel)
 function Arcana:RenderEnchantBandsForEntity(ent, count, color, style)
-	if not IsValid(ent) or not _G.BandCircle then return end
+	if not IsValid(ent) or not BandCircle then return end
 	count = math.max(1, math.floor(count or 1))
 	style = style or "axis"
 
