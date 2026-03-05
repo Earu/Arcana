@@ -1,9 +1,13 @@
 -- Fallen Down: A devastating super-tier spell inspired by Overlord
 -- Charges for 60 seconds with spectacular magic circle array, then unleashes a godly beam from the heavens
 
--- Network strings registered in arcana/init.lua
-
 if SERVER then
+	util.AddNetworkString("Arcana_FallenDown_BeamStart")
+	util.AddNetworkString("Arcana_FallenDown_BeamTick")
+	util.AddNetworkString("Arcana_FallenDown_ImpactWave")
+	util.AddNetworkString("Arcana_FallenDown_VacuumImplosion")
+	util.AddNetworkString("Arcana_FallenDown_VacuumCollapse")
+	util.AddNetworkString("Arcana_FallenDown_BGM")
 	resource.AddFile("sound/arcana/fallen_down/bgm.wav")
 	resource.AddFile("sound/arcana/fallen_down/blast.wav")
 	resource.AddFile("sound/arcana/fallen_down/after_blast.wav")

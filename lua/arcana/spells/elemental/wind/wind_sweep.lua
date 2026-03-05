@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("Arcana_WindSweep") end
+
 Arcana:RegisterSpell({
 	id = "wind_sweep",
 	name = "Wind Sweep",

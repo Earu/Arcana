@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("Arcana_WindBlast") end
+
 -- Wind Blast: A powerful radial burst that pushes everything away from the caster
 Arcana:RegisterSpell({
 	id = "wind_blast",
