@@ -1,45 +1,22 @@
-local function isMeleeHoldType(wep)
-	if not IsValid(wep) then return false end
+local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
 
-	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-	if not isstring(ht) then return false end
-
-	ht = string.lower(ht)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
-end
-
--- Brief tesla burst for lightning feedback
 local function spawnTeslaBurst(pos)
-	local tesla = ents.Create("point_tesla")
-	if not IsValid(tesla) then return end
-	tesla:SetPos(pos)
-	tesla:SetKeyValue("targetname", "arcana_thundering_reach")
-	tesla:SetKeyValue("m_SoundName", "DoSpark")
-	tesla:SetKeyValue("texture", "sprites/physbeam.vmt")
-	tesla:SetKeyValue("m_Color", "170 200 255")
-	tesla:SetKeyValue("m_flRadius", "180")
-	tesla:SetKeyValue("beamcount_min", "5")
-	tesla:SetKeyValue("beamcount_max", "8")
-	tesla:SetKeyValue("thick_min", "5")
-	tesla:SetKeyValue("thick_max", "8")
-	tesla:SetKeyValue("lifetime_min", "0.10")
-	tesla:SetKeyValue("lifetime_max", "0.16")
-	tesla:SetKeyValue("interval_min", "0.05")
-	tesla:SetKeyValue("interval_max", "0.10")
-	tesla:Spawn()
-	tesla:Fire("DoSpark", "", 0)
-	tesla:Fire("Kill", "", 0.5)
-
-	return tesla
+	return Arcana.Common.SpawnTeslaBurst(pos, {
+		targetname = "arcana_thundering_reach",
+		radius = 180, beamcount_min = 5, beamcount_max = 8,
+		thick_min = 5, thick_max = 8,
+		lifetime_min = 0.10, lifetime_max = 0.16,
+		interval_min = 0.05, interval_max = 0.10,
+		kill_delay = 0.5,
+	})
 end
 
-local function impactVFX(pos, normal)
-	local ed = EffectData()
-	ed:SetOrigin(pos)
-	util.Effect("cball_explode", ed, true, true)
-	util.Effect("ManhackSparks", ed, true, true)
-	util.Decal("Scorch", pos + (normal or Vector(0,0,1)) * 8, pos - (normal or Vector(0,0,1)) * 8)
-	sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, 90, 100)
+local function impactVFX(pos, normal, power)
+	Arcana.Common.LightningImpactVFX(pos, normal, {
+		power = power,
+		shakePower = 4, shakeHz = 80, shakeDur = 0.30, shakeRadius = 500,
+		soundLvl = 90,
+	})
 end
 
 -- Attempt to strike an extra target slightly beyond normal melee reach

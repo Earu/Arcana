@@ -73,9 +73,7 @@ Arcana:RegisterSpell({
 	end
 })
 
-if SERVER then
-	util.AddNetworkString("Arcana_WindSweep")
-end
+-- Network string registered in arcana/init.lua
 
 if CLIENT then
 	local matGlow = Material("sprites/light_glow02_add")

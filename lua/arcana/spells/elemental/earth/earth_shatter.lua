@@ -1,6 +1,4 @@
-if SERVER then
-	util.AddNetworkString("Arcana_EarthShatter_VFX")
-end
+-- Network string registered in arcana/init.lua
 
 -- Earth Shatter: Smash the ground to send a devastating seismic shockwave
 Arcana:RegisterSpell({

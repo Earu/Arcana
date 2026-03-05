@@ -183,6 +183,9 @@ if CLIENT then
 		self:SetRenderBounds(Vector(-450, -450, -300), Vector(450, 450, 500))
 	end
 
+	local MagicCircle = Arcana.Circle.MagicCircle
+	local MagicCircleManager = Arcana.Circle.MagicCircleManager
+
 	-- Create magic circle on ground underneath showing fire levitation
 	function ENT:CreateLevitationCircle()
 		if not MagicCircle or not MagicCircle.new then return end

@@ -1,4 +1,7 @@
-require("shader_to_gma")
+local _shaderOk, _shaderErr = pcall(require, "shader_to_gma")
+if not _shaderOk then
+	MsgC(Color(255, 200, 0), "[Arcana] ", Color(200, 200, 200), "Optional dependency 'shader_to_gma' not found — tutorial crystal shaders will be disabled. " .. tostring(_shaderErr) .. "\n")
+end
 
 if SERVER then
 	resource.AddFile("materials/arcana/skybox/nebula/right.vtf")

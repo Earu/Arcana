@@ -1226,6 +1226,8 @@ if CLIENT then
 		end
 	end
 
+	local MagicCircle = Arcana.Circle.MagicCircle
+
 	-- For forward-like spells cast by the local player in first person, override the default
 	-- world-space circle and instead anchor it to the grimoire viewmodel so it looks like
 	-- the magic is emerging from the open book pages.

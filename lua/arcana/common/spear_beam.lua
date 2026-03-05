@@ -63,7 +63,7 @@ if SERVER then
 
 			-- Splash damage around impact
 			if splashDamage > 0 and splashRadius > 0 then
-				Arcana:BlastDamage(attacker, attacker, hitPos, splashRadius, splashDamage, DMG_DISSOLVE, true)
+				Arcana:BlastDamage(attacker, hitPos, splashRadius, splashDamage, { damageType = DMG_DISSOLVE, ignoreAttacker = true })
 			end
 		end
 

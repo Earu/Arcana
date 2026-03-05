@@ -1,78 +1,29 @@
--- Spawns a brief tesla burst for visual feedback
+local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
+
 local function spawnTeslaBurst(pos)
-	local tesla = ents.Create("point_tesla")
-	if not IsValid(tesla) then return end
-	tesla:SetPos(pos)
-	tesla:SetKeyValue("targetname", "arcana_lightning")
-	tesla:SetKeyValue("m_SoundName", "DoSpark")
-	tesla:SetKeyValue("texture", "sprites/physbeam.vmt")
-	tesla:SetKeyValue("m_Color", "170 200 255")
-	tesla:SetKeyValue("m_flRadius", "220")
-	tesla:SetKeyValue("beamcount_min", "6")
-	tesla:SetKeyValue("beamcount_max", "10")
-	tesla:SetKeyValue("thick_min", "6")
-	tesla:SetKeyValue("thick_max", "10")
-	tesla:SetKeyValue("lifetime_min", "0.12")
-	tesla:SetKeyValue("lifetime_max", "0.18")
-	tesla:SetKeyValue("interval_min", "0.05")
-	tesla:SetKeyValue("interval_max", "0.10")
-	tesla:Spawn()
-	tesla:Fire("DoSpark", "", 0)
-	tesla:Fire("Kill", "", 0.6)
-
-	return tesla
+	return Arcana.Common.SpawnTeslaBurst(pos, {
+		targetname = "arcana_lightning",
+		radius = 220, beamcount_min = 6, beamcount_max = 10,
+		thick_min = 6, thick_max = 10,
+		lifetime_min = 0.12, lifetime_max = 0.18,
+		interval_min = 0.05, interval_max = 0.10,
+		kill_delay = 0.6,
+	})
 end
 
--- Impact visual/sound feedback similar to lightning_strike
-local function impactVFX(pos, normal)
-	local ed = EffectData()
-	ed:SetOrigin(pos)
-	util.Effect("cball_explode", ed, true, true)
-	util.Effect("ManhackSparks", ed, true, true)
-	util.Decal("Scorch", pos + normal * 8, pos - normal * 8)
-	util.ScreenShake(pos, 6, 90, 0.35, 600)
-	sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, 95, 100)
+local function impactVFX(pos, normal, power)
+	Arcana.Common.LightningImpactVFX(pos, normal, {
+		power = power,
+		shakePower = 6, shakeHz = 90, shakeDur = 0.35, shakeRadius = 600,
+		soundLvl = 95,
+	})
 end
 
--- Apply shock damage in a radius and chain to nearby targets
-local function applyLightningDamage(attacker, hitPos, normal)
-	local radius = 180
-	local baseDamage = 60
-	Arcana:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
-
-	local candidates = {}
-	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do
-		if ent == attacker then continue end
-		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
-			table.insert(candidates, ent)
-		end
-	end
-
-	table.sort(candidates, function(a, b)
-		return a:GetPos():DistToSqr(hitPos) < b:GetPos():DistToSqr(hitPos)
-	end)
-
-	local maxChains = 3
-	for i = 1, math.min(maxChains, #candidates) do
-		local tgt = candidates[i]
-		local tpos = tgt:WorldSpaceCenter()
-
-		timer.Simple(0.03 * i, function()
-			if not IsValid(tgt) or tgt == attacker then return end
-			local tesla = spawnTeslaBurst(tpos)
-			if IsValid(tesla) and tesla.CPPISetOwner then
-				tesla:CPPISetOwner(attacker)
-			end
-
-			local dmg = DamageInfo()
-			dmg:SetDamage(24)
-			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
-			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
-			dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-			dmg:SetDamagePosition(tpos)
-			tgt:TakeDamageInfo(dmg)
-		end)
-	end
+local function applyLightningDamage(attacker, hitPos)
+	Arcana.Common.ApplyLightningChain(attacker, hitPos, {
+		baseDamage = 60, chainDamage = 24, chainDelay = 0.03,
+		spawnTesla = spawnTeslaBurst,
+	})
 end
 
 local function attachHook(ply, wep, state)
@@ -112,16 +63,6 @@ local function detachHook(ply, wep, state)
 	if not state or not state._hookId then return end
 	hook.Remove("EntityFireBullets", state._hookId)
 	state._hookId = nil
-end
-
-local function isMeleeHoldType(wep)
-	if not IsValid(wep) then return false end
-
-	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-	if not isstring(ht) then return false end
-
-	ht = string.lower(ht)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
 Arcana:RegisterEnchantment({

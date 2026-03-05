@@ -1,3 +1,5 @@
+local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
+
 local function attachInfiniteAmmo(ply, wep, state)
 	if not SERVER then return end
 	if not IsValid(ply) or not IsValid(wep) then return end
@@ -54,16 +56,6 @@ local function detachInfiniteAmmo(ply, wep, state)
 	if not state or not state._hookId then return end
 	hook.Remove("Think", state._hookId)
 	state._hookId = nil
-end
-
-local function isMeleeHoldType(wep)
-	if not IsValid(wep) then return false end
-
-	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-	if not isstring(ht) then return false end
-
-	ht = string.lower(ht)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
 Arcana:RegisterEnchantment({

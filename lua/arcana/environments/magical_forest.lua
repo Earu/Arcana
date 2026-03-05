@@ -631,13 +631,13 @@ Envs:RegisterEnvironment({
 })
 
 if CLIENT then
+	local MagicCircle = Arcana.Circle.MagicCircle
 	-- Client-side summoning circle for graveyard skeleton spawns
 	net.Receive("Arcana_GraveyardCircle", function()
 		local pos = net.ReadVector()
 		local ang = net.ReadAngle()
 		local size = net.ReadFloat() or 52
 		local duration = net.ReadFloat() or 1.2
-		if not _G.MagicCircle then return end
 		local color = Color(110, 40, 200, 255) -- deep purple
 		local circle = MagicCircle.CreateMagicCircle(pos + Vector(0, 0, 0.5), ang, color, 3, size, duration, 2)
 		if circle and circle.StartEvolving then

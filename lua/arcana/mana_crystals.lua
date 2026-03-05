@@ -418,6 +418,13 @@ if SERVER then
 		Arcana.ManaCrystals:SaveState()
 	end)
 
+	-- React to successful spell casts without requiring core.lua to know our API.
+	hook.Add("SpellCastSucceeded", "ManaCrystals_ReportMagicUse", function(ply, spellId, ctxPos, reportContext)
+		if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
+			Arcana.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, reportContext)
+		end
+	end)
+
 	-- Hotspot decay timer (similar to corruption decay)
 	timer.Create("Arcana_ManaEnvironment_HotspotDecay", 1, 0, function()
 		if not Arcana or not Arcana.ManaCrystals then return end

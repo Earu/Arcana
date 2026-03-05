@@ -1,3 +1,5 @@
+local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
+
 local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
@@ -23,11 +25,7 @@ local function attachHook(ply, wep, state)
 		local pos = ply:WorldSpaceCenter() + ply:GetForward() * 25
 		fb:SetPos(pos)
 		fb:Spawn()
-		fb:SetOwner(ply)
-
-		if fb.SetSpellOwner then fb:SetSpellOwner(ply) end
-		if fb.CPPISetOwner then fb:CPPISetOwner(ply) end
-		if fb.LaunchTowards then fb:LaunchTowards(ply:GetAimVector()) end
+		Arcana.Common.LaunchProjectile(fb, ply, ply:GetAimVector())
 
 		if Arcana and Arcana.SendAttachBandVFX then
 			Arcana:SendAttachBandVFX(fb, Color(255, 150, 80, 255), 14, 6, {
@@ -42,16 +40,6 @@ local function detachHook(ply, wep, state)
 	if not state or not state._hookId then return end
 	hook.Remove("EntityFireBullets", state._hookId)
 	state._hookId = nil
-end
-
-local function isMeleeHoldType(wep)
-	if not IsValid(wep) then return false end
-
-	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-	if not isstring(ht) then return false end
-
-	ht = string.lower(ht)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
 end
 
 Arcana:RegisterEnchantment({
