@@ -11,9 +11,11 @@ ENT.HintDistance = 140
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "AuraSize")
+	self:NetworkVar("Bool", 0, "AltarIsOpen")
 
 	if SERVER then
 		self:SetAuraSize(200)
+		self:SetAltarIsOpen(false)
 	end
 end
 
@@ -45,6 +47,7 @@ if SERVER then
 		self.ShadowParams = {}
 		self._floatHeight = 100
 		self._nextUse = 0
+		self._activeUsers = {}
 	end
 
 	local TRACE_OFFSET = Vector(0, 0, 1000)
@@ -104,11 +107,49 @@ if SERVER then
 		local now = CurTime()
 		if now < (self._nextUse or 0) then return end
 		self._nextUse = now + self.UseCooldown
+
+		self._activeUsers[ply] = true
+		self:SetAltarIsOpen(true)
+
 		net.Start("Arcana_OpenAltarMenu")
 		net.WriteEntity(self)
 		net.Send(ply)
 		self:EmitSound("buttons/button9.wav", 60, 110)
 	end
+
+	function ENT:PlayerClosedMenu(ply)
+		if self._activeUsers then
+			self._activeUsers[ply] = nil
+		end
+
+		local hasUsers = false
+		for p in pairs(self._activeUsers or {}) do
+			if IsValid(p) then
+				hasUsers = true
+				break
+			end
+		end
+
+		if not hasUsers then
+			self:SetAltarIsOpen(false)
+		end
+	end
+
+	util.AddNetworkString("Arcana_CloseAltarMenu")
+
+	net.Receive("Arcana_CloseAltarMenu", function(len, ply)
+		local ent = net.ReadEntity()
+		if not IsValid(ent) or ent:GetClass() ~= "arcana_altar" then return end
+		ent:PlayerClosedMenu(ply)
+	end)
+
+	hook.Add("PlayerDisconnected", "Arcana_AltarUserCleanup", function(ply)
+		for _, ent in ipairs(ents.FindByClass("arcana_altar")) do
+			if IsValid(ent) then
+				ent:PlayerClosedMenu(ply)
+			end
+		end
+	end)
 end
 
 if CLIENT then
@@ -127,13 +168,19 @@ if CLIENT then
 		-- Create clientside obelisk props
 		self:CreateObeliskProps()
 
-		-- Animation state
-		self._spinDuration = 24
-		self._mergeDuration = 2
-		self._mergedDuration = 5
-
-		self._animStartTime = CurTime()
-		self._animCycleTime = self._spinDuration + self._mergeDuration + self._mergedDuration -- Total cycle: 16s spin + 16s merge + 5s stay merged
+		-- Animation state (player-driven open/close)
+		self._animState = "closed"  -- "closed", "opening", "open", "closing"
+		self._animTransitionStart = 0
+		self._closedAngle = 0            -- unified rotation applied to both parts when closed
+		self._openStartAngle = 0         -- snapshot of _closedAngle when opening begins
+		self._openSpinAngle = 0          -- counter-rotation divergence (bottom +, top -)
+		self._spinAngleAtCloseStart = 0  -- snapshot of _openSpinAngle when closing begins
+		self._animLastTime = 0
+		self._spinRate = 30              -- deg/sec counter-spin while open
+		self._closedSpinRate = 8         -- deg/sec slow unified rotation when closed
+		self._openTransitionDur = 2      -- seconds to open
+		self._closeTransitionDur = 2     -- seconds to close (0.5 align + 0.5 merge each)
+		self._wasOpen = nil              -- nil = not yet initialized (snap on first Think)
 	end
 
 	function ENT:CreateObeliskProps()
@@ -212,116 +259,91 @@ if CLIENT then
 	end
 
 	function ENT:UpdateObeliskAnimation()
-		-- Ensure props exist
 		if not IsValid(self._obeliskTop) or not IsValid(self._obeliskBottom) then
 			self:CreateObeliskProps()
 			return
 		end
 
 		local now = CurTime()
-		local cycleTime = self._animCycleTime
-		local spinDur = self._spinDuration
-		local mergeDur = self._mergeDuration
-		local mergedDur = self._mergedDuration
-		local startTime = self._animStartTime or now
-
-		-- Calculate time in current cycle
-		local elapsed = (now - startTime) % cycleTime
+		local dt = now - (self._animLastTime or now)
+		self._animLastTime = now
 
 		local basePos = self:GetPos()
 		local baseAng = self:GetAngles()
 		local upVec = self:GetUp()
+		local verticalSeparation = 30
+		local spinRate = self._spinRate or 30
+		local closedSpinRate = self._closedSpinRate or 8
+		local openTransDur = self._openTransitionDur or 2
+		local closeTransDur = self._closeTransitionDur or 2
+		local state = self._animState or "closed"
 
-		local verticalSeparation = 30 -- Units to separate vertically
-
-		if elapsed < spinDur then
-			-- Spinning phase with vertical separation
-			local spinFrac = elapsed / spinDur
-			local spinAngle = spinFrac * 360 * 2 -- 2 full rotations during spin phase (faster)
-
-			-- Ease in/out for vertical separation (smooth movement)
-			local separationEase
-			if spinFrac < 0.1 then
-				-- Ease out when separating (10% of spin time)
-				local t = spinFrac / 0.1
-				separationEase = 1 - math.pow(1 - t, 3)
-			else
-				-- Stay fully separated for the rest of spin
-				separationEase = 1
-			end
-
-			local separation = verticalSeparation * separationEase
-
-			-- Bottom spins clockwise and moves down (rotate around entity's up axis)
+		-- Helper: build the two part angles from a base offset and a divergence
+		local function applyAngles(baseOffset, divergence, separation)
 			local bottomAng = Angle(baseAng.p, baseAng.y, baseAng.r)
-			bottomAng:RotateAroundAxis(upVec, spinAngle)
-			local bottomPos = basePos - upVec * separation
-			self._obeliskBottom:SetPos(bottomPos)
+			bottomAng:RotateAroundAxis(upVec, baseOffset + divergence)
+			self._obeliskBottom:SetPos(basePos - upVec * separation)
 			self._obeliskBottom:SetAngles(bottomAng)
 
-			-- Top spins counter-clockwise and moves up (rotate around entity's up axis)
 			local topAng = Angle(baseAng.p, baseAng.y, baseAng.r)
-			topAng:RotateAroundAxis(upVec, -spinAngle)
-			local topPos = basePos + upVec * separation
-			self._obeliskTop:SetPos(topPos)
+			topAng:RotateAroundAxis(upVec, baseOffset - divergence)
+			self._obeliskTop:SetPos(basePos + upVec * separation)
 			self._obeliskTop:SetAngles(topAng)
-		elseif elapsed < spinDur + mergeDur then
-			-- Merging phase
-			local mergeElapsed = elapsed - spinDur
-			local mergeFrac = mergeElapsed / mergeDur
+		end
 
-			-- Split merge into two phases: angle alignment (first 50%), then position merge (last 50%)
-			local finalSpinAngle = 360 * 2
+		if state == "closed" then
+			-- Both parts together, rotating slowly as one piece
+			self._closedAngle = (self._closedAngle or 0) + closedSpinRate * dt
+			applyAngles(self._closedAngle, 0, 0)
 
-			if mergeFrac < 0.5 then
-				-- Phase 1: Align angles while staying separated
-				local alignFrac = mergeFrac / 0.5
-				-- Ease in-out for smooth angle alignment
-				local eased = alignFrac < 0.5
-					and 2 * alignFrac * alignFrac
-					or 1 - math.pow(-2 * alignFrac + 2, 2) / 2
+		elseif state == "opening" then
+			local elapsed = now - (self._animTransitionStart or now)
+			local frac = math.Clamp(elapsed / openTransDur, 0, 1)
+			-- Ease-out cubic: fast initial separation that slows near the end
+			local eased = 1 - math.pow(1 - frac, 3)
+			local separation = verticalSeparation * eased
 
-				-- Bottom rotates from its final spin position to aligned (rotate around entity's up axis)
-				local bottomAngle = finalSpinAngle * (1 - eased)
-				local bottomAng = Angle(baseAng.p, baseAng.y, baseAng.r)
-				bottomAng:RotateAroundAxis(upVec, bottomAngle)
-				local bottomPos = basePos - upVec * verticalSeparation
-				self._obeliskBottom:SetPos(bottomPos)
-				self._obeliskBottom:SetAngles(bottomAng)
+			-- Counter-spin ramps up alongside the separation
+			self._openSpinAngle = (self._openSpinAngle or 0) + spinRate * dt * eased
+			applyAngles(self._openStartAngle or 0, self._openSpinAngle, separation)
 
-				-- Top rotates from its final spin position to aligned (rotate around entity's up axis)
-				local topAngle = finalSpinAngle * (1 - eased)
-				local topAng = Angle(baseAng.p, baseAng.y, baseAng.r)
-				topAng:RotateAroundAxis(upVec, -topAngle)
-				local topPos = basePos + upVec * verticalSeparation
-				self._obeliskTop:SetPos(topPos)
-				self._obeliskTop:SetAngles(topAng)
-			else
-				-- Phase 2: Move together while keeping angles aligned
-				local moveFrac = (mergeFrac - 0.5) / 0.5
-				-- Ease in-out for smooth position merge
-				local eased = moveFrac < 0.5
-					and 2 * moveFrac * moveFrac
-					or 1 - math.pow(-2 * moveFrac + 2, 2) / 2
-
-				-- Both parts are angle-aligned, now merge positions
-				local currentSeparation = verticalSeparation * (1 - eased)
-
-				local bottomPos = basePos - upVec * currentSeparation
-				self._obeliskBottom:SetPos(bottomPos)
-				self._obeliskBottom:SetAngles(baseAng)
-
-				local topPos = basePos + upVec * currentSeparation
-				self._obeliskTop:SetPos(topPos)
-				self._obeliskTop:SetAngles(baseAng)
+			if frac >= 1 then
+				self._animState = "open"
 			end
-		else
-			-- Merged phase - both parts aligned and stay together for 5s
-			self._obeliskBottom:SetPos(basePos)
-			self._obeliskBottom:SetAngles(baseAng)
 
-			self._obeliskTop:SetPos(basePos)
-			self._obeliskTop:SetAngles(baseAng)
+		elseif state == "open" then
+			-- Full separation, continuous counter-spin
+			self._openSpinAngle = (self._openSpinAngle or 0) + spinRate * dt
+			applyAngles(self._openStartAngle or 0, self._openSpinAngle, verticalSeparation)
+
+		elseif state == "closing" then
+			local elapsed = now - (self._animTransitionStart or now)
+			local halfDur = closeTransDur * 0.5
+
+			if elapsed < halfDur then
+				-- Phase 1: parts stay fully separated while counter-spin lerps back to 0 (alignment)
+				local pFrac = math.Clamp(elapsed / halfDur, 0, 1)
+				local eased = pFrac < 0.5
+					and 2 * pFrac * pFrac
+					or 1 - math.pow(-2 * pFrac + 2, 2) / 2
+				local divergence = (self._spinAngleAtCloseStart or 0) * (1 - eased)
+				applyAngles(self._openStartAngle or 0, divergence, verticalSeparation)
+			else
+				-- Phase 2: angles are now aligned, parts slide back together
+				local pFrac = math.Clamp((elapsed - halfDur) / halfDur, 0, 1)
+				local eased = pFrac < 0.5
+					and 2 * pFrac * pFrac
+					or 1 - math.pow(-2 * pFrac + 2, 2) / 2
+				local separation = verticalSeparation * (1 - eased)
+				applyAngles(self._openStartAngle or 0, 0, separation)
+
+				if pFrac >= 1 then
+					-- Resume unified rotation from the angle the parts aligned to
+					self._closedAngle = self._openStartAngle or 0
+					self._openSpinAngle = 0
+					self._animState = "closed"
+				end
+			end
 		end
 	end
 
@@ -408,29 +430,21 @@ if CLIENT then
 	end
 
 	local function shouldShowOrb(self)
-		-- Only show orb when parts are separated
-		local now = CurTime()
-		local cycleTime = self._animCycleTime or 37
-		local spinDur = self._spinDuration or 16
-		local mergeDur = self._mergeDuration or 16
-		local startTime = self._animStartTime or now
-
-		local elapsed = (now - startTime) % cycleTime
-
-		-- Show orb during spinning phase and first half of merge (while still separated)
-		if elapsed < spinDur then
-			-- During spin - check if separated
-			local spinFrac = elapsed / spinDur
-			return spinFrac >= 0.01 -- Show almost immediately when separation starts
-		elseif elapsed < spinDur + mergeDur then
-			-- During merge - show during most of it, hide near the very end
-			local mergeElapsed = elapsed - spinDur
-			local mergeFrac = mergeElapsed / mergeDur
-			return mergeFrac < 0.75 -- Hide later in the merge (was 0.5)
-		else
-			-- During merged phase - don't show
-			return false
+		local state = self._animState or "closed"
+		if state == "open" then return true end
+		if state == "closed" then return false end
+		local elapsed = CurTime() - (self._animTransitionStart or CurTime())
+		if state == "opening" then
+			local frac = math.Clamp(elapsed / (self._openTransitionDur or 2), 0, 1)
+			return frac >= 0.01
 		end
+		if state == "closing" then
+			-- Show only while parts are still separated (phase 1 = first half of close duration)
+			-- Hide once the merge phase (phase 2) begins
+			local halfDur = (self._closeTransitionDur or 2) * 0.5
+			return elapsed < halfDur * 1.1  -- small overlap so the orb fades out naturally
+		end
+		return false
 	end
 
 	function ENT:Think()
@@ -480,6 +494,39 @@ if CLIENT then
 			end
 		end
 
+		-- Drive open/close animation from networked state
+		local isOpen = self:GetAltarIsOpen()
+		if self._wasOpen == nil then
+			-- First think: snap to correct state without animating (handles late-joining clients)
+			self._wasOpen = isOpen
+			if isOpen then
+				self._animState = "open"
+				self._openStartAngle = 0
+				self._openSpinAngle = 0
+			else
+				self._animState = "closed"
+				self._closedAngle = 0
+			end
+		elseif isOpen ~= self._wasOpen then
+			self._wasOpen = isOpen
+			if isOpen then
+				if self._animState == "closed" or self._animState == "closing" then
+					-- Snapshot the current unified angle so opening begins from the right rotation
+					self._openStartAngle = self._closedAngle or 0
+					self._openSpinAngle = 0
+					self._animState = "opening"
+					self._animTransitionStart = now
+				end
+			else
+				if self._animState == "open" or self._animState == "opening" then
+					-- Snapshot the current counter-spin divergence so phase 1 can unwind it
+					self._spinAngleAtCloseStart = self._openSpinAngle or 0
+					self._animState = "closing"
+					self._animTransitionStart = now
+				end
+			end
+		end
+
 		-- Update obelisk animation
 		self:UpdateObeliskAnimation()
 
@@ -518,7 +565,6 @@ if CLIENT then
 
 		-- Update glyph particles (spawn/update/expire)
 		-- Only spawn particles when obelisk is separated (not merged)
-		local showOrb = shouldShowOrb(self)
 		local dt = FrameTime() > 0 and FrameTime() or 0.05
 
 		if showOrb then
@@ -697,6 +743,12 @@ if CLIENT then
 					hook.Remove("Think", "ArcanaTooltipPos_" .. tostring(pnl))
 				end
 				frame._arcanaTooltips = {}
+			end
+
+			if IsValid(altar) then
+				net.Start("Arcana_CloseAltarMenu")
+				net.WriteEntity(altar)
+				net.SendToServer()
 			end
 		end
 
