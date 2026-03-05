@@ -122,32 +122,14 @@ if SERVER then
 		net.Send(ply)
 	end
 
-	-- Tracks players who have been granted vault access via altar interaction.
-	-- Access expires automatically after 60 seconds or when the vault UI is closed.
-	local vaultAccessExpiry = {}
-	local VAULT_ACCESS_TIMEOUT = 60
-
-	-- Returns true if the player is a valid, living vault actor with a current access grant.
+	-- Returns true if the player is a valid, living vault actor; false otherwise.
 	local function validateVaultActor(ply)
-		if not (IsValid(ply) and ply:Alive()) then return false end
-		local expiry = vaultAccessExpiry[ply]
-		return expiry ~= nil and CurTime() < expiry
+		return IsValid(ply) and ply:Alive()
 	end
 
-	-- Grant vault access to a player (called from altar interaction or map_setup.lua).
-	function Arcana:GrantVaultAccess(ply)
-		if not IsValid(ply) then return end
-		vaultAccessExpiry[ply] = CurTime() + VAULT_ACCESS_TIMEOUT
-	end
-
-	hook.Add("PlayerDisconnected", "Arcana_ClearVaultAccess", function(ply)
-		vaultAccessExpiry[ply] = nil
-	end)
-
-	-- Open request (from client) — grants access for this session.
+	-- Open request (from client)
 	net.Receive("Arcana_AstralVault_RequestOpen", function(_, ply)
-		if not (IsValid(ply) and ply:Alive()) then return end
-		Arcana:GrantVaultAccess(ply)
+		if not validateVaultActor(ply) then return end
 		readVault(ply, function(ok, items)
 			if not ok then return end
 			sendOpen(ply, items)
