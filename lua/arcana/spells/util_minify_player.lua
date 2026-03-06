@@ -1,3 +1,12 @@
+if SERVER then
+	hook.Add("Arcana_BeginCasting", "MinifyPlayer_TargetScan", function(caster, spellId)
+		if spellId ~= "minify_player" then return end
+		Arcana.Common.TargetScan(caster, function(ent)
+			return IsValid(ent) and ent:IsPlayer()
+		end, 1200)
+	end)
+end
+
 local function minify_bandvfx(target)
 	local r = math.max(target:OBBMaxs():Unpack()) * 0.5
 
@@ -33,14 +42,7 @@ Arcana:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local tr = srcEnt.GetEyeTrace and srcEnt:GetEyeTrace() or util.TraceLine({
-			start = srcEnt:WorldSpaceCenter(),
-			endpos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 1000,
-			filter = {srcEnt, caster}
-		})
-
-		local target = tr.Entity
+		local target = Arcana.Common.GetLockedTarget(caster)
 		if not target or not target:IsPlayer() then
 			target = caster
 		end
