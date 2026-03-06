@@ -53,6 +53,23 @@ if CLIENT then
 		end
 
 		if forwardLike then
+			-- When the local player is in first-person with a grimoire, anchor the circle
+			-- to the book pages instead of projecting it into world space.
+			if caster == LocalPlayer() and not caster:ShouldDrawLocalPlayer() then
+				local wep = caster:GetActiveWeapon()
+				if IsValid(wep) and wep:GetClass() == "grimoire" then
+					local eyePos = caster:EyePos()
+					local eyeAng = caster:EyeAngles()
+					local pos = eyePos
+						+ eyeAng:Forward() * 18
+						+ eyeAng:Right()   * 7
+						+ eyeAng:Up()      * (-5)
+					local ang = Angle(eyeAng.p, eyeAng.y, eyeAng.r)
+					ang:RotateAroundAxis(ang:Right(), 90)
+					return pos, ang, 22
+				end
+			end
+
 			local maxs = caster:OBBMaxs()
 			local eyePos = caster:EyePos()
 			local eyeAng = caster:EyeAngles()
