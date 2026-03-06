@@ -9,10 +9,34 @@ Arcana is a magic mod for Garry's Mod, it comes with spells, enchantments and ri
 Arcana ships with a built-in coin and item inventory system. To integrate with an existing economy (DarkRP, PointShop2, a custom database, etc.), override any of the following functions:
 
 ```lua
--- Example: DarkRP integration
+-- Example: DarkRP coin integration
 function Arcana:GiveCoins(ply, amount) ply:addMoney(amount) end
 function Arcana:TakeCoins(ply, amount) ply:addMoney(-amount) end
 function Arcana:GetCoins(ply) return ply:getDarkRPVar("money") end
+```
+
+```lua
+-- Example: PointShop 2 item integration
+function Arcana:GiveItem(ply, itemClass, amount, reason)
+    if not IsValid(ply) or amount <= 0 then return false end
+    ply:PS2_AddItem(itemClass, amount)
+    return true
+end
+
+function Arcana:TakeItem(ply, itemClass, amount, reason)
+    if not IsValid(ply) or amount <= 0 then return false end
+    if ply:PS2_GetItemCount(itemClass) < amount then return false end
+    ply:PS2_RemoveItem(itemClass, amount)
+    return true
+end
+
+function Arcana:GetItemCount(ply, itemClass)
+    if SERVER then
+        return ply:PS2_GetItemCount(itemClass) or 0
+    else
+        return LocalPlayer():PS2_GetItemCount(itemClass) or 0
+    end
+end
 ```
 
 Full examples for DarkRP, PointShop2, MySQL, and custom database backends are documented in [`lua/arcana/third_party.lua`](lua/arcana/third_party.lua).
