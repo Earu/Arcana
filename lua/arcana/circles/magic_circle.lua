@@ -446,12 +446,7 @@ local function registerMagicCircleFonts()
 	surface.CreateFont("MagicCircle_Rune",   { font = Arcana.RUNIC_FONT, size = 80,  weight = 800, antialias = true })
 end
 
-if Arcana.RUNIC_FONT then
-	registerMagicCircleFonts()
-else
-	-- core.lua may not be fully initialized yet; defer until Arcana is ready
-	hook.Add("Arcana_Initialized", "Arcana_RegisterMagicCircleFonts", registerMagicCircleFonts)
-end
+registerMagicCircleFonts()
 
 -- Export
 Arcana.Circle.MagicCircle = MagicCircle

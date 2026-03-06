@@ -41,6 +41,10 @@ end
 
 -- ── Client-side VFX receivers ────────────────────────────────────────────────
 if CLIENT then
+	-- Direct-call registry for per-circle cast-failure VFX callbacks. Populated by
+	-- CreateFollowingCastCircle; iterated and called before Arcana_CastSpellFailure fires
+	-- so VFX teardown is guaranteed even when a third-party hook returns early.
+	local castFailureCallbacks = {}
 	-- Returns pos, ang, size for a casting circle given the caster's current transform.
 	-- isSpellCaster: entity is an arcana_spell_caster NPC rather than a player.
 	-- forwardLike: circle should track the eye-forward direction rather than sit on the ground.
@@ -94,6 +98,9 @@ if CLIENT then
 		local forwardLike = net.ReadBool()
 		if not IsValid(caster) then return end
 
+		if Arcana.HUD and Arcana.HUD.TrackCast then
+			Arcana.HUD.TrackCast(caster, spellId, castTime)
+		end
 		Arcana.RunHook("TrackCast", caster, spellId, castTime)
 
 		if not (Arcana.Circle and Arcana.Circle.MagicCircle) then return end
@@ -166,7 +173,14 @@ if CLIENT then
 		local castTime = net.ReadFloat() or 0
 		if not IsValid(caster) then return end
 
+		if Arcana.HUD and Arcana.HUD.TrackCastFailure then
+			Arcana.HUD.TrackCastFailure(caster, spellId, castTime)
+		end
 		Arcana.RunHook("TrackCastFailure", caster, spellId, castTime)
+
+		for _, cb in pairs(castFailureCallbacks) do
+			cb(caster, spellId)
+		end
 		Arcana.RunHook("CastSpellFailure", caster, spellId)
 
 		local circle = caster._ArcanaCastingCircle
@@ -317,6 +331,7 @@ if CLIENT then
 		hook.Add("Think", hookName, function()
 			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
 				hook.Remove("Think", hookName)
+				castFailureCallbacks[hookName] = nil
 				return
 			end
 
@@ -328,10 +343,10 @@ if CLIENT then
 		end)
 
 		local targetSpellId = spellId
-		hook.Add("Arcana_CastSpellFailure", hookName, function(failedCaster, failedSpellId)
+		castFailureCallbacks[hookName] = function(failedCaster, failedSpellId)
 			if failedSpellId ~= targetSpellId then return end
 			if not IsValid(failedCaster) or not circle then
-				hook.Remove("Arcana_CastSpellFailure", hookName)
+				castFailureCallbacks[hookName] = nil
 				return
 			end
 
@@ -339,7 +354,7 @@ if CLIENT then
 				circle:StartBreakdown(0.1)
 			end
 
-			hook.Remove("Arcana_CastSpellFailure", hookName)
-		end)
+			castFailureCallbacks[hookName] = nil
+		end
 	end
 end

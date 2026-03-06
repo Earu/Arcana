@@ -542,11 +542,14 @@ local function handleSpellResult(self, ply, data, castInfo, success)
 		end
 
 		if SERVER then
-			-- Fire hook so optional subsystems (e.g. ManaCrystals) can react without core.lua knowing their API.
 			local ctxPos = (context and context.circlePos) or (IsValid(ply) and (ply:GetPos() + Vector(0, 0, 2))) or nil
 			if ctxPos then
 				local reportContext = table.Copy(context or {})
 				reportContext.cooldown = spell.cooldown or Arcana.Config.DEFAULT_SPELL_COOLDOWN or 1.0
+				-- Direct call so crystal growth always runs regardless of third-party hook early returns
+				if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
+					Arcana.ManaCrystals:ReportMagicUse(ply, ctxPos, spellId, reportContext)
+				end
 				runHook("SpellCastSucceeded", ply, spellId, ctxPos, reportContext)
 			end
 		end
