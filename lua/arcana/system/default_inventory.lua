@@ -226,15 +226,18 @@ if SERVER then
 		return true
 	end
 
-	-- Player lifecycle hooks
-	hook.Add("Arcana_LoadedPlayerData", "Arcana_InventorySyncOnLoad", function(ply)
+	-- Direct lifecycle callbacks — called by lifecycle.lua before firing the matching hook,
+	-- so these always run even if a third-party hook listener returns early.
+	function Arcana.Inventory.OnPlayerDataLoaded(ply)
 		Arcana.Inventory:SyncToClient(ply)
-	end)
+	end
 
-	hook.Add("PlayerDisconnected", "Arcana_InventorySave", function(ply)
+	function Arcana.Inventory.OnPlayerDisconnected(ply)
 		Arcana.Inventory:Save(ply)
-		Arcana.Inventory.Cache[ply:SteamID64()] = nil
-	end)
+		if IsValid(ply) then
+			Arcana.Inventory.Cache[ply:SteamID64()] = nil
+		end
+	end
 
 	timer.Create("Arcana_InventoryAutosave", 120, 0, function()
 		for _, ply in ipairs(player.GetAll()) do

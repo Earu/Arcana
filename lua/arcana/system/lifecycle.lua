@@ -17,6 +17,9 @@ if SERVER then
 			justSpawned[ply] = nil
 
 			Arcana:LoadPlayerData(ply, function(data)
+				if Arcana.Inventory and Arcana.Inventory.OnPlayerDataLoaded then
+					Arcana.Inventory.OnPlayerDataLoaded(ply)
+				end
 				Arcana.RunHook("LoadedPlayerData", ply, data)
 			end)
 		end
@@ -41,5 +44,8 @@ if SERVER then
 			Arcana.RetryStateBySteamID[sid] = nil
 		end
 		Arcana:SavePlayerData(ply)
+		if Arcana.Inventory and Arcana.Inventory.OnPlayerDisconnected then
+			Arcana.Inventory.OnPlayerDisconnected(ply)
+		end
 	end)
 end

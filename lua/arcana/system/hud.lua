@@ -180,19 +180,21 @@ local activeCast = {
 	endsAt = 0,
 }
 
-hook.Add("Arcana_TrackCast", "HUD_TrackCast", function(caster, spellId, castTime)
+-- Direct callbacks for cast tracking (called by vfx/casting.lua before firing the hook,
+-- so system state updates are guaranteed even if a third-party hook returns early)
+function Arcana.HUD.TrackCast(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 	activeCast.spellId = spellId
 	activeCast.startedAt = CurTime()
 	activeCast.endsAt = CurTime() + (castTime or 0)
-end)
+end
 
-hook.Add("Arcana_TrackCastFailure", "HUD_TrackCastFailure", function(caster, spellId, castTime)
+function Arcana.HUD.TrackCastFailure(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 	activeCast.spellId = nil
 	activeCast.startedAt = 0
 	activeCast.endsAt = 0
-end)
+end
 
 local function drawCastingBar(scrW, scrH)
 	if not activeCast.spellId then return end
