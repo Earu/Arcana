@@ -138,27 +138,65 @@ Arcana.Environments:RegisterEnvironment({
 
 ## Hooks
 
-Arcana fires the following hooks that other addons can listen to:
+### Casting
 
-| Hook | Realm | Description |
-|---|---|---|
-| `Arcana_PlayerGainedXP` | Server | Player gained XP |
-| `Arcana_PlayerLevelUp` | Server | Player leveled up |
-| `Arcana_ClientLevelUp` | Client | Client-side level up event |
-| `Arcana_SpellUnlocked` | Server | Player unlocked a spell |
-| `Arcana_CanUnlockSpell` | Server | Override whether a spell can be unlocked |
-| `Arcana_BeginCasting` | Server | Player started casting a spell |
-| `Arcana_CastSpell` | Server | A spell is being cast |
-| `Arcana_CastSpellFailure` | Server | A spell cast failed |
-| `Arcana_CanCastSpell` | Server | Override whether a spell can be cast |
-| `Arcana_SpellCastSucceeded` | Server | A spell was cast successfully |
-| `Arcana_CanApplyEnchantment` | Server | Override whether an enchantment can be applied |
-| `Arcana_AppliedEnchantment` | Server | An enchantment was applied to a weapon |
-| `Arcana_RemovedEnchantment` | Server | An enchantment was removed from a weapon |
-| `Arcana_SavedPlayerData` | Server | Player data was saved |
-| `Arcana_LoadedPlayerData` | Server | Player data was loaded |
-| `Arcana_SyncPlayerData` | Client | Player data was synced to the client |
-| `Arcana_ItemRegistered` | Shared | An item was registered in the inventory system |
+| Hook | Realm | Parameters | Notes |
+|---|---|---|---|
+| `Arcana_CanCastSpell` | Server | `ply, spellId` | Return `false, reason` to block the cast |
+| `Arcana_BeginCasting` | Server | `ply, spellId` | Fired when the cast wind-up begins |
+| `Arcana_CastSpell` | Server | `ply, spellId, has_target, data, context, success` | Fired after every cast attempt regardless of outcome |
+| `Arcana_SpellCastSucceeded` | Server | `ply, spellId, castPos, context` | Fired only on a successful cast; `castPos` is the world position of the magic circle |
+| `Arcana_CastSpellFailure` | Server | `ply, spellId` | Fired when a cast fails or is interrupted |
+
+### Casting Visuals (Client)
+
+| Hook | Realm | Parameters | Notes |
+|---|---|---|---|
+| `Arcana_TrackCast` | Client | `caster, spellId, castTime` | Fired when the client receives a cast start network message |
+| `Arcana_BeginCastingVisuals` | Client | `caster, spellId, castTime, forwardLike` | Return `true` to suppress the default magic circle VFX |
+| `Arcana_TrackCastFailure` | Client | `caster, spellId, castTime` | Fired when the client receives a cast failure network message |
+| `Arcana_CastSpellFailure` | Client | `caster, spellId` | Fired client-side after VFX teardown on failure |
+
+### Progression
+
+| Hook | Realm | Parameters | Notes |
+|---|---|---|---|
+| `Arcana_PlayerGainedXP` | Shared | `ply, amount, reason` | Fired on server when XP is awarded; fired on client when the XP update is received |
+| `Arcana_PlayerLevelUp` | Server | `ply, oldLevel, newLevel, knowledgePoints` | Fired after level and knowledge point values are updated |
+| `Arcana_ClientLevelUp` | Client | `prevLevel, newLevel, knowledgeDelta` | Fired after the client receives and applies a level-up packet |
+| `Arcana_CanUnlockSpell` | Server | `ply, spellId` | Return `false, reason` to block unlocking |
+| `Arcana_SpellUnlocked` | Shared | `ply, spellId, spellName` | Fired after a spell is successfully added to the player's known spells |
+
+### Enchantments
+
+| Hook | Realm | Parameters | Notes |
+|---|---|---|---|
+| `Arcana_CanApplyEnchantment` | Server | `ply, wep, enchId` | Return `false, reason` to block the enchantment |
+| `Arcana_AppliedEnchantment` | Server | `ply, wep, enchId` | Fired after the enchantment is stored and synced |
+| `Arcana_RemovedEnchantment` | Server | `ply, wep, enchId` | Fired after the enchantment is removed and synced |
+
+### Persistence
+
+| Hook | Realm | Parameters | Notes |
+|---|---|---|---|
+| `Arcana_SavePlayerDataToSQL` | Server | `ply, data` | Return `true` to suppress the default SQLite save |
+| `Arcana_LoadPlayerDataFromSQL` | Server | `ply, callback` | Return `true` to suppress the default SQLite load; must call `callback(data)` yourself |
+| `Arcana_SavedPlayerData` | Server | `ply, data` | Fired after player data is saved (any backend) |
+| `Arcana_LoadedPlayerData` | Server | `ply, data` | Fired after player data is loaded and ready |
+| `Arcana_SyncPlayerData` | Client | `ply, data` | Fired after the client receives a full data sync from the server |
+| `Arcana_ReadAstralVault` | Server | `ply, callback` | Return `true` to suppress the default vault read; must call `callback(items)` yourself |
+| `Arcana_WriteAstralVault` | Server | `ply, items` | Return `true` to suppress the default vault write |
+
+### Economy & Inventory
+
+| Hook | Realm | Parameters | Notes |
+|---|---|---|---|
+| `Arcana_ItemRegistered` | Shared | `itemClass, itemData` | Fired when a new item type is registered via `RegisterItem` |
+| `Arcana_CoinsGiven` | Server | `ply, amount, reason` | Fired after coins are added to a player |
+| `Arcana_CoinsTaken` | Server | `ply, amount, reason` | Fired after coins are deducted from a player |
+| `Arcana_ItemGiven` | Server | `ply, itemClass, amount, reason` | Fired after items are added to a player's inventory |
+| `Arcana_ItemTaken` | Server | `ply, itemClass, amount, reason` | Fired after items are removed from a player's inventory |
+| `Arcana_ShouldDrawInventory` | Client | *(none)* | Return `false` to hide the Arcana inventory UI |
 
 ## Configuration
 
