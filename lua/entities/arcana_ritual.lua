@@ -318,6 +318,10 @@ if CLIENT then
 		end
 	end
 
+	local MagicCircle = Arcana.Circle.MagicCircle
+	local BandCircle = Arcana.Circle.BandCircle
+	local MagicCircleManager = Arcana.Circle.MagicCircleManager
+
 	local VECTOR_SLIGHTLY_ABOVE = Vector(0, 0, 2)
 	local TEXT_OFFSET = Vector(0, 0, 24)
 	function ENT:DrawTranslucent()

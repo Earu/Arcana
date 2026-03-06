@@ -6,115 +6,58 @@ if SERVER then
 end
 
 local function spawnTeslaBurst(pos)
-	local tesla = ents.Create("point_tesla")
-	if not IsValid(tesla) then return end
-	tesla:SetPos(pos)
-	tesla:SetKeyValue("targetname", "arcana_lightning")
-	tesla:SetKeyValue("m_SoundName", "DoSpark")
-	tesla:SetKeyValue("texture", "sprites/physbeam.vmt")
-	tesla:SetKeyValue("m_Color", "170 200 255")
-	tesla:SetKeyValue("m_flRadius", "280")
-	tesla:SetKeyValue("beamcount_min", "10")
-	tesla:SetKeyValue("beamcount_max", "16")
-	tesla:SetKeyValue("thick_min", "8")
-	tesla:SetKeyValue("thick_max", "14")
-	tesla:SetKeyValue("lifetime_min", "0.15")
-	tesla:SetKeyValue("lifetime_max", "0.25")
-	tesla:SetKeyValue("interval_min", "0.03")
-	tesla:SetKeyValue("interval_max", "0.08")
-	tesla:Spawn()
-	tesla:Fire("DoSpark", "", 0)
-	tesla:Fire("Kill", "", 0.8)
-
-	return tesla
+	return Arcana.Common.SpawnTeslaBurst(pos, {
+		targetname = "arcana_lightning",
+		radius = 280, beamcount_min = 10, beamcount_max = 16,
+		thick_min = 8, thick_max = 14,
+		lifetime_min = 0.15, lifetime_max = 0.25,
+		interval_min = 0.03, interval_max = 0.08,
+		kill_delay = 0.8,
+	})
 end
 
 -- Draw a few quick effects at the impact point
 local function impactVFX(pos, normal, power)
-	power = power or 1.0
-
+	Arcana.Common.LightningImpactVFX(pos, normal, {
+		power = power,
+		shakePower = 8, shakeHz = 120, shakeDur = 0.4, shakeRadius = 800,
+		soundLvl = 95,
+	})
+	-- Additional spell-specific effects beyond the shared base
 	local ed = EffectData()
 	ed:SetOrigin(pos)
-	ed:SetNormal(normal)
-	util.Effect("cball_explode", ed, true, true)
-	util.Effect("ManhackSparks", ed, true, true)
+	ed:SetNormal(normal or Vector(0, 0, 1))
 	util.Effect("ElectricSpark", ed, true, true)
-
-	util.Decal("FadingScorch", pos + normal * 8, pos - normal * 8)
-	util.ScreenShake(pos, 8 * power, 120, 0.4, 800 * power)
-
-	-- Impactful layered sounds
-	sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", pos, 95, 90 + math.random(-5, 5))
 	sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", pos, 100, 100)
-
-	-- Delayed thunder rumble
 	timer.Simple(0.1, function()
 		sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", pos, 95, 120)
 	end)
-
-	-- Network lightning bolt effect to clients
 	if SERVER then
 		net.Start("Arcana_LightningStrike", true)
 		net.WriteVector(pos)
-		net.WriteFloat(power)
+		net.WriteFloat(power or 1.0)
 		net.Broadcast()
 	end
 end
 
 -- Apply shock damage in a radius and optionally chain to a few nearby targets
-local function applyLightningDamage(attacker, hitPos, normal)
-	local radius = 180
-	local baseDamage = 75
-	Arcana:BlastDamage(attacker, attacker, hitPos, radius, baseDamage, DMG_SHOCK, true)
-
-	-- Chain to up to 3 nearby living targets
-	local candidates = {}
-
-	for _, ent in ipairs(ents.FindInSphere(hitPos, 380)) do
-		if ent == attacker then continue end
-		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
-			table.insert(candidates, ent)
-		end
-	end
-
-	table.sort(candidates, function(a, b) return a:GetPos():DistToSqr(hitPos) < b:GetPos():DistToSqr(hitPos) end)
-	local maxChains = 3
-
+local function applyLightningDamage(attacker, hitPos)
 	local lastPos = hitPos
-
-	for i = 1, math.min(maxChains, #candidates) do
-		local tgt = candidates[i]
-		local tpos = tgt:WorldSpaceCenter()
-
-		timer.Simple(0.05 * i, function()
-			if not IsValid(tgt) then return end
-			local tesla = spawnTeslaBurst(tpos)
-
-			if IsValid(tesla) and tesla.CPPISetOwner then
-				tesla:CPPISetOwner(attacker)
-			end
-
-			local dmg = DamageInfo()
-			dmg:SetDamage(28)
-			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
-			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
-			dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-			tgt:TakeDamageInfo(dmg)
-
+	Arcana.Common.ApplyLightningChain(attacker, hitPos, {
+		baseDamage = 75, chainDamage = 28, chainDelay = 0.05,
+		spawnTesla = spawnTeslaBurst,
+		onChain = function(tgt, tpos, i)
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", tpos, 85, 110)
 			sound.Play("weapons/physcannon/superphys_small_zap" .. math.random(1, 4) .. ".wav", tpos, 80, 100)
-
-			-- Send chain lightning visual
 			if SERVER then
 				net.Start("Arcana_LightningChain", true)
 				net.WriteVector(lastPos)
 				net.WriteVector(tpos)
 				net.Broadcast()
 			end
-
 			lastPos = tpos
-		end)
-	end
+		end,
+	})
 end
 
 Arcana:RegisterSpell({
@@ -173,7 +116,7 @@ Arcana:RegisterSpell({
 				if s.power >= 1.0 then
 					applyLightningDamage(caster, targetPos + s.offset, normal)
 				else
-					Arcana:BlastDamage(caster, caster, targetPos + s.offset, 120, 30, DMG_SHOCK, true)
+					Arcana:BlastDamage(caster, targetPos + s.offset, 120, 30, { damageType = DMG_SHOCK, ignoreAttacker = true })
 				end
 			end)
 		end
@@ -189,6 +132,10 @@ if CLIENT then
 	local matBeam = Material("effects/laser1")
 	local matFlare = Material("effects/blueflare1")
 	local matGlow = Material("sprites/light_glow02_add")
+
+	Arcana.LightningBolts  = {}
+	Arcana.LightningFlashes = {}
+	Arcana.LightningChains  = {}
 
 	-- Main lightning bolt from sky
 	net.Receive("Arcana_LightningStrike", function()
@@ -240,17 +187,15 @@ if CLIENT then
 		end
 
 		-- Store lightning bolt for rendering
-		table.insert(Arcana.LightningBolts or {}, {
+		table.insert(Arcana.LightningBolts, {
 			startPos = skyPos,
 			endPos = pos,
 			dieTime = CurTime() + 0.4,
 			startTime = CurTime(),
 			power = power
 		})
-		Arcana.LightningBolts = Arcana.LightningBolts or {}
 
 		-- Store bright flash sprite
-		Arcana.LightningFlashes = Arcana.LightningFlashes or {}
 		table.insert(Arcana.LightningFlashes, {
 			pos = pos,
 			dieTime = CurTime() + 0.15,
@@ -278,13 +223,12 @@ if CLIENT then
 		local endPos = net.ReadVector()
 
 		-- Store chain for rendering
-		table.insert(Arcana.LightningChains or {}, {
+		table.insert(Arcana.LightningChains, {
 			startPos = startPos,
 			endPos = endPos,
 			dieTime = CurTime() + 0.3,
 			startTime = CurTime()
 		})
-		Arcana.LightningChains = Arcana.LightningChains or {}
 
 		-- Particles along chain
 		local emitter = ParticleEmitter((startPos + endPos) * 0.5)
@@ -308,10 +252,6 @@ if CLIENT then
 
 	-- Render lightning bolts
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLightning", function()
-		if not Arcana.LightningBolts then Arcana.LightningBolts = {} end
-		if not Arcana.LightningChains then Arcana.LightningChains = {} end
-		if not Arcana.LightningFlashes then Arcana.LightningFlashes = {} end
-
 		local curTime = CurTime()
 
 		-- Render bright flash sprites

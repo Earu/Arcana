@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("Arcana_PoisonCloud") end
+
 local function applyOrRefreshPoisonSlow(ply, duration)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 
@@ -152,9 +154,7 @@ Arcana:RegisterSpell({
 	}
 })
 
-if SERVER then
-	util.AddNetworkString("Arcana_PoisonCloud")
-end
+-- Network string registered in arcana/init.lua
 
 if CLIENT then
 	local activeEmitters = {}

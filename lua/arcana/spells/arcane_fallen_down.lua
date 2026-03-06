@@ -1,5 +1,6 @@
 -- Fallen Down: A devastating super-tier spell inspired by Overlord
 -- Charges for 60 seconds with spectacular magic circle array, then unleashes a godly beam from the heavens
+
 if SERVER then
 	util.AddNetworkString("Arcana_FallenDown_BeamStart")
 	util.AddNetworkString("Arcana_FallenDown_BeamTick")
@@ -7,7 +8,6 @@ if SERVER then
 	util.AddNetworkString("Arcana_FallenDown_VacuumImplosion")
 	util.AddNetworkString("Arcana_FallenDown_VacuumCollapse")
 	util.AddNetworkString("Arcana_FallenDown_BGM")
-
 	resource.AddFile("sound/arcana/fallen_down/bgm.wav")
 	resource.AddFile("sound/arcana/fallen_down/blast.wav")
 	resource.AddFile("sound/arcana/fallen_down/after_blast.wav")
@@ -62,29 +62,29 @@ if SERVER then
 	hook.Add("PlayerDisconnected", "Arcana_FallenDown_Cleanup", function(ply)
 		cleanupChargingState(ply, true) -- Stop BGM on disconnect
 	end)
+end
 
+local function registerFallenDownServerHooks()
 	-- Set up charging state when spell casting begins
 	hook.Add("Arcana_BeginCasting", "Arcana_FallenDown_StartCharging", function(caster, spellId)
 		if spellId ~= "fallen_down" then return end
 		if not IsValid(caster) then return end
 
-		-- Mark player as charging (movement lock starts immediately)
 		chargingPlayers[caster] = {
 			charging = true,
 			startTime = CurTime()
 		}
 
-		-- Start BGM
 		net.Start("Arcana_FallenDown_BGM", true)
 		net.WriteEntity(caster)
-		net.WriteBool(true) -- Start
+		net.WriteBool(true)
 		net.Broadcast()
 	end)
 
 	-- Clean up charging state if spell cast fails
 	hook.Add("Arcana_CastSpellFailure", "Arcana_FallenDown_CleanupOnFail", function(caster, spellId)
 		if spellId ~= "fallen_down" then return end
-		cleanupChargingState(caster, true) -- Stop BGM on failure
+		cleanupChargingState(caster, true)
 	end)
 end
 
@@ -201,7 +201,7 @@ local function startBeamPhase(caster, targetPos)
 
 		util.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
 		-- Final damage wave
-		Arcana:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS, 200, bit.bor(DMG_BLAST, DMG_DISSOLVE), true)
+		Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS, 200, { damageType = bit.bor(DMG_BLAST, DMG_DISSOLVE), ignoreAttacker = true })
 		-- Broadcast final impact wave
 		net.Start("Arcana_FallenDown_ImpactWave", true)
 		net.WriteVector(targetPos)
@@ -292,7 +292,7 @@ local function startBeamPhase(caster, targetPos)
 				end)
 
 				-- Final pull damage
-				Arcana:BlastDamage(caster, caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, bit.bor(DMG_CRUSH, DMG_BLAST), true)
+				Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, { damageType = bit.bor(DMG_CRUSH, DMG_BLAST), ignoreAttacker = true })
 				util.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
 				-- Broadcast collapse visuals
 				net.Start("Arcana_FallenDown_VacuumCollapse", true)
@@ -306,6 +306,10 @@ end
 
 Arcana:RegisterSpell({
 	id = "fallen_down",
+	on_register = function()
+		if not SERVER then return end
+		registerFallenDownServerHooks()
+	end,
 	name = "Fallen Down",
 	description = "A spell of absolute devastation. Charge for 60 seconds, immobilized by the spell's complexity, then unleash a godly beam from the heavens that obliterates everything in its wake.",
 	category = Arcana.CATEGORIES.COMBAT,
@@ -653,6 +657,8 @@ if CLIENT then
 		end
 	end
 
+	local MagicCircle = Arcana.Circle.MagicCircle
+	local BandCircle = Arcana.Circle.BandCircle
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_FallenDown_ChargingCircles", function(caster, spellId, castTime, _)
 		if spellId ~= "fallen_down" then return end
 		if not IsValid(caster) then return end

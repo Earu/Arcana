@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("Arcana_WindBlast") end
+
 -- Wind Blast: A powerful radial burst that pushes everything away from the caster
 Arcana:RegisterSpell({
 	id = "wind_blast",
@@ -85,9 +87,7 @@ Arcana:RegisterSpell({
 	}
 })
 
-if SERVER then
-	util.AddNetworkString("Arcana_WindBlast")
-end
+-- Network string registered in arcana/init.lua
 
 if CLIENT then
 	net.Receive("Arcana_WindBlast", function()

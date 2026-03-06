@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("Arcana_WindDash") end
+
 -- Wind Dash
 -- Propel the caster forward in their aim direction with wind magic, negating fall damage
 local DASH_FORCE = 2000 -- Base propulsion force
@@ -22,26 +24,22 @@ Arcana:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		-- Get the direction the player is looking
 		local aimDir = caster:GetAimVector()
 		local startPos = caster:WorldSpaceCenter()
 
-		-- Calculate propulsion force with slight upward component for better mobility
+		-- UPWARD_LIFT prevents clipping into walls on near-horizontal dashes
 		local forceVector = aimDir * DASH_FORCE + Vector(0, 0, UPWARD_LIFT)
 		local curVel = caster:GetVelocity()
 		caster:SetVelocity(curVel + forceVector)
 		caster:SetGroundEntity(NULL)
 
-		-- Network visual effects to clients
 		net.Start("Arcana_WindDash", true)
 		net.WriteEntity(caster)
 		net.WriteVector(aimDir)
 		net.Broadcast()
 
-		-- Grant temporary fall damage immunity
 		caster.ArcanaWindDashProtection = CurTime() + FALL_DAMAGE_IMMUNITY_TIME
 
-		-- Enhanced dash sounds
 		sound.Play("ambient/wind/wind_roar1.wav", startPos, 85, 140)
 		sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", startPos, 80, 120)
 		timer.Simple(0.05, function()
@@ -52,29 +50,22 @@ Arcana:RegisterSpell({
 	end
 })
 
-if SERVER then
-	util.AddNetworkString("Arcana_WindDash")
+-- Network string registered in arcana/init.lua
 
-	-- Hook to handle fall damage negation
+if SERVER then
 	hook.Add("EntityTakeDamage", "Arcana_WindDashFallProtection", function(target, dmg)
 		if not target:IsPlayer() then return end
 		if not target.ArcanaWindDashProtection then return end
 
-		-- Check if this is fall damage
 		local damageType = dmg:GetDamageType()
 		if bit.band(damageType, DMG_FALL) == DMG_FALL then
-			-- Still protected?
 			if CurTime() < target.ArcanaWindDashProtection then
-				-- Negate fall damage
 				dmg:SetDamage(0)
-				-- Play a soft landing sound
 				target:EmitSound("physics/cardboard/cardboard_box_impact_soft" .. math.random(1, 7) .. ".wav", 60, 120)
-				-- Remove protection after use
 				target.ArcanaWindDashProtection = nil
 
 				return true
 			else
-				-- Protection expired
 				target.ArcanaWindDashProtection = nil
 			end
 		end
@@ -92,7 +83,6 @@ if CLIENT then
 		local emitter = ParticleEmitter(startPos)
 		if not emitter then return end
 
-		-- Initial burst explosion at launch point
 		for i = 1, 40 do
 			local spread = VectorRand():GetNormalized()
 			local pos = startPos + spread * math.Rand(10, 30)
@@ -115,7 +105,6 @@ if CLIENT then
 
 		emitter:Finish()
 
-		-- Create trailing particle effect that follows the player
 		local trailData = {
 			player = ply,
 			direction = aimDir,
@@ -124,6 +113,7 @@ if CLIENT then
 			nextParticle = CurTime(),
 		}
 
+		-- CurTime() suffix prevents hook name collision when the same player dashes again quickly
 		local hookName = "Arcana_WindDash_Trail_" .. ply:EntIndex() .. "_" .. CurTime()
 
 		hook.Add("Think", hookName, function()
@@ -139,7 +129,6 @@ if CLIENT then
 			local em = ParticleEmitter(pos, false)
 			if not em then return end
 
-			-- Wind trail particles
 			for i = 1, 3 do
 				local offset = VectorRand() * 15
 				local p = em:Add("effects/splash2", pos + offset)
@@ -158,7 +147,6 @@ if CLIENT then
 				end
 			end
 
-			-- Dust being kicked up
 			if math.random() > 0.3 then
 				local p = em:Add("particle/particle_smokegrenade", pos + VectorRand() * 10)
 				if p then
@@ -179,7 +167,6 @@ if CLIENT then
 			em:Finish()
 		end)
 
-		-- Flash effect at start
 		local ed = EffectData()
 		ed:SetOrigin(startPos)
 		util.Effect("ManhackSparks", ed)

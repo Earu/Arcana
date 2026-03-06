@@ -1,6 +1,4 @@
-if SERVER then
-	util.AddNetworkString("Arcana_FrostNovaBurst")
-end
+if SERVER then util.AddNetworkString("Arcana_FrostNovaBurst") end
 
 Arcana:RegisterSpell({
 	id = "frost_nova",

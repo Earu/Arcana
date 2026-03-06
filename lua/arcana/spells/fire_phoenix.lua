@@ -1,7 +1,7 @@
 -- Phoenix Form: Transforms the caster into a fiery bird with flight and fire attacks
 if SERVER then
-    util.AddNetworkString("Arcana_Phoenix_Start")
-    util.AddNetworkString("Arcana_Phoenix_Stop")
+	util.AddNetworkString("Arcana_Phoenix_Start")
+	util.AddNetworkString("Arcana_Phoenix_Stop")
 end
 
 local PHX_DURATION = 24.0

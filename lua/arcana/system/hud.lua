@@ -1,12 +1,13 @@
 -- Arcana Global HUD (casting + cooldown), shared independent of SWEP
 -- Reuses styling helpers/colors from the Art Deco library for visual cohesion
+-- Depends on: arcana/default_inventory.lua (Arcana.Inventory.Items) — accessed at call time, not load time
 if not CLIENT then return end
 
 -- Create HUD namespace
 Arcana.HUD = Arcana.HUD or {}
 
 -- Local reference cache
-local function getData()
+local function getLocalPlayerData()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return nil end
 
@@ -30,6 +31,16 @@ local unlockAnnounce = {
 	spellId = "",
 }
 
+-- Returns the first sound path in candidates that exists on disk, or fallback.
+local function pickFirstSound(candidates, fallback)
+	for _, path in ipairs(candidates) do
+		if file.Exists("sound/" .. path, "GAME") then
+			return path
+		end
+	end
+	return fallback
+end
+
 local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId)
 	unlockAnnounce.active = true
 	unlockAnnounce.spellId = spellId or ""
@@ -46,44 +57,23 @@ local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId
 	unlockAnnounce.startedAt = CurTime()
 	unlockAnnounce.endsAt = CurTime() + (isDivine and 6.0 or 4.5) -- Longer display for Divine Pacts
 	unlockAnnounce.knowledgeDelta = tonumber(knowledgeDelta or 0) or 0
-	-- Play a deep, long sound. For Divine Pacts, use a more dramatic sound if available
-	local snd = nil
-
-	if isDivine then
-		-- Divine Pact gets special dramatic sound
-		if file.Exists("sound/arcana/arcane_3.ogg", "GAME") then
-			snd = "arcana/arcane_3.ogg"
-		elseif file.Exists("sound/arcana/arcane_1.ogg", "GAME") then
-			snd = "arcana/arcane_1.ogg"
-		else
-			snd = "ambient/atmosphere/terrain_rumble1.wav"
-		end
-	else
-		-- Regular spell/ritual unlock
-		if file.Exists("sound/arcana/arcane_1.ogg", "GAME") then
-			snd = "arcana/arcane_1.ogg"
-		elseif file.Exists("sound/arcana/arcane_2.ogg", "GAME") then
-			snd = "arcana/arcane_2.ogg"
-		elseif file.Exists("sound/arcana/arcane_3.ogg", "GAME") then
-			snd = "arcana/arcane_3.ogg"
-		else
-			snd = "ambient/atmosphere/terrain_rumble1.wav"
-		end
-	end
+	local divineOrder = { "arcana/arcane_3.ogg", "arcana/arcane_1.ogg" }
+	local regularOrder = { "arcana/arcane_1.ogg", "arcana/arcane_2.ogg", "arcana/arcane_3.ogg" }
+	local snd = pickFirstSound(isDivine and divineOrder or regularOrder, "ambient/atmosphere/terrain_rumble1.wav")
 
 	surface.PlaySound(snd)
 end
 
 net.Receive("Arcana_SpellUnlocked", function()
-	local _id = net.ReadString()
+	local spellId = net.ReadString()
 	local name = net.ReadString()
 	local cost = 0
 
-	if Arcana.RegisteredSpells[_id] then
-		cost = tonumber(Arcana.RegisteredSpells[_id].knowledge_cost or 0) or 0
+	if Arcana.RegisteredSpells[spellId] then
+		cost = tonumber(Arcana.RegisteredSpells[spellId].knowledge_cost or 0) or 0
 	end
 
-	showUnlockAnnouncement("spell", name, -cost, _id)
+	showUnlockAnnouncement("spell", name, -cost, spellId)
 end)
 
 -- Notification stack (XP, coins, items - multiple notifications can be active)
@@ -153,7 +143,7 @@ end
 function Arcana.HUD.ShowItemGainedAnnouncement(ply, itemClass, amount, reason)
 	if not IsValid(ply) or ply ~= LocalPlayer() then return end
 
-	local itemDef = Arcana.Inventory.Items[itemClass]
+	local itemDef = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[itemClass]
 	local itemName = itemDef and itemDef.name or itemClass
 
 	table.insert(notificationStack, {
@@ -170,7 +160,7 @@ end
 function Arcana.HUD.ShowItemTakenAnnouncement(ply, itemClass, amount, reason)
 	if not IsValid(ply) or ply ~= LocalPlayer() then return end
 
-	local itemDef = Arcana.Inventory.Items[itemClass]
+	local itemDef = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[itemClass]
 	local itemName = itemDef and itemDef.name or itemClass
 
 	table.insert(notificationStack, {
@@ -190,7 +180,8 @@ local activeCast = {
 	endsAt = 0,
 }
 
--- Direct callback for tracking casts (called by core, bypasses hooks)
+-- Direct callbacks for cast tracking (called by vfx/casting.lua before firing the hook,
+-- so system state updates are guaranteed even if a third-party hook returns early)
 function Arcana.HUD.TrackCast(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
 	activeCast.spellId = spellId
@@ -198,11 +189,8 @@ function Arcana.HUD.TrackCast(caster, spellId, castTime)
 	activeCast.endsAt = CurTime() + (castTime or 0)
 end
 
--- Direct callback for tracking cast failures (called by core, bypasses hooks)
 function Arcana.HUD.TrackCastFailure(caster, spellId, castTime)
 	if not IsValid(caster) or caster ~= LocalPlayer() then return end
-
-	-- reset the casting bar if spell fails
 	activeCast.spellId = nil
 	activeCast.startedAt = 0
 	activeCast.endsAt = 0
@@ -241,7 +229,7 @@ local function drawCastingBar(scrW, scrH)
 end
 
 local function drawCooldownStack(scrW, scrH)
-	local data = getData()
+	local data = getLocalPlayerData()
 	if not data then return end
 	local cds = data.spell_cooldowns or {}
 	local now = CurTime()
@@ -351,6 +339,8 @@ local function drawNotifications(scrW, scrH)
 			_tempMainCol.r = 200
 			_tempMainCol.g = 100
 			_tempMainCol.b = 100
+		else
+			mainText = ""
 		end
 
 		-- Calculate text widths for dynamic sizing

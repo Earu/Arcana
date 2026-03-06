@@ -52,16 +52,7 @@ if SERVER then
 		end
 	end
 
-	local function isSolidNonTrigger(ent)
-		if not IsValid(ent) then return false end
-		if ent:IsWorld() then return true end
-
-		local solid = ent.GetSolid and ent:GetSolid() or SOLID_NONE
-		if solid == SOLID_NONE then return false end
-
-		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
-		return bit.band(flags, FSOLID_TRIGGER) == 0
-	end
+	local isSolidNonTrigger = Arcana.Common.IsSolidNonTrigger
 
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end
@@ -88,7 +79,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcana:BlastDamage(IsValid(owner) and owner or self, self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400, DMG_DISSOLVE, true)
+		Arcana:BlastDamage(IsValid(owner) and owner or self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400, { inflictor = self, damageType = DMG_DISSOLVE, ignoreAttacker = true })
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)
