@@ -1,3 +1,12 @@
+if SERVER then
+	hook.Add("Arcana_BeginCasting", "Healing_TargetScan", function(caster, spellId)
+		if spellId ~= "healing" then return end
+		Arcana.Common.TargetScan(caster, function(ent)
+			return IsValid(ent) and ent:IsPlayer() and ent:Alive()
+		end, 400)
+	end)
+end
+
 Arcana:RegisterSpell({
 	id = "healing",
 	name = "Healing",
@@ -16,14 +25,7 @@ Arcana:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not IsValid(caster) then return false end
 
-		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local tr = srcEnt.GetEyeTrace and srcEnt:GetEyeTrace() or util.TraceLine({
-			start = srcEnt:WorldSpaceCenter(),
-			endpos = srcEnt:WorldSpaceCenter() + srcEnt:GetForward() * 1000,
-			filter = {srcEnt, caster}
-		})
-
-		local target = tr.Entity
+		local target = Arcana.Common.GetLockedTarget(caster)
 		if not IsValid(target) or not target:IsPlayer() or not target:Alive() then return false end
 		if target:Health() >= target:GetMaxHealth() then return false end
 		if not SERVER then return true end
@@ -31,7 +33,7 @@ Arcana:RegisterSpell({
 		-- Apply healing
 		target:SetHealth(math.min(target:GetMaxHealth(), target:Health() + 40))
 
-		local healColor = Color(120, 255, 140, 255) -- Golden healing light
+		local healColor = Color(120, 255, 140, 255)
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
 
 		Arcana:SendAttachBandVFX(target, healColor, 26, 2.5, {
