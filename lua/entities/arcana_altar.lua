@@ -395,6 +395,7 @@ if CLIENT then
 		return self:GetPos()
 	end
 
+	local BandCircle = Arcana.Circle.BandCircle
 	-- Removed ground magic circle to reduce visual noise
 	local BAND_CIRCLE_COLOR = Color(222, 198, 120, 255)
 	local function ensureBands(self)

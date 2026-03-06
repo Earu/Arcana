@@ -28,19 +28,7 @@ Arcana:RegisterSpell({
 		if not IsValid(ent) then return false end
 		ent:SetPos(startPos)
 		ent:Spawn()
-		ent:SetOwner(caster)
-
-		if ent.SetSpellOwner then
-			ent:SetSpellOwner(caster)
-		end
-
-		if ent.CPPISetOwner then
-			ent:CPPISetOwner(caster)
-		end
-
-		if ent.LaunchTowards then
-			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
-		end
+		Arcana.Common.LaunchProjectile(ent, caster, srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 
 		Arcana:SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {
 			{

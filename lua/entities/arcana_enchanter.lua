@@ -146,7 +146,7 @@ if SERVER then
 			Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
 		end
 
-		Arcana:SyncWeaponEnchantNW(wep)
+		Arcana.SyncWeaponEnchantNW(wep)
 
 		-- Keep a snapshot for fallback re-give
 		ent._containedEnchantIds = table.Copy(transferIds)
@@ -223,9 +223,9 @@ if SERVER then
 					Arcana:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
 				end
 
-				Arcana:SyncWeaponEnchantNW(newWep)
-				end
-				ply:SelectWeapon(cls)
+			Arcana.SyncWeaponEnchantNW(newWep)
+			end
+			ply:SelectWeapon(cls)
 			end)
 
 			ent._containedEnchantIds = nil
@@ -298,11 +298,12 @@ if SERVER then
 
 		for _, it in ipairs(enchs) do
 			if it.ench.can_apply then
-				local ok, reason = pcall(it.ench.can_apply, ply, wep)
+				local callOk, allowed, reason = pcall(it.ench.can_apply, ply, wep)
 
-				if not ok or reason == false then
+				if not callOk or allowed == false then
 					if Arcana and Arcana.SendErrorNotification then
-						Arcana:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. tostring(reason or "invalid"))
+						local msg = callOk and tostring(reason or "weapon not eligible") or tostring(allowed)
+						Arcana:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. msg)
 					end
 
 					return
@@ -582,13 +583,14 @@ if CLIENT then
 		emitter:Finish()
 	end)
 
+	local BandCircle = Arcana.Circle.BandCircle
 	-- Create band rings that spin around the deposited weapon
 	function ENT:ClientInitBandVis()
 		if self._bandCircle and self._bandCircle.IsActive and self._bandCircle:IsActive() then return end
 
 		local wep = self:GetContainedWeapon()
 		if not IsValid(wep) then return end
-		if not _G.BandCircle then return end
+		if not BandCircle then return end
 
 		local pos = wep:WorldSpaceCenter()
 		local ang = self:GetAngles()
@@ -1283,10 +1285,10 @@ if CLIENT then
 			for enchId, ench in pairs(getEnchantmentsList()) do
 				local show = true
 				if IsValid(wepEnt) and not appliedSet[enchId] then
-					if ench and ench.can_apply then
-						local ok, res = pcall(ench.can_apply, ply, wepEnt)
-						show = ok and (res ~= false)
-					end
+				if ench and ench.can_apply then
+					local callOk, allowed = pcall(ench.can_apply, ply, wepEnt)
+					show = callOk and (allowed ~= false)
+				end
 				end
 
 				if show then

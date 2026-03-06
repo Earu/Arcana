@@ -1,14 +1,6 @@
-local function isMeleeHoldType(wep)
-	if not IsValid(wep) then return false end
+local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
 
-	local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-	if not isstring(ht) then return false end
-
-	ht = string.lower(ht)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
-end
-
-local function attachDashHook(ply, wep, state)
+local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
 	state._hookId = string.format("Arcana_Ench_DashingStrikes_%d_%d", wep:EntIndex(), ply:EntIndex())
@@ -117,15 +109,20 @@ local function attachDashHook(ply, wep, state)
 	end)
 end
 
-local function detachDashHook(ply, wep, state)
+local function detachHook(ply, wep, state)
 	if not state or not state._hookId then return end
 
 	hook.Remove("KeyPress", state._hookId)
 	state._hookId = nil
 
-	if state._impactHookId then
-		hook.Remove("Think", state._impactHookId)
-		state._impactHookId = nil
+	if state._thinkId then
+		hook.Remove("Think", state._thinkId)
+		state._thinkId = nil
+	end
+
+	if state._landHookId then
+		hook.Remove("OnPlayerHitGround", state._landHookId)
+		state._landHookId = nil
 	end
 end
 
@@ -141,6 +138,6 @@ Arcana:RegisterEnchantment({
 	can_apply = function(ply, wep)
 		return IsValid(wep) and isMeleeHoldType(wep)
 	end,
-	apply = attachDashHook,
-	remove = detachDashHook,
+	apply = attachHook,
+	remove = detachHook,
 })

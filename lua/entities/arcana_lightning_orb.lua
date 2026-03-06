@@ -43,24 +43,7 @@ if SERVER then
 		util.SpriteTrail(self, 0, Color(170, 210, 255, 200), true, 32, 8, 0.8, 1 / 64, "trails/electric.vmt")
 
 		-- Add a couple of sprites for a bright electric core
-		local function addSprite(parent, model, color, scale, name)
-			local spr = ents.Create("env_sprite")
-			if not IsValid(spr) then return end
-			spr:SetKeyValue("model", model)
-			spr:SetKeyValue("rendercolor", string.format("%d %d %d", color.r, color.g, color.b))
-			spr:SetKeyValue("rendermode", "9")
-			spr:SetKeyValue("scale", tostring(scale))
-			spr:SetParent(parent)
-			spr:Spawn()
-			spr:Activate()
-
-			parent:CallOnRemove(name or ("ArcanaLightningOrb_" .. model), function(_, s)
-				if IsValid(s) then
-					s:Remove()
-				end
-			end, spr)
-		end
-
+		local addSprite = Arcana.Common.AddEntitySprite
 		addSprite(self, "sprites/physbeam.vmt", Color(180, 220, 255), 0.8, "ArcanaLO_S1")
 		addSprite(self, "sprites/light_glow02_add.vmt", Color(150, 200, 255), 1.2, "ArcanaLO_S2")
 		self.Created = CurTime()
@@ -81,15 +64,7 @@ if SERVER then
 		end
 	end
 
-	local function isSolidNonTrigger(ent)
-		if not IsValid(ent) then return false end
-		if ent:IsWorld() then return true end
-		local solid = ent.GetSolid and ent:GetSolid() or SOLID_NONE
-		if solid == SOLID_NONE then return false end
-		local flags = ent.GetSolidFlags and ent:GetSolidFlags() or 0
-
-		return bit.band(flags, FSOLID_TRIGGER) == 0
-	end
+	local isSolidNonTrigger = Arcana.Common.IsSolidNonTrigger
 
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end
@@ -112,27 +87,15 @@ if SERVER then
 	end
 
 	local function spawnTeslaBurst(pos, radius)
-		local tesla = ents.Create("point_tesla")
-		if not IsValid(tesla) then return end
-		tesla:SetPos(pos)
-		tesla:SetKeyValue("targetname", "arcana_lightning_orb")
-		tesla:SetKeyValue("m_SoundName", "DoSpark")
-		tesla:SetKeyValue("texture", "sprites/physbeam.vmt")
-		tesla:SetKeyValue("m_Color", "170 210 255")
-		tesla:SetKeyValue("m_flRadius", radius)
-		tesla:SetKeyValue("beamcount_min", "4")
-		tesla:SetKeyValue("beamcount_max", "7")
-		tesla:SetKeyValue("thick_min", "4")
-		tesla:SetKeyValue("thick_max", "7")
-		tesla:SetKeyValue("lifetime_min", "0.08")
-		tesla:SetKeyValue("lifetime_max", "0.12")
-		tesla:SetKeyValue("interval_min", "0.03")
-		tesla:SetKeyValue("interval_max", "0.06")
-		tesla:Spawn()
-		tesla:Fire("DoSpark", "", 0)
-		tesla:Fire("Kill", "", 0.4)
-
-		return tesla
+		return Arcana.Common.SpawnTeslaBurst(pos, {
+			targetname = "arcana_lightning_orb",
+			color = "170 210 255",
+			radius = radius, beamcount_min = 4, beamcount_max = 7,
+			thick_min = 4, thick_max = 7,
+			lifetime_min = 0.08, lifetime_max = 0.12,
+			interval_min = 0.03, interval_max = 0.06,
+			kill_delay = 0.4,
+		})
 	end
 
 	function ENT:ZapTick()
@@ -212,7 +175,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcana:BlastDamage(self, IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), true)
+		Arcana:BlastDamage(IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, { inflictor = self, damageType = bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), ignoreAttacker = true })
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)

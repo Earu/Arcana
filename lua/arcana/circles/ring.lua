@@ -1,9 +1,9 @@
-if SERVER then
-	require("shader_to_gma")
-	resource.AddShader("arcana_circle_ps30")
-	resource.AddShader("arcana_circle_vs30")
-	return
-end
+-- Arcana Ring primitive renderer.
+-- Provides the Ring class used by MagicCircle and BandCircle for all low-level
+-- glyph/RT/mesh rendering. Exports: Arcana.Circle.Ring, Arcana.Circle.RING_TYPES
+
+Arcana = Arcana or {}
+Arcana.Circle = Arcana.Circle or {}
 
 local render_SetMaterial = _G.render.SetMaterial
 local render_PushRenderTarget = _G.render.PushRenderTarget
@@ -59,13 +59,8 @@ local VECTOR_ZERO = Vector(0, 0, 0)
 local VECTOR_X1 = Vector(1, 0, 0)
 local ANGLE_ZERO = Angle(0, 0, 0)
 
-local function getRTBuildPasses()
-	return 4
-end
+local RT_BUILD_PASSES = 4
 
-local MagicCircle = {}
-MagicCircle.__index = MagicCircle
--- Ring class definition
 local Ring = {}
 Ring.__index = Ring
 
@@ -217,79 +212,67 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.type = ringType or RING_TYPES.SIMPLE_LINE
 	ring.radius = radius or 50
 	ring.height = height or 0
-	ring.rotationSpeed = rotationSpeed or (math_random() * 2 - 1) * 45 -- -45 to 45 degrees per second
+	ring.rotationSpeed = rotationSpeed or (math_random() * 2 - 1) * 45
 	ring.rotationDirection = rotationDirection or (math_random() > 0.5 and 1 or -1)
-	ring.currentRotation = math_random() * 360 -- Start at random rotation
+	ring.currentRotation = math_random() * 360
 	ring.segments = 64
 	ring.opacity = 1.0
-	ring.lineWidth = 2.0 -- Default line thickness
-	-- Render target cache (only for non-band rings)
-	ring.useRTCache = (ring.type ~= RING_TYPES.BAND_RING)
-	ring.rtBuilt = false
-	ring.rtSize = nil
-	ring.rt = nil
-	ring.rtMat = nil
-	ring.rtRadiusPx = nil
-	ring.unitToPx = nil
-	-- Band-specific RT + mesh
-	ring.bandRTBuilt = false
-	ring.bandRT = nil
-	ring.bandRTW = nil
-	ring.bandRTH = nil
-	ring.bandMat = nil
-	ring.bandMesh = nil
-	ring.bandPxPerUnit = 32
+	ring.lineWidth = 2.0
+	ring.removed = false
 
-	-- Type-specific properties
-	if ring.type == RING_TYPES.PATTERN_LINES then
-		ring.mysticalPhrase = ALL_MYSTICAL_PHRASES[math_random(#ALL_MYSTICAL_PHRASES)]
-		ring.outerTextRadius = ring.radius
-		ring.innerTextRadius = ring.radius - math_max(5, ring.radius * 0.05)
-		ring.textFont = "MagicCircle_Medium"
-		-- Cache text processing for performance
-		ring.cachedTextData = ring:CacheTextProcessing()
-	elseif ring.type == RING_TYPES.RUNE_STAR then
-		ring.runes = {}
-
-		for i = 1, 4 do
-			ring.runes[i] = GetRandomRune()
-		end
-
-		ring.runeRadiusRatio = 0.15
-		ring.starConnections = true
-	elseif ring.type == RING_TYPES.STAR_RING then
-		ring.starPoints = math_random(5, 8) -- 5-8 pointed star
-		ring.starType = math_random(1, 2) -- Different star patterns
-		ring.innerRadius = ring.radius * (0.3 + math_random() * 0.3) -- 0.3-0.6
-		ring.outerRadius = ring.radius
-	elseif ring.type == RING_TYPES.BAND_RING then
-		-- Vertical band with outward-facing text
-		ring.bandHeight = 1
-		ring.mysticalPhrase = ALL_MYSTICAL_PHRASES[math_random(#ALL_MYSTICAL_PHRASES)]
-		ring.textFont = "MagicCircle_Medium"
-		ring.cachedTextData = ring:CacheTextProcessing()
-		-- Scaling animation state (similar to Entity:SetModelScale)
+	if ring.type == RING_TYPES.BAND_RING then
+		ring.useRTCache = false
+		-- Band-specific RT + mesh
+		ring.bandRTBuilt = false
+		ring.bandPxPerUnit = 32
+		-- Scaling animation state
 		ring.currentScale = 1
 		ring.scaleFrom = 1
 		ring.scaleTarget = 1
 		ring.scaleStart = 0
 		ring.scaleDuration = 0
-	end
+		-- Band appearance
+		ring.bandHeight = 1
+		ring.mysticalPhrase = ALL_MYSTICAL_PHRASES[math_random(#ALL_MYSTICAL_PHRASES)]
+		ring.textFont = "MagicCircle_Medium"
+		ring.cachedTextData = ring:CacheTextProcessing()
+	else
+		-- Render target cache for non-band rings
+		ring.useRTCache = true
+		ring.rtBuilt = false
+		-- Breakdown / ejection animation state
+		ring.breaking = false
+		ring.breakStart = 0
+		ring.breakDuration = 0
+		ring.breakOffset = Vector(0, 0, 0)
+		ring.breakVelocity = Vector(0, 0, 0)
+		ring.breakSpinBoost = 0
+		ring.breakDelay = 0
+		ring.ejectStarted = false
+		ring.ejectDirXY = Vector(1, 0, 0)
+		ring.breakRemoveDistance = 0
+		ring.ejectSoundPlayed = false
 
-	-- Breakdown animation state (non-band rings)
-	ring.breaking = false
-	ring.breakStart = 0
-	ring.breakDuration = 0
-	ring.breakOffset = Vector(0, 0, 0) -- local space: x=fwd, y=right, z=up
-	ring.breakVelocity = Vector(0, 0, 0) -- local space units/sec
-	ring.breakSpinBoost = 0 -- extra deg/sec
-	ring.removed = false
-	-- Ejection control
-	ring.breakDelay = 0
-	ring.ejectStarted = false
-	ring.ejectDirXY = Vector(1, 0, 0) -- in-plane direction
-	ring.breakRemoveDistance = 0 -- world units threshold to remove
-	ring.ejectSoundPlayed = false
+		if ring.type == RING_TYPES.PATTERN_LINES then
+			ring.mysticalPhrase = ALL_MYSTICAL_PHRASES[math_random(#ALL_MYSTICAL_PHRASES)]
+			ring.outerTextRadius = ring.radius
+			ring.innerTextRadius = ring.radius - math_max(5, ring.radius * 0.05)
+			ring.textFont = "MagicCircle_Medium"
+			ring.cachedTextData = ring:CacheTextProcessing()
+		elseif ring.type == RING_TYPES.RUNE_STAR then
+			ring.runes = {}
+			for i = 1, 4 do
+				ring.runes[i] = GetRandomRune()
+			end
+			ring.runeRadiusRatio = 0.15
+			ring.starConnections = true
+		elseif ring.type == RING_TYPES.STAR_RING then
+			ring.starPoints = math_random(5, 8)
+			ring.starType = math_random(1, 2)
+			ring.innerRadius = ring.radius * (0.3 + math_random() * 0.3)
+			ring.outerRadius = ring.radius
+		end
+	end
 
 	return ring
 end
@@ -516,7 +499,7 @@ function Ring:BuildRingRT()
 		self.rtSize = entry.size
 		self.rtRadiusPx = entry.rtRadiusPx
 		self.unitToPx = entry.rtRadiusPx / math_max(1, entry.radiusBucket)
-		local passes = getRTBuildPasses()
+		local passes = RT_BUILD_PASSES
 
 		for _pass = 1, passes do
 			surface_SetDrawColor(255, 255, 255, 255)
@@ -581,7 +564,7 @@ local function GetGlyphMaterial(fontName, char)
 	cam_Start2D()
 	surface_SetFont(fontName or "DermaDefault")
 	surface_SetTextColor(255, 255, 255, 255)
-	local passes = getRTBuildPasses()
+	local passes = RT_BUILD_PASSES
 
 	for _pass = 1, passes do
 		surface_SetTextPos(1, 1)
@@ -635,7 +618,7 @@ function Ring:BuildBandRTAndMesh()
 			end
 
 			local scale = math_max(0.25, math_min(2.5, (texH * 0.7) / ch))
-			local passes = getRTBuildPasses()
+			local passes = RT_BUILD_PASSES
 
 			for _pass = 1, passes do
 				do
@@ -1034,677 +1017,6 @@ function Ring:RT_DrawStarRing2D()
 	end
 end
 
--- MagicCircle class implementation
-function MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)
-	local circle = setmetatable({}, MagicCircle)
-	-- Core properties
-	circle.position = pos or Vector(0, 0, 0)
-	circle.angles = ang or Angle(0, 0, 0)
-	circle.color = color or Color(255, 100, 255, 255)
-	circle.intensity = math_max(1, intensity or 3)
-	circle.size = math_max(10, size or 100)
-	circle.lineWidth = math_max(1, lineWidth or 2)
-	circle.seed = seed
-	-- Animation properties
-	circle.isAnimated = false
-	circle.startTime = CurTime()
-	circle.duration = 0
-	circle.isActive = true
-	circle._drawnManually = false
-	-- Fade-out state
-	circle.isFading = false
-	circle.fadeStart = 0
-	circle.fadeDuration = 0.3
-	-- Set to true on the first Draw call; used by StartEvolving to decide whether
-	-- to preserve current ring visibility or start the ring-by-ring appearance animation
-	circle._hasBeenDrawn = false
-	-- When true, all rings are always drawn regardless of lastVisible (which only
-	-- controls the staggered height animation, not visibility)
-	circle._preserveVisibility = false
-	-- Evolving-cast state
-	circle.isEvolving = false
-	circle.evolveStart = 0
-	circle.evolveDuration = 0
-	circle.baseVisible = 2
-	circle.lastVisible = 0
-	circle.kLog = 9 -- control for logarithmic growth
-	circle.enableRingSounds = false
-	-- Breakdown state
-	circle.isBreaking = false
-	-- Generate rings
-	circle.rings = {}
-	circle:GenerateRings()
-
-	return circle
-end
-
-function MagicCircle:GenerateRings()
-	self.rings = self.rings or {}
-
-	if self.seed then
-		math.randomseed(self.seed)
-	end
-
-	-- Calculate number of rings based on intensity
-	local ringCount = math_max(4, math_min(self.intensity + math_random(1, 3), 8))
-
-	-- Standard magic circles should NOT include band rings (reserved for VFX)
-	local allTypes = {RING_TYPES.PATTERN_LINES, RING_TYPES.RUNE_STAR, RING_TYPES.SIMPLE_LINE, RING_TYPES.STAR_RING,}
-
-	-- Create a list to track which ring types we need to place (one of each first)
-	local requiredTypes = {}
-
-	for _, t in ipairs(allTypes) do
-		table_insert(requiredTypes, t)
-	end
-
-	-- Shuffle the required types for random order
-	for i = #requiredTypes, 2, -1 do
-		local j = math_random(i)
-		requiredTypes[i], requiredTypes[j] = requiredTypes[j], requiredTypes[i]
-	end
-
-	-- First, place one of each required ring type
-	for i = 1, math_min(#requiredTypes, ringCount) do
-		local ringType = requiredTypes[i]
-		local radius = self.size * (0.2 + (i - 1) * 0.8 / (ringCount - 1))
-		local height = 0
-		local rotationSpeed = (math_random() * 60 - 30) -- -30 to 30 degrees per second
-		local rotationDirection = math_random() > 0.5 and 1 or -1
-		local ring = Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
-		ring.lineWidth = self.lineWidth -- Apply the magic circle's line width
-		table_insert(self.rings, ring)
-	end
-
-	-- Fill remaining slots with random types (excluding star ring to keep it special)
-	for i = #requiredTypes + 1, ringCount do
-		-- pool excludes STAR_RING
-		local pool = {RING_TYPES.PATTERN_LINES, RING_TYPES.RUNE_STAR, RING_TYPES.SIMPLE_LINE,}
-
-		local ringType = pool[math_random(#pool)]
-		local radius = self.size * (0.2 + (i - 1) * 0.8 / (ringCount - 1))
-		local height = 0
-		local rotationSpeed = (math_random() * 60 - 30) -- -30 to 30 degrees per second
-		local rotationDirection = math_random() > 0.5 and 1 or -1
-		local ring = Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
-		ring.lineWidth = self.lineWidth -- Apply the magic circle's line width
-		table_insert(self.rings, ring)
-	end
-
-	-- Sort rings by radius (largest first) for proper layering
-	table_sort(self.rings, function(a, b) return a.radius > b.radius end)
-	-- Add central glow ring
-	local glowRing = Ring.new(RING_TYPES.SIMPLE_LINE, self.size * 0.1, 0, math_random() * 120 - 60, math_random() > 0.5 and 1 or -1)
-	glowRing.lineWidth = self.lineWidth -- Apply the magic circle's line width
-	table_insert(self.rings, glowRing)
-
-	if self.seed then
-		math.randomseed(SysTime())
-	end
-end
-
-function MagicCircle:Update(deltaTime)
-	if not self.isActive then return end
-
-	-- Update all rings
-	for _, ring in ipairs(self.rings) do
-		ring:Update(deltaTime)
-	end
-
-	-- Cull rings removed by breakdown
-	for i = #self.rings, 1, -1 do
-		local r = self.rings[i]
-
-		if r and r.removed then
-			table_remove(self.rings, i)
-		end
-	end
-
-	-- Check if animation should end (skip while breaking)
-	if self.isAnimated and not self.isBreaking and (CurTime() - self.startTime) > self.duration and not self.isFading then
-		self:StartFadeOut(self.fadeDuration)
-	end
-
-	-- Update evolving behavior
-	if self.isEvolving then
-		local now = CurTime()
-		local p = math.Clamp((now - self.evolveStart) / math.max(0.01, self.evolveDuration), 0, 1)
-		local maxVisible = math.max(2, #self.rings)
-		local logp = math.log(1 + self.kLog * p) / math.log(1 + self.kLog)
-		local shouldVisible = self.baseVisible + math.floor((maxVisible - self.baseVisible) * logp + 0.0001)
-		shouldVisible = math.Clamp(shouldVisible, self.baseVisible, maxVisible)
-
-		if shouldVisible > self.lastVisible then
-			-- Play subtle mystical chime(s) when adding ring(s)
-			if self.enableRingSounds then
-				local addCount = shouldVisible - self.lastVisible
-
-				for i = 1, addCount do
-					local pitch = 100 + math.random(-8, 10)
-					local vol = 0.45
-					local posJitter = self.position + Vector(math.random(-2, 2), math.random(-2, 2), math.random(-1, 1))
-					sound.Play("arcana/arcane_" .. math.random(1, 3) .. ".ogg", posJitter, 70, pitch, vol)
-				end
-			end
-
-			self.lastVisible = shouldVisible
-		end
-
-		-- Move ring heights to create depth evolution
-		for i, ring in ipairs(self.rings) do
-			local target = 0
-
-			if i > 2 and i <= self.lastVisible then
-				local sign = self.evolveDirection or ((i % 2 == 0) and 1 or -1)
-				local span = math.max(1, self.lastVisible - 2)
-				local fraction = math.Clamp((i - 2) / span, 0, 1)
-				-- Larger depth range proportional to circle size
-				local depthAmplitude = self.size * 0.35
-				target = sign * depthAmplitude * fraction * logp
-			end
-
-			ring.height = ring.height + (target - ring.height) * math.min(1, deltaTime * 6)
-		end
-
-		-- Handle fade-out completion
-		if self.isFading then
-			local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
-
-			if t >= 1 then
-				self:FinalizeDeactivate()
-				self.isActive = false
-			end
-		end
-	end
-end
-
-function MagicCircle:Draw()
-	if not self.isActive then return end
-	self._hasBeenDrawn = true
-	render.SetColorMaterial()
-	local currentTime = CurTime()
-	-- Apply fade alpha if fading
-	local fadeMul = 1
-
-	if self.isFading then
-		fadeMul = math_max(0, 1 - (currentTime - self.fadeStart) / math_max(0.01, self.fadeDuration))
-	end
-
-	-- Draw all rings
-	local count = #self.rings
-	-- _preserveVisibility: rings were already on screen when evolving started; keep them
-	-- all visible while lastVisible still gates the staggered height animation
-	local maxToDraw = (self.isEvolving and not self._preserveVisibility) and math.max(self.baseVisible, self.lastVisible) or count
-
-	for i = 1, math.min(count, maxToDraw) do
-		local ring = self.rings[i]
-		local baseCol = self.color or COLOR_WHITE
-		local a = math_floor((baseCol.a or 255) * fadeMul)
-
-		if a > 0 then
-			ring:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
-		end
-	end
-end
-
-function MagicCircle:SetDrawnManually(b)
-	self._drawnManually = b and true or false
-end
-
-function MagicCircle:IsDrawnManually()
-	return self._drawnManually == true
-end
-
-function MagicCircle:SetAnimated(duration)
-	self.isAnimated = true
-	self.duration = duration or 5
-	self.startTime = CurTime()
-end
-
--- Trigger a breakdown animation: fling non-band rings outward with extra spin and sparks
-function MagicCircle:StartBreakdown(duration)
-	if self.isFading then return end -- don't conflict with fade
-	self.isBreaking = true
-	self.isAnimated = false
-	self.isEvolving = false
-	local d = math_max(0.1, tonumber(duration) or 0.6)
-	local num = #self.rings
-	local idx = 0
-
-	for _, r in ipairs(self.rings) do
-		idx = idx + 1
-
-		if r and r.type ~= RING_TYPES.BAND_RING then
-			r.breaking = true
-			r.breakStart = CurTime()
-			r.breakDuration = d * (0.7 + math_random() * 0.6)
-			r.breakOffset = Vector(0, 0, 0)
-			r.breakVelocity = Vector(0, 0, 0)
-			r.breakSpinBoost = 360 + math_random() * 360
-			-- Spread ejections: set per-ring delay and evenly distributed directions
-			r.breakDelay = (idx - 1) * (d / math_max(1, num)) * 0.5
-			local angle = ((idx - 1) / math_max(1, num)) * math_pi * 2 + math_random() * 0.35
-			r.ejectDirXY = Vector(math_cos(angle), math_sin(angle), 0)
-			r.breakRemoveDistance = self.size * 4
-			-- slight vertical stagger for variety
-			r.height = r.height + (math_random() * 2 - 1) * (self.size * 0.05)
-			-- sound cue will play when ejection actually starts in Update
-		end
-	end
-
-	-- Optional: schedule final cleanup if all rings gone
-	timer.Simple(d + 0.2, function()
-		if not self.isActive then return end
-
-		if #self.rings <= 0 then
-			-- No fade here; breakdown fully removes rings already
-			self.isActive = false
-			self:FinalizeDeactivate()
-		end
-	end)
-end
-
--- Start evolving the circle over the given duration.
--- This progressively reveals rings (logarithmically) and animates their height (depth).
-function MagicCircle:StartEvolving(duration, direction)
-	self.isEvolving = true
-	self.evolveStart = CurTime()
-	self.evolveDuration = math.max(0.1, duration or 1)
-	self.baseVisible = 2
-	self.enableRingSounds = true
-
-	-- Allow the caller to override the upOnly flag set at construction time
-	if isnumber(direction) then
-		self.evolveDirection = direction
-	end
-
-	-- If the circle has already been drawn (it was showing all rings in static mode),
-	-- set _preserveVisibility so Draw always renders the full ring set. lastVisible
-	-- still starts at 2 and grows normally, so the height animation is staggered
-	-- ring-by-ring just like it is for freshly created circles — but no ring ever
-	-- disappears because Draw ignores lastVisible for the visibility count.
-	if self._hasBeenDrawn then
-		self._preserveVisibility = true
-	end
-	self.lastVisible = 2
-
-	-- Reset all ring heights to 0 so the staggered height animation starts from a
-	-- clean baseline for every ring (including ones that were already on screen)
-	for _, ring in ipairs(self.rings) do
-		ring.height = 0
-	end
-end
-
-function MagicCircle:IsActive()
-	return self.isActive
-end
-
-function MagicCircle:Remove()
-	-- Trigger a quick fade-out instead of instant disappearance
-	self:StartFadeOut(self.fadeDuration)
-end
-MagicCircle.Destroy = MagicCircle.Remove
-
-function MagicCircle:StartFadeOut(duration)
-	if self.isFading then return end
-	self.isFading = true
-	self.fadeStart = CurTime()
-	self.fadeDuration = math_max(0.05, duration or 0.3)
-end
-
-function MagicCircle:FinalizeDeactivate()
-	-- Drop heavy per-ring references to encourage GC; shared cache persists
-	if self.rings then
-		for _, r in ipairs(self.rings) do
-			if r then
-				r.rt = nil
-				r.rtMat = nil
-			end
-		end
-	end
-end
-
-function MagicCircle:GetRingCount()
-	return #self.rings
-end
-
-function MagicCircle:GetRing(index)
-	return self.rings[index]
-end
-
-function MagicCircle:SetRingProperty(index, property, value)
-	if self.rings[index] then
-		self.rings[index][property] = value
-	end
-end
-
--- Global magic circle manager
-local MagicCircleManager = {
-	circles = {},
-	lastUpdate = CurTime()
-}
-
-function MagicCircleManager:Add(circle)
-	table_insert(self.circles, circle)
-end
-
-function MagicCircleManager:Update()
-	local currentTime = CurTime()
-	local deltaTime = currentTime - self.lastUpdate
-	self.lastUpdate = currentTime
-
-	-- Update all circles and remove inactive ones
-	for i = #self.circles, 1, -1 do
-		local circle = self.circles[i]
-
-		if circle.Update then
-			circle:Update(deltaTime)
-		end
-
-		if circle.IsActive and not circle:IsActive() then
-			table_remove(self.circles, i)
-		end
-	end
-end
-
-function MagicCircleManager:Draw()
-	for _, circle in ipairs(self.circles) do
-		if circle.Draw then
-			local manual = (circle.IsDrawnManually and circle:IsDrawnManually()) or false
-			if not manual then
-				circle:Draw()
-			end
-		end
-	end
-end
-
-function MagicCircleManager:Clear()
-	-- Trigger fade-out on all circles instead of instant removal
-	for _, circle in ipairs(self.circles) do
-		if circle and circle.StartFadeOut then
-			circle:StartFadeOut(0.25)
-		end
-	end
-end
-
--- Hook for automatic updates
-hook.Add("Think", "MagicCircleManager_Update", function()
-	MagicCircleManager:Update()
-end)
-
-hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(isDepth, isSkybox, is3dSkybox)
-	MagicCircleManager:Draw()
-end)
-
--- Convenience functions (maintaining backward compatibility)
-function MagicCircle.DrawMagicCircle(pos, ang, color, intensity, size, lineWidth)
-	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
-	circle:Draw()
-end
-
-function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duration, lineWidth, seed)
-	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)
-	circle:SetAnimated(duration or 5)
-	MagicCircleManager:Add(circle)
-
-	return circle
-end
-
--- Create custom fonts for magic circles (high resolution)
-surface.CreateFont("MagicCircle_Small", {
-	font = Arcana.RUNIC_FONT,
-	size = 64,
-	weight = 500,
-	antialias = true,
-})
-
-surface.CreateFont("MagicCircle_Medium", {
-	font = Arcana.RUNIC_FONT,
-	size = 96,
-	weight = 600,
-	antialias = true,
-})
-
-surface.CreateFont("MagicCircle_Large", {
-	font = Arcana.RUNIC_FONT,
-	size = 128,
-	weight = 700,
-	antialias = true,
-})
-
-surface.CreateFont("MagicCircle_Rune", {
-	font = Arcana.RUNIC_FONT,
-	size = 80,
-	weight = 800,
-	antialias = true,
-})
-
---
--- Dedicated BandCircle for VFX (not used for spell casting)
---
-local BandCircle = {}
-BandCircle.__index = BandCircle
-
-function BandCircle.new(pos, ang, color, size)
-	local bc = setmetatable({}, BandCircle)
-	bc.position = pos or Vector(0, 0, 0)
-	bc.angles = ang or Angle(0, 0, 0)
-	bc.color = color or Color(255, 150, 255, 255)
-	bc.size = math_max(10, size or 80)
-	bc.rings = {}
-	bc.isActive = true
-	bc._drawnManually = false
-	bc.isAnimated = false
-	bc.startTime = CurTime()
-	bc.duration = 0
-	-- Fade-out state
-	bc.isFading = false
-	bc.fadeStart = 0
-	bc.fadeDuration = 0.3
-
-	return bc
-end
-
-function BandCircle:AddBand(radius, height, axisSpin, lineWidth, phrase)
-	local ring = Ring.new(RING_TYPES.BAND_RING, radius or (self.size * 0.6), 0, 30, 1)
-	ring.bandHeight = height or (radius and radius * 0.2 or self.size * 0.12)
-	ring.axisSpin = axisSpin -- table: {p=,y=,r=} degrees/sec
-	ring.lineWidth = math_max(1, lineWidth or 2)
-
-	if phrase then
-		ring.mysticalPhrase = phrase
-		ring.cachedTextData = ring:CacheTextProcessing()
-	end
-
-	table_insert(self.rings, ring)
-
-	return ring
-end
-
--- Smoothly animate all band rings' scale similar to Entity:SetModelScale(scale, deltaTime)
--- If duration is 0 or nil, the scale is applied immediately.
-function BandCircle:SetScale(scale, duration)
-	scale = tonumber(scale) or 1
-	duration = tonumber(duration) or 0
-
-	for _, r in ipairs(self.rings) do
-		if r and r.type == RING_TYPES.BAND_RING then
-			r.scaleFrom = r.currentScale or 1
-			r.scaleTarget = scale
-			r.scaleStart = CurTime()
-			r.scaleDuration = math_max(0, duration)
-
-			if duration <= 0 then
-				r.currentScale = scale
-				r.scaleDuration = 0
-			end
-		end
-	end
-end
-
-function BandCircle:Update(dt)
-	for _, r in ipairs(self.rings) do
-		r:Update(dt)
-	end
-
-	if self.isAnimated and (CurTime() - self.startTime) > (self.duration or 0) and not self.isFading then
-		self:StartFadeOut(self.fadeDuration)
-	end
-
-	if self.isFading then
-		local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
-
-		if t >= 1 then
-			self.isActive = false
-		end
-	end
-end
-
-function BandCircle:Draw()
-	if not self.isActive then return end
-	render.SetColorMaterial()
-	local t = CurTime()
-	local fadeMul = 1
-
-	if self.isFading then
-		fadeMul = math_max(0, 1 - (t - self.fadeStart) / math_max(0.01, self.fadeDuration))
-	end
-
-	-- Stable back-to-front ordering by radius for translucent blending
-	local ordered = {}
-
-	for i = 1, #self.rings do
-		ordered[i] = self.rings[i]
-	end
-
-	table_sort(ordered, function(a, b) return (a.radius or 0) > (b.radius or 0) end)
-
-	for _, r in ipairs(ordered) do
-		local baseCol = self.color or COLOR_WHITE
-		local a = math_floor((baseCol.a or 255) * fadeMul)
-
-		if a > 0 then
-			r:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), t)
-		end
-	end
-end
-
-function BandCircle:SetDrawnManually(b)
-	self._drawnManually = b and true or false
-end
-
-function BandCircle:IsDrawnManually()
-	return self._drawnManually == true
-end
-
-function BandCircle:IsActive()
-	return self.isActive
-end
-
-function BandCircle:Remove()
-	self:StartFadeOut(self.fadeDuration)
-end
-BandCircle.Destroy = BandCircle.Remove
-
-function BandCircle:StartFadeOut(duration)
-	if self.isFading then return end
-	self.isFading = true
-	self.fadeStart = CurTime()
-	self.fadeDuration = math_max(0.05, duration or 0.3)
-end
-
-function BandCircle:SetAnimated(duration)
-	self.isAnimated = true
-	self.duration = duration or 5
-	self.startTime = CurTime()
-end
-
-function BandCircle.Create(pos, ang, color, size, duration)
-	local bc = BandCircle.new(pos, ang, color, size)
-
-	if duration and duration > 0 then
-		bc:SetAnimated(duration)
-	end
-
-	if MagicCircleManager and MagicCircleManager.Add then
-		MagicCircleManager:Add(bc)
-	end
-
-	return bc
-end
-
--- Console commands for testing
-concommand.Add("magic_circle_test", function(ply, cmd, args)
-	if not IsValid(ply) then return end
-	local tr = ply:GetEyeTrace()
-	local pos = tr.HitPos + tr.HitNormal * 5
-	local ang = tr.HitNormal:Angle()
-	ang:RotateAroundAxis(ang:Right(), 90)
-	local intensity = tonumber(args[1]) or 3
-	local size = tonumber(args[2]) or 100
-	local r = tonumber(args[3]) or 255
-	local g = tonumber(args[4]) or 0
-	local b = tonumber(args[5]) or 0
-	local duration = tonumber(args[6]) or 10
-	local lineWidth = tonumber(args[7]) or 3
-	local circle = MagicCircle.CreateMagicCircle(pos, ang, Color(r, g, b, 255), intensity, size, duration, lineWidth)
-	print("Magic circle created! ID: " .. tostring(circle) .. " Rings: " .. circle:GetRingCount() .. " Line Width: " .. lineWidth)
-end)
-
-concommand.Add("magic_circle_clear", function(ply, cmd, args)
-	MagicCircleManager:Clear()
-
-	if IsValid(ply) then
-		print("All magic circles cleared!")
-	end
-end)
-
--- Simple console helper to preview band circles
-concommand.Add("band_circle_test", function(ply, cmd, args)
-	if not IsValid(ply) then return end
-	local tr = ply:GetEyeTrace()
-	local pos = tr.HitPos + tr.HitNormal * 8
-	local ang = Angle(0, 0, 0)
-	ang:RotateAroundAxis(tr.HitNormal:Angle():Right(), 0)
-	local bc = BandCircle.Create(pos, tr.HitNormal:Angle(), Color(100, 200, 255, 255), tonumber(args[1]) or 80, tonumber(args[2]) or 8)
-
-	if bc then
-		-- Add a few bands spinning on different axes
-		bc:AddBand(tonumber(args[3]) or 60, tonumber(args[4]) or 4, {
-			p = 0,
-			y = 35,
-			r = 0
-		}, 2)
-
-		bc:AddBand((tonumber(args[3]) or 60) * 0.8, (tonumber(args[4]) or 4) * 0.8, {
-			p = 25,
-			y = -20,
-			r = 0
-		}, 2)
-
-		bc:AddBand((tonumber(args[3]) or 60) * 1.1, (tonumber(args[4]) or 4) * 0.6, {
-			p = 0,
-			y = 0,
-			r = 45
-		}, 2)
-
-		bc:AddBand((tonumber(args[3]) or 60) * 1.25, (tonumber(args[4]) or 4) * 0.6, {
-			p = 0,
-			y = 45,
-			r = 45
-		}, 2)
-
-		bc:AddBand((tonumber(args[3]) or 60) * 1.9, (tonumber(args[4]) or 4) * 0.6, {
-			p = -45,
-			y = 0,
-			r = 45
-		}, 2)
-	end
-end)
-
--- Export the library
-_G.MagicCircle = MagicCircle
-_G.MagicCircleManager = MagicCircleManager
-_G.BandCircle = BandCircle
-
-return MagicCircle
+-- Export for consumption by magic_circle.lua and band_circle.lua
+Arcana.Circle.Ring = Ring
+Arcana.Circle.RING_TYPES = RING_TYPES

@@ -600,6 +600,7 @@ if CLIENT then
 		end
 	end)
 
+	local MagicCircle = Arcana.Circle.MagicCircle
 	-- Initial VFX: Sky darkening and warning circles
 	net.Receive("Arcana_MeteorStorm_InitialVFX", function()
 		local center = net.ReadVector()

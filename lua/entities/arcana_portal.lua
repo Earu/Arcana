@@ -174,6 +174,9 @@ if CLIENT then
 		self._circle = nil
 	end
 
+	local MagicCircle = Arcana.Circle.MagicCircle
+	local MagicCircleManager = Arcana.Circle.MagicCircleManager
+
 	local function ensureCircle(self)
 		if not MagicCircle or not MagicCircle.new then return end
 		if self._circle and self._circle.IsActive and self._circle:IsActive() then return end

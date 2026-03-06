@@ -33,19 +33,7 @@ Arcana:RegisterSpell({
 		ent:SetPos(startPos)
 		ent:SetAngles(srcEnt.GetAimVector and srcEnt:GetAimVector():Angle() or srcEnt:GetForward():Angle())
 		ent:Spawn()
-		ent:SetOwner(caster)
-
-		if ent.SetSpellOwner then
-			ent:SetSpellOwner(caster)
-		end
-
-		if ent.CPPISetOwner then
-			ent:CPPISetOwner(caster)
-		end
-
-		if ent.LaunchTowards then
-			ent:LaunchTowards(srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
-		end
+		Arcana.Common.LaunchProjectile(ent, caster, srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 
 		-- Subtle cast SFX
 		srcEnt:EmitSound("weapons/physcannon/energy_sing_flyby1.wav", 65, 220)

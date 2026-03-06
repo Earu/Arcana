@@ -1,9 +1,9 @@
-if SERVER then
-	util.AddNetworkString("Arcana_Blackhole_Climax")
+if SERVER then util.AddNetworkString("Arcana_Blackhole_Climax") end
 
-	-- Server-side dark star tracking for vaporization
-	local darkStarServerData = {}
+-- Server-side dark star tracking for vaporization (file-scope so on_register closures can access it)
+local darkStarServerData = {}
 
+local function registerBlackholeServerHooks(spell)
 	-- Hook into casting start to begin dark star vaporization
 	hook.Add("Arcana_BeginCasting", "Arcana_Blackhole_ServerDarkStar", function(caster, spellId)
 		if spellId ~= "blackhole" then return end
@@ -60,9 +60,8 @@ if SERVER then
 				local smoothGrowth = math.pow(growthProgress, 2.5)
 				local currentRadius = Lerp(smoothGrowth, data.radius, data.targetRadius)
 
-				-- Check for entities within radius
-				local ents = ents.FindInSphere(data.pos, currentRadius)
-				for _, ent in ipairs(ents) do
+				local nearbyEnts = ents.FindInSphere(data.pos, currentRadius)
+				for _, ent in ipairs(nearbyEnts) do
 					if IsValid(ent) and ent ~= caster then
 						local isValidTarget = false
 
@@ -130,6 +129,10 @@ end
 
 Arcana:RegisterSpell({
 	id = "blackhole",
+	on_register = function(spell)
+		if not SERVER then return end
+		registerBlackholeServerHooks(spell)
+	end,
 	name = "Blackhole",
 	description = "Channel void energy to summon a gravitational singularity that consumes all matter.",
 	category = Arcana.CATEGORIES.COMBAT,
@@ -1165,6 +1168,7 @@ if CLIENT then
 		end
 	end)
 
+	local MagicCircle = Arcana.Circle.MagicCircle
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_Blackhole_CastCharge", function(caster, spellId, castTime)
 		if spellId ~= "blackhole" then return end
 		if not IsValid(caster) then return end
