@@ -93,9 +93,7 @@ end
 
 includePath("arcana/status")
 includePath("arcana/environments")
-includePath("arcana/spells/elemental")
-includePath("arcana/spells/rituals")
-includePath("arcana/spells/utility")
+includePath("arcana/spells")
 includePath("arcana/enchantments")
 
 if SERVER then
