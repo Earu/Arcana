@@ -452,9 +452,8 @@ if CLIENT then
 		local now = CurTime()
 		self._lastThink = now
 
-		-- Ensure/drive ambient loop only for the core-spawned altar
-		local isCore = self:GetNWBool("ArcanaCoreSpawned", false)
-		if isCore then
+		local shouldPlayMusic = self:GetNWBool("ArcanaPlayMusic", false)
+		if shouldPlayMusic then
 			if not self._ambient then
 				self._ambient = CreateSound(self, "arcana/altar_ambient_stereo.ogg")
 
