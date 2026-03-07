@@ -12,6 +12,17 @@ if SERVER then
 	for _, f in ipairs(file.Find("sound/arcana/tutorials/grimoire/*.wav", "GAME")) do
 		resource.AddFile("sound/arcana/tutorials/grimoire/" .. f)
 	end
+
+	-- Starter spell for new players
+	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function(wep, ply)
+		if wep:GetClass() == "grimoire" and IsValid(ply) then
+			local data = Arcana:GetPlayerData(ply)
+
+			if data and not data.unlocked_spells["fireball"] then
+				Arcana:UnlockSpell(ply, "fireball", true)
+			end
+		end
+	end)
 end
 
 SWEP.PrintName = "Grimoire"
