@@ -26,11 +26,12 @@ if SERVER then
 	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
 	resource.AddFile("models/arcana_obelisk/arcana_obelisk_bottom.mdl")
 	resource.AddFile("models/arcana_obelisk/arcana_obelisk_top.mdl")
+	resource.AddFile("materials/models/arcana_obelisk/arcana_bronze.vmt")
+	resource.AddFile("materials/models/arcana_obelisk/arcana_bronze_nm.vtf")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
 		self:SetModel("models/props_c17/gravestone_cross001b.mdl")
-		self:SetMaterial("models/props_foliage/coastrock02")
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
@@ -207,7 +208,6 @@ if CLIENT then
 			self._obeliskTop:SetPos(self:GetPos())
 			self._obeliskTop:SetAngles(self:GetAngles())
 			self._obeliskTop:SetMaterial("models/props_foliage/coastrock02")
-
 		end
 	end
 
