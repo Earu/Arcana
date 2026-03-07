@@ -109,6 +109,12 @@ if SERVER then
 
 		if inWater then return end
 
+		local landPos = ply:GetPos()
+
+		-- Heavy landing: deep thud + wind burst
+		sound.Play("physics/concrete/concrete_impact_hard" .. math.random(1, 3) .. ".wav", landPos, 75, math.random(80, 90))
+		sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav",             landPos, 65, math.random(90, 105))
+
 		-- Deal speed-scaled damage to whatever entity was landed on
 		local ent = ply:GetGroundEntity()
 		if IsValid(ent) and ent.TakeDamage and ent:GetClass() ~= "worldspawn" then
