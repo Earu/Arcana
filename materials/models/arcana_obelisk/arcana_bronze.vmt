@@ -1,0 +1,5 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models/props_foliage/coastrock02"
+	"$bumpmap" "models/arcana_obelisk/arcana_bronze_nm"
+}
