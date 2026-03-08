@@ -141,25 +141,20 @@ if CLIENT then
 
 		-- While casting, continuously follow the caster so visuals stay attached
 		local followHook = "Arcana_FollowCasting_" .. tostring(caster)
-		hook.Remove("Think", followHook)
-
-		hook.Add("Think", followHook, function()
+		hook.Remove("PostDrawOpaqueRenderables", followHook)
+		hook.Add("PostDrawOpaqueRenderables", followHook, function()
 			if not IsValid(caster) then
-				hook.Remove("Think", followHook)
-
+				hook.Remove("PostDrawOpaqueRenderables", followHook)
 				return
 			end
 
 			local c = caster._ArcanaCastingCircle
-
 			if not c or not c.IsActive or not c:IsActive() then
-				hook.Remove("Think", followHook)
-
+				hook.Remove("PostDrawOpaqueRenderables", followHook)
 				return
 			end
 
-				local newPos, newAng, newSize = computeCastCircleTransform(caster, isSpellCaster, forwardLike)
-
+			local newPos, newAng, newSize = computeCastCircleTransform(caster, isSpellCaster, forwardLike)
 			c.position = newPos
 			c.angles = newAng
 			c.size = newSize
@@ -261,7 +256,6 @@ if CLIENT then
 			if not IsValid(ent) or not bc or not bc.isActive then
 				bc:Remove()
 				hook.Remove("PostDrawOpaqueRenderables", hookName)
-
 				return
 			end
 
@@ -328,9 +322,9 @@ if CLIENT then
 		local hookName = "Arcana_FollowCastCircle_" .. spellId .. "_" .. tostring(circle)
 		local endTime = CurTime() + castTime + 0.05
 
-		hook.Add("Think", hookName, function()
+		hook.Add("PostDrawOpaqueRenderables", hookName, function()
 			if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endTime then
-				hook.Remove("Think", hookName)
+				hook.Remove("PostDrawOpaqueRenderables", hookName)
 				castFailureCallbacks[hookName] = nil
 				return
 			end
