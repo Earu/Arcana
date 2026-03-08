@@ -40,11 +40,9 @@ if SERVER then
 
 		self:SetColor(Color(170, 210, 255, 255))
 		self:SetMaterial("models/debug/debugwhite")
-		util.SpriteTrail(self, 0, Color(170, 210, 255, 200), true, 32, 8, 0.8, 1 / 64, "trails/electric.vmt")
 
 		-- Add a couple of sprites for a bright electric core
 		local addSprite = Arcana.Common.AddEntitySprite
-		addSprite(self, "sprites/physbeam.vmt", Color(180, 220, 255), 0.8, "ArcanaLO_S1")
 		addSprite(self, "sprites/light_glow02_add.vmt", Color(150, 200, 255), 1.2, "ArcanaLO_S2")
 		self.Created = CurTime()
 		self._nextTick = CurTime() + (self.OrbTickInterval or 0.25)
