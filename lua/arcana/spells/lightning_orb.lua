@@ -32,14 +32,23 @@ Arcana:RegisterSpell({
 		ent:Activate()
 		Arcana.Common.LaunchProjectile(ent, caster, srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 
-		-- Brief casting VFX on the caster
-		Arcana:SendAttachBandVFX(srcEnt, Color(170, 210, 255, 255), 26, 0.8, {
+		Arcana:SendAttachBandVFX(ent, Color(170, 210, 255, 255), 14, 6, {
 			{
-				radius = 20,
-				height = 6,
+				radius = 15,
+				height = 4,
 				spin = {
 					p = 0,
-					y = 45,
+					y = 80 * 50,
+					r = 60 * 50
+				},
+				lineWidth = 2
+			},
+			{
+				radius = 13,
+				height = 3,
+				spin = {
+					p = 60 * 50,
+					y = -45 * 50,
 					r = 0
 				},
 				lineWidth = 2
