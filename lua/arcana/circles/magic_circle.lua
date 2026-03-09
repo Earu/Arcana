@@ -341,15 +341,8 @@ function MagicCircle:StartFadeOut(duration)
 end
 
 function MagicCircle:FinalizeDeactivate()
-	-- Drop heavy per-ring references to encourage GC; shared cache persists
-	if self.rings then
-		for _, r in ipairs(self.rings) do
-			if r then
-				r.rt = nil
-				r.rtMat = nil
-			end
-		end
-	end
+	-- Nil out ring list to release mesh references and encourage GC
+	self.rings = {}
 end
 
 function MagicCircle:GetRingCount()
@@ -431,16 +424,6 @@ function MagicCircle.DrawMagicCircle(pos, ang, color, intensity, size, lineWidth
 end
 
 function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duration, lineWidth, seed)
-	-- Derive a deterministic seed from visual parameters when none is provided.
-	-- This ensures rings with identical intensity/size/lineWidth reuse cached RTs
-	-- instead of allocating new ones with different random phrases each cast.
-	if not seed then
-		seed = tonumber(util.CRC(string.format("mc_%d_%d_%d",
-			math_floor(math_max(1, intensity or 3)),
-			math_floor(math_max(10, size or 100)),
-			math_floor(math_max(1, lineWidth or 2))
-		)))
-	end
 	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)
 	circle:SetAnimated(duration or 5)
 	MagicCircleManager:Add(circle)

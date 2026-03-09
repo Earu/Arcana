@@ -12,6 +12,18 @@ local function includePath(path)
 	end
 end
 
+local function addRingTextures()
+	local files, dirs = file.Find("materials/arcana/rings/*.png", "GAME")
+	for _, fname in ipairs(files) do
+		resource.AddFile("materials/arcana/rings/" .. fname)
+	end
+
+	files, dirs = file.Find("materials/arcana/glyphs/*.png", "GAME")
+	for _, fname in ipairs(files) do
+		resource.AddFile("materials/arcana/glyphs/" .. fname)
+	end
+end
+
 if SERVER then
 	AddCSLuaFile("arcana/system/art_deco.lua")
 	AddCSLuaFile("arcana/system/core.lua")
@@ -48,6 +60,8 @@ if SERVER then
 
 	resource.AddFile("materials/arcana/pattern.vmt")
 	resource.AddFile("materials/arcana/pattern_antique_stone.vmt")
+
+	addRingTextures()
 end
 
 include("arcana/system/core.lua")
@@ -86,7 +100,6 @@ if CLIENT then
 
 	include("arcana/spell_browser.lua")
 	include("arcana/voice_activation.lua")
-
 end
 
 includePath("arcana/status")
