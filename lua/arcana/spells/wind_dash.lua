@@ -15,7 +15,7 @@ local LAND_DAMAGE_SPEED = 700 -- Speed at which a heavy landing plays heavy impa
 Arcana:RegisterSpell({
 	id = "wind_dash",
 	name = "Wind Dash",
-	description = "Aim upward while grounded to launch yourself skyward. Aim downward while airborne to crash back to earth.",
+	description = "Aim upward to launch yourself skyward. Aim downward to crash back to earth.",
 	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 8,
 	knowledge_cost = 2,
@@ -32,18 +32,29 @@ Arcana:RegisterSpell({
 		if not IsValid(caster) then return false, "Invalid caster" end
 		if caster:GetMoveType() ~= MOVETYPE_WALK then return false, "Cannot wind dash in this state" end
 
-		local pitch    = caster:EyeAngles().pitch
-		local onGround = caster:IsOnGround()
+		local pitch = caster:EyeAngles().pitch
 
-		if onGround and pitch < LEAP_PITCH then
-			return true -- grounded + aiming up → leap
+		if pitch < LEAP_PITCH and not caster.ArcanaWindDashLeaped then
+			return true -- aiming up + haven't leaped yet → leap
 		end
 
-		if not onGround and pitch > DIVE_PITCH and not caster.ArcanaWindDashDived then
-			return true -- airborne + aiming down + not already dived → dive
+		if pitch > DIVE_PITCH and not caster:IsOnGround() and not caster.ArcanaWindDashDived then
+			return true -- aiming down + airborne + haven't dived yet → dive
 		end
 
-		return false, "On ground, aim upward to leap into the sky. In the air, aim downward to crash back to earth"
+		if caster.ArcanaWindDashLeaped and caster.ArcanaWindDashDived then
+			return false, "You must land before dashing again"
+		end
+
+		if caster.ArcanaWindDashLeaped then
+			return false, "Already dashing, aim downward to dive, or land to reset"
+		end
+
+		if caster.ArcanaWindDashDived then
+			return false, "Already diving, land to reset"
+		end
+
+		return false, "Aim upward to dash into the sky, or aim downward to dive back to earth"
 	end,
 
 	cast = function(caster, _, _, ctx)
@@ -51,8 +62,7 @@ Arcana:RegisterSpell({
 
 		local aimVec   = caster:GetAimVector()
 		local pitch    = caster:EyeAngles().pitch
-		local onGround = caster:IsOnGround()
-		local isDive   = not onGround and pitch > DIVE_PITCH
+		local isDive   = pitch > DIVE_PITCH and not caster:IsOnGround()
 		local startPos = caster:WorldSpaceCenter()
 
 		if isDive then
@@ -70,9 +80,10 @@ Arcana:RegisterSpell({
 		else
 			caster:SetVelocity(aimVec * LEAP_FORCE)
 			caster:SetGroundEntity(NULL)
-			caster.ArcanaWindDashActive = true
-			caster.ArcanaWindDashDived  = false
-			caster.ArcanaWindDashLast   = CurTime() + 0.1
+			caster.ArcanaWindDashActive  = true
+			caster.ArcanaWindDashLeaped  = true
+			caster.ArcanaWindDashDived   = false
+			caster.ArcanaWindDashLast    = CurTime() + 0.1
 
 			sound.Play("ambient/wind/wind_roar1.wav", startPos, 85, 140)
 			sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", startPos, 80, 120)
@@ -105,6 +116,7 @@ if SERVER then
 		if not ply.ArcanaWindDashLast or ply.ArcanaWindDashLast >= CurTime() then return end
 
 		ply.ArcanaWindDashActive = false
+		ply.ArcanaWindDashLeaped = false
 		ply.ArcanaWindDashDived  = false
 
 		if inWater then return end
