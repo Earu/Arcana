@@ -38,16 +38,11 @@ function BandCircle.new(pos, ang, color, size)
 	return bc
 end
 
-function BandCircle:AddBand(radius, height, axisSpin, lineWidth, phrase)
+function BandCircle:AddBand(radius, height, axisSpin, lineWidth)
 	local ring = Ring.new(RING_TYPES.BAND_RING, radius or (self.size * 0.6), 0, 30, 1)
 	ring.bandHeight = height or (radius and radius * 0.2 or self.size * 0.12)
 	ring.axisSpin = axisSpin -- table: {p=,y=,r=} degrees/sec
 	ring.lineWidth = math_max(1, lineWidth or 2)
-
-	if phrase then
-		ring.mysticalPhrase = phrase
-		ring.cachedTextData = ring:CacheTextProcessing()
-	end
 
 	table_insert(self.rings, ring)
 
