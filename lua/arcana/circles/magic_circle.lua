@@ -20,6 +20,16 @@ local table_remove = _G.table.remove
 local table_sort = _G.table.sort
 local COLOR_WHITE = Color(255, 255, 255, 255)
 
+local tempColorCache = Color(255, 255, 255, 255)
+local function tempColor(r, g, b, a)
+	tempColorCache.r = math.min(r, 255)
+	tempColorCache.g = math.min(g, 255)
+	tempColorCache.b = math.min(b, 255)
+	tempColorCache.a = a
+
+	return tempColorCache
+end
+
 local MagicCircle = {}
 MagicCircle.__index = MagicCircle
 
@@ -228,9 +238,8 @@ function MagicCircle:Draw()
 		local ring = self.rings[i]
 		local baseCol = self.color or COLOR_WHITE
 		local a = math_floor((baseCol.a or 255) * fadeMul)
-
 		if a > 0 then
-			ring:Draw(self.position, self.angles, Color(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
+			ring:Draw(self.position, self.angles, tempColor(baseCol.r, baseCol.g, baseCol.b, a), currentTime)
 		end
 	end
 end
@@ -413,7 +422,8 @@ hook.Add("Think", "MagicCircleManager_Update", function()
 	MagicCircleManager:Update()
 end)
 
-hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(isDepth, isSkybox, is3dSkybox)
+hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
+	if isSkybox then return end
 	MagicCircleManager:Draw()
 end)
 

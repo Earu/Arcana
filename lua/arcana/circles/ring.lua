@@ -159,7 +159,7 @@ function Ring.new(ringType, radius, height, rotationSpeed, rotationDirection)
 	ring.removed          = false
 
 	if ring.type == RING_TYPES.PATTERN_LINES then
-		-- Pick one of the 3 exported phrase variants at random; stored so DrawCachedRTQuad
+		-- Pick one of the 3 exported phrase variants at random; stored so DrawPNGQuad
 		-- can look up the correct material (PNG_PATTERN_LINE_MATS is indexed 1-3).
 		ring.patternVariant = math_random(3)
 	end
@@ -288,7 +288,7 @@ function Ring:Draw(centerPos, angles, color, time)
 
 	if self.type == RING_TYPES.PATTERN_LINES or self.type == RING_TYPES.RUNE_STAR
 	or self.type == RING_TYPES.SIMPLE_LINE   or self.type == RING_TYPES.STAR_RING then
-		self:DrawCachedRTQuad(ringPos, angles, color, self.currentRotation)
+		self:DrawPNGQuad(ringPos, angles, color, self.currentRotation)
 	elseif self.type == RING_TYPES.BAND_RING then
 		local oriented = Angle(angles.p, angles.y, angles.r)
 
@@ -311,7 +311,7 @@ end
 -- Draw the ring as a 3D2D quad using the pre-baked PNG material.
 -- pxToWorld = radius / PNG_RING_RADIUS_PX ensures the ring circle in the 4096 PNG
 -- lands exactly at self.radius world units from the centre.
-function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
+function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 	ensurePNGMatsLoaded()
 
 	local pngMat
@@ -328,7 +328,6 @@ function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
 		pngMat:SetFloat("$c1_x", color.r / 255)
 		pngMat:SetFloat("$c1_y", color.g / 255)
 		pngMat:SetFloat("$c1_z", color.b / 255)
-		--pngMat:Recompute()
 	end
 
 	local pxToWorld  = self.radius / PNG_RING_RADIUS_PX
@@ -364,7 +363,6 @@ function Ring:DrawCachedRTQuad(centerPos, angles, color, rotationAngle)
 					gm:SetFloat("$c1_x", color.r / 255)
 					gm:SetFloat("$c1_y", color.g / 255)
 					gm:SetFloat("$c1_z", color.b / 255)
-					--gm:Recompute()
 				end
 				surface_SetMaterial(gm)
 				surface_SetDrawColor(255, 255, 255, color.a)
