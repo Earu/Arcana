@@ -115,6 +115,43 @@ local RING_RT_CACHE = {}
 local BAND_RT_CACHE = {}
 local BAND_MESH_CACHE = {}
 
+-- Hard limits: once a cache reaches capacity, no new RTs are allocated.
+-- The closest existing entry (by sizeBucket match) is used as a fallback.
+-- This prevents unbounded VRAM growth across a long play session.
+local MAX_RING_RT_ENTRIES = 64
+local MAX_BAND_RT_ENTRIES = 32
+
+local function ringRTCacheCount()
+	local n = 0
+	for _ in pairs(RING_RT_CACHE) do n = n + 1 end
+	return n
+end
+
+local function bandRTCacheCount()
+	local n = 0
+	for _ in pairs(BAND_RT_CACHE) do n = n + 1 end
+	return n
+end
+
+-- Return the first cached entry whose sizeBucket matches (good-enough fallback).
+local function fallbackRingEntry(sizeBucket)
+	for _, e in pairs(RING_RT_CACHE) do
+		if e.size == sizeBucket then return e end
+	end
+	-- Any entry is better than allocating a new RT over the cap.
+	-- next() returns (key, value); discard the key and return only the entry table.
+	local _, e = next(RING_RT_CACHE)
+	return e
+end
+
+local function fallbackBandEntry(wBucket, hBucket)
+	for _, e in pairs(BAND_RT_CACHE) do
+		if e.w == wBucket or e.h == hBucket then return e end
+	end
+	local _, e = next(BAND_RT_CACHE)
+	return e
+end
+
 -- Default ring ejection sound candidates (short, energetic)
 local MAGIC_EJECT_SOUNDS = {"ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav"}
 
@@ -170,9 +207,13 @@ end
 local function ringRTKey(r)
 	local ringType = r.type or 0
 	local radius = tonumber(r.radius or 128) or 128
-	-- Derive intended RT size (as before), then bucket to reduce permutations
-	local baseSize = math.Clamp(math_floor(radius * 2 * 10), 256, 4096)
-	local sizeBucket = math.min(4096, math.max(256, quantize(baseSize, 64)))
+	-- Keep × 10 density so unitToPx ≈ 4.8 px/unit (lines and glyphs scale correctly).
+	-- Cap at 2048 instead of 4096: 2048×2048 = 16 MB vs 64 MB per RT, 4× reduction
+	-- for any ring with radius > 102 while preserving visual quality up to ~200 units.
+	local baseSize = math.Clamp(math_floor(radius * 2 * 10), 256, 2048)
+	local sizeBucket = math.min(2048, math.max(256, quantize(baseSize, 64)))
+	-- radiusBucket must stay at step=1: the RT geometry is drawn using radiusBucket as
+	-- the reference radius, so coarser steps cause the ring to appear at the wrong world radius.
 	local radiusBucket = quantize(radius, 1)
 	local lineWidthBucket = quantize(r.lineWidth or 2, 0.5)
 	local fontName = r.textFont or "MagicCircle_Medium"
@@ -196,8 +237,10 @@ local function bandRTKey(r)
 	local texW = math_max(256, math_floor(circumference * pxPerUnitBucket))
 	texW = math_min(texW, 4096)
 	local wBucket = math_min(4096, math_max(256, quantize(texW, 128)))
-	local texH = math_max(64, math_min(1024, math_floor(height * pxPerUnitBucket)))
-	local hBucket = math_min(1024, math_max(64, quantize(texH, 16)))
+	-- Height capped at 512 instead of 1024: band height is rarely perceived in detail.
+	-- 4096 × 512 = 8 MB vs 4096 × 1024 = 16 MB per band RT.
+	local texH = math_max(64, math_min(512, math_floor(height * pxPerUnitBucket)))
+	local hBucket = math_min(512, math_max(64, quantize(texH, 16)))
 	local fontName = r.textFont or "MagicCircle_Medium"
 	local phrase = r.mysticalPhrase or ""
 	local phraseId = (util_CRC and util_CRC(phrase)) or tostring(phrase)
@@ -453,22 +496,27 @@ function Ring:BuildRingRT()
 	local entry = RING_RT_CACHE[key]
 
 	if not entry then
-		local rtName = "arcana_ring_rt_" .. key
-		local tex = GetRenderTarget(rtName, size, size, true)
-		local matName = "arcana_ring_mat_" .. key
+		local fallback = ringRTCacheCount() >= MAX_RING_RT_ENTRIES and fallbackRingEntry(size)
+		if fallback then
+			entry = fallback
+		else
+			local rtName = "arcana_ring_rt_" .. key
+			local tex = GetRenderTarget(rtName, size, size, true)
+			local matName = "arcana_ring_mat_" .. key
 
-		local mat = CreateCircleMaterial(matName, tex:GetName())
+			local mat = CreateCircleMaterial(matName, tex:GetName())
 
-		entry = {
-			tex = tex,
-			mat = mat,
-			size = size,
-			rtRadiusPx = math_floor(size * 0.48),
-			radiusBucket = radiusBucket,
-			built = false,
-		}
+			entry = {
+				tex = tex,
+				mat = mat,
+				size = size,
+				rtRadiusPx = math_floor(size * 0.48),
+				radiusBucket = radiusBucket,
+				built = false,
+			}
 
-		RING_RT_CACHE[key] = entry
+			RING_RT_CACHE[key] = entry
+		end
 	end
 
 	-- Bind shared RT/material to this instance
@@ -588,6 +636,13 @@ function Ring:BuildBandRTAndMesh()
 	-- Shared band RT/material
 	local rtKey, texW, texH = bandRTKey(self)
 	local rtEntry = BAND_RT_CACHE[rtKey]
+
+	if not rtEntry then
+		local fallback = bandRTCacheCount() >= MAX_BAND_RT_ENTRIES and fallbackBandEntry(texW, texH)
+		if fallback then
+			rtEntry = fallback
+		end
+	end
 
 	if not rtEntry then
 		local rtName = "arcana_band_rt_" .. rtKey
