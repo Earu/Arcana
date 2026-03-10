@@ -11,7 +11,6 @@ struct PS_IN
 {
 	float2 uv        : TEXCOORD0;
 	float4 color     : TEXCOORD1;
-	float2 pos       : VPOS;
 };
 
 // Simple 2D noise function
@@ -144,7 +143,7 @@ float4 main(PS_IN i) : COLOR
 
 	// Make dark spots smaller by using power function
 	// This makes the noise more concentrated towards bright values
-	noiseValue = pow(saturate(noiseValue), 0.6);
+	noiseValue = pow(max(saturate(noiseValue), 0.00001f), 0.6);
 
 	// Remap noise with dynamic range based on color extremeness
 	float brightnessMod = lerp(minBrightness, maxBrightness, noiseValue);
