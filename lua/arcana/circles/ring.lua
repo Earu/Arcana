@@ -73,7 +73,7 @@ local function CreateCircleMaterial(name, textureName)
 	end
 
 	if not shader_available then
-		return CreateMaterial(name, "UnlitGeneric", {
+		return CreateMaterial(name, textureName:match("band") and "VertexLitGeneric" or "UnlitGeneric", {
 			["$basetexture"] = baseTexture,
 			["$translucent"] = 1,
 			["$vertexalpha"] = 1,

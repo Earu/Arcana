@@ -245,41 +245,43 @@ end
 
 if CLIENT then
 	local SHADER_MAT
-	local function initShaderMaterial()
-		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
-			["$pixshader"] = "arcana_crystal_surface_ps30",
-			["$vertexshader"] = "arcana_crystal_surface_vs30",
-			--["$texture1"] = "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge",
-			["$model"] = 1,
-			["$vertexnormal"] = 1,
-			["$softwareskin"] = 1,
-			["$alpha_blend"] = 1,
-			["$linearwrite"] = 1,
-			["$linearread_basetexture"] = 1,
-			["$c0_x"] = 3.0, -- dispersion strength
-			["$c0_y"] = 4.0, -- fresnel power
-			["$c0_z"] = 0.1, -- tint r
-			["$c0_w"] = 0.5, -- tint g
-			["$c1_x"] = 3, -- tint b
-			["$c1_y"] = 1, -- opacity
-			["$c1_z"] = 0.75, -- albedo blend
-			["$c1_w"] = 1.0, -- selfillum glow strength
+	if system.IsWindows() then
+		local function initShaderMaterial()
+			SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
+				["$pixshader"] = "arcana_crystal_surface_ps30",
+				["$vertexshader"] = "arcana_crystal_surface_vs30",
+				--["$texture1"] = "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge",
+				["$model"] = 1,
+				["$vertexnormal"] = 1,
+				["$softwareskin"] = 1,
+				["$alpha_blend"] = 1,
+				["$linearwrite"] = 1,
+				["$linearread_basetexture"] = 1,
+				["$c0_x"] = 3.0, -- dispersion strength
+				["$c0_y"] = 4.0, -- fresnel power
+				["$c0_z"] = 0.1, -- tint r
+				["$c0_w"] = 0.5, -- tint g
+				["$c1_x"] = 3, -- tint b
+				["$c1_y"] = 1, -- opacity
+				["$c1_z"] = 0.75, -- albedo blend
+				["$c1_w"] = 1.0, -- selfillum glow strength
 
-			-- Defaults for grain/sparkles and facet multi-bounce
-			["$c2_y"] = 12, -- NOISE_SCALE
-			["$c2_z"] = 0.6, -- GRAIN_STRENGTH
-			["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
-			["$c3_x"] = 0.15, -- THICKNESS_SCALE
-			["$c3_y"] = 12, -- FACET_QUANT
-			["$c3_z"] = 8, -- BOUNCE_FADE
-			["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
-		})
-	end
+				-- Defaults for grain/sparkles and facet multi-bounce
+				["$c2_y"] = 12, -- NOISE_SCALE
+				["$c2_z"] = 0.6, -- GRAIN_STRENGTH
+				["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
+				["$c3_x"] = 0.15, -- THICKNESS_SCALE
+				["$c3_y"] = 12, -- FACET_QUANT
+				["$c3_z"] = 8, -- BOUNCE_FADE
+				["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
+			})
+		end
 
-	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
-		initShaderMaterial()
-	else
-		hook.Add("ShaderMounted", "arcana_crystal_dispersion", initShaderMaterial)
+		if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+			initShaderMaterial()
+		else
+			hook.Add("ShaderMounted", "arcana_crystal_dispersion", initShaderMaterial)
+		end
 	end
 
 	local MAX_RENDER_DIST = 2000 * 2000
