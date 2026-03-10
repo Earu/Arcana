@@ -52,10 +52,13 @@ local RING_TYPES = {
 -- Default ring ejection sound candidates
 local MAGIC_EJECT_SOUNDS = { "ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav" }
 
-local hader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
-hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
-	shader_available = true
-end)
+local shader_available = false
+if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
+	shader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
+	hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
+		shader_available = true
+	end)
+end
 
 local loadedTextures = {}
 
@@ -70,7 +73,8 @@ local function CreateCircleMaterial(name, textureName)
 	end
 
 	if not shader_available then
-		return CreateMaterial(name, textureName:match("band") and "VertexLitGeneric" or "UnlitGeneric", {
+		local isModel = textureName:match("band")
+		return CreateMaterial(name, isModel and "VertexLitGeneric" or "UnlitGeneric", {
 			["$basetexture"] = baseTexture,
 			["$translucent"] = 1,
 			["$vertexalpha"] = 1,
@@ -78,6 +82,7 @@ local function CreateCircleMaterial(name, textureName)
 			["$nolod"]       = 1,
 			["$nocull"]      = 1,
 			["$additive"]    = 0,
+			["$model"]       = isModel and 1 or 0,
 		})
 	end
 
@@ -340,7 +345,11 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 		-- cam.PushModelMatrix has no effect on surface.* inside cam.Start3D2D,
 		-- so rotation is handled through DrawTexturedRectRotated + manual position math.
 		surface_SetMaterial(pngMat)
-		surface_SetDrawColor(color.r, color.g, color.b, color.a)
+		if shader_available then
+			surface_SetDrawColor(255, 255, 255, color.a)
+		else
+			surface_SetDrawColor(color.r, color.g, color.b, color.a)
+		end
 		surface_DrawTexturedRectRotated(0, 0, PNG_RING_SIZE, PNG_RING_SIZE, rotationAngle or 0)
 
 		-- Glyph PNGs overlaid at the four sub-circle positions, co-rotated with the ring.
@@ -365,14 +374,22 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 					gm:SetFloat("$c1_z", color.b / 255)
 				end
 				surface_SetMaterial(gm)
-				surface_SetDrawColor(color.r, color.g, color.b, color.a)
+				if shader_available then
+					surface_SetDrawColor(255, 255, 255, color.a)
+				else
+					surface_SetDrawColor(color.r, color.g, color.b, color.a)
+				end
 				surface_DrawTexturedRect(gx - glyphDraw * 0.5, gy - glyphDraw * 0.5, glyphDraw, glyphDraw)
 			end
 		end
 	else
 		-- All other types: simple centred quad with direct rotation.
 		surface_SetMaterial(pngMat)
-		surface_SetDrawColor(color.r, color.g, color.b, color.a)
+		if shader_available then
+			surface_SetDrawColor(255, 255, 255, color.a)
+		else
+			surface_SetDrawColor(color.r, color.g, color.b, color.a)
+		end
 		surface_DrawTexturedRectRotated(0, 0, PNG_RING_SIZE, PNG_RING_SIZE, rotationAngle or 0)
 	end
 
@@ -467,9 +484,13 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	end
 
 	render_SetMaterial(self.bandMat)
-	render_SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
+	if shader_available then
+		render_SetColorModulation(1, 1, 1)
+	else
+		render_SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
+	end
 	render_SetBlend((color.a or 255) / 255)
-	render_SetLightingMode(2)
+	render_SetLightingMode(1)
 	render_OverrideDepthEnable(true, true)
 	self.bandMesh:Draw()
 	render_OverrideDepthEnable(false, false)
