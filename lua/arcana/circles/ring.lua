@@ -52,13 +52,10 @@ local RING_TYPES = {
 -- Default ring ejection sound candidates
 local MAGIC_EJECT_SOUNDS = { "ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav" }
 
-local shader_available = false
-if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
-	shader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
-	hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
-		shader_available = true
-	end)
-end
+local hader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
+hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
+	shader_available = true
+end)
 
 local loadedTextures = {}
 
@@ -343,7 +340,7 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 		-- cam.PushModelMatrix has no effect on surface.* inside cam.Start3D2D,
 		-- so rotation is handled through DrawTexturedRectRotated + manual position math.
 		surface_SetMaterial(pngMat)
-		surface_SetDrawColor(255, 255, 255, color.a)
+		surface_SetDrawColor(color.r, color.g, color.b, color.a)
 		surface_DrawTexturedRectRotated(0, 0, PNG_RING_SIZE, PNG_RING_SIZE, rotationAngle or 0)
 
 		-- Glyph PNGs overlaid at the four sub-circle positions, co-rotated with the ring.
@@ -368,14 +365,14 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 					gm:SetFloat("$c1_z", color.b / 255)
 				end
 				surface_SetMaterial(gm)
-				surface_SetDrawColor(255, 255, 255, color.a)
+				surface_SetDrawColor(color.r, color.g, color.b, color.a)
 				surface_DrawTexturedRect(gx - glyphDraw * 0.5, gy - glyphDraw * 0.5, glyphDraw, glyphDraw)
 			end
 		end
 	else
 		-- All other types: simple centred quad with direct rotation.
 		surface_SetMaterial(pngMat)
-		surface_SetDrawColor(255, 255, 255, color.a)
+		surface_SetDrawColor(color.r, color.g, color.b, color.a)
 		surface_DrawTexturedRectRotated(0, 0, PNG_RING_SIZE, PNG_RING_SIZE, rotationAngle or 0)
 	end
 
@@ -470,7 +467,7 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	end
 
 	render_SetMaterial(self.bandMat)
-	render_SetColorModulation(color.r / 255 * 3, color.g / 255 * 3, color.b / 255 * 3)
+	render_SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
 	render_SetBlend((color.a or 255) / 255)
 	render_SetLightingMode(2)
 	render_OverrideDepthEnable(true, true)
