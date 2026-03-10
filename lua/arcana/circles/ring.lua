@@ -52,10 +52,13 @@ local RING_TYPES = {
 -- Default ring ejection sound candidates
 local MAGIC_EJECT_SOUNDS = { "ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav" }
 
-local shader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
-hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
-	shader_available = true
-end)
+local shader_available = false
+if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
+	shader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
+	hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
+		shader_available = true
+	end)
+end
 
 local loadedTextures = {}
 
