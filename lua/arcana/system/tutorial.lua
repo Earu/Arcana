@@ -23,39 +23,41 @@ Arcana.Tutorial = Tutorial
 
 -- Initialize crystal shader material for tree
 local TREE_SHADER_MAT
-local function initTreeShaderMaterial()
-	TREE_SHADER_MAT = CreateShaderMaterial("tree_crystal_dispersion", {
-		["$pixshader"] = "arcana_crystal_surface_ps30",
-		["$vertexshader"] = "arcana_crystal_surface_vs30",
-		["$model"] = 1,
-		["$vertexnormal"] = 1,
-		["$softwareskin"] = 1,
-		["$alpha_blend"] = 1,
-		["$linearwrite"] = 1,
-		["$linearread_basetexture"] = 1,
-		["$c0_x"] = 3.0, -- dispersion strength
-		["$c0_y"] = 4.0, -- fresnel power
-		["$c0_z"] = 1.0, -- tint r (golden)
-		["$c0_w"] = 0.7, -- tint g (golden)
-		["$c1_x"] = 0.0, -- tint b (golden)
-		["$c1_y"] = 1, -- opacity
-		["$c1_z"] = 0.75, -- albedo blend
-		["$c1_w"] = 1.0, -- selfillum glow strength
-		-- Defaults for grain/sparkles and facet multi-bounce
-		["$c2_y"] = 12, -- NOISE_SCALE
-		["$c2_z"] = 0.6, -- GRAIN_STRENGTH
-		["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
-		["$c3_x"] = 0.15, -- THICKNESS_SCALE
-		["$c3_y"] = 12, -- FACET_QUANT
-		["$c3_z"] = 8, -- BOUNCE_FADE
-		["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
-	})
-end
+if system.IsWindows() then
+	local function initTreeShaderMaterial()
+		TREE_SHADER_MAT = CreateShaderMaterial("tree_crystal_dispersion", {
+			["$pixshader"] = "arcana_crystal_surface_ps30",
+			["$vertexshader"] = "arcana_crystal_surface_vs30",
+			["$model"] = 1,
+			["$vertexnormal"] = 1,
+			["$softwareskin"] = 1,
+			["$alpha_blend"] = 1,
+			["$linearwrite"] = 1,
+			["$linearread_basetexture"] = 1,
+			["$c0_x"] = 3.0, -- dispersion strength
+			["$c0_y"] = 4.0, -- fresnel power
+			["$c0_z"] = 1.0, -- tint r (golden)
+			["$c0_w"] = 0.7, -- tint g (golden)
+			["$c1_x"] = 0.0, -- tint b (golden)
+			["$c1_y"] = 1, -- opacity
+			["$c1_z"] = 0.75, -- albedo blend
+			["$c1_w"] = 1.0, -- selfillum glow strength
+			-- Defaults for grain/sparkles and facet multi-bounce
+			["$c2_y"] = 12, -- NOISE_SCALE
+			["$c2_z"] = 0.6, -- GRAIN_STRENGTH
+			["$c2_w"] = 0.2, -- SPARKLE_STRENGTH
+			["$c3_x"] = 0.15, -- THICKNESS_SCALE
+			["$c3_y"] = 12, -- FACET_QUANT
+			["$c3_z"] = 8, -- BOUNCE_FADE
+			["$c3_w"] = 1.4, -- BOUNCE_STEPS (1..4)
+		})
+	end
 
-if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
-	initTreeShaderMaterial()
-else
-	hook.Add("ShaderMounted", "arcana_tree_crystal_dispersion", initTreeShaderMaterial)
+	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+		initTreeShaderMaterial()
+	else
+		hook.Add("ShaderMounted", "arcana_tree_crystal_dispersion", initTreeShaderMaterial)
+	end
 end
 
 -- Tutorial state
