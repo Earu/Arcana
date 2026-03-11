@@ -228,6 +228,42 @@ local function drawCastingBar(scrW, scrH)
 	draw.SimpleText(label, "Arcana_AncientSmall", x + barW * 0.5, y + barH + 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
 end
 
+-- Spells with a cooldown longer than this (seconds) are considered "long cooldown" spells
+-- and are hidden from the HUD for most of their duration to avoid persistent clutter.
+local LONG_CD_THRESHOLD   = 60  -- cooldowns over 1 minute are treated as long
+local LONG_CD_INITIAL_SHOW = 8  -- seconds to show after casting before fading out
+local LONG_CD_INITIAL_FADE = 4  -- seconds to spend fading out after the initial show
+local LONG_CD_RETURN_SHOW  = 30 -- seconds before expiry at which the entry fades back in
+local LONG_CD_RETURN_FADE  = 5  -- seconds spent fading in before it is fully visible again
+
+-- Returns a [0, 1] alpha multiplier for a long-cooldown HUD entry.
+-- Entries are fully shown just after casting, hidden in the middle, and fade back
+-- in as they approach expiry.
+local function getLongCooldownAlpha(remain, total)
+	local elapsed = total - remain
+	if elapsed < LONG_CD_INITIAL_SHOW then
+		return 1
+	elseif elapsed < LONG_CD_INITIAL_SHOW + LONG_CD_INITIAL_FADE then
+		return (LONG_CD_INITIAL_SHOW + LONG_CD_INITIAL_FADE - elapsed) / LONG_CD_INITIAL_FADE
+	elseif remain <= LONG_CD_RETURN_SHOW + LONG_CD_RETURN_FADE then
+		return math.Clamp(1 - (remain - LONG_CD_RETURN_SHOW) / LONG_CD_RETURN_FADE, 0, 1)
+	end
+	return 0
+end
+
+local function formatCooldownTime(secs)
+	if secs >= 3600 then
+		local h = math.floor(secs / 3600)
+		local m = math.floor((secs % 3600) / 60)
+		return string.format("%dh %dm", h, m)
+	elseif secs >= 60 then
+		local m = math.floor(secs / 60)
+		local s = math.floor(secs % 60)
+		return string.format("%dm %ds", m, s)
+	end
+	return string.format("%.1fs", secs)
+end
+
 local function drawCooldownStack(scrW, scrH)
 	local data = getLocalPlayerData()
 	if not data then return end
@@ -239,13 +275,22 @@ local function drawCooldownStack(scrW, scrH)
 		if untilTs and untilTs > now and Arcana.RegisteredSpells[sid] then
 			local sp = Arcana.RegisteredSpells[sid]
 			local remain = untilTs - now
+			local total = sp.cooldown or remain
+			local rowAlpha = 1
 
-			table.insert(entries, {
-				id = sid,
-				spell = sp,
-				remain = remain,
-				total = sp.cooldown or remain
-			})
+			if total > LONG_CD_THRESHOLD then
+				rowAlpha = getLongCooldownAlpha(remain, total)
+			end
+
+			if rowAlpha > 0 then
+				table.insert(entries, {
+					id = sid,
+					spell = sp,
+					remain = remain,
+					total = total,
+					rowAlpha = rowAlpha,
+				})
+			end
 		end
 	end
 
@@ -263,16 +308,19 @@ local function drawCooldownStack(scrW, scrH)
 
 	for i = 1, #entries do
 		local e = entries[i]
-		ArtDeco.FillDecoPanel(x, y, rowW, rowH, ArtDeco.Colors.decoPanel, 8)
-		ArtDeco.DrawDecoFrame(x, y, rowW, rowH, ArtDeco.Colors.gold, 8)
-		draw.SimpleText(e.spell.name, "Arcana_Ancient", x + 10, y + 6, ArtDeco.Colors.textBright)
-		local remainText = string.format("%.1fs", e.remain)
-		draw.SimpleText(remainText, "Arcana_AncientSmall", x + rowW - 10, y + 8, ArtDeco.Colors.paleGold, TEXT_ALIGN_RIGHT)
+		local a = e.rowAlpha
+		local ia = math.floor(255 * a)
+		local xpFill = ArtDeco.Colors.xpFill
+		ArtDeco.FillDecoPanel(x, y, rowW, rowH, ColorAlpha(ArtDeco.Colors.decoPanel, ia), 8)
+		ArtDeco.DrawDecoFrame(x, y, rowW, rowH, ColorAlpha(ArtDeco.Colors.gold, ia), 8)
+		draw.SimpleText(e.spell.name, "Arcana_Ancient", x + 10, y + 6, ColorAlpha(ArtDeco.Colors.textBright, ia))
+		local remainText = formatCooldownTime(e.remain)
+		draw.SimpleText(remainText, "Arcana_AncientSmall", x + rowW - 10, y + 8, ColorAlpha(ArtDeco.Colors.paleGold, ia), TEXT_ALIGN_RIGHT)
 		-- thin progress bar
 		local progress = 1 - math.Clamp(e.remain / math.max(0.001, e.total), 0, 1)
-		surface.SetDrawColor(60, 46, 34, 220)
+		surface.SetDrawColor(60, 46, 34, math.floor(220 * a))
 		surface.DrawRect(x + 10, y + rowH - 10, rowW - 20, 6)
-		surface.SetDrawColor(ArtDeco.Colors.xpFill)
+		surface.SetDrawColor(xpFill.r, xpFill.g, xpFill.b, math.floor(255 * a))
 		surface.DrawRect(x + 12, y + rowH - 8, math.floor((rowW - 24) * progress), 2)
 		y = y + rowH + gap
 	end

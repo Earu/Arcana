@@ -339,6 +339,19 @@ if CLIENT then
 	function SWEP:OnRemove()
 	end
 
+	local function formatCooldownTime(secs)
+		if secs >= 3600 then
+			local h = math.floor(secs / 3600)
+			local m = math.floor((secs % 3600) / 60)
+			return string.format("%dh %dm", h, m)
+		elseif secs >= 60 then
+			local m = math.floor(secs / 60)
+			local s = math.floor(secs % 60)
+			return string.format("%dm %ds", m, s)
+		end
+		return tostring(math.ceil(secs)) .. "s"
+	end
+
 	-- Reusable color objects to avoid allocation overhead in draw calls
 	local _tempGoldFill = Color(198, 160, 74, 24)
 
@@ -895,13 +908,13 @@ if CLIENT then
 				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 				if cd and cd > CurTime() then
-					local remaining = math.max(0, math.ceil(cd - CurTime()))
+					local remaining = math.max(0, cd - CurTime())
 
 					if pnl:IsEnabled() then
 						pnl:SetEnabled(false)
 					end
 
-					pnl:SetText(tostring(remaining) .. "s")
+					pnl:SetText(formatCooldownTime(remaining))
 				else
 					if not pnl:IsEnabled() then
 						pnl:SetEnabled(true)
@@ -1064,19 +1077,19 @@ if CLIENT then
 					pnl:SetTextColor(textCol)
 				end
 
-				castBtn.Think = function(pnl)
-					local data = Arcana and Arcana:GetPlayerData(owner) or nil
-					local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
+			castBtn.Think = function(pnl)
+				local data = Arcana and Arcana:GetPlayerData(owner) or nil
+				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
-					if cd and cd > CurTime() then
-						local remaining = math.max(0, math.ceil(cd - CurTime()))
-						if pnl:IsEnabled() then pnl:SetEnabled(false) end
-						pnl:SetText(tostring(remaining) .. "s")
-					else
-						if not pnl:IsEnabled() then pnl:SetEnabled(true) end
-						pnl:SetText("Cast")
-					end
+				if cd and cd > CurTime() then
+					local remaining = math.max(0, cd - CurTime())
+					if pnl:IsEnabled() then pnl:SetEnabled(false) end
+					pnl:SetText(formatCooldownTime(remaining))
+				else
+					if not pnl:IsEnabled() then pnl:SetEnabled(true) end
+					pnl:SetText("Cast")
 				end
+			end
 
 				row.PerformLayout = function(pnl, w, h)
 					if IsValid(infoIcon) then
@@ -1199,31 +1212,31 @@ if CLIENT then
 					pnl:SetTextColor(col)
 				end
 
-				castBtn.Think = function(pnl)
-					local data = Arcana and Arcana:GetPlayerData(owner) or nil
-					local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
+			castBtn.Think = function(pnl)
+				local data = Arcana and Arcana:GetPlayerData(owner) or nil
+				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
-					if cd and cd > CurTime() then
-						local remaining = math.max(0, math.ceil(cd - CurTime()))
+				if cd and cd > CurTime() then
+					local remaining = math.max(0, cd - CurTime())
 
-						if pnl:IsEnabled() then
-							pnl:SetEnabled(false)
-						end
-
-						pnl:SetText(tostring(remaining) .. "s")
-					else
-						if not pnl:IsEnabled() then
-							pnl:SetEnabled(true)
-						end
-
-						pnl:SetText("Cast")
+					if pnl:IsEnabled() then
+						pnl:SetEnabled(false)
 					end
-				end
 
-				row.PerformLayout = function(pnl, w, h)
-					if IsValid(infoIcon) then
-						surface.SetFont("Arcana_AncientLarge")
-						local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
+					pnl:SetText(formatCooldownTime(remaining))
+				else
+					if not pnl:IsEnabled() then
+						pnl:SetEnabled(true)
+					end
+
+					pnl:SetText("Cast")
+				end
+			end
+
+			row.PerformLayout = function(pnl, w, h)
+				if IsValid(infoIcon) then
+					surface.SetFont("Arcana_AncientLarge")
+					local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
 						local nameW, nameH = surface.GetTextSize(displayName)
 						infoIcon:SetPos(16 + nameW, 8 + (nameH - 20) / 2)
 					end
