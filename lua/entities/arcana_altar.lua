@@ -494,8 +494,9 @@ if CLIENT then
 			end
 		end
 
-		-- Drive open/close animation from networked state
-		local isOpen = self:GetAltarIsOpen()
+	-- Drive open/close animation from networked state
+	local isOpen = self:GetAltarIsOpen()
+	if shouldPlayMusic then isOpen = true end
 		if self._wasOpen == nil then
 			-- First think: snap to correct state without animating (handles late-joining clients)
 			self._wasOpen = isOpen
