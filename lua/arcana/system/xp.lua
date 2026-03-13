@@ -169,6 +169,55 @@ function Arcana:HasSpellUnlocked(ply, spellId)
 	return data ~= nil and data.unlocked_spells[spellId] == true
 end
 
+-- Returns the total KP a player earns purely from levelling.
+-- One batch of KNOWLEDGE_POINTS_PER_LEVEL is granted via CreateDefaultPlayerData at
+-- level 1, and then again on every subsequent LevelUp, so the lifetime total is:
+--   level × KNOWLEDGE_POINTS_PER_LEVEL
+function Arcana:GetTotalEarnedKnowledgePoints(level)
+	return (tonumber(level) or 1) * (Arcana.Config.KNOWLEDGE_POINTS_PER_LEVEL or 1)
+end
+
+-- Returns the total KP spent across a set of unlocked spells.
+-- Divine-pact spells are always granted for free, so they are excluded from the sum.
+function Arcana:GetTotalSpentKnowledgePoints(unlockedSpells)
+	local spent = 0
+	for spellId, unlocked in pairs(unlockedSpells or {}) do
+		if unlocked then
+			local spell = self.RegisteredSpells[spellId]
+			if spell and not spell.is_divine_pact then
+				spent = spent + (tonumber(spell.knowledge_cost) or 0)
+			end
+		end
+	end
+	return spent
+end
+
+-- Returns the KP a player should currently have, derived from their level and spells.
+-- Formula: (level × KP_PER_LEVEL) − Σ knowledge_cost for each non-divine-pact unlocked spell
+-- This is the canonical "ground truth" value and can be used to detect or correct drift.
+function Arcana:CalculateExpectedKnowledgePoints(ply)
+	local data = self:GetPlayerData(ply)
+	if not data then return 0 end
+	local earned = self:GetTotalEarnedKnowledgePoints(data.level)
+	local spent  = self:GetTotalSpentKnowledgePoints(data.unlocked_spells)
+	return math.max(0, earned - spent)
+end
+
+if SERVER then
+	-- Recalculates a player's KP from first principles and overwrites the stored value.
+	-- Useful as an admin repair tool or a post-load integrity check.
+	-- Returns the corrected KP amount.
+	function Arcana:RecalculateAndRepairKnowledgePoints(ply)
+		local data = self:GetPlayerData(ply)
+		if not data then return 0 end
+		local corrected = self:CalculateExpectedKnowledgePoints(ply)
+		data.knowledge_points = corrected
+		self:SavePlayerData(ply)
+		self:SyncPlayerData(ply)
+		return corrected
+	end
+end
+
 if SERVER then
 	util.AddNetworkString("Arcana_XPUpdate")
 	util.AddNetworkString("Arcana_LevelUp")
