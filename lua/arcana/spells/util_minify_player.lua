@@ -36,7 +36,6 @@ Arcana:RegisterSpell({
 	cost_amount = 500,
 	cast_time = 3.0,
 	range = 1200,
-	icon = "icon16/zoom_out.png",
 	is_projectile = false,
 	has_target = true,
 	cast = function(caster, _, _, ctx)

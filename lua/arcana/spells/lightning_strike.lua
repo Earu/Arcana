@@ -72,7 +72,6 @@ Arcana:RegisterSpell({
 	cost_amount = 30,
 	cast_time = 1.0,
 	range = 1500,
-	icon = "icon16/weather_lightning.png",
 	has_target = true,
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end

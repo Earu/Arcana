@@ -10,7 +10,6 @@ Arcana:RegisterSpell({
 	cost_amount = 15,
 	cast_time = 0.5,
 	range = 0,
-	icon = "icon16/heart.png",
 	cast_anim = "becon",
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end

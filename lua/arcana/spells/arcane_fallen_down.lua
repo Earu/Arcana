@@ -320,7 +320,6 @@ Arcana:RegisterSpell({
 	cost_amount = 5000000,
 	cast_time = CHARGE_TIME,
 	range = 2000,
-	icon = "icon16/star.png",
 	is_divine_pact = true,
 	is_projectile = false,
 	has_target = true,

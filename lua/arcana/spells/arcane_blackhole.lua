@@ -143,7 +143,6 @@ Arcana:RegisterSpell({
 	cost_amount = 600000,
 	cast_time = 25,
 	range = 0,
-	icon = "icon16/brick.png",
 	is_divine_pact = true,
 	cast_anim = "becon",
 	has_target = false,

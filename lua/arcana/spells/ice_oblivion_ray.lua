@@ -271,7 +271,6 @@ Arcana:RegisterSpell({
 	cost_amount = 750000,
 	cast_time = CAST_TIME,
 	range = 0,
-	icon = "icon16/arrow_right.png",
 	is_divine_pact = true,
 	is_projectile = false,
 	has_target = false,

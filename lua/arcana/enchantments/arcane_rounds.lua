@@ -57,7 +57,6 @@ Arcana:RegisterEnchantment({
 	id = "arcane_rounds",
 	name = "Arcane Rounds",
 	description = "Each bullet also launches an arcane spear from around you.",
-	icon = "icon16/bullet_blue.png",
 	cost_coins = 1800,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 70 },

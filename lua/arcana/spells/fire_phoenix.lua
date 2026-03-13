@@ -210,7 +210,6 @@ Arcana:RegisterSpell({
 	cost_amount = 550000,
 	cast_time = 1.0,
 	range = 0,
-	icon = "icon16/fire.png",
 	is_divine_pact = true,
 	is_projectile = false,
 	has_target = false,

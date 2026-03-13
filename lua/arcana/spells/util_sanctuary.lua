@@ -11,7 +11,6 @@ Arcana:RegisterSpell({
 	cost_amount = 150,
 	cast_time = 1.5,
 	range = 0,
-	icon = "icon16/heart_add.png",
 	has_target = true,
 	cast_anim = "becon",
 	cast = function(caster, _, _, ctx)

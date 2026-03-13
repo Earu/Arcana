@@ -79,7 +79,6 @@ Arcana:RegisterEnchantment({
     id = "vampiric_edge",
     name = "Vampiric Edge",
     description = "Melee hits restore health based on damage dealt.",
-    icon = "icon16/heart.png",
     cost_coins = 1200,
     cost_items = {
         { name = "mana_crystal_shard", amount = 40 },

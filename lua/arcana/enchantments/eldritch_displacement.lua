@@ -136,7 +136,6 @@ Arcana:RegisterEnchantment({
 	id = "eldritch_displacement",
 	name = "Eldritch Displacement",
 	description = "On taking damage from others, blink to a random nearby spot and keep your aim.",
-	icon = "icon16/arrow_refresh.png",
 	cost_coins = 1100,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 45 },

@@ -130,7 +130,6 @@ Arcana:RegisterEnchantment({
 	id = "dashing_strikes",
 	name = "Dashing Strikes",
 	description = "On melee attack, dash forward toward your aim (1.5s cooldown).",
-	icon = "icon16/arrow_right.png",
 	cost_coins = 350,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 20 },

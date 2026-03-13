@@ -41,7 +41,6 @@ Arcana:RegisterEnchantment({
 	id = "seeking_salvo",
 	name = "Seeking Salvo",
 	description = "On shot, launches three homing arcane missiles toward your aim.",
-	icon = "icon16/wand.png",
 	cost_coins = 1500,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 60 },

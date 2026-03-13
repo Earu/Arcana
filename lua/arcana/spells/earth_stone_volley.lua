@@ -10,7 +10,6 @@ Arcana:RegisterSpell({
 	cost_amount = 18,
 	cast_time = 0.8,
 	range = 1000,
-	icon = "icon16/brick.png",
 	is_projectile = true,
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)

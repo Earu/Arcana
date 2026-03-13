@@ -54,7 +54,6 @@ Arcana:RegisterEnchantment({
 	id = "searing_strikes",
 	name = "Searing Strikes",
 	description = "Melee hits ignite targets for 3 seconds.",
-	icon = "icon16/fire.png",
 	cost_coins = 400,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 20 },

@@ -299,7 +299,6 @@ function Arcana:RegisterSpell(spellData)
 		cost_amount = spellData.cost_amount or 10,
 		cast_time = spellData.cast_time or 0, -- Instant by default
 		range = spellData.range or 500,
-		icon = spellData.icon or "icon16/wand.png",
 		-- Divine Pacts: special category of powerful spells unlocked at certain levels
 		is_divine_pact = spellData.is_divine_pact or false,
 		-- Rituals: special category of spells that create ritual entities

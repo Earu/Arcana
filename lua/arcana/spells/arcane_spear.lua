@@ -10,7 +10,6 @@ Arcana:RegisterSpell({
 	cost_amount = 120,
 	cast_time = 0.8,
 	range = 2000,
-	icon = "icon16/bullet_blue.png",
 	is_projectile = false,
 	has_target = true,
 	cast_anim = "forward",

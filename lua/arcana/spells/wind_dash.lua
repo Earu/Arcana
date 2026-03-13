@@ -24,7 +24,6 @@ Arcana:RegisterSpell({
 	cost_amount = 25,
 	cast_time = 0.3,
 	range = 0,
-	icon = "icon16/arrow_up.png",
 	has_target = false,
 	cast_anim = "forward",
 
