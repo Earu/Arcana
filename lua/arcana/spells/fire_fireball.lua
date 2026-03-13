@@ -10,7 +10,6 @@ Arcana:RegisterSpell({
 	cost_amount = 20,
 	cast_time = 1.0,
 	range = 1200,
-	icon = "icon16/fire.png",
 	is_projectile = true,
 	has_target = true,
 	cast = function(caster, _, _, ctx)

@@ -13,7 +13,6 @@ Arcana:RegisterSpell({
 	cost_amount = 180,
 	cast_time = 0.9,
 	range = 0,
-	icon = "icon16/brick.png",
 	is_projectile = false,
 	has_target = false,
 	cast_anim = "becon",

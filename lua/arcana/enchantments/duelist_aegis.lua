@@ -121,7 +121,6 @@ Arcana:RegisterEnchantment({
 	id = "duelist_aegis",
 	name = "Duelist's Aegis",
 	description = "After dealing melee damage, ignore non-melee damage for 2s while wielding this weapon.",
-	icon = "icon16/shield.png",
 	cost_coins = 1200,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 50 },

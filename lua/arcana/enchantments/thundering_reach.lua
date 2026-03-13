@@ -127,7 +127,6 @@ Arcana:RegisterEnchantment({
 	id = "thundering_reach",
 	name = "Thundering Reach",
 	description = "Unleash a line of thunder on melee swing, damaging foes ahead.",
-	icon = "icon16/weather_lightning.png",
 	cost_coins = 1200,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 60 },

@@ -12,7 +12,6 @@ Arcana:RegisterSpell({
 	cost_amount = 12,
 	cast_time = 0.6,
 	range = 500,
-	icon = "icon16/flag_white.png",
 	has_target = false,
 	cast_anim = "forward",
 	cast = function(caster, _, _, ctx)

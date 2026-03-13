@@ -94,7 +94,6 @@ Arcana:RegisterEnchantment({
 	id = "frostbite_rounds",
 	name = "Frostbite Rounds",
 	description = "Bullets freeze the struck target with chilling slow and cold VFX.",
-	icon = "icon16/weather_snow.png",
 	cost_coins = 1000,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 50 },

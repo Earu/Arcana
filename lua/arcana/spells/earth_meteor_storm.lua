@@ -19,7 +19,6 @@ Arcana:RegisterSpell({
 	cost_amount = 500000,
 	cast_time = 12,
 	range = 0,
-	icon = "icon16/weather_clouds.png",
 	is_divine_pact = true,
 	is_projectile = false,
 	has_target = true,

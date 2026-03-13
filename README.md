@@ -111,7 +111,6 @@ Arcana:RegisterEnchantment({
     id = "my_enchantment",
     name = "My Enchantment",
     description = "Enchants a weapon with something.",
-    icon = "materials/arcana/enchantments/my_enchant.png",
     cost_coins = 10000,
     cost_items = { { id = "crystal_shard", amount = 3 } },
     max_stacks = 1,

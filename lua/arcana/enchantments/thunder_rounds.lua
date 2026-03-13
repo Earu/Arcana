@@ -69,7 +69,6 @@ Arcana:RegisterEnchantment({
 	id = "thunder_rounds",
 	name = "Thunder Rounds",
 	description = "Each bullet impact calls a lightning AoE, chaining to nearby foes.",
-	icon = "icon16/weather_lightning.png",
 	cost_coins = 2000,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 80 },

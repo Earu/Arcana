@@ -10,7 +10,6 @@ Arcana:RegisterSpell({
 	cost_amount = 160,
 	cast_time = 1.2,
 	range = 1400,
-	icon = "icon16/weather_lightning.png",
 	is_projectile = true,
 	has_target = true,
 	cast_anim = "forward",

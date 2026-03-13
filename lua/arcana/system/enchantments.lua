@@ -25,7 +25,6 @@ end
 --   id (string): unique identifier
 --   name (string): display name
 --   description (string): tooltip text
---   icon (string): icon path
 --   cost_coins (number): coin cost to apply via enchanter
 --   cost_items (array): [{name, amount}] items required
 --   can_apply(ply, wep) -> (bool, reason?): pre-apply validation
@@ -52,7 +51,6 @@ function Arcana:RegisterEnchantment(def)
 		id = id,
 		name = name,
 		description = def.description or "Mystic modification to a weapon",
-		icon = def.icon or "icon16/wand.png",
 		-- Requirements/costs
 		cost_coins = tonumber(def.cost_coins or 0) or 0,
 		cost_items = istable(def.cost_items) and def.cost_items or { -- array of {name="mana_crystal_shard", amount=5}

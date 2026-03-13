@@ -11,7 +11,6 @@ Arcana:RegisterSpell({
 	cost_amount = 55,
 	cast_time = 0.7,
 	range = 1200,
-	icon = "icon16/wand.png",
 	has_target = true,
 	is_projectile = true,
 	cast_anim = "forward",

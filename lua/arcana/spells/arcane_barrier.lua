@@ -97,7 +97,6 @@ Arcana:RegisterSpell({
 	cost_amount = 45,
 	cast_time = 1.0,
 	range = 0,
-	icon = "icon16/shield.png",
 	cast_anim = "becon",
 	can_cast = function(caster)
 		if hasBarrier(caster) then return false, "Barrier already active" end

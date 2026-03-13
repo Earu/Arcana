@@ -46,7 +46,6 @@ Arcana:RegisterEnchantment({
 	id = "blazing_salvo",
 	name = "Blazing Salvo",
 	description = "Fires a fireball every second while shooting this weapon.",
-	icon = "icon16/fire.png",
 	cost_coins = 1000,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 30 },

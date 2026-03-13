@@ -11,7 +11,6 @@ Arcana:RegisterSpell({
 	cost_amount = 35,
 	cast_time = 0.5,
 	range = 1400,
-	icon = "icon16/weather_snow.png",
 	is_projectile = true,
 	has_target = true,
 	cast_anim = "forward",
