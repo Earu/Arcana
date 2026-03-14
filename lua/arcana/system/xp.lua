@@ -76,10 +76,8 @@ function Arcana:LevelUp(ply, oldLevel, newLevel)
 
 	if SERVER then
 		for spellId, spell in pairs(self.RegisteredSpells) do
-			if spell.is_divine_pact and not data.unlocked_spells[spellId] then
-				if newLevel >= spell.level_required and oldLevel < spell.level_required then
-					self:UnlockSpell(ply, spellId, true)
-				end
+			if spell.is_divine_pact and not data.unlocked_spells[spellId] and newLevel >= spell.level_required then
+				self:UnlockSpell(ply, spellId, true)
 			end
 		end
 	end
