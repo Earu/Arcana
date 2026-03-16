@@ -1285,10 +1285,10 @@ if CLIENT then
 			for enchId, ench in pairs(getEnchantmentsList()) do
 				local show = true
 				if IsValid(wepEnt) and not appliedSet[enchId] then
-				if ench and ench.can_apply then
-					local callOk, allowed = pcall(ench.can_apply, ply, wepEnt)
-					show = callOk and (allowed ~= false)
-				end
+					if ench and ench.can_apply then
+						local callOk, allowed = pcall(ench.can_apply, ply, wepEnt)
+						show = callOk and (allowed ~= false)
+					end
 				end
 
 				if show then
