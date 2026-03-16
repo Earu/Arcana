@@ -1,5 +1,3 @@
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-
 local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
@@ -51,8 +49,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 30 },
 	},
 	can_apply = function(ply, wep)
-		-- only firearms that can shoot bullets
-		return IsValid(wep) and (wep.Primary ~= nil or wep.FireBullets ~= nil) and not isMeleeHoldType(wep)
+		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,

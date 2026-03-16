@@ -1,8 +1,5 @@
 -- Arcana Missiles Rounds: On firearm shot, launch three homing arcane missiles toward your aim
 -- Adapted from spells/arcane_missiles.lua and existing enchantment hook patterns
-
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-
 local function attachHook(ply, wep, state)
 	if not IsValid(ply) or not IsValid(wep) then return end
 
@@ -47,7 +44,7 @@ Arcana:RegisterEnchantment({
 	},
 	can_apply = function(ply, wep)
 		-- Firearms that can shoot bullets (exclude melee)
-		return IsValid(wep) and (wep.Primary ~= nil or wep.FireBullets ~= nil) and not isMeleeHoldType(wep)
+		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,

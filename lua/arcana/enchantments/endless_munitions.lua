@@ -1,5 +1,3 @@
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-
 local function attachInfiniteAmmo(ply, wep, state)
 	if not SERVER then return end
 	if not IsValid(ply) or not IsValid(wep) then return end
@@ -74,7 +72,7 @@ Arcana:RegisterEnchantment({
 		if (not maxClip or maxClip <= 0) and wep.Primary and tonumber(wep.Primary.ClipSize) then
 			maxClip = tonumber(wep.Primary.ClipSize) or -1
 		end
-		return usesAmmo or (maxClip and maxClip > 0) and not isMeleeHoldType(wep)
+		return usesAmmo or (maxClip and maxClip > 0) and Arcana.Common.GetWeaponClassification(wep) ~= "MELEE"
 	end,
 	apply = attachInfiniteAmmo,
 	remove = detachInfiniteAmmo,

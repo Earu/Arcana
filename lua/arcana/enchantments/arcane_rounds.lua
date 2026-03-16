@@ -1,5 +1,3 @@
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-
 -- Fire an arcane spear beam starting from a given origin and along a direction
 local function fireArcaneSpear(caster, origin, dir)
 	if not SERVER then return end
@@ -62,8 +60,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 70 },
 	},
 	can_apply = function(ply, wep)
-		-- Only firearms that can shoot bullets
-		return IsValid(wep) and (wep.Primary ~= nil or wep.FireBullets ~= nil) and not isMeleeHoldType(wep)
+		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,
