@@ -68,10 +68,17 @@ local function getHoldType(wep)
 	end
 end
 
+local MELEE_HOLDTYPES = {
+	["melee"] = true,
+	["melee2"] = true,
+	["knife"] = true,
+	["fist"] = true,
+}
+
 --- Returns true when the weapon uses a melee hold type.
 function Arcana.Common.IsMeleeHoldType(wep)
 	local ht = getHoldType(wep)
-	return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
+	return MELEE_HOLDTYPES[ht] or false
 end
 
 --- Returns true when the weapon uses a pistol hold type.
@@ -287,7 +294,7 @@ if SERVER then
 		return "HITSCAN"
 	end
 
-	local UNKNOWN_HOLD_TYPES = {
+	local UNKNOWN_HOLDTYPES = {
 		["normal"] = true,
 		["passive"] = true,
 	}
@@ -327,11 +334,14 @@ if SERVER then
 
 	local function classifyWeapon(wep)
 		local classification = "UNKNOWN"
-		local isMelee = Arcana.Common.IsMeleeHoldType(wep)
-		if isMelee then
+		local className = wep.ClassName
+		local holdType = getHoldType(wep)
+		if MELEE_HOLDTYPES[holdType] then
 			classification = "MELEE"
-		elseif UNKNOWN_HOLD_TYPES[getHoldType(wep)] then
+		elseif UNKNOWN_HOLDTYPES[holdType] then
 			classification = "UNKNOWN"
+		elseif holdType == "grenade" or className:find("grenade") or className:find("nade") then -- grenade holdtype and classnames are almost always projectiles
+			classification = "PROJECTILE"
 		else
 			classification = classifyRangedWeapon(wep)
 		end
