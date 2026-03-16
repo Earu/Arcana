@@ -1,5 +1,3 @@
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-
 local function spawnTeslaBurst(pos)
 	return Arcana.Common.SpawnTeslaBurst(pos, {
 		targetname = "arcana_lightning",
@@ -75,7 +73,7 @@ Arcana:RegisterEnchantment({
 	},
 	can_apply = function(ply, wep)
 		-- Only firearms that can shoot bullets
-		return IsValid(wep) and (wep.Primary ~= nil or wep.FireBullets ~= nil) and not isMeleeHoldType(wep)
+		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,

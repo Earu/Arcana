@@ -1,14 +1,4 @@
 -- Vampiric Edge: Melee-only enchantment that regenerates health on hit
-local function isMeleeHoldType(wep)
-    if not IsValid(wep) then return false end
-
-    local ht = (wep.GetHoldType and wep:GetHoldType()) or wep.HoldType
-    if not isstring(ht) then return false end
-
-    ht = string.lower(ht)
-    return ht == "melee" or ht == "melee2" or ht == "knife" or ht == "fist"
-end
-
 local function isMeleeDamage(dmginfo)
     if not dmginfo then return false end
     local dt = dmginfo:GetDamageType()
@@ -52,7 +42,7 @@ local function attachHook(ply, wep, state)
 
         local active = attacker:GetActiveWeapon()
         if not IsValid(active) or active ~= wep then return end
-        if not isMeleeHoldType(wep) then return end
+        if Arcana.Common.GetWeaponClassification(wep) ~= "MELEE" then return end
         if not isMeleeDamage(dmginfo) then return end
 
         local now = CurTime()
@@ -84,7 +74,7 @@ Arcana:RegisterEnchantment({
         { name = "mana_crystal_shard", amount = 40 },
     },
     can_apply = function(ply, wep)
-        return IsValid(wep) and isMeleeHoldType(wep)
+        return IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "MELEE"
     end,
     apply = attachHook,
     remove = detachHook,

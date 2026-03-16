@@ -1,5 +1,3 @@
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-
 local function isMeleeDamage(dmginfo)
 	if not dmginfo then return false end
 	local dt = dmginfo:GetDamageType()
@@ -79,9 +77,10 @@ local function attachHook(ply, wep, state)
 
 		-- Grant Aegis when this player deals melee damage with this weapon
 		local attacker = dmginfo:GetAttacker()
+		local classification = Arcana.Common.GetWeaponClassification(wep)
 		if IsValid(attacker) and attacker == ply then
 			local active = ply:GetActiveWeapon()
-			if IsValid(active) and active == wep and isMeleeHoldType(wep) and isMeleeDamage(dmginfo) then
+			if IsValid(active) and active == wep and classification == "MELEE" and isMeleeDamage(dmginfo) then
 				state._aegisUntil = now + 2.0
 				playAegisVFX(ply)
 			end
@@ -90,7 +89,7 @@ local function attachHook(ply, wep, state)
 		-- While Aegis is active, ignore non-melee damage to this player (only while wielding this melee)
 		if IsValid(victim) and victim == ply and now <= (state._aegisUntil or 0) then
 			local active = ply:GetActiveWeapon()
-			if IsValid(active) and active == wep and isMeleeHoldType(wep) then
+			if IsValid(active) and active == wep and classification == "MELEE" then
 				if not isMeleeDamage(dmginfo) then
 					-- Block non-melee damage
 					dmginfo:SetDamage(0)
@@ -126,7 +125,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 50 },
 	},
 	can_apply = function(ply, wep)
-		return IsValid(wep) and isMeleeHoldType(wep)
+		return Arcana.Common.GetWeaponClassification(wep) == "MELEE"
 	end,
 	apply = attachHook,
 	remove = detachHook,
