@@ -121,6 +121,7 @@ if SERVER then
 		-- Spawn a fresh weapon entity for display
 		local wep = ents.Create(cls)
 		if not IsValid(wep) then return end
+		
 		wep:Spawn()
 		wep:Activate()
 		wep:SetOwner(NULL)
@@ -583,7 +584,17 @@ if CLIENT then
 		emitter:Finish()
 	end)
 
-	local BandCircle = Arcana.Circle.BandCircle
+	local BandCircle    = Arcana.Circle.BandCircle
+	local RING_TYPES    = Arcana.Circle.RING_TYPES
+	local Draw2DRing    = Arcana.Circle.Draw2DRing
+	local Draw2DPattern = Arcana.Circle.Draw2DPatternRing
+	local Draw2DRune    = Arcana.Circle.Draw2DRuneStar
+
+	-- Enchanter-specific circle appearance
+	local _circleCol       = Color(210, 185, 145)
+	local _runeGlyphs      = {65, 67, 69, 71}  -- inner star: A/C/E/G
+	local _runeGlyphsOuter = {66, 68, 70, 72}  -- outer star: B/D/F/H
+
 	-- Create band rings that spin around the deposited weapon
 	function ENT:ClientInitBandVis()
 		if self._bandCircle and self._bandCircle.IsActive and self._bandCircle:IsActive() then return end
@@ -643,111 +654,6 @@ if CLIENT then
 	function ENT:OnRemove()
 		self:ClientCleanupBandVis()
 	end
-
-	-- UI-only glyph helpers to enrich the circle visuals (standalone from circles.lua)
-	local RUNIC_PHRASES = {"ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS ABRAXAS", "DIVINE LIGHT WISDOM TRUTH COSMOS SOUL SPIRIT", "BEGINNING AND END BEGINNING AND END BEGINNING",}
-
-	local MYSTICAL_PHRASES = {"IN THE NAME OF THE MOST GRACIOUS THE MOST MERCIFUL", "THE DIVINE LIGHT OF THE HEAVENS AND THE EARTH", "GLORY BE TO THE INFINITE GLORY BE TO THE ETERNAL",}
-
-	local GLYPH_PHRASES = {}
-
-	for _, p in ipairs(RUNIC_PHRASES) do
-		table.insert(GLYPH_PHRASES, p)
-	end
-
-	for _, p in ipairs(MYSTICAL_PHRASES) do
-		table.insert(GLYPH_PHRASES, p)
-	end
-
-	local UI_GLYPH_CACHE = {}
-	local function UI_GetGlyphMaterial(fontName, char)
-		local key = (fontName or "") .. ":" .. (char or "")
-		local cached = UI_GLYPH_CACHE[key]
-		if cached then return cached.mat, cached.w, cached.h end
-		surface.SetFont(fontName or "DermaDefault")
-		local w, h = surface.GetTextSize(char)
-		w = math.max(1, math.floor(w + 2))
-		h = math.max(1, math.floor(h + 2))
-		local id = util.CRC and util.CRC(key) or tostring(key):gsub("%W", "")
-		local rtName = "arcana_ui_glyph_rt_" .. id
-		local tex = GetRenderTarget(rtName, w, h, true)
-		local matName = "arcana_ui_glyph_mat_" .. id
-
-		local mat = CreateMaterial(matName, "UnlitGeneric", {
-			["$basetexture"] = tex:GetName(),
-			["$translucent"] = 1,
-			["$vertexalpha"] = 1,
-			["$vertexcolor"] = 1,
-			["$nolod"] = 1,
-		})
-
-		render.PushRenderTarget(tex)
-		render.Clear(0, 0, 0, 0, true, true)
-		cam.Start2D()
-		surface.SetFont(fontName or "DermaDefault")
-		surface.SetTextColor(255, 255, 255, 255)
-		surface.SetTextPos(1, 1)
-		surface.DrawText(char)
-		cam.End2D()
-		render.PopRenderTarget()
-
-		UI_GLYPH_CACHE[key] = {
-			mat = mat,
-			w = w,
-			h = h
-		}
-
-		return mat, w, h
-	end
-
-	local function UI_DrawGlyphRing(cx, cy, radius, fontName, phrase, scaleMul, count, col, rotOffset)
-		phrase = tostring(phrase or "MAGIC")
-		local chars = {}
-
-		for _, code in utf8.codes(phrase) do
-			chars[#chars + 1] = utf8.char(code)
-		end
-
-		if #chars == 0 then
-			chars = {"*"}
-		end
-
-		local num = math.max(12, count or 36)
-		local step = (math.pi * 2) / num
-		local drawCol = col or Color(220, 200, 150, 235)
-		surface.SetDrawColor(drawCol.r, drawCol.g, drawCol.b, drawCol.a)
-		local ro = tonumber(rotOffset) or 0
-
-		for i = 1, num do
-			local ch = chars[((i - 1) % #chars) + 1]
-			local mat, gw, gh = UI_GetGlyphMaterial(fontName or "DermaDefault", ch)
-			local ang = -math.pi / 2 + i * step + ro
-			local px = cx + math.cos(ang) * radius
-			local py = cy + math.sin(ang) * radius
-			local rot = math.deg(ang + math.pi * 0.5)
-			local s = (scaleMul or 0.6)
-			local w = math.max(1, gw * s)
-			local h = math.max(1, gh * s)
-			surface.SetMaterial(mat)
-			surface.DrawTexturedRectRotated(px, py, w, h, rot)
-		end
-	end
-
-	local function UI_DrawMinorTicks(cx, cy, radiusOuter, radiusInner, count, col)
-		surface.SetDrawColor((col and col.r) or 200, (col and col.g) or 180, (col and col.b) or 140, (col and col.a) or 220)
-		local n = math.max(1, count or 32)
-		local step = (math.pi * 2) / n
-
-		for i = 0, n - 1 do
-			local a = -math.pi / 2 + i * step
-			local x1 = cx + math.cos(a) * radiusOuter
-			local y1 = cy + math.sin(a) * radiusOuter
-			local x2 = cx + math.cos(a) * radiusInner
-			local y2 = cy + math.sin(a) * radiusInner
-			surface.DrawLine(x1, y1, x2, y2)
-		end
-	end
-
 
 	local function getEnchantmentsList()
 		return Arcana and Arcana.RegisteredEnchantments or {}
@@ -914,69 +820,15 @@ if CLIENT then
 			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
 			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
 
-			-- Engraved circle background (non-pentagram)
 			local cx, cy = w * 0.5, h * 0.44
 			local radius = math.min(w, h) * 0.36
+			local t      = CurTime()
 
-			-- Stone base
-			draw.NoTexture()
-			surface.SetDrawColor(ArtDeco.Colors.decoBg)
-			surface.DrawCircle(cx, cy, radius, 80, 70, 60, 245)
-
-			-- Soft inner disc for contrast
-			for r = radius, radius - 6, -1 do
-				surface.DrawCircle(cx, cy, r, 90, 80, 70, 200)
-			end
-
-			-- Outer engraved rings
-			local function thickCircle(r, t)
-				for i = 0, t do
-					surface.DrawCircle(cx, cy, r - i, 200, 180, 140, 255)
-				end
-			end
-
-			thickCircle(radius - 8, 1)
-			thickCircle(radius * 0.82, 1)
-			thickCircle(radius * 0.64, 1)
-
-			-- Helpers
-			local function pnt(a, r)
-				return cx + math.cos(a) * r, cy + math.sin(a) * r
-			end
-
-			-- Radial ticks
-			surface.SetDrawColor(ArtDeco.Colors.textDim)
-
-			for i = 0, 11 do
-				local ang = i * (math.pi * 2 / 12)
-				local x1, y1 = pnt(ang, radius * 0.90)
-				local x2, y2 = pnt(ang, radius * 0.84)
-				surface.DrawLine(x1, y1, x2, y2)
-			end
-
-			-- Fine ticks between main ticks (keep within outer band)
-			UI_DrawMinorTicks(cx, cy, radius * 0.89, radius * 0.865, 48, ArtDeco.Colors.textDim)
-
-			-- Engraved glyph rings (slow counter-rotation)
-			local t = CurTime()
-
-			-- Outer glyph band (slightly larger for breathing room)
-			local bandOuterMid = radius * 0.755
-			local bandOuterIn = radius * 0.72
-			local bandOuterOut = radius * 0.79
-			thickCircle(bandOuterOut, 1)
-			thickCircle(bandOuterIn, 1)
-			local phraseOuter = RUNIC_PHRASES[1 + (math.floor(t * 0.02) % #RUNIC_PHRASES)]
-			UI_DrawGlyphRing(cx, cy, bandOuterMid, "MagicCircle_Small", phraseOuter, 0.30, 64, Color(220, 200, 150, 235), t * 0.08)
-
-			-- Inner glyph band (slightly larger)
-			local bandInnerMid = radius * 0.585
-			local bandInnerIn = radius * 0.56
-			local bandInnerOut = radius * 0.61
-			thickCircle(bandInnerOut, 1)
-			thickCircle(bandInnerIn, 1)
-			local phraseInner = MYSTICAL_PHRASES[1 + (math.floor(t * 0.015 + 1) % #MYSTICAL_PHRASES)]
-			UI_DrawGlyphRing(cx, cy, bandInnerMid, "MagicCircle_Small", phraseInner, 0.26, 48, Color(220, 200, 150, 210), -t * 0.06)
+			Draw2DRune(cx, cy, radius,        t * 2,  _runeGlyphsOuter, _circleCol, 210)
+			Draw2DPattern(2, cx, cy, radius * 0.88, -t * 4, _circleCol, 220)
+			Draw2DRing(RING_TYPES.SIMPLE_LINE, cx, cy, radius * 0.74, t * 2, _circleCol, 190)
+			Draw2DPattern(1, cx, cy, radius * 0.60, -t * 9, _circleCol, 210)
+			Draw2DRune(cx, cy, radius * 0.44, -t * 3, _runeGlyphs, _circleCol, 210)
 		end
 
 		-- Weapon model preview centered in the circle

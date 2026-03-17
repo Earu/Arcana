@@ -75,6 +75,38 @@ local MELEE_HOLDTYPES = {
 	["fist"] = true,
 }
 
+-- Static classifications for default HL2/GMod weapons that are not SWEPs and
+-- therefore cannot be inspected via source analysis.
+local HL2_WEAPON_CLASSIFICATIONS = {
+	-- Melee
+	["weapon_crowbar"]    = "MELEE",
+	["weapon_stunstick"]  = "MELEE",
+	
+	-- Hitscan
+	["weapon_pistol"]     = "HITSCAN",
+	["weapon_357"]        = "HITSCAN",
+	["weapon_smg1"]       = "HITSCAN",
+	["weapon_ar2"]        = "HITSCAN",
+	["weapon_shotgun"]    = "HITSCAN",
+	["weapon_annabelle"]  = "HITSCAN",
+	["weapon_alyxgun"]    = "HITSCAN",
+
+	-- Projectile
+	["weapon_crossbow"]   = "PROJECTILE",
+	["weapon_rpg"]        = "PROJECTILE",
+	["weapon_frag"]       = "PROJECTILE",
+	["weapon_slam"]       = "PROJECTILE",
+	["weapon_bugbait"]    = "PROJECTILE",
+
+	-- Unknown / special-purpose
+	["weapon_physcannon"] = "UNKNOWN",
+	["weapon_physgun"]    = "UNKNOWN",
+	["weapon_medkit"]     = "UNKNOWN",
+	["gmod_tool"]         = "UNKNOWN",
+	["gmod_camera"]       = "UNKNOWN",
+	["none"]              = "UNKNOWN",
+}
+
 --- Returns true when the weapon uses a melee hold type.
 function Arcana.Common.IsMeleeHoldType(wep)
 	local ht = getHoldType(wep)
@@ -333,44 +365,46 @@ if SERVER then
 	end
 
 	local function classifyWeapon(wep)
-		local classification = "UNKNOWN"
-		local className = wep.ClassName
+		local className = wep:GetClass()
+		local hl2 = HL2_WEAPON_CLASSIFICATIONS[className]
+		if hl2 then return hl2 end
+
 		local holdType = getHoldType(wep)
 		if MELEE_HOLDTYPES[holdType] then
-			classification = "MELEE"
+			return "MELEE"
 		elseif UNKNOWN_HOLDTYPES[holdType] then
-			classification = "UNKNOWN"
+			return "UNKNOWN"
 		elseif holdType == "grenade" or className:find("grenade") or className:find("nade") then -- grenade holdtype and classnames are almost always projectiles
-			classification = "PROJECTILE"
+			return "PROJECTILE"
 		else
-			classification = classifyRangedWeapon(wep)
+			return classifyRangedWeapon(wep)
 		end
-
-		return classification
 	end
 
 	function Arcana.Common.GetWeaponClassification(wep)
-		if not IsValid(wep) or not isstring(wep.ClassName) then return "UNKNOWN" end
+		if not IsValid(wep) then return "UNKNOWN" end
 
-		local cached = weaponClassificationCache[wep.ClassName]
+		local className = wep:GetClass()
+		local cached = weaponClassificationCache[className]
 		if cached then return cached end
 
 		local classification = classifyWeapon(wep)
 
-		weaponClassificationCache[wep.ClassName] = classification
+		weaponClassificationCache[className] = classification
 		updateWeaponClassificationCache()
 		return classification
 	end
 
 	-- Classify weapons when theyre equipped
 	hook.Add("WeaponEquip", "Arcana_UpdateWeaponClassificationCache", function(wep)
-		if not IsValid(wep) or not isstring(wep.ClassName) then return end
-		if weaponClassificationCache[wep.ClassName] then return end
+		if not IsValid(wep) then return end
+		local className = wep:GetClass()
+		if weaponClassificationCache[className] then return end
 
 		timer.Simple(0.1, function()
 			if not IsValid(wep) then return end
 
-			weaponClassificationCache[wep.ClassName] = classifyWeapon(wep)
+			weaponClassificationCache[className] = classifyWeapon(wep)
 			updateWeaponClassificationCache()
 		end)
 	end)
@@ -388,8 +422,9 @@ if CLIENT then
 	end)
 
 	function Arcana.Common.GetWeaponClassification(wep)
-		if not IsValid(wep) or not isstring(wep.ClassName) then return "UNKNOWN" end
-		local cached = weaponClassificationCache[wep.ClassName]
+		local className = wep:GetClass()
+		if not IsValid(wep) or not isstring(className) then return "UNKNOWN" end
+		local cached = weaponClassificationCache[className]
 		if cached then return cached end
 		return "UNKNOWN"
 	end
