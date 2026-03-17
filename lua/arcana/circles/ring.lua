@@ -500,6 +500,79 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	cam_PopModelMatrix()
 end
 
+-- ── 2D surface drawing API ────────────────────────────────────────────────────
+-- Draw ring PNGs inside Paint hooks / vgui without exposing internal material tables.
+
+local RING_2D_SCALE  -- PNG_RING_SIZE / PNG_RING_RADIUS_PX, set on first draw call.
+
+-- Sets material + draw colour, handling both the custom shader and fallback paths.
+local function apply2DColor(mat, color, alpha)
+	local r = color and color.r or 255
+	local g = color and color.g or 255
+	local b = color and color.b or 255
+	local a = alpha or (color and color.a) or 255
+	if mat.SetFloat then
+		mat:SetFloat("$c0_x", CurTime())
+		mat:SetFloat("$c1_x", r / 255)
+		mat:SetFloat("$c1_y", g / 255)
+		mat:SetFloat("$c1_z", b / 255)
+	end
+	surface_SetMaterial(mat)
+	if shader_available then
+		surface_SetDrawColor(255, 255, 255, a)
+	else
+		surface_SetDrawColor(r, g, b, a)
+	end
+end
+
+-- Draws a ring (by RING_TYPES value) centred at (cx, cy) in screen space.
+function Arcana.Circle.Draw2DRing(ringType, cx, cy, radius, angle, color, alpha)
+	ensurePNGMatsLoaded()
+	local mat = PNG_RING_MATS[ringType]
+	if not mat then return end
+	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
+	apply2DColor(mat, color, alpha)
+	local s = radius * RING_2D_SCALE
+	surface_DrawTexturedRectRotated(cx, cy, s, s, angle or 0)
+end
+
+-- Draws a pattern-lines ring (variant 1–3) centred at (cx, cy) in screen space.
+function Arcana.Circle.Draw2DPatternRing(variant, cx, cy, radius, angle, color, alpha)
+	ensurePNGMatsLoaded()
+	local mat = PNG_PATTERN_LINE_MATS[variant or 1]
+	if not mat then return end
+	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
+	apply2DColor(mat, color, alpha)
+	local s = radius * RING_2D_SCALE
+	surface_DrawTexturedRectRotated(cx, cy, s, s, angle or 0)
+end
+
+-- Draws a RUNE_STAR ring with four co-rotating glyph overlays in screen space.
+-- glyphs: array of 4 char codes from EXPORTED_GLYPH_CODES (65–72 = 'A'–'H').
+function Arcana.Circle.Draw2DRuneStar(cx, cy, radius, angle, glyphs, color, alpha)
+	ensurePNGMatsLoaded()
+	local mat = PNG_RING_MATS[RING_TYPES.RUNE_STAR]
+	if not mat then return end
+	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
+	local s = radius * RING_2D_SCALE
+	apply2DColor(mat, color, alpha)
+	surface_DrawTexturedRectRotated(cx, cy, s, s, angle or 0)
+	if not glyphs then return end
+	local glyphSize = radius * 0.35
+	local rot = -math_pi / 180 * (angle or 0)
+	for i = 1, 4 do
+		local a  = (i - 1) * math_pi * 0.5 + math_pi * 0.25 + rot
+		local gm = PNG_GLYPH_MATS[glyphs[i]]
+		if gm then
+			apply2DColor(gm, color, alpha)
+			surface_DrawTexturedRect(
+				cx + math_cos(a) * radius - glyphSize * 0.5,
+				cy + math_sin(a) * radius - glyphSize * 0.5,
+				glyphSize, glyphSize)
+		end
+	end
+end
+
 -- Export
 Arcana.Circle.Ring       = Ring
 Arcana.Circle.RING_TYPES = RING_TYPES
