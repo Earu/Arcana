@@ -274,7 +274,6 @@ if SERVER then
 		-- Parenthesised call: ents.Create("foo") or ents.Create(var)
 		for args in source:gmatch("ents%.Create%s*(%b())") do
 			local literal = args:match("^%(%s*[\"']([^\"']+)[\"']%s*%)$")
-			print(literal, weapon)
 			if literal then
 				if isProjectileClass(literal) then return literal end
 			else
