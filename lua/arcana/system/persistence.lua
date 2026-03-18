@@ -112,11 +112,18 @@ if SERVER then
 		local incoming_selected = tonumber(data.selected_quickslot) or 1
 		local lastsave = tonumber(data.last_save) or os.time()
 
-		-- Merge strategy: xp/level take max, knowledge_points use incoming, unlocked_spells union, quickslots prefer incoming
+		-- Merge strategy: xp/level take max, unlocked_spells union, quickslots prefer incoming.
+		-- knowledge_points is fully derived from merged_level and merged_unlocked (earned - spent),
+		-- because it is a spendable value — higher is not necessarily truer, only the formula is.
 		local function mergeWithExistingRow(row)
 			if not istable(row) then
-				return incoming_xp, incoming_level, incoming_unlocked_map, incoming_quickslots, incoming_selected
+				local derived_kp = math.max(0,
+					Arcana:GetTotalEarnedKnowledgePoints(incoming_level) -
+					Arcana:GetTotalSpentKnowledgePoints(incoming_unlocked_map)
+				)
+				return incoming_xp, incoming_level, derived_kp, incoming_unlocked_map, incoming_quickslots, incoming_selected
 			end
+
 			local existing_xp = tonumber(row.xp) or 0
 			local existing_level = tonumber(row.level) or 1
 			local existing_unlocked = deserializeUnlockedSpells(row.unlocked_spells)
@@ -135,14 +142,18 @@ if SERVER then
 				end
 			end
 			local merged_selected = (incoming_selected >= 1 and incoming_selected <= 8) and incoming_selected or existing_selected
-			return merged_xp, merged_level, merged_unlocked, merged_quick, merged_selected
+			local derived_kp = math.max(0,
+				Arcana:GetTotalEarnedKnowledgePoints(merged_level) -
+				Arcana:GetTotalSpentKnowledgePoints(merged_unlocked)
+			)
+			return merged_xp, merged_level, derived_kp, merged_unlocked, merged_quick, merged_selected
 		end
 
 		local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
-		local mxp, mlevel, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
+		local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
 		local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
 		local quick = sql.SQLStr(serializeQuickslots(mquick))
-		local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, incoming_kp, unlocked, quick, mselected, lastsave)
+		local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
 		local ok = sql.Query(q)
 		if ok == false then
 			dbLogError("SavePlayerDataToSQL failed")
