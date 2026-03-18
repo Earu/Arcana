@@ -106,7 +106,6 @@ if SERVER then
 		local steamid = sql.SQLStr(ply:SteamID64(), true)
 		local incoming_xp = tonumber(data.xp) or 0
 		local incoming_level = tonumber(data.level) or 1
-		local incoming_kp = tonumber(data.knowledge_points) or 0
 		local incoming_unlocked_map = data.unlocked_spells or {}
 		local incoming_quickslots = data.quickspell_slots or {nil, nil, nil, nil, nil, nil, nil, nil}
 		local incoming_selected = tonumber(data.selected_quickslot) or 1
@@ -172,11 +171,18 @@ if SERVER then
 			local data = CreateDefaultPlayerData()
 			data.xp = tonumber(row.xp) or data.xp
 			data.level = tonumber(row.level) or data.level
-			data.knowledge_points = tonumber(row.knowledge_points) or data.knowledge_points
 			data.unlocked_spells = deserializeUnlockedSpells(row.unlocked_spells)
 			data.quickspell_slots = deserializeQuickslots(row.quickspell_slots)
 			data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
 			data.last_save = tonumber(row.last_save) or data.last_save
+			-- KP is fully derived from level and spells rather than trusted from storage,
+			-- because it is a spendable value — the formula is the only ground truth.
+			-- CalculateExpectedKnowledgePoints requires data to be in Arcana.PlayerData which
+			-- it isn't yet at this point, so we call the two constituent helpers directly.
+			data.knowledge_points = math.max(0,
+				Arcana:GetTotalEarnedKnowledgePoints(data.level) -
+				Arcana:GetTotalSpentKnowledgePoints(data.unlocked_spells)
+			)
 			Arcana.SaveBlockedBySteamID[rawSid] = nil
 			Arcana.RetryStateBySteamID[rawSid] = nil
 			callback(true, data)
