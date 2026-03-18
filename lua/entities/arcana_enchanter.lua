@@ -675,6 +675,113 @@ if CLIENT then
 		weapon_stunstick = "models/weapons/w_stunbaton.mdl",
 	}
 
+	local WARN_TEXT = {
+		"Not all enchantments work with every weapon.",
+		"",
+		"The enchanter does its best to figure out how your",
+		"weapon works, but it can sometimes get it wrong.",
+		"",
+		"If an enchantment does not seem to do anything,",
+		"it may simply not be compatible with this weapon.",
+	}
+
+	local function showClassificationWarning(parent, onConfirm)
+		-- Full-frame dim overlay
+		local overlay = vgui.Create("DPanel", parent)
+		overlay:SetPos(0, 0)
+		overlay:SetSize(parent:GetWide(), parent:GetTall())
+		overlay:SetZPos(9999)
+		overlay:MoveToFront()
+		overlay.Paint = function(pnl, w, h)
+			surface.SetDrawColor(0, 0, 0, 170)
+			surface.DrawRect(0, 0, w, h)
+		end
+
+		-- Block input reaching the enchanter UI behind us
+		overlay:SetMouseInputEnabled(true)
+
+		local bw, bh = 580, 300
+		local inner = vgui.Create("DPanel", overlay)
+		inner:SetSize(bw, bh)
+		inner:Center()
+		inner.Paint = function(pnl, w, h)
+			-- Background
+			ArtDeco.FillDecoPanel(0, 0, w, h, Color(20, 10, 10, 245), 10)
+
+			-- Pulsing red border (two passes for glow effect)
+			local pulse = math.abs(math.sin(CurTime() * 3.5))
+			local glowA = math.floor(60 + pulse * 80)
+			local edgeR = math.floor(200 + pulse * 55)
+			surface.SetDrawColor(edgeR, 20, 20, glowA)
+			surface.DrawOutlinedRect(0, 0, w, h, 4)
+			surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 2)
+			surface.SetDrawColor(edgeR, 30, 30, 200 + math.floor(pulse * 55))
+			surface.DrawOutlinedRect(6, 6, w - 12, h - 12, 1)
+
+			-- Corner diamonds (art deco)
+			local function diamond(cx, cy, r, col)
+				surface.SetDrawColor(col)
+				surface.DrawLine(cx, cy - r, cx + r, cy)
+				surface.DrawLine(cx + r, cy, cx, cy + r)
+				surface.DrawLine(cx, cy + r, cx - r, cy)
+				surface.DrawLine(cx - r, cy, cx, cy - r)
+			end
+			local dc = Color(edgeR, 40, 40, 220)
+			local cr = 7
+			diamond(cr + 6, cr + 6, cr, dc)
+			diamond(w - cr - 6, cr + 6, cr, dc)
+			diamond(cr + 6, h - cr - 6, cr, dc)
+			diamond(w - cr - 6, h - cr - 6, cr, dc)
+
+			-- Title
+			draw.SimpleText("⚠  WARNING  ⚠", "Arcana_AncientLarge", w * 0.5, 22, Color(edgeR, 60, 60, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+			-- Divider
+			surface.SetDrawColor(edgeR, 40, 40, 160)
+			surface.DrawRect(20, 42, w - 40, 1)
+
+			-- Body text
+			local lineH = draw.GetFontHeight("Arcana_Ancient") + 4
+			local textY = 58
+			for _, line in ipairs(WARN_TEXT) do
+				if line ~= "" then
+					draw.SimpleText(line, "Arcana_Ancient", w * 0.5, textY, Color(230, 200, 200, 245), TEXT_ALIGN_CENTER)
+				end
+				textY = textY + lineH
+			end
+		end
+
+		local btn = vgui.Create("DButton", inner)
+		btn:SetText("")
+		btn:SetSize(200, 36)
+
+		btn.Paint = function(pnl, w, h)
+			local hovered = pnl:IsHovered()
+			local bg = hovered and Color(80, 20, 20, 245) or Color(50, 15, 15, 245)
+			ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+			local pulse = math.abs(math.sin(CurTime() * 3.5))
+			local edgeR = math.floor(180 + pulse * 75)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, Color(edgeR, 40, 40, 255), 8)
+			draw.SimpleText("I UNDERSTAND", "Arcana_AncientLarge", w * 0.5, h * 0.5, Color(255, 200, 200, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+
+		btn.DoClick = function()
+			surface.PlaySound("buttons/button6.wav")
+			overlay:Remove()
+			if onConfirm then onConfirm() end
+		end
+
+		inner.PerformLayout = function(pnl, w, h)
+			btn:SetPos(math.floor(w * 0.5 - 100), h - 52)
+		end
+
+		-- Resize overlay if frame resizes
+		parent.OnSizeChanged = function(pnl, w, h)
+			overlay:SetSize(w, h)
+			inner:Center()
+		end
+	end
+
 	local function OpenEnchanterMenu(machine)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
@@ -925,13 +1032,24 @@ if CLIENT then
 			draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
+		local function doDeposit()
+			net.Start("Arcana_Enchanter_Deposit")
+			net.WriteEntity(machine)
+			net.SendToServer()
+		end
+
 		function toggleBtn:DoClick()
 			updateToggle()
 
 			if self._mode == "deposit" then
-				net.Start("Arcana_Enchanter_Deposit")
-				net.WriteEntity(machine)
-				net.SendToServer()
+				if cookie.GetNumber("Arcana_SeenClassificationWarning", 0) == 0 then
+					showClassificationWarning(frame, function()
+						cookie.Set("Arcana_SeenClassificationWarning", "1")
+						doDeposit()
+					end)
+				else
+					doDeposit()
+				end
 			else
 				net.Start("Arcana_Enchanter_Withdraw")
 				net.WriteEntity(machine)
