@@ -81,7 +81,7 @@ local HL2_WEAPON_CLASSIFICATIONS = {
 	-- Melee
 	["weapon_crowbar"]    = "MELEE",
 	["weapon_stunstick"]  = "MELEE",
-	
+
 	-- Hitscan
 	["weapon_pistol"]     = "HITSCAN",
 	["weapon_357"]        = "HITSCAN",
@@ -105,6 +105,30 @@ local HL2_WEAPON_CLASSIFICATIONS = {
 	["gmod_tool"]         = "UNKNOWN",
 	["gmod_camera"]       = "UNKNOWN",
 	["none"]              = "UNKNOWN",
+}
+
+-- Known projectile entity classes for native HL2 projectile weapons.
+local HL2_WEAPON_PROJECTILE_CLASSES = {
+	["weapon_crossbow"] = "crossbow_bolt",
+	["weapon_rpg"]      = "rpg_missile",
+	["weapon_frag"]     = "npc_grenade_frag",
+	["weapon_slam"]     = "npc_satchel",
+	["weapon_bugbait"]  = "grenade_bugbait",
+}
+
+local HL2_PROJECTILE_CLASSES = {
+	["crossbow_bolt"]        = true,
+	["rpg_missile"]          = true,
+	["npc_grenade_frag"]     = true,
+	["grenade_ar2"]          = true,
+	["prop_combine_ball"]    = true,
+	["grenade_bugbait"]      = true,
+	["npc_satchel"]          = true,
+	["apc_missile"]          = true,
+	["grenade_spit"]         = true,
+	["hunter_flechette"]     = true,
+	["grenade_helicopter"]   = true,
+	["weapon_striderbuster"] = true,
 }
 
 --- Returns true when the weapon uses a melee hold type.
@@ -223,26 +247,31 @@ if SERVER then
 		return table.concat(lines, "\n"), info.source:sub(2) .. ":" .. lineStart
 	end
 
-	-- Returns true if `source` contains an ents.Create call that creates a scripted entity.
-	-- String literal arguments are verified with scripted_ents.GetStored.
-	-- Variable arguments cannot be resolved statically, so they are assumed scripted.
+	local function isProjectileClass(className)
+		if scripted_ents.GetStored(className) then return true end
+		return HL2_PROJECTILE_CLASSES[className] or false
+	end
+
+	-- Returns the scripted entity class string when `source` contains an ents.Create call
+	-- that creates a scripted entity (truthy), true when the argument is a variable and
+	-- the class cannot be resolved statically (conservatively assumes scripted), or false.
 	local function sourceHasScriptedCreate(source)
 		-- Parenthesised call: ents.Create("foo") or ents.Create(var)
 		for args in source:gmatch("ents%.Create%s*(%b())") do
 			local literal = args:match("^%(%s*[\"']([^\"']+)[\"']%s*%)$")
 			if literal then
-				if scripted_ents.GetStored(literal) then return true end
+				if isProjectileClass(literal) then return literal end
 			else
 				return true -- variable argument; conservatively assume scripted
 			end
 		end
 		-- Bare short-string call: ents.Create "foo" or ents.Create 'foo'
 		for literal in source:gmatch("ents%.Create%s+[\"']([^\"']+)[\"']") do
-			if scripted_ents.GetStored(literal) then return true end
+			if isProjectileClass(literal) then return literal end
 		end
 		-- Bare long-string call: ents.Create [[foo]]
 		for literal in source:gmatch("ents%.Create%s+%[%[([^%]]*)%]%]") do
-			if scripted_ents.GetStored(literal) then return true end
+			if isProjectileClass(literal) then return literal end
 		end
 		return false
 	end
@@ -264,17 +293,17 @@ if SERVER then
 		if visited[key] then return false end
 		visited[key] = true
 
-		if matchFn(source) then
-			return true
-		end
+		local result = matchFn(source)
+		if result then return result end
 
 		-- Collect all self:Method() call sites within this function body
 		-- Also covers bare-string and bare-table call syntax: self:Method "x", self:Method { }, self:Method [[x]]
 		for methodName in source:gmatch("self%s*:%s*([%w_]+)%s*[%(\"'{%[]") do
 			if not ENTITY_META[methodName] and not WEAPON_META[methodName] and not WEAPON_HOOKS[methodName] then
 				local method = weapon[methodName]
-				if isfunction(method) and checkForMatch(method, weapon, visited, depth + 1, matchFn) then
-					return true
+				if isfunction(method) then
+					result = checkForMatch(method, weapon, visited, depth + 1, matchFn)
+					if result then return result end
 				end
 			end
 		end
@@ -300,16 +329,18 @@ if SERVER then
 	-- FireBullets is checked first; finding it immediately means hitscan, which
 	-- avoids misclassifying weapons that create a shell entity after shooting.
 	-- Only if FireBullets is absent do we check for scripted ents.Create calls.
+	-- Returns: type (string), projectileClass (string or nil)
 	local function classifyRangedWeapon(weapon)
 		local primaryAttack = weapon.PrimaryAttack
-		if not isfunction(primaryAttack) then return "HITSCAN" end
+		if not isfunction(primaryAttack) then return "HITSCAN", nil end
 
 		if checkForMatch(primaryAttack, weapon, {}, 1, matchFireBullets) then
-			return "HITSCAN"
+			return "HITSCAN", nil
 		end
 
-		if checkForMatch(primaryAttack, weapon, {}, 1, sourceHasScriptedCreate) then
-			return "PROJECTILE"
+		local projClass = checkForMatch(primaryAttack, weapon, {}, 1, sourceHasScriptedCreate)
+		if projClass then
+			return "PROJECTILE", isstring(projClass) and projClass or nil
 		end
 
 		-- If PrimaryAttack makes no custom method calls it is a thin stub (e.g. just
@@ -318,12 +349,15 @@ if SERVER then
 		local primarySource = getFunctionSource(primaryAttack)
 		if primarySource and not sourceHasCustomCalls(primarySource) then
 			local think = weapon.Think
-			if isfunction(think) and checkForMatch(think, weapon, {}, 1, sourceHasScriptedCreate) then
-				return "PROJECTILE"
+			if isfunction(think) then
+				projClass = checkForMatch(think, weapon, {}, 1, sourceHasScriptedCreate)
+				if projClass then
+					return "PROJECTILE", isstring(projClass) and projClass or nil
+				end
 			end
 		end
 
-		return "HITSCAN"
+		return "HITSCAN", nil
 	end
 
 	local UNKNOWN_HOLDTYPES = {
@@ -336,15 +370,23 @@ if SERVER then
 	local CACHE_FILE = "arcana/weapon_classification_cache.json"
 	local weaponClassificationCache = {}
 	if file.Exists(CACHE_FILE, "DATA") then
-		weaponClassificationCache = util.JSONToTable(file.Read(CACHE_FILE, "DATA")) or {}
+		local loaded = util.JSONToTable(file.Read(CACHE_FILE, "DATA")) or {}
+		for className, v in pairs(loaded) do
+			-- Discard entries from the old string-only format; they will be re-classified.
+			if istable(v) then
+				weaponClassificationCache[className] = v
+			end
+		end
 	end
 
 	function Arcana.Common.SendWeaponClassificationCache(ply)
 		net.Start("Arcana_UpdateWeaponClassificationCache")
 		net.WriteInt(table.Count(weaponClassificationCache), 32)
-		for className, classification in pairs(weaponClassificationCache) do
+		for className, entry in pairs(weaponClassificationCache) do
 			net.WriteString(className)
-			net.WriteString(classification)
+			net.WriteString(entry.type or "UNKNOWN")
+			net.WriteString(entry.holdType or "")
+			net.WriteString(entry.projectileClass or "")
 		end
 
 		if IsValid(ply) then
@@ -366,18 +408,26 @@ if SERVER then
 
 	local function classifyWeapon(wep)
 		local className = wep:GetClass()
-		local hl2 = HL2_WEAPON_CLASSIFICATIONS[className]
-		if hl2 then return hl2 end
-
 		local holdType = getHoldType(wep)
+
+		local hl2Type = HL2_WEAPON_CLASSIFICATIONS[className]
+		if hl2Type then
+			local entry = { type = hl2Type, holdType = holdType }
+			if hl2Type == "PROJECTILE" then
+				entry.projectileClass = HL2_WEAPON_PROJECTILE_CLASSES[className]
+			end
+			return entry
+		end
+
 		if MELEE_HOLDTYPES[holdType] then
-			return "MELEE"
+			return { type = "MELEE", holdType = holdType }
 		elseif UNKNOWN_HOLDTYPES[holdType] then
-			return "UNKNOWN"
-		elseif holdType == "grenade" or className:find("grenade") or className:find("nade") then -- grenade holdtype and classnames are almost always projectiles
-			return "PROJECTILE"
+			return { type = "UNKNOWN", holdType = holdType }
+		elseif holdType == "grenade" or className:find("grenade") or className:find("nade") then
+			return { type = "PROJECTILE", holdType = holdType }
 		else
-			return classifyRangedWeapon(wep)
+			local wepType, projClass = classifyRangedWeapon(wep)
+			return { type = wepType, holdType = holdType, projectileClass = projClass }
 		end
 	end
 
@@ -386,13 +436,18 @@ if SERVER then
 
 		local className = wep:GetClass()
 		local cached = weaponClassificationCache[className]
-		if cached then return cached end
+		if cached then return cached.type end
 
 		local classification = classifyWeapon(wep)
 
 		weaponClassificationCache[className] = classification
 		updateWeaponClassificationCache()
-		return classification
+		return classification.type
+	end
+
+	function Arcana.Common.GetWeaponClassificationData(className)
+		if not isstring(className) then return nil end
+		return weaponClassificationCache[className]
 	end
 
 	-- Classify weapons when theyre equipped
@@ -415,9 +470,15 @@ if CLIENT then
 	net.Receive("Arcana_UpdateWeaponClassificationCache", function()
 		local count = net.ReadInt(32)
 		for i = 1, count do
-			local className = net.ReadString()
-			local classification = net.ReadString()
-			weaponClassificationCache[className] = classification
+			local className       = net.ReadString()
+			local wepType         = net.ReadString()
+			local holdType        = net.ReadString()
+			local projectileClass = net.ReadString()
+			weaponClassificationCache[className] = {
+				type           = wepType,
+				holdType       = holdType ~= "" and holdType or nil,
+				projectileClass = projectileClass ~= "" and projectileClass or nil,
+			}
 		end
 	end)
 
@@ -425,7 +486,12 @@ if CLIENT then
 		local className = wep:GetClass()
 		if not IsValid(wep) or not isstring(className) then return "UNKNOWN" end
 		local cached = weaponClassificationCache[className]
-		if cached then return cached end
+		if cached then return cached.type end
 		return "UNKNOWN"
+	end
+
+	function Arcana.Common.GetWeaponClassificationData(className)
+		if not isstring(className) then return nil end
+		return weaponClassificationCache[className]
 	end
 end
