@@ -252,23 +252,56 @@ if SERVER then
 		return HL2_PROJECTILE_CLASSES[className] or false
 	end
 
+	-- Builds a name->value table of all upvalues for `func`.
+	local function getUpvalues(func)
+		local upvalues = {}
+		local i = 1
+		while true do
+			local name, val = debug.getupvalue(func, i)
+			if not name then break end
+			upvalues[name] = val
+			i = i + 1
+		end
+		return upvalues
+	end
+
 	-- Returns the scripted entity class string when `source` contains an ents.Create call
 	-- that creates a scripted entity (truthy), true when the argument is a variable and
 	-- the class cannot be resolved statically (conservatively assumes scripted), or false.
-	local function sourceHasScriptedCreate(source)
+	-- `func`   – the function whose upvalues can be inspected to resolve bare variables
+	-- `weapon` – the SWEP table used to resolve self.Field / SWEP.Field member access
+	local function sourceHasScriptedCreate(source, func, weapon)
 		-- Parenthesised call: ents.Create("foo") or ents.Create(var)
 		for args in source:gmatch("ents%.Create%s*(%b())") do
 			local literal = args:match("^%(%s*[\"']([^\"']+)[\"']%s*%)$")
+			print(literal, weapon)
 			if literal then
 				if isProjectileClass(literal) then return literal end
 			else
-				return true -- variable argument; conservatively assume scripted
+				-- Try to resolve self.Field or SWEP.Field member access
+				local field = args:match("^%(%s*[Ss][Ee][Ll][Ff]%.([%w_]+)%s*%)$") or args:match("^%(%s*SWEP%.([%w_]+)%s*%)$")
+				if field and weapon then
+					local v = weapon[field]
+					if isstring(v) and isProjectileClass(v) then return v end
+				end
+
+				-- Try to resolve a bare local/upvalue variable
+				local varName = args:match("^%(%s*([%w_]+)%s*%)$")
+				if varName and func then
+					local upvalues = getUpvalues(func)
+					local v = upvalues[varName]
+					if isstring(v) and isProjectileClass(v) then return v end
+				end
+
+				return true -- unresolvable variable; conservatively assume scripted
 			end
 		end
+
 		-- Bare short-string call: ents.Create "foo" or ents.Create 'foo'
 		for literal in source:gmatch("ents%.Create%s+[\"']([^\"']+)[\"']") do
 			if isProjectileClass(literal) then return literal end
 		end
+
 		-- Bare long-string call: ents.Create [[foo]]
 		for literal in source:gmatch("ents%.Create%s+%[%[([^%]]*)%]%]") do
 			if isProjectileClass(literal) then return literal end
@@ -293,7 +326,7 @@ if SERVER then
 		if visited[key] then return false end
 		visited[key] = true
 
-		local result = matchFn(source)
+		local result = matchFn(source, func, weapon)
 		if result then return result end
 
 		-- Collect all self:Method() call sites within this function body
@@ -313,18 +346,6 @@ if SERVER then
 
 	local function matchFireBullets(source) return source:find(":FireBullets%(") ~= nil end
 
-	-- Returns true if `source` contains at least one self:Method() call where Method
-	-- is NOT part of the Entity or Weapon metatables (i.e. a custom weapon method).
-	local function sourceHasCustomCalls(source)
-		-- Also covers bare-string and bare-table call syntax: self:Method "x", self:Method { }, self:Method [[x]]
-		for methodName in source:gmatch("self%s*:%s*([%w_]+)%s*[%(\"'{%[]") do
-			if not ENTITY_META[methodName] and not WEAPON_META[methodName] and not WEAPON_HOOKS[methodName] then
-				return true
-			end
-		end
-		return false
-	end
-
 	-- Entry point: classifies a weapon as "PROJECTILE" or "HITSCAN".
 	-- FireBullets is checked first; finding it immediately means hitscan, which
 	-- avoids misclassifying weapons that create a shell entity after shooting.
@@ -343,17 +364,11 @@ if SERVER then
 			return "PROJECTILE", isstring(projClass) and projClass or nil
 		end
 
-		-- If PrimaryAttack makes no custom method calls it is a thin stub (e.g. just
-		-- sets a timer or calls SetNextPrimaryFire). Some weapons defer projectile
-		-- creation entirely to Think, so scan that function for scripted entity creation.
-		local primarySource = getFunctionSource(primaryAttack)
-		if primarySource and not sourceHasCustomCalls(primarySource) then
-			local think = weapon.Think
-			if isfunction(think) then
-				projClass = checkForMatch(think, weapon, {}, 1, sourceHasScriptedCreate)
-				if projClass then
-					return "PROJECTILE", isstring(projClass) and projClass or nil
-				end
+		local think = weapon.Think
+		if isfunction(think) then
+			projClass = checkForMatch(think, weapon, {}, 1, sourceHasScriptedCreate)
+			if projClass then
+				return "PROJECTILE", isstring(projClass) and projClass or nil
 			end
 		end
 
@@ -423,10 +438,12 @@ if SERVER then
 			return { type = "MELEE", holdType = holdType }
 		elseif UNKNOWN_HOLDTYPES[holdType] then
 			return { type = "UNKNOWN", holdType = holdType }
-		elseif holdType == "grenade" or className:find("grenade") or className:find("nade") then
-			return { type = "PROJECTILE", holdType = holdType }
 		else
 			local wepType, projClass = classifyRangedWeapon(wep)
+			if wepType == "HITSCAN" and (holdType == "grenade" or className:find("grenade") or className:find("nade")) then
+				wepType = "PROJECTILE"
+			end
+
 			return { type = wepType, holdType = holdType, projectileClass = projClass }
 		end
 	end
