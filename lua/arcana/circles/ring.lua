@@ -117,10 +117,19 @@ local PNG_RING_MATS         = nil   -- keyed by RING_TYPES value; nil until firs
 local PNG_PATTERN_LINE_MATS = nil   -- array of 3 PATTERN_LINES variant materials
 local PNG_BAND_MATS         = nil   -- array of 3 BAND_RING variant materials
 local PNG_GLYPH_MATS        = {}    -- keyed by char code 65-72
+local BUILT_WITH_SHADER    = false
 
 local function ensurePNGMatsLoaded()
-	if PNG_RING_MATS then return end
+	if PNG_RING_MATS then
+		-- this bit makes sure to rebuild the materials if the shader is available
+		local shouldReturn = true
+		if not BUILT_WITH_SHADER and shader_available then
+			shouldReturn = false
+		end
+		if shouldReturn then return end
+	end
 
+	BUILT_WITH_SHADER = shader_available
 	PNG_PATTERN_LINE_MATS = {
 		CreateCircleMaterial("arcana_png_pattern_1", "arcana/rings/ring_pattern_lines.png"),
 		CreateCircleMaterial("arcana_png_pattern_2", "arcana/rings/ring_pattern_lines_2.png"),
