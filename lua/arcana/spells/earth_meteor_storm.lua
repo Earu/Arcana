@@ -926,7 +926,9 @@ if CLIENT then
 	end)
 
 	-- Render meteor trails
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_MeteorStorm_RenderMeteors", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_MeteorStorm_RenderMeteors", function(_, isSkybox)
+		if isSkybox then return end
+
 		-- Clean up expired meteors
 		for i = #activeMeteors, 1, -1 do
 			if CurTime() > activeMeteors[i].impactTime + 0.1 then

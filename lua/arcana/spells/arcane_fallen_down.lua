@@ -1351,7 +1351,9 @@ if CLIENT then
 		local renderHook = "Arcana_FallenDown_RenderAura_" .. tostring(caster)
 		local matGlow = Material("sprites/light_glow02_add")
 
-		hook.Add("PostDrawTranslucentRenderables", renderHook, function()
+		hook.Add("PostDrawTranslucentRenderables", renderHook, function(_, isSkybox)
+			if isSkybox then return end
+
 			if not IsValid(caster) then
 				hook.Remove("PostDrawTranslucentRenderables", renderHook)
 
@@ -2217,7 +2219,9 @@ if CLIENT then
 	end)
 
 	-- Render the beam from sky
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_FallenDown_RenderBeam", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_FallenDown_RenderBeam", function(_, isSkybox)
+		if isSkybox then return end
+
 		local curTime = CurTime()
 		-- Render and clean up lightning arcs
 		local matBeamLightning = Material("effects/laser1")

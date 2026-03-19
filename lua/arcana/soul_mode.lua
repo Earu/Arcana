@@ -261,7 +261,9 @@ if CLIENT then
 		}
 	end
 
-	hook.Add("PostDrawTranslucentRenderables", Tag .. "_SoulRunes3D", function(bDepth, bSky)
+	hook.Add("PostDrawTranslucentRenderables", Tag .. "_SoulRunes3D", function(_, isSkybox)
+		if isSkybox then return end
+
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
 
