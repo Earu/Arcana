@@ -250,7 +250,9 @@ if CLIENT then
 	end)
 
 	-- Render lightning bolts
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLightning", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLightning", function(_, isSkybox)
+		if isSkybox then return end
+
 		local curTime = CurTime()
 
 		-- Render bright flash sprites

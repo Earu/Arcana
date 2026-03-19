@@ -270,7 +270,9 @@ if CLIENT then
 		end
 	end
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_EarthShatter_Render", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_EarthShatter_Render", function(_, isSkybox)
+		if isSkybox then return end
+
 		-- Cull expired
 		for i = #bursts, 1, -1 do
 			local b = bursts[i]

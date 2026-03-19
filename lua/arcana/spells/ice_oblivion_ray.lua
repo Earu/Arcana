@@ -1093,7 +1093,9 @@ if CLIENT then
 
 	-- ── Rendering ─────────────────────────────────────────────────────────────
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_IceOblivionRay_Render", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_IceOblivionRay_Render", function(_, isSkybox)
+		if isSkybox then return end
+
 		local curTime = CurTime()
 
 		-- Lightning arcs (both casting phase and beam side-discharge)

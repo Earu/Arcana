@@ -113,7 +113,9 @@ if CLIENT then
 	local iceSpikes = {}
 	local frostOverlayMat = Material("particle/particle_smokegrenade")
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_FrostNova_Render", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_FrostNova_Render", function(_, isSkybox)
+		if isSkybox then return end
+
 		-- Rings
 		for i = #bursts, 1, -1 do
 			local b = bursts[i]
