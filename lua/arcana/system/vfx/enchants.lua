@@ -410,7 +410,9 @@ local function rescanWeapons()
 	end
 end
 
-hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function()
+hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(_, isSkybox)
+	if isSkybox then return end
+
 	for wep, st in pairs(ActiveVFXByEnt) do
 		if not (st and st.bc) then continue end
 		if not IsValid(wep) then continue end
