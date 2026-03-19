@@ -2,18 +2,17 @@
 -- Loads ring.lua → magic_circle.lua → band_circle.lua in order,
 -- then re-exports the public API to _G for backward compatibility.
 
+require("shader_to_gma")
+
 if SERVER then
-	local ok, err = pcall(require, "shader_to_gma")
-	if not ok then
-		MsgC(Color(255, 200, 0), "[Arcana] Optional dependency 'shader_to_gma' not found — custom circle shaders will not be registered. ", Color(200, 200, 200), tostring(err) .. "\n")
-	else
-		resource.AddShader("arcana_circle_ps30")
-		resource.AddShader("arcana_circle_vs30")
-	end
+	resource.AddShader("arcana_circle_ps30")
+	resource.AddShader("arcana_passthrough_vs30")
+	resource.AddShader("arcana_bloom_ps30")
 
 	AddCSLuaFile("arcana/circles/ring.lua")
 	AddCSLuaFile("arcana/circles/magic_circle.lua")
 	AddCSLuaFile("arcana/circles/band_circle.lua")
+	AddCSLuaFile("arcana/circles/bloom.lua")
 	return
 end
 
@@ -23,6 +22,7 @@ Arcana.Circle = Arcana.Circle or {}
 include("arcana/circles/ring.lua")
 include("arcana/circles/magic_circle.lua")
 include("arcana/circles/band_circle.lua")
+include("arcana/circles/bloom.lua")
 
 local MagicCircle = Arcana.Circle.MagicCircle
 local MagicCircleManager = Arcana.Circle.MagicCircleManager

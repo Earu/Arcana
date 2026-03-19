@@ -424,7 +424,27 @@ end)
 
 hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
 	if isSkybox then return end
+
+	-- Capture circles to the bloom render target while 3D camera matrices are
+	-- still live (cam.Start3D2D works correctly inside PushRenderTarget here).
+	local bloom = Arcana.Circle.Bloom
+	if bloom then
+		render.PushRenderTarget(bloom.CIRCLE_RT)
+		render.Clear(0, 0, 0, 0, true, false) -- colour only; depth is shared with the screen
+		MagicCircleManager:Draw()
+		render.PopRenderTarget()
+	end
+
 	MagicCircleManager:Draw()
+
+	-- Run the bloom pipeline inside a 2D pass so the composite is written to the
+	-- framebuffer before the viewmodel renders.  The viewmodel then draws on top
+	-- and naturally occludes the bloom, fixing the depth issue.
+	if bloom and bloom.DoBloom then
+		cam.Start2D()
+		bloom.DoBloom()
+		cam.End2D()
+	end
 end)
 
 -- Convenience functions (maintaining backward compatibility)

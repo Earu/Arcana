@@ -88,7 +88,7 @@ local function CreateCircleMaterial(name, textureName)
 
 	return CreateShaderMaterial(name, {
 		["$pixshader"]   = "arcana_circle_ps30",
-		["$vertexshader"] = "arcana_circle_vs30",
+		["$vertexshader"] = "arcana_passthrough_vs30",
 		["$basetexture"] = baseTexture,
 		["$translucent"] = 1,
 		["$vertexalpha"] = 1,
