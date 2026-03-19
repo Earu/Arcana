@@ -422,7 +422,7 @@ hook.Add("Think", "MagicCircleManager_Update", function()
 	MagicCircleManager:Update()
 end)
 
-hook.Add("PreDrawOpaqueRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
+hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
 	if isSkybox then return end
 
 	local bloom = Arcana.Circle.Bloom
@@ -431,19 +431,13 @@ hook.Add("PreDrawOpaqueRenderables", "MagicCircleManager_Draw", function(_, isSk
 		render.Clear(0, 0, 0, 0, true, false) -- colour only; depth is shared with the screen
 		MagicCircleManager:Draw()
 		render.PopRenderTarget()
-
-		if bloom and bloom.DoBloom then
-			cam.Start2D()
-			bloom.DoBloom()
-			cam.End2D()
-		end
 	end
-end)
-
-hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
-	if isSkybox then return end
 
 	MagicCircleManager:Draw()
+
+	if bloom and bloom.DoBloom then
+		bloom.DoBloom()
+	end
 end)
 
 -- Convenience functions (maintaining backward compatibility)
