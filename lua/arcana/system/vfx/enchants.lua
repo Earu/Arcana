@@ -612,21 +612,7 @@ hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, w
 
 	-- Draw immediately in the viewmodel pass to avoid one-frame lag
 	if s.bc.Draw then
-		local bloom = Arcana.Circle.Bloom
-		if bloom and bloom.CIRCLE_RT and bloom.DoBloom then
-			render.PushRenderTarget(bloom.CIRCLE_RT)
-			render.Clear(0, 0, 0, 0, true, false)
-			s.bc:Draw()
-			render.PopRenderTarget()
-		end
-
 		s.bc:Draw()
-
-		if bloom and bloom.DoBloom then
-			cam.Start2D()
-			bloom.DoBloom()
-			cam.End2D()
-		end
 	end
 end)
 
