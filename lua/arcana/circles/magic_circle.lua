@@ -425,19 +425,19 @@ end)
 hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
 	if isSkybox then return end
 
-	local bloom = Arcana.Circle.Bloom
+	--[[local bloom = Arcana.Circle.Bloom
 	if bloom then
 		render.PushRenderTarget(bloom.CIRCLE_RT)
 		render.Clear(0, 0, 0, 0, true, false) -- colour only; depth is shared with the screen
 		MagicCircleManager:Draw()
 		render.PopRenderTarget()
-	end
+	end]]
 
 	MagicCircleManager:Draw()
 
-	if bloom and bloom.DoBloom then
+	--[[if bloom and bloom.DoBloom then
 		bloom.DoBloom()
-	end
+	end]]
 end)
 
 -- Convenience functions (maintaining backward compatibility)
