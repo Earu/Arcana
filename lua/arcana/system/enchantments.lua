@@ -30,6 +30,9 @@ end
 --   can_apply(ply, wep) -> (bool, reason?): pre-apply validation
 --   apply(ply, wep, state): attach runtime behavior (hooks, etc.) to the weapon
 --   remove(ply, wep, state): remove runtime behavior when enchantment is stripped
+--   on_projectile_fired(ply, wep, proj, state): optional; called automatically by the system
+--     whenever a player fires a projectile from this enchanted weapon. Ownership is resolved
+--     via Arcana.Common.ResolveProjectileOwner — no manual OnEntityCreated hook needed.
 --   max_stacks (number, default 1): max simultaneous applications
 --   grants_xp (bool, default true): whether a successful apply awards XP via GiveXP.
 --     Set to false for system-applied enchantments (e.g., vault restore) that should not grant XP.
@@ -58,6 +61,7 @@ function Arcana:RegisterEnchantment(def)
 		},
 		-- Applicability: return (bool, reason) — reason is a human-readable string on failure, matching can_cast contract
 		can_apply = def.can_apply, -- function(ply, wep) -> (bool, reason?)
+		on_projectile_fired = def.on_projectile_fired, -- function(ply, wep, proj, state)
 		-- Apply/remove: attach runtime behavior (e.g., hooks) to the weapon
 		apply = def.apply,   -- function(ply, wep, state)
 		remove = def.remove, -- function(ply, wep, state)
@@ -132,6 +136,13 @@ function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 		if not ok then ErrorNoHalt("Enchantment apply error: " .. tostring(err) .. "\n") end
 	end
 
+	-- Cache projClass so the on_projectile_fired dispatcher can filter by entity class.
+	-- Arcana.Common is loaded after enchantments.lua, but this runs at runtime so it's available.
+	if SERVER and isfunction(ench.on_projectile_fired) then
+		local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+		list[enchId]._projClass = wepData and wepData.projectileClass or nil
+	end
+
 	-- Award XP if allowed by both the enchantment definition and the call site
 	if SERVER and not skipXP and ench.grants_xp then
 		local amount = tonumber(self.Config.XP_PER_ENCHANT_SUCCESS) or 20
@@ -184,5 +195,39 @@ if SERVER then
 			end
 		end
 		ent.ArcanaEnchantments = nil
+	end)
+
+	-- Global dispatcher for on_projectile_fired enchantment callbacks.
+	-- Fires once per created entity; defers one frame so SetOwner / CPPISetOwner have settled.
+	-- Arcana.Common (weapon_utils, projectile_utils) is loaded after this file but is fully
+	-- available by the time any hook body executes at runtime.
+	hook.Add("OnEntityCreated", "Arcana_ProjectileFiredDispatch", function(ent)
+		timer.Simple(0, function()
+			if not IsValid(ent) then return end
+
+			local entClass = ent:GetClass()
+			local owner = Arcana.Common.ResolveProjectileOwner(ent, entClass)
+			if not IsValid(owner) then return end
+
+			local wep = owner:GetActiveWeapon()
+			if not IsValid(wep) then return end
+			if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then return end
+
+			local enchants = wep.ArcanaEnchantments
+			if not enchants then return end
+
+			for enchId, state in pairs(enchants) do
+				local ench = (Arcana.RegisteredEnchantments or {})[enchId]
+				if not ench or not isfunction(ench.on_projectile_fired) then continue end
+
+				local projClass = state._projClass
+				if projClass and entClass ~= projClass then continue end
+
+				local ok, err = pcall(ench.on_projectile_fired, owner, wep, ent, state)
+				if not ok then
+					ErrorNoHalt("Enchantment on_projectile_fired error [" .. enchId .. "]: " .. tostring(err) .. "\n")
+				end
+			end
+		end)
 	end)
 end
