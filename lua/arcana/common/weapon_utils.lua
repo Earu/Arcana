@@ -113,7 +113,7 @@ local HL2_WEAPON_PROJECTILE_CLASSES = {
 	["weapon_rpg"]      = "rpg_missile",
 	["weapon_frag"]     = "npc_grenade_frag",
 	["weapon_slam"]     = "npc_satchel",
-	["weapon_bugbait"]  = "grenade_bugbait",
+	["weapon_bugbait"]  = "npc_grenade_bugbait",
 }
 
 local HL2_PROJECTILE_CLASSES = {
@@ -122,7 +122,7 @@ local HL2_PROJECTILE_CLASSES = {
 	["npc_grenade_frag"]     = true,
 	["grenade_ar2"]          = true,
 	["prop_combine_ball"]    = true,
-	["grenade_bugbait"]      = true,
+	["npc_grenade_bugbait"]  = true,
 	["npc_satchel"]          = true,
 	["apc_missile"]          = true,
 	["grenade_spit"]         = true,

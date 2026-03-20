@@ -147,6 +147,42 @@ function Arcana.Common.LightningImpactVFX(pos, normal, opts)
 	sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, opts.soundLvl or 95, 100)
 end
 
+--- Resolve the player owner of a freshly-created projectile entity.
+-- Tries GetOwner, then CPPI (community standard, not vanilla — always guard), then
+-- spatial proximity to the closest player holding a matching PROJECTILE-classified weapon.
+-- Must be called after a timer.Simple(0) defer so ownership has had time to settle.
+-- @param ent       Entity     The projectile entity
+-- @param projClass string|nil Expected entity class; used only to narrow the proximity fallback
+-- @return Player|nil
+function Arcana.Common.ResolveProjectileOwner(ent, projClass)
+	-- Tier 1: standard GMod owner
+	local owner = ent:GetOwner()
+	if IsValid(owner) and owner:IsPlayer() then return owner end
+
+	-- Tier 2: CPPI community standard (not part of vanilla GLua API — always guard)
+	if isfunction(ent.CPPIGetOwner) then
+		owner = ent:CPPIGetOwner()
+		if IsValid(owner) and owner:IsPlayer() then return owner end
+	end
+
+	-- Tier 3: closest player holding a PROJECTILE weapon whose projectileClass matches
+	local pos = ent:GetPos()
+	local bestPly, bestDist = nil, 300
+	for _, ply in ipairs(player.GetAll()) do
+		if not ply:Alive() then continue end
+		local wep = ply:GetActiveWeapon()
+		if not IsValid(wep) then continue end
+		if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then continue end
+		if projClass then
+			local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+			if not data or data.projectileClass ~= projClass then continue end
+		end
+		local dist = ply:GetPos():Distance(pos)
+		if dist < bestDist then bestDist = dist; bestPly = ply end
+	end
+	return bestPly
+end
+
 --- Creates a point_tesla entity for brief lightning visual feedback.
 -- @param pos Vector  World position for the burst
 -- @param opts table  Optional overrides:
