@@ -7,12 +7,10 @@ require("shader_to_gma")
 if SERVER then
 	resource.AddShader("arcana_circle_ps30")
 	resource.AddShader("arcana_passthrough_vs30")
-	resource.AddShader("arcana_bloom_ps30")
 
 	AddCSLuaFile("arcana/circles/ring.lua")
 	AddCSLuaFile("arcana/circles/magic_circle.lua")
 	AddCSLuaFile("arcana/circles/band_circle.lua")
-	AddCSLuaFile("arcana/circles/bloom.lua")
 	return
 end
 
@@ -22,7 +20,6 @@ Arcana.Circle = Arcana.Circle or {}
 include("arcana/circles/ring.lua")
 include("arcana/circles/magic_circle.lua")
 include("arcana/circles/band_circle.lua")
-include("arcana/circles/bloom.lua")
 
 local MagicCircle = Arcana.Circle.MagicCircle
 local MagicCircleManager = Arcana.Circle.MagicCircleManager
