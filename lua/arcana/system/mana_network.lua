@@ -224,9 +224,7 @@ if CLIENT then
 	end)
 
 	local MAX_RENDER_DIST = 2000 * 2000
-	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function(_, isSkybox)
-		if isSkybox then return end
-
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function()
 		local eye = EyePos()
 		local now = CurTime()
 		local write = 1
