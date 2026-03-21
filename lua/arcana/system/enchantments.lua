@@ -185,8 +185,16 @@ Arcana.SyncWeaponEnchantNW = syncWeaponEnchantNW
 if SERVER then
 	hook.Add("EntityRemoved", "Arcana_CleanupWeaponEnchantments", function(ent)
 		if not ent or not ent.ArcanaEnchantments then return end
-		local list = ent.ArcanaEnchantments
+
+		-- Snapshot the weapon's enchantment data before cleanup so the deferred
+		-- projectile dispatcher can still find it if the weapon is removed between
+		-- projectile creation and dispatch (e.g. grenades consumed on throw).
 		local owner = (ent.GetOwner and ent:GetOwner()) or nil
+		if IsValid(owner) and owner:IsPlayer() then
+			Arcana.Common.CachePlayerProjectileWeapon(owner, ent)
+		end
+
+		local list = ent.ArcanaEnchantments
 		for enchId, state in pairs(list) do
 			local ench = (Arcana.RegisteredEnchantments or {})[enchId]
 			if ench and ench.remove then
@@ -197,8 +205,17 @@ if SERVER then
 		ent.ArcanaEnchantments = nil
 	end)
 
+	-- When a player switches away from a PROJECTILE weapon, snapshot it so projectiles
+	-- already in flight (or about to spawn) can still resolve back to its enchantments.
+	hook.Add("PlayerSwitchWeapon", "Arcana_CacheLastProjectileWeapon", function(ply, oldWep, newWep)
+		if not IsValid(oldWep) then return end
+		Arcana.Common.CachePlayerProjectileWeapon(ply, oldWep)
+	end)
+
 	-- Global dispatcher for on_projectile_fired enchantment callbacks.
 	-- Fires once per created entity; defers one frame so SetOwner / CPPISetOwner have settled.
+	-- If the owner's current active weapon doesn't match the projectile, falls back to the
+	-- cached previous weapon data (covers weapon removal before dispatch).
 	-- Arcana.Common (weapon_utils, projectile_utils) is loaded after this file but is fully
 	-- available by the time any hook body executes at runtime.
 	hook.Add("OnEntityCreated", "Arcana_ProjectileFiredDispatch", function(ent)
@@ -209,11 +226,29 @@ if SERVER then
 			local owner = Arcana.Common.ResolveProjectileOwner(ent, entClass)
 			if not IsValid(owner) then return end
 
+			-- Try the current active weapon first
 			local wep = owner:GetActiveWeapon()
-			if not IsValid(wep) then return end
-			if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then return end
+			local enchants = nil
 
-			local enchants = wep.ArcanaEnchantments
+			if IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE" then
+				local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+				if wepData and wepData.projectileClass == entClass then
+					enchants = wep.ArcanaEnchantments
+					Arcana.Common.CachePlayerProjectileWeapon(owner, wep)
+				end
+			end
+
+			-- Fallback: cached previous weapon (covers weapon removal before dispatch)
+			if not enchants then
+				local cache = Arcana.Common.GetCachedProjectileWeapon(owner)
+				if cache and cache.enchantments then
+					if not cache.projClass or cache.projClass == entClass then
+						enchants = cache.enchantments
+						wep = cache.wep
+					end
+				end
+			end
+
 			if not enchants then return end
 
 			for enchId, state in pairs(enchants) do

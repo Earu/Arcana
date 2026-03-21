@@ -147,9 +147,45 @@ function Arcana.Common.LightningImpactVFX(pos, normal, opts)
 	sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, opts.soundLvl or 95, 100)
 end
 
+--- Cache a player's current PROJECTILE weapon data so the projectile dispatcher can
+-- recover enchantment state even if the weapon is removed before the deferred check.
+-- Called from PlayerSwitchWeapon, EntityRemoved, and on successful dispatch.
+-- @param ply Player
+-- @param wep Entity  The weapon to cache (must still be valid)
+function Arcana.Common.CachePlayerProjectileWeapon(ply, wep)
+	if not IsValid(ply) or not IsValid(wep) then return end
+	if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then return end
+
+	local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+	ply._ArcanaLastProjWeapon = {
+		wep          = wep,
+		wepClass     = wep:GetClass(),
+		projClass    = wepData and wepData.projectileClass or nil,
+		enchantments = wep.ArcanaEnchantments,
+		cachedAt     = CurTime(),
+	}
+end
+
+--- Retrieve the cached PROJECTILE weapon data for a player. Returns nil if the
+-- cache has expired (>0.1s) or was never set.
+-- @param ply Player
+-- @return table|nil  { wep, wepClass, projClass, enchantments, cachedAt }
+function Arcana.Common.GetCachedProjectileWeapon(ply)
+	if not IsValid(ply) then return nil end
+	local cache = ply._ArcanaLastProjWeapon
+	if not cache then return nil end
+	if CurTime() - cache.cachedAt > 0.1 then
+		ply._ArcanaLastProjWeapon = nil
+		return nil
+	end
+	return cache
+end
+
 --- Resolve the player owner of a freshly-created projectile entity.
 -- Tries GetOwner, then CPPI (community standard, not vanilla — always guard), then
--- spatial proximity to the closest player holding a matching PROJECTILE-classified weapon.
+-- spatial proximity to the closest player holding (or recently holding) a matching
+-- PROJECTILE-classified weapon. The proximity fallback also checks the player's cached
+-- previous weapon to handle weapons removed between fire and this deferred check.
 -- Must be called after a timer.Simple(0) defer so ownership has had time to settle.
 -- @param ent       Entity     The projectile entity
 -- @param projClass string|nil Expected entity class; used only to narrow the proximity fallback
@@ -165,20 +201,37 @@ function Arcana.Common.ResolveProjectileOwner(ent, projClass)
 		if IsValid(owner) and owner:IsPlayer() then return owner end
 	end
 
-	-- Tier 3: closest player holding a PROJECTILE weapon whose projectileClass matches
+	-- Tier 3: closest player holding (or recently holding) a matching PROJECTILE weapon
 	local pos = ent:GetPos()
 	local bestPly, bestDist = nil, 300
 	for _, ply in ipairs(player.GetAll()) do
 		if not ply:Alive() then continue end
+
+		local matched = false
+
 		local wep = ply:GetActiveWeapon()
-		if not IsValid(wep) then continue end
-		if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then continue end
-		if projClass then
-			local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
-			if not data or data.projectileClass ~= projClass then continue end
+		if IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE" then
+			if projClass then
+				local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+				if data and data.projectileClass == projClass then matched = true end
+			else
+				matched = true
+			end
 		end
-		local dist = ply:GetPos():Distance(pos)
-		if dist < bestDist then bestDist = dist; bestPly = ply end
+
+		if not matched then
+			local cache = Arcana.Common.GetCachedProjectileWeapon(ply)
+			if cache then
+				if not projClass or cache.projClass == projClass then
+					matched = true
+				end
+			end
+		end
+
+		if matched then
+			local dist = ply:GetPos():Distance(pos)
+			if dist < bestDist then bestDist = dist; bestPly = ply end
+		end
 	end
 	return bestPly
 end
