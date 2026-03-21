@@ -111,11 +111,8 @@ local function augmentProjectile(proj, owner)
 		zapNearestTarget(proj, owner)
 	end)
 
-	proj:CallOnRemove("Arcana_ConductiveShell_Stop", function()
+	Arcana.Common.TrackProjectileDetonation(proj, function(e)
 		timer.Remove(timerName)
-	end)
-
-	proj:CallOnRemove("Arcana_ConductiveShell_Discharge", function(e)
 		if not IsValid(owner) then return end
 		local pos = e:GetPos()
 

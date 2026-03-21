@@ -268,4 +268,79 @@ function Arcana.Common.SpawnTeslaBurst(pos, opts)
 
 	return tesla
 end
+
+--- Tracks a projectile and calls `onDetonate(ent)` exactly once when either:
+--   a) The entity is removed (standard detonation) — primary trigger via CallOnRemove.
+--   b) The entity's speed has been below SLOW_VEL_THRESHOLD for SLOW_VEL_DURATION seconds
+--      — catches sticky/long-lived projectiles that never naturally remove themselves.
+-- Enchantments should use this instead of raw CallOnRemove so that sticky weapons
+-- (grenades glued to walls, slow-moving slugs, etc.) always resolve within a predictable
+-- time window rather than lingering for 30+ seconds.
+-- @param proj       Entity    The projectile to track
+-- @param onDetonate function  Called as onDetonate(proj) on detonation; fires exactly once
+local SLOW_VEL_THRESHOLD = 30   -- units/sec; below this counts as "stuck"
+local SLOW_VEL_DURATION  = 2.0  -- seconds of continuous low velocity before forcing detonation
+local SLOW_VEL_MIN_AGE   = 0.5  -- ignore velocity for the first N seconds so slow-launch weapons don't misfire
+
+local _projDetonTrack = {}
+
+function Arcana.Common.TrackProjectileDetonation(proj, onDetonate)
+	if not IsValid(proj) or not isfunction(onDetonate) then return end
+
+	local state = {
+		callback     = onDetonate,
+		fired        = false,
+		lowVelSince  = nil,
+		registeredAt = CurTime(),
+	}
+
+	_projDetonTrack[proj] = state
+
+	-- Primary trigger: entity removal (normal detonation path)
+	proj:CallOnRemove("Arcana_ProjDetonTrack", function(e)
+		local s = _projDetonTrack[e]
+		if not s or s.fired then
+			_projDetonTrack[e] = nil
+			return
+		end
+		s.fired = true
+		_projDetonTrack[e] = nil
+		local ok, err = pcall(s.callback, e)
+		if not ok then ErrorNoHalt("TrackProjectileDetonation (remove) error: " .. tostring(err) .. "\n") end
+	end)
+end
+
+-- Secondary trigger: velocity timeout, checked every 0.1s across all tracked projectiles.
+timer.Create("Arcana_ProjDetonVelCheck", 0.1, 0, function()
+	local now = CurTime()
+	for ent, state in pairs(_projDetonTrack) do
+		if state.fired then
+			_projDetonTrack[ent] = nil
+			continue
+		end
+
+		if not IsValid(ent) then
+			-- CallOnRemove should have cleaned this up, but guard anyway
+			_projDetonTrack[ent] = nil
+			continue
+		end
+
+		-- Don't penalise slow-launch projectiles during their initial flight window
+		if now - state.registeredAt < SLOW_VEL_MIN_AGE then continue end
+
+		local speed = ent:GetVelocity():Length()
+		if speed < SLOW_VEL_THRESHOLD then
+			if not state.lowVelSince then
+				state.lowVelSince = now
+			elseif now - state.lowVelSince >= SLOW_VEL_DURATION then
+				state.fired = true
+				_projDetonTrack[ent] = nil
+				local ok, err = pcall(state.callback, ent)
+				if not ok then ErrorNoHalt("TrackProjectileDetonation (velocity) error: " .. tostring(err) .. "\n") end
+			end
+		else
+			state.lowVelSince = nil  -- picked up speed again, reset the clock
+		end
+	end
+end)
 end

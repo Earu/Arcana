@@ -76,11 +76,8 @@ Arcana:RegisterEnchantment({
 			path[#path + 1] = proj:GetPos()
 		end)
 
-		proj:CallOnRemove("Arcana_GlacialWake_Stop", function()
+		Arcana.Common.TrackProjectileDetonation(proj, function(e)
 			timer.Remove(timerName)
-		end)
-
-		proj:CallOnRemove("Arcana_GlacialWake_Fire", function(e)
 			if not IsValid(ply) then return end
 			fireWake(ply, e:GetPos(), path)
 		end)
