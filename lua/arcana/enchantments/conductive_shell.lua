@@ -7,7 +7,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_ConductiveShell_Track")
 end
 
-local ZAP_INTERVAL = 0.1
+local ZAP_INTERVAL = 0.25
 local ZAP_RADIUS   = 300
 local ZAP_DAMAGE   = 15
 
