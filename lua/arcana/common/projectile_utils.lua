@@ -39,308 +39,320 @@ if SERVER then
 		spr:Spawn()
 		spr:Activate()
 
-	parent:CallOnRemove(name, function(_, s)
+		parent:CallOnRemove(name, function(_, s)
 			if IsValid(s) then s:Remove() end
 		end, spr)
-end
-
---- Assign ownership and launch a projectile entity towards a direction.
--- Handles SetOwner, SetSpellOwner, CPPISetOwner, and LaunchTowards in one call.
--- @param ent       Entity  The spawned projectile (must already be Spawn()ed or about to be)
--- @param caster    Entity  The player or NPC launching the projectile
--- @param direction Vector  Direction to launch towards (e.g. caster:GetAimVector())
-function Arcana.Common.LaunchProjectile(ent, caster, direction)
-	if not IsValid(ent) or not IsValid(caster) then return end
-	if ent.SetOwner then ent:SetOwner(caster) end
-	if ent.SetSpellOwner then ent:SetSpellOwner(caster) end
-	if ent.CPPISetOwner then ent:CPPISetOwner(caster) end
-	if ent.LaunchTowards and isvector(direction) then ent:LaunchTowards(direction) end
-end
-
--- Canonical defaults for ApplyLightningChain opts — serves as documentation and
--- allows callers to override only the keys that differ from the standard behaviour.
-Arcana.Common.LIGHTNING_CHAIN_DEFAULTS = {
-	baseDamage  = 60,   -- AoE damage at hitPos
-	blastRadius = 180,  -- radius of the initial AoE blast
-	chainRadius = 380,  -- radius to search for chaining targets
-	chainDamage = 24,   -- damage per chained target
-	maxChains   = 3,    -- maximum number of secondary targets
-	chainDelay  = 0.03, -- seconds between each chain strike
-	-- spawnTesla: function(pos) -> Entity; defaults to Arcana.Common.SpawnTeslaBurst(pos)
-	-- onChain: function(tgt, tpos, chainIdx) -> nil; called inside each chain timer (optional)
-}
-
---- Apply an AoE lightning blast then chain to nearby living targets.
--- @param attacker Entity  Attacker (player or NPC)
--- @param hitPos   Vector  Center of the blast and chain search
--- @param opts     table   Optional overrides (see Arcana.Common.LIGHTNING_CHAIN_DEFAULTS for all keys):
---   spawnTesla: function(pos) -> Entity — called to spawn visual effect at chain position
---   onChain:    function(tgt, tpos, chainIdx) -> nil — called after each chain strike
-function Arcana.Common.ApplyLightningChain(attacker, hitPos, opts)
-	opts = opts or {}
-	local D = Arcana.Common.LIGHTNING_CHAIN_DEFAULTS
-	local blastRadius = opts.blastRadius or D.blastRadius
-	local baseDamage  = opts.baseDamage  or D.baseDamage
-	local chainRadius = opts.chainRadius or D.chainRadius
-	local chainDamage = opts.chainDamage or D.chainDamage
-	local maxChains   = opts.maxChains   or D.maxChains
-	local chainDelay  = opts.chainDelay  or D.chainDelay
-	local spawnFn     = opts.spawnTesla  or function(pos) return Arcana.Common.SpawnTeslaBurst(pos) end
-	local onChain     = opts.onChain
-
-	Arcana:BlastDamage(attacker, hitPos, blastRadius, baseDamage, { damageType = DMG_SHOCK, ignoreAttacker = true })
-
-	local candidates = {}
-	for _, ent in ipairs(ents.FindInSphere(hitPos, chainRadius)) do
-		if ent == attacker then continue end
-		if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
-			table.insert(candidates, ent)
-		end
 	end
 
-	table.sort(candidates, function(a, b)
-		return a:GetPos():DistToSqr(hitPos) < b:GetPos():DistToSqr(hitPos)
-	end)
-
-	for i = 1, math.min(maxChains, #candidates) do
-		local tgt = candidates[i]
-		local tpos = tgt:WorldSpaceCenter()
-		timer.Simple(chainDelay * i, function()
-			if not IsValid(tgt) or tgt == attacker then return end
-			local tesla = spawnFn(tpos)
-			if IsValid(tesla) and tesla.CPPISetOwner then
-				tesla:CPPISetOwner(attacker)
-			end
-			local dmg = DamageInfo()
-			dmg:SetDamage(chainDamage)
-			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
-			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
-			dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-			dmg:SetDamagePosition(tpos)
-			tgt:TakeDamageInfo(dmg)
-			if isfunction(onChain) then onChain(tgt, tpos, i) end
-		end)
+	--- Assign ownership and launch a projectile entity towards a direction.
+	-- Handles SetOwner, SetSpellOwner, CPPISetOwner, and LaunchTowards in one call.
+	-- @param ent       Entity  The spawned projectile (must already be Spawn()ed or about to be)
+	-- @param caster    Entity  The player or NPC launching the projectile
+	-- @param direction Vector  Direction to launch towards (e.g. caster:GetAimVector())
+	function Arcana.Common.LaunchProjectile(ent, caster, direction)
+		if not IsValid(ent) or not IsValid(caster) then return end
+		if ent.SetOwner then ent:SetOwner(caster) end
+		if ent.SetSpellOwner then ent:SetSpellOwner(caster) end
+		if ent.CPPISetOwner then ent:CPPISetOwner(caster) end
+		if ent.LaunchTowards and isvector(direction) then ent:LaunchTowards(direction) end
 	end
-end
 
---- Shared lightning impact VFX: scorch decal, sparks, screen shake, and zap sound.
--- @param pos    Vector  World position of the impact
--- @param normal Vector  Surface normal at the impact point
--- @param opts   table   Optional overrides: power (number, default 1.0),
---                       shakePower (number), shakeHz (number), shakeDur (number), shakeRadius (number)
-function Arcana.Common.LightningImpactVFX(pos, normal, opts)
-	opts = opts or {}
-	local power = opts.power or 1.0
-	normal = normal or Vector(0, 0, 1)
-	local ed = EffectData()
-	ed:SetOrigin(pos)
-	util.Effect("cball_explode", ed, true, true)
-	util.Effect("ManhackSparks", ed, true, true)
-	util.Decal("Scorch", pos + normal * 8, pos - normal * 8)
-	util.ScreenShake(
-		pos,
-		(opts.shakePower or 6) * power,
-		opts.shakeHz or 90,
-		opts.shakeDur or 0.35,
-		(opts.shakeRadius or 600) * power
-	)
-	sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, opts.soundLvl or 95, 100)
-end
-
---- Cache a player's current PROJECTILE weapon data so the projectile dispatcher can
--- recover enchantment state even if the weapon is removed before the deferred check.
--- Called from PlayerSwitchWeapon, EntityRemoved, and on successful dispatch.
--- @param ply Player
--- @param wep Entity  The weapon to cache (must still be valid)
-function Arcana.Common.CachePlayerProjectileWeapon(ply, wep)
-	if not IsValid(ply) or not IsValid(wep) then return end
-	if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then return end
-
-	local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
-	ply._ArcanaLastProjWeapon = {
-		wep          = wep,
-		wepClass     = wep:GetClass(),
-		projClass    = wepData and wepData.projectileClass or nil,
-		enchantments = wep.ArcanaEnchantments,
-		cachedAt     = CurTime(),
+	-- Canonical defaults for ApplyLightningChain opts — serves as documentation and
+	-- allows callers to override only the keys that differ from the standard behaviour.
+	Arcana.Common.LIGHTNING_CHAIN_DEFAULTS = {
+		baseDamage  = 60,   -- AoE damage at hitPos
+		blastRadius = 180,  -- radius of the initial AoE blast
+		chainRadius = 380,  -- radius to search for chaining targets
+		chainDamage = 24,   -- damage per chained target
+		maxChains   = 3,    -- maximum number of secondary targets
+		chainDelay  = 0.03, -- seconds between each chain strike
+		-- spawnTesla: function(pos) -> Entity; defaults to Arcana.Common.SpawnTeslaBurst(pos)
+		-- onChain: function(tgt, tpos, chainIdx) -> nil; called inside each chain timer (optional)
 	}
-end
 
---- Retrieve the cached PROJECTILE weapon data for a player. Returns nil if the
--- cache has expired (>0.1s) or was never set.
--- @param ply Player
--- @return table|nil  { wep, wepClass, projClass, enchantments, cachedAt }
-function Arcana.Common.GetCachedProjectileWeapon(ply)
-	if not IsValid(ply) then return nil end
-	local cache = ply._ArcanaLastProjWeapon
-	if not cache then return nil end
-	if CurTime() - cache.cachedAt > 0.1 then
-		ply._ArcanaLastProjWeapon = nil
-		return nil
-	end
-	return cache
-end
+	--- Apply an AoE lightning blast then chain to nearby living targets.
+	-- @param attacker Entity  Attacker (player or NPC)
+	-- @param hitPos   Vector  Center of the blast and chain search
+	-- @param opts     table   Optional overrides (see Arcana.Common.LIGHTNING_CHAIN_DEFAULTS for all keys):
+	--   spawnTesla: function(pos) -> Entity — called to spawn visual effect at chain position
+	--   onChain:    function(tgt, tpos, chainIdx) -> nil — called after each chain strike
+	function Arcana.Common.ApplyLightningChain(attacker, hitPos, opts)
+		opts = opts or {}
+		local D = Arcana.Common.LIGHTNING_CHAIN_DEFAULTS
+		local blastRadius = opts.blastRadius or D.blastRadius
+		local baseDamage  = opts.baseDamage  or D.baseDamage
+		local chainRadius = opts.chainRadius or D.chainRadius
+		local chainDamage = opts.chainDamage or D.chainDamage
+		local maxChains   = opts.maxChains   or D.maxChains
+		local chainDelay  = opts.chainDelay  or D.chainDelay
+		local spawnFn     = opts.spawnTesla  or function(pos) return Arcana.Common.SpawnTeslaBurst(pos) end
+		local onChain     = opts.onChain
 
---- Resolve the player owner of a freshly-created projectile entity.
--- Tries GetOwner, then CPPI (community standard, not vanilla — always guard), then
--- spatial proximity to the closest player holding (or recently holding) a matching
--- PROJECTILE-classified weapon. The proximity fallback also checks the player's cached
--- previous weapon to handle weapons removed between fire and this deferred check.
--- Must be called after a timer.Simple(0) defer so ownership has had time to settle.
--- @param ent       Entity     The projectile entity
--- @param projClass string|nil Expected entity class; used only to narrow the proximity fallback
--- @return Player|nil
-function Arcana.Common.ResolveProjectileOwner(ent, projClass)
-	-- Tier 1: standard GMod owner
-	local owner = ent:GetOwner()
-	if IsValid(owner) and owner:IsPlayer() then return owner end
+		Arcana:BlastDamage(attacker, hitPos, blastRadius, baseDamage, { damageType = DMG_SHOCK, ignoreAttacker = true })
 
-	-- Tier 2: CPPI community standard (not part of vanilla GLua API — always guard)
-	if isfunction(ent.CPPIGetOwner) then
-		owner = ent:CPPIGetOwner()
-		if IsValid(owner) and owner:IsPlayer() then return owner end
-	end
-
-	-- Tier 3: closest player holding (or recently holding) a matching PROJECTILE weapon
-	local pos = ent:GetPos()
-	local bestPly, bestDist = nil, 300
-	for _, ply in ipairs(player.GetAll()) do
-		if not ply:Alive() then continue end
-
-		local matched = false
-
-		local wep = ply:GetActiveWeapon()
-		if IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE" then
-			if projClass then
-				local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
-				if data and data.projectileClass == projClass then matched = true end
-			else
-				matched = true
+		local candidates = {}
+		for _, ent in ipairs(ents.FindInSphere(hitPos, chainRadius)) do
+			if ent == attacker then continue end
+			if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
+				table.insert(candidates, ent)
 			end
 		end
 
-		if not matched then
-			local cache = Arcana.Common.GetCachedProjectileWeapon(ply)
-			if cache then
-				if not projClass or cache.projClass == projClass then
+		table.sort(candidates, function(a, b)
+			return a:GetPos():DistToSqr(hitPos) < b:GetPos():DistToSqr(hitPos)
+		end)
+
+		for i = 1, math.min(maxChains, #candidates) do
+			local tgt = candidates[i]
+			local tpos = tgt:WorldSpaceCenter()
+			timer.Simple(chainDelay * i, function()
+				if not IsValid(tgt) or tgt == attacker then return end
+				local tesla = spawnFn(tpos)
+				if IsValid(tesla) and tesla.CPPISetOwner then
+					tesla:CPPISetOwner(attacker)
+				end
+				local dmg = DamageInfo()
+				dmg:SetDamage(chainDamage)
+				dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
+				dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
+				dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
+				dmg:SetDamagePosition(tpos)
+				tgt:TakeDamageInfo(dmg)
+				if isfunction(onChain) then onChain(tgt, tpos, i) end
+			end)
+		end
+	end
+
+	--- Shared lightning impact VFX: scorch decal, sparks, screen shake, and zap sound.
+	-- @param pos    Vector  World position of the impact
+	-- @param normal Vector  Surface normal at the impact point
+	-- @param opts   table   Optional overrides: power (number, default 1.0),
+	--                       shakePower (number), shakeHz (number), shakeDur (number), shakeRadius (number)
+	function Arcana.Common.LightningImpactVFX(pos, normal, opts)
+		opts = opts or {}
+		local power = opts.power or 1.0
+		normal = normal or Vector(0, 0, 1)
+		local ed = EffectData()
+		ed:SetOrigin(pos)
+		util.Effect("cball_explode", ed, true, true)
+		util.Effect("ManhackSparks", ed, true, true)
+		util.Decal("Scorch", pos + normal * 8, pos - normal * 8)
+		util.ScreenShake(
+			pos,
+			(opts.shakePower or 6) * power,
+			opts.shakeHz or 90,
+			opts.shakeDur or 0.35,
+			(opts.shakeRadius or 600) * power
+		)
+		sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, opts.soundLvl or 95, 100)
+	end
+
+	--- Cache a player's current PROJECTILE weapon data so the projectile dispatcher can
+	-- recover enchantment state even if the weapon is removed before the deferred check.
+	-- Called from PlayerSwitchWeapon, EntityRemoved, and on successful dispatch.
+	-- @param ply Player
+	-- @param wep Entity  The weapon to cache (must still be valid)
+	function Arcana.Common.CachePlayerProjectileWeapon(ply, wep)
+		if not IsValid(ply) or not IsValid(wep) then return end
+		if Arcana.Common.GetWeaponClassification(wep) ~= "PROJECTILE" then return end
+
+		local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+		ply._ArcanaLastProjWeapon = {
+			wep          = wep,
+			wepClass     = wep:GetClass(),
+			projClass    = wepData and wepData.projectileClass or nil,
+			enchantments = wep.ArcanaEnchantments,
+			cachedAt     = CurTime(),
+		}
+	end
+
+	--- Retrieve the cached PROJECTILE weapon data for a player. Returns nil if the
+	-- cache has expired (>0.1s) or was never set.
+	-- @param ply Player
+	-- @return table|nil  { wep, wepClass, projClass, enchantments, cachedAt }
+	function Arcana.Common.GetCachedProjectileWeapon(ply)
+		if not IsValid(ply) then return nil end
+		local cache = ply._ArcanaLastProjWeapon
+		if not cache then return nil end
+		if CurTime() - cache.cachedAt > 0.1 then
+			ply._ArcanaLastProjWeapon = nil
+			return nil
+		end
+		return cache
+	end
+
+	--- Resolve the player owner of a freshly-created projectile entity.
+	-- Tries GetOwner, then CPPI (community standard, not vanilla — always guard), then
+	-- spatial proximity to the closest player holding (or recently holding) a matching
+	-- PROJECTILE-classified weapon. The proximity fallback also checks the player's cached
+	-- previous weapon to handle weapons removed between fire and this deferred check.
+	-- Must be called after a timer.Simple(0) defer so ownership has had time to settle.
+	-- @param ent       Entity     The projectile entity
+	-- @param projClass string|nil Expected entity class; used only to narrow the proximity fallback
+	-- @return Player|nil
+	function Arcana.Common.ResolveProjectileOwner(ent, projClass)
+		-- Tier 1: standard GMod owner
+		local owner = ent:GetOwner()
+		if IsValid(owner) and owner:IsPlayer() then return owner end
+
+		-- Tier 2: CPPI community standard (not part of vanilla GLua API — always guard)
+		if isfunction(ent.CPPIGetOwner) then
+			owner = ent:CPPIGetOwner()
+			if IsValid(owner) and owner:IsPlayer() then return owner end
+		end
+
+		-- Tier 3: closest player holding (or recently holding) a matching PROJECTILE weapon
+		local pos = ent:GetPos()
+		local bestPly, bestDist = nil, 300
+		for _, ply in ipairs(player.GetAll()) do
+			if not ply:Alive() then continue end
+
+			local matched = false
+
+			local wep = ply:GetActiveWeapon()
+			if IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE" then
+				if projClass then
+					local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+					if data and data.projectileClass == projClass then matched = true end
+				else
 					matched = true
 				end
 			end
-		end
 
-		if matched then
-			local dist = ply:GetPos():Distance(pos)
-			if dist < bestDist then bestDist = dist; bestPly = ply end
+			if not matched then
+				local cache = Arcana.Common.GetCachedProjectileWeapon(ply)
+				if cache then
+					if not projClass or cache.projClass == projClass then
+						matched = true
+					end
+				end
+			end
+
+			if matched then
+				local dist = ply:GetPos():Distance(pos)
+				if dist < bestDist then bestDist = dist; bestPly = ply end
+			end
+		end
+		return bestPly
+	end
+
+	--- Creates a point_tesla entity for brief lightning visual feedback.
+	-- @param pos Vector  World position for the burst
+	-- @param opts table  Optional overrides:
+	--   targetname (string), color (string "R G B"), radius (number),
+	--   beamcount_min/max, thick_min/max, lifetime_min/max, interval_min/max,
+	--   kill_delay (number, seconds before entity is removed)
+	-- @return Entity  The spawned point_tesla (may be invalid if creation failed)
+	function Arcana.Common.SpawnTeslaBurst(pos, opts)
+		opts = opts or {}
+		local tesla = ents.Create("point_tesla")
+		if not IsValid(tesla) then return end
+
+		tesla:SetPos(pos)
+		tesla:SetKeyValue("targetname", opts.targetname or "arcana_tesla")
+		tesla:SetKeyValue("m_SoundName", "DoSpark")
+		tesla:SetKeyValue("texture", opts.texture or "sprites/physbeam.vmt")
+		tesla:SetKeyValue("m_Color", opts.color or "170 200 255")
+		tesla:SetKeyValue("m_flRadius", tostring(opts.radius or 200))
+		tesla:SetKeyValue("beamcount_min", tostring(opts.beamcount_min or 5))
+		tesla:SetKeyValue("beamcount_max", tostring(opts.beamcount_max or 8))
+		tesla:SetKeyValue("thick_min", tostring(opts.thick_min or 5))
+		tesla:SetKeyValue("thick_max", tostring(opts.thick_max or 8))
+		tesla:SetKeyValue("lifetime_min", string.format("%.2f", opts.lifetime_min or 0.10))
+		tesla:SetKeyValue("lifetime_max", string.format("%.2f", opts.lifetime_max or 0.16))
+		tesla:SetKeyValue("interval_min", string.format("%.2f", opts.interval_min or 0.04))
+		tesla:SetKeyValue("interval_max", string.format("%.2f", opts.interval_max or 0.08))
+		tesla:Spawn()
+		tesla:Fire("DoSpark", "", 0)
+		tesla:Fire("Kill", "", opts.kill_delay or 0.5)
+
+		return tesla
+	end
+
+	--- Tracks a projectile and calls each registered onDetonate(ent) callback when either:
+	--   a) The entity is removed (standard detonation) — primary trigger via CallOnRemove.
+	--   b) The entity's speed has been below SLOW_VEL_THRESHOLD for SLOW_VEL_DURATION seconds
+	--      — catches sticky/long-lived projectiles that never naturally remove themselves.
+	-- Multiple enchantments on the same projectile each call this independently; all callbacks
+	-- are stored in a list and fired together from a single shared CallOnRemove/velocity trigger.
+	-- Each callback fires exactly once per detonation event.
+	-- @param proj       Entity    The projectile to track
+	-- @param onDetonate function  Called as onDetonate(proj) on detonation
+	local SLOW_VEL_THRESHOLD = 30   -- units/sec; below this counts as "stuck"
+	local SLOW_VEL_DURATION  = 2.0  -- seconds of continuous low velocity before forcing detonation
+	local SLOW_VEL_MIN_AGE   = 0.5  -- ignore velocity for the first N seconds so slow-launch weapons don't misfire
+
+	local _projDetonTrack = {}
+
+	local function fireDetonCallbacks(state, ent)
+		state.fired = true
+		for _, cb in ipairs(state.callbacks) do
+			local ok, err = pcall(cb, ent)
+			if not ok then ErrorNoHalt("TrackProjectileDetonation error: " .. tostring(err) .. "\n") end
 		end
 	end
-	return bestPly
-end
 
---- Creates a point_tesla entity for brief lightning visual feedback.
--- @param pos Vector  World position for the burst
--- @param opts table  Optional overrides:
---   targetname (string), color (string "R G B"), radius (number),
---   beamcount_min/max, thick_min/max, lifetime_min/max, interval_min/max,
---   kill_delay (number, seconds before entity is removed)
--- @return Entity  The spawned point_tesla (may be invalid if creation failed)
-function Arcana.Common.SpawnTeslaBurst(pos, opts)
-	opts = opts or {}
-	local tesla = ents.Create("point_tesla")
-	if not IsValid(tesla) then return end
+	function Arcana.Common.TrackProjectileDetonation(proj, onDetonate)
+		if not IsValid(proj) or not isfunction(onDetonate) then return end
 
-	tesla:SetPos(pos)
-	tesla:SetKeyValue("targetname", opts.targetname or "arcana_tesla")
-	tesla:SetKeyValue("m_SoundName", "DoSpark")
-	tesla:SetKeyValue("texture", opts.texture or "sprites/physbeam.vmt")
-	tesla:SetKeyValue("m_Color", opts.color or "170 200 255")
-	tesla:SetKeyValue("m_flRadius", tostring(opts.radius or 200))
-	tesla:SetKeyValue("beamcount_min", tostring(opts.beamcount_min or 5))
-	tesla:SetKeyValue("beamcount_max", tostring(opts.beamcount_max or 8))
-	tesla:SetKeyValue("thick_min", tostring(opts.thick_min or 5))
-	tesla:SetKeyValue("thick_max", tostring(opts.thick_max or 8))
-	tesla:SetKeyValue("lifetime_min", string.format("%.2f", opts.lifetime_min or 0.10))
-	tesla:SetKeyValue("lifetime_max", string.format("%.2f", opts.lifetime_max or 0.16))
-	tesla:SetKeyValue("interval_min", string.format("%.2f", opts.interval_min or 0.04))
-	tesla:SetKeyValue("interval_max", string.format("%.2f", opts.interval_max or 0.08))
-	tesla:Spawn()
-	tesla:Fire("DoSpark", "", 0)
-	tesla:Fire("Kill", "", opts.kill_delay or 0.5)
-
-	return tesla
-end
-
---- Tracks a projectile and calls `onDetonate(ent)` exactly once when either:
---   a) The entity is removed (standard detonation) — primary trigger via CallOnRemove.
---   b) The entity's speed has been below SLOW_VEL_THRESHOLD for SLOW_VEL_DURATION seconds
---      — catches sticky/long-lived projectiles that never naturally remove themselves.
--- Enchantments should use this instead of raw CallOnRemove so that sticky weapons
--- (grenades glued to walls, slow-moving slugs, etc.) always resolve within a predictable
--- time window rather than lingering for 30+ seconds.
--- @param proj       Entity    The projectile to track
--- @param onDetonate function  Called as onDetonate(proj) on detonation; fires exactly once
-local SLOW_VEL_THRESHOLD = 30   -- units/sec; below this counts as "stuck"
-local SLOW_VEL_DURATION  = 2.0  -- seconds of continuous low velocity before forcing detonation
-local SLOW_VEL_MIN_AGE   = 0.5  -- ignore velocity for the first N seconds so slow-launch weapons don't misfire
-
-local _projDetonTrack = {}
-
-function Arcana.Common.TrackProjectileDetonation(proj, onDetonate)
-	if not IsValid(proj) or not isfunction(onDetonate) then return end
-
-	local state = {
-		callback     = onDetonate,
-		fired        = false,
-		lowVelSince  = nil,
-		registeredAt = CurTime(),
-	}
-
-	_projDetonTrack[proj] = state
-
-	-- Primary trigger: entity removal (normal detonation path)
-	proj:CallOnRemove("Arcana_ProjDetonTrack", function(e)
-		local s = _projDetonTrack[e]
-		if not s or s.fired then
-			_projDetonTrack[e] = nil
+		local state = _projDetonTrack[proj]
+		if state then
+			-- Already tracking this projectile (another enchantment registered first);
+			-- just append the new callback to the shared list.
+			table.insert(state.callbacks, onDetonate)
 			return
 		end
-		s.fired = true
-		_projDetonTrack[e] = nil
-		local ok, err = pcall(s.callback, e)
-		if not ok then ErrorNoHalt("TrackProjectileDetonation (remove) error: " .. tostring(err) .. "\n") end
-	end)
-end
 
--- Secondary trigger: velocity timeout, checked every 0.1s across all tracked projectiles.
-timer.Create("Arcana_ProjDetonVelCheck", 0.1, 0, function()
-	local now = CurTime()
-	for ent, state in pairs(_projDetonTrack) do
-		if state.fired then
-			_projDetonTrack[ent] = nil
-			continue
-		end
+		-- First registration for this projectile: create state and hook removal.
+		state = {
+			callbacks    = { onDetonate },
+			fired        = false,
+			lowVelSince  = nil,
+			registeredAt = CurTime(),
+		}
+		_projDetonTrack[proj] = state
 
-		if not IsValid(ent) then
-			-- CallOnRemove should have cleaned this up, but guard anyway
-			_projDetonTrack[ent] = nil
-			continue
-		end
-
-		-- Don't penalise slow-launch projectiles during their initial flight window
-		if now - state.registeredAt < SLOW_VEL_MIN_AGE then continue end
-
-		local speed = ent:GetVelocity():Length()
-		if speed < SLOW_VEL_THRESHOLD then
-			if not state.lowVelSince then
-				state.lowVelSince = now
-			elseif now - state.lowVelSince >= SLOW_VEL_DURATION then
-				state.fired = true
-				_projDetonTrack[ent] = nil
-				local ok, err = pcall(state.callback, ent)
-				if not ok then ErrorNoHalt("TrackProjectileDetonation (velocity) error: " .. tostring(err) .. "\n") end
+		-- Primary trigger: a single CallOnRemove fires all callbacks together.
+		proj:CallOnRemove("Arcana_ProjDetonTrack", function(e)
+			local s = _projDetonTrack[e]
+			if not s or s.fired then
+				_projDetonTrack[e] = nil
+				return
 			end
-		else
-			state.lowVelSince = nil  -- picked up speed again, reset the clock
-		end
+			_projDetonTrack[e] = nil
+			fireDetonCallbacks(s, e)
+		end)
 	end
-end)
+
+	-- Secondary trigger: velocity timeout, checked every 0.1s across all tracked projectiles.
+	timer.Create("Arcana_ProjDetonVelCheck", 0.1, 0, function()
+		local now = CurTime()
+		for ent, state in pairs(_projDetonTrack) do
+			if state.fired then
+				_projDetonTrack[ent] = nil
+				continue
+			end
+
+			if not IsValid(ent) then
+				-- CallOnRemove should have cleaned this up, but guard anyway
+				_projDetonTrack[ent] = nil
+				continue
+			end
+
+			-- Don't penalise slow-launch projectiles during their initial flight window
+			if now - state.registeredAt < SLOW_VEL_MIN_AGE then continue end
+
+			local speed = ent:GetVelocity():Length()
+			if speed < SLOW_VEL_THRESHOLD then
+				if not state.lowVelSince then
+					state.lowVelSince = now
+				elseif now - state.lowVelSince >= SLOW_VEL_DURATION then
+					_projDetonTrack[ent] = nil
+					fireDetonCallbacks(state, ent)
+				end
+			else
+				state.lowVelSince = nil  -- picked up speed again, reset the clock
+			end
+		end
+	end)
 end
