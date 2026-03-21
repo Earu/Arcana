@@ -127,7 +127,7 @@ Arcana:RegisterEnchantment({
 		return Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE"
 	end,
 	on_projectile_fired = function(ply, wep, proj, state)
-		proj:CallOnRemove("Arcana_GravCollapse_Fire", function(e)
+		Arcana.Common.TrackProjectileDetonation(proj, function(e)
 			if not IsValid(ply) then return end
 			spawnVortex(ply, e:GetPos())
 		end)

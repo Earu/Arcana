@@ -93,7 +93,7 @@ Arcana:RegisterEnchantment({
 		return Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE"
 	end,
 	on_projectile_fired = function(ply, wep, proj, state)
-		proj:CallOnRemove("Arcana_SporeSeeding_Detonate", function(e)
+		Arcana.Common.TrackProjectileDetonation(proj, function(e)
 			if not IsValid(ply) then return end
 			spawnCloud(ply, e:GetPos())
 		end)
