@@ -5,6 +5,7 @@
 
 if SERVER then
 	util.AddNetworkString("Arcana_ConductiveShell_Track")
+	util.AddNetworkString("Arcana_ConductiveShell_Untrack")
 end
 
 local ZAP_INTERVAL = 0.25
@@ -113,6 +114,13 @@ local function augmentProjectile(proj, owner)
 
 	Arcana.Common.TrackProjectileDetonation(proj, function(e)
 		timer.Remove(timerName)
+
+		-- Tell clients to stop emitting particles regardless of whether the entity
+		-- was removed normally or force-detonated by the velocity timeout.
+		net.Start("Arcana_ConductiveShell_Untrack", true)
+		net.WriteEntity(e)
+		net.Broadcast()
+
 		if not IsValid(owner) then return end
 		local pos = e:GetPos()
 
@@ -153,6 +161,15 @@ if CLIENT then
 			lastPos = ent:GetPos(),
 			nextPFX = 0,
 		}
+	end)
+
+	-- Stop emitting particles for a projectile that has detonated (either via removal
+	-- or velocity timeout — the entity may still be valid in the latter case).
+	net.Receive("Arcana_ConductiveShell_Untrack", function()
+		local ent = net.ReadEntity()
+		local data = trackedEntities[ent]
+		if data and data.emitter then data.emitter:Finish() end
+		trackedEntities[ent] = nil
 	end)
 
 	-- Spark trail + blueflare cloud: same materials, colors, and sizes as ENT:Think
