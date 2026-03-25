@@ -437,7 +437,6 @@ if SERVER then
 		wep.PrimaryAttack = function(self, ...)
 			local hookId = "Arcana_RuntimeProjectileCapture_" .. weaponClass
 			hook.Add("OnEntityCreated", hookId, function(ent)
-				print("OnEntityCreated", ent:GetClass(), weaponClass)
 				if isProjectileClass(ent:GetClass()) then
 					timer.Simple(0, function()
 						if ent:GetPos():DistToSqr(self:GetPos()) < PROJECTILE_CAPTURE_DISTANCE then
