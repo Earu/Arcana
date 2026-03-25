@@ -277,11 +277,11 @@ if CLIENT then
 			})
 		end
 
-		if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+		WaitForShaderMounted({"arcana_crystal_surface_ps30", "arcana_crystal_surface_vs30"}, function(available)
+			if not available then return end
+
 			initShaderMaterial()
-		else
-			hook.Add("ShaderMounted", "arcana_crystal_dispersion", initShaderMaterial)
-		end
+		end)
 	end
 
 	local MAX_RENDER_DIST = 2000 * 2000

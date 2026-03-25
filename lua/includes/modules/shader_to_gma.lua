@@ -167,14 +167,9 @@ if SERVER then
 	end)
 
 	local function sendGMA(ply)
-		if gmaData then
-			local base64 = util.Base64Encode(gmaData)
-			net.Start("shader_to_gma")
-			net.WriteString(base64)
-			net.Send(ply)
-		else
-			log("Failed:", res or "unknown error")
-		end
+		net.Start("shader_to_gma")
+		net.WriteString(gmaData and util.Base64Encode(gmaData) or "")
+		net.Send(ply)
 	end
 
 	hook.Add("SetupMove", "shader_to_gma", function(ply, _, ucmd)
@@ -186,8 +181,16 @@ if SERVER then
 end
 
 if CLIENT then
+	SHADER_MOUNTED = false
 	net.Receive("shader_to_gma", function()
 		local base64 = net.ReadString()
+		if base64 == "" then
+			log("Nothing to mount")
+			SHADER_MOUNTED = true
+			hook.Run("ShaderMounted", {})
+			return
+		end
+
 		local data = util.Base64Decode(base64)
 
 		-- clear old gma files
@@ -206,6 +209,7 @@ if CLIENT then
 		else
 			log("Mounted GMA")
 			PrintTable(files_or_err)
+			SHADER_MOUNTED = true
 			hook.Run("ShaderMounted", files_or_err)
 		end
 	end)
@@ -249,5 +253,37 @@ if CLIENT then
 		end
 
 		return CreateMaterial(name, "screenspace_general", key_values)
+	end
+
+	local internalHookIndex = 0
+	function WaitForShaderMounted(shaderNames, callback)
+		if not istable(shaderNames) and isstring(shaderNames) then shaderNames = { shaderNames } end
+
+		for _, shaderName in pairs(shaderNames) do
+			if file.Exists("shaders/fxc/" .. shaderName .. ".vcs", "GAME") then
+				callback(true)
+				return
+			end
+		end
+
+		if not SHADER_MOUNTED then
+			local hookName = "shader_to_gma_WaitForShaderMounted_" .. internalHookIndex
+			internalHookIndex = internalHookIndex + 1
+
+			hook.Add("ShaderMounted", "shader_to_gma_WaitForShaderMounted", function()
+				local allAvailable = true
+				for _, shaderName in pairs(shaderNames) do
+					if not file.Exists("shaders/fxc/" .. shaderName .. ".vcs", "GAME") then
+						allAvailable = false
+						break
+					end
+				end
+
+				hook.Remove("ShaderMounted", hookName)
+				callback(allAvailable)
+			end)
+		else
+			callback(false)
+		end
 	end
 end

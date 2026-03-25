@@ -5,6 +5,16 @@
 require("shader_to_gma")
 
 if SERVER then
+	local files, dirs = file.Find("materials/arcana/rings/*.png", "GAME")
+	for _, fname in ipairs(files) do
+		resource.AddFile("materials/arcana/rings/" .. fname)
+	end
+
+	files, dirs = file.Find("materials/arcana/glyphs/*.png", "GAME")
+	for _, fname in ipairs(files) do
+		resource.AddFile("materials/arcana/glyphs/" .. fname)
+	end
+
 	resource.AddShader("arcana_circle_ps30")
 	resource.AddShader("arcana_passthrough_vs30")
 

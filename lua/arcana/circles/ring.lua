@@ -52,7 +52,7 @@ local RING_TYPES = {
 -- Default ring ejection sound candidates
 local MAGIC_EJECT_SOUNDS = { "ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav" }
 
-local shader_available = false
+local SHADER_AVAILABLE = false
 local loadedTextures = {}
 
 -- Helper: create a circle material wrapping a texture (custom shader when available)
@@ -65,9 +65,9 @@ local function CreateCircleMaterial(name, textureName)
 		baseTexture = loadedTextures[textureName]
 	end
 
-	if not shader_available then
+	if not SHADER_AVAILABLE then
 		local isModel = textureName:match("band")
-		return CreateMaterial(name, isModel and "VertexLitGeneric" or "UnlitGeneric", {
+		return CreateMaterial(name .. "_" .. FrameNumber(), isModel and "VertexLitGeneric" or "UnlitGeneric", {
 			["$basetexture"] = baseTexture,
 			["$translucent"] = 1,
 			["$vertexalpha"] = 1,
@@ -79,7 +79,7 @@ local function CreateCircleMaterial(name, textureName)
 		})
 	end
 
-	return CreateShaderMaterial(name, {
+	return CreateShaderMaterial(name .. "_" .. FrameNumber(), {
 		["$pixshader"]   = "arcana_circle_ps30",
 		["$vertexshader"] = "arcana_passthrough_vs30",
 		["$basetexture"] = baseTexture,
@@ -135,24 +135,20 @@ local function initPNGMats()
 		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i, "arcana/glyphs/glyph_" .. i .. ".png")
 	end
 
-	Arcana.RunHook("CircleMaterialsLoaded", shader_available)
+	Arcana.RunHook("CircleMaterialsLoaded", SHADER_AVAILABLE)
 end
 
-if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
-	if file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME") then
-		shader_available = true
-		initPNGMats()
-	else
-		shader_available = false
-		hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
-			shader_available = true
+hook.Add("Initialize", "MagicCircle_Initialize", function()
+	if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
+		WaitForShaderMounted({"arcana_circle_ps30", "arcana_passthrough_vs30"}, function(available)
+			SHADER_AVAILABLE = available
 			initPNGMats()
 		end)
+	else
+		SHADER_AVAILABLE = false
+		initPNGMats()
 	end
-else
-	shader_available = false
-	initPNGMats()
-end
+end)
 
 -- ── Shared mesh cache for cylindrical band geometry ───────────────────────────
 local BAND_MESH_CACHE = {}
@@ -354,7 +350,7 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 		-- cam.PushModelMatrix has no effect on surface.* inside cam.Start3D2D,
 		-- so rotation is handled through DrawTexturedRectRotated + manual position math.
 		surface_SetMaterial(pngMat)
-		if shader_available then
+		if SHADER_AVAILABLE then
 			surface_SetDrawColor(255, 255, 255, color.a)
 		else
 			surface_SetDrawColor(color.r, color.g, color.b, color.a)
@@ -383,7 +379,7 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 					gm:SetFloat("$c1_z", color.b / 255)
 				end
 				surface_SetMaterial(gm)
-				if shader_available then
+				if SHADER_AVAILABLE then
 					surface_SetDrawColor(255, 255, 255, color.a)
 				else
 					surface_SetDrawColor(color.r, color.g, color.b, color.a)
@@ -394,7 +390,7 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 	else
 		-- All other types: simple centred quad with direct rotation.
 		surface_SetMaterial(pngMat)
-		if shader_available then
+		if SHADER_AVAILABLE then
 			surface_SetDrawColor(255, 255, 255, color.a)
 		else
 			surface_SetDrawColor(color.r, color.g, color.b, color.a)
@@ -493,7 +489,7 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	end
 
 	render_SetMaterial(self.bandMat)
-	if shader_available then
+	if SHADER_AVAILABLE then
 		render_SetColorModulation(1, 1, 1)
 	else
 		render_SetColorModulation(color.r / 255, color.g / 255, color.b / 255)
@@ -527,7 +523,7 @@ local function apply2DColor(mat, color, alpha)
 		mat:SetFloat("$c1_z", b / 255)
 	end
 	surface_SetMaterial(mat)
-	if shader_available then
+	if SHADER_AVAILABLE then
 		surface_SetDrawColor(255, 255, 255, a)
 	else
 		surface_SetDrawColor(r, g, b, a)
@@ -565,11 +561,15 @@ function Arcana.Circle.Draw2DRuneStar(cx, cy, radius, angle, glyphs, color, alph
 
 	local mat = PNG_RING_MATS[RING_TYPES.RUNE_STAR]
 	if not mat then return end
+
 	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
 	local s = radius * RING_2D_SCALE
+
 	apply2DColor(mat, color, alpha)
 	surface_DrawTexturedRectRotated(cx, cy, s, s, angle or 0)
+
 	if not glyphs then return end
+
 	local glyphSize = radius * 0.35
 	local rot = -math_pi / 180 * (angle or 0)
 	for i = 1, 4 do

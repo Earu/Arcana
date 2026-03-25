@@ -127,12 +127,8 @@ local function initBloom()
 	}
 end
 
-if file.Exists("shaders/fxc/arcana_bloom_ps30.vcs", "GAME") then
+WaitForShaderMounted({"arcana_bloom_ps30", "arcana_passthrough_vs30"}, function(available)
+	if not available then return end
+
 	initBloom()
-else
-	hook.Add("ShaderMounted", "ArcanaBloom_Init", function()
-		timer.Simple(0, function()
-			initBloom()
-		end)
-	end)
-end
+end)
