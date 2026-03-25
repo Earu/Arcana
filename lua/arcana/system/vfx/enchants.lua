@@ -612,7 +612,11 @@ hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, w
 
 	-- Draw immediately in the viewmodel pass to avoid one-frame lag
 	if s.bc.Draw then
+		Arcana.Bloom.ProcessBloom(function()
+			s.bc:Draw()
+		end)
 		s.bc:Draw()
+		Arcana.Bloom.RenderBloom()
 	end
 end)
 
