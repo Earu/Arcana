@@ -54,9 +54,6 @@ local function playAegisVFX(ply)
 		}
 	}, "duelist_aegis_fx")
 
-	local ed = EffectData()
-	ed:SetOrigin(ply:WorldSpaceCenter())
-	util.Effect("cball_bounce", ed, true, true)
 	sound.Play("ambient/energy/zap1.wav", ply:GetPos(), 70, 110)
 end
 
@@ -96,9 +93,6 @@ local function attachHook(ply, wep, state)
 					dmginfo:ScaleDamage(0)
 					-- Small block VFX with cooldown to avoid spam
 					if now > (state._lastBlockFxAt or 0) + 0.15 then
-						local ed = EffectData()
-						ed:SetOrigin(ply:WorldSpaceCenter())
-						util.Effect("cball_bounce", ed, true, true)
 						sound.Play("ambient/energy/zap2.wav", ply:GetPos(), 65, 120)
 						state._lastBlockFxAt = now
 					end
