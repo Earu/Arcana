@@ -111,31 +111,28 @@ local PNG_PATTERN_LINE_MATS = nil   -- array of 3 PATTERN_LINES variant material
 local PNG_BAND_MATS         = nil   -- array of 3 BAND_RING variant materials
 local PNG_GLYPH_MATS        = {}    -- keyed by char code 65-72
 
-local function ensurePNGMatsLoaded(forceRebuild)
-	if PNG_RING_MATS and not forceRebuild then return end
-
-	local nameSuffix = "_" .. FrameNumber()
+local function initPNGMats()
 	PNG_PATTERN_LINE_MATS = {
-		CreateCircleMaterial("arcana_png_pattern_1" .. nameSuffix, "arcana/rings/ring_pattern_lines.png"),
-		CreateCircleMaterial("arcana_png_pattern_2" .. nameSuffix, "arcana/rings/ring_pattern_lines_2.png"),
-		CreateCircleMaterial("arcana_png_pattern_3" .. nameSuffix, "arcana/rings/ring_pattern_lines_3.png"),
+		CreateCircleMaterial("arcana_png_pattern_1", "arcana/rings/ring_pattern_lines.png"),
+		CreateCircleMaterial("arcana_png_pattern_2", "arcana/rings/ring_pattern_lines_2.png"),
+		CreateCircleMaterial("arcana_png_pattern_3", "arcana/rings/ring_pattern_lines_3.png"),
 	}
 
 	PNG_BAND_MATS = {
-		CreateCircleMaterial("arcana_png_band_1" .. nameSuffix, "arcana/rings/ring_band.png"),
-		CreateCircleMaterial("arcana_png_band_2" .. nameSuffix, "arcana/rings/ring_band_2.png"),
-		CreateCircleMaterial("arcana_png_band_3" .. nameSuffix, "arcana/rings/ring_band_3.png"),
+		CreateCircleMaterial("arcana_png_band_1", "arcana/rings/ring_band.png"),
+		CreateCircleMaterial("arcana_png_band_2", "arcana/rings/ring_band_2.png"),
+		CreateCircleMaterial("arcana_png_band_3", "arcana/rings/ring_band_3.png"),
 	}
 
 	PNG_RING_MATS = {
-		[RING_TYPES.SIMPLE_LINE]   = CreateCircleMaterial("arcana_png_simple" .. nameSuffix,    "arcana/rings/ring_simple_line.png"),
+		[RING_TYPES.SIMPLE_LINE]   = CreateCircleMaterial("arcana_png_simple",    "arcana/rings/ring_simple_line.png"),
 		[RING_TYPES.PATTERN_LINES] = PNG_PATTERN_LINE_MATS[1],   -- overridden per-ring via ring.patternVariant
-		[RING_TYPES.RUNE_STAR]     = CreateCircleMaterial("arcana_png_rune_star" .. nameSuffix, "arcana/rings/ring_rune_star.png"),
-		[RING_TYPES.STAR_RING]     = CreateCircleMaterial("arcana_png_star" .. nameSuffix,      "arcana/rings/ring_star_ring.png"),
+		[RING_TYPES.RUNE_STAR]     = CreateCircleMaterial("arcana_png_rune_star", "arcana/rings/ring_rune_star.png"),
+		[RING_TYPES.STAR_RING]     = CreateCircleMaterial("arcana_png_star",      "arcana/rings/ring_star_ring.png"),
 	}
 
 	for i = 65, 72 do
-		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i .. nameSuffix, "arcana/glyphs/glyph_" .. i .. ".png")
+		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i, "arcana/glyphs/glyph_" .. i .. ".png")
 	end
 
 	Arcana.RunHook("CircleMaterialsLoaded", shader_available)
@@ -144,14 +141,17 @@ end
 if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
 	if file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME") then
 		shader_available = true
-		ensurePNGMatsLoaded(true)
+		initPNGMats()
 	else
 		shader_available = false
 		hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
 			shader_available = true
-			ensurePNGMatsLoaded(true)
+			initPNGMats()
 		end)
 	end
+else
+	shader_available = false
+	initPNGMats()
 end
 
 -- ── Shared mesh cache for cylindrical band geometry ───────────────────────────
@@ -326,7 +326,7 @@ end
 -- pxToWorld = radius / PNG_RING_RADIUS_PX ensures the ring circle in the 4096 PNG
 -- lands exactly at self.radius world units from the centre.
 function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
-	ensurePNGMatsLoaded()
+	if not PNG_RING_MATS then return false end
 
 	local pngMat
 	if self.type == RING_TYPES.PATTERN_LINES and self.patternVariant then
@@ -409,7 +409,7 @@ end
 -- Build the cylindrical mesh for a band ring and bind the PNG band material.
 -- The mesh is shared across all bands with the same radius/height/segment bucket.
 function Ring:BuildBandMesh()
-	ensurePNGMatsLoaded()
+	if not PNG_BAND_MATS then return false end
 
 	self.bandMat = PNG_BAND_MATS[self.bandVariant or 1]
 
@@ -536,7 +536,8 @@ end
 
 -- Draws a ring (by RING_TYPES value) centred at (cx, cy) in screen space.
 function Arcana.Circle.Draw2DRing(ringType, cx, cy, radius, angle, color, alpha)
-	ensurePNGMatsLoaded()
+	if not PNG_RING_MATS then return end
+
 	local mat = PNG_RING_MATS[ringType]
 	if not mat then return end
 	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
@@ -547,7 +548,8 @@ end
 
 -- Draws a pattern-lines ring (variant 1–3) centred at (cx, cy) in screen space.
 function Arcana.Circle.Draw2DPatternRing(variant, cx, cy, radius, angle, color, alpha)
-	ensurePNGMatsLoaded()
+	if not PNG_RING_MATS then return end
+
 	local mat = PNG_PATTERN_LINE_MATS[variant or 1]
 	if not mat then return end
 	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
@@ -559,7 +561,8 @@ end
 -- Draws a RUNE_STAR ring with four co-rotating glyph overlays in screen space.
 -- glyphs: array of 4 char codes from EXPORTED_GLYPH_CODES (65–72 = 'A'–'H').
 function Arcana.Circle.Draw2DRuneStar(cx, cy, radius, angle, glyphs, color, alpha)
-	ensurePNGMatsLoaded()
+	if not PNG_RING_MATS then return end
+
 	local mat = PNG_RING_MATS[RING_TYPES.RUNE_STAR]
 	if not mat then return end
 	RING_2D_SCALE = RING_2D_SCALE or (PNG_RING_SIZE / PNG_RING_RADIUS_PX)
