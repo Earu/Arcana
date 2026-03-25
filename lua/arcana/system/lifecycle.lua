@@ -21,8 +21,8 @@ if SERVER then
 					Arcana.Inventory.OnPlayerDataLoaded(ply)
 				end
 
-				if Arcana.Common and Arcana.Common.SendWeaponClassificationCache then
-					Arcana.Common.SendWeaponClassificationCache(ply)
+				if Arcana.WeaponClassification and Arcana.WeaponClassification.SendCache then
+					Arcana.WeaponClassification.SendCache(ply)
 				end
 
 				Arcana.RunHook("LoadedPlayerData", ply, data)

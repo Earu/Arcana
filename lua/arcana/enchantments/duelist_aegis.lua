@@ -74,7 +74,7 @@ local function attachHook(ply, wep, state)
 
 		-- Grant Aegis when this player deals melee damage with this weapon
 		local attacker = dmginfo:GetAttacker()
-		local classification = Arcana.Common.GetWeaponClassification(wep)
+		local classification = Arcana.WeaponClassification.Get(wep)
 		if IsValid(attacker) and attacker == ply then
 			local active = ply:GetActiveWeapon()
 			if IsValid(active) and active == wep and classification == "MELEE" and isMeleeDamage(dmginfo) then
@@ -119,7 +119,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 50 },
 	},
 	can_apply = function(ply, wep)
-		return Arcana.Common.GetWeaponClassification(wep) == "MELEE"
+		return Arcana.WeaponClassification.Get(wep) == "MELEE"
 	end,
 	apply = attachHook,
 	remove = detachHook,

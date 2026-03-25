@@ -112,7 +112,7 @@ local function augmentProjectile(proj, owner)
 		zapNearestTarget(proj, owner)
 	end)
 
-	Arcana.Common.TrackProjectileDetonation(proj, function(e)
+	Arcana.WeaponClassification.TrackProjectileDetonation(proj, function(e)
 		timer.Remove(timerName)
 
 		-- Tell clients to stop emitting particles regardless of whether the entity
@@ -143,7 +143,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 75 },
 	},
 	can_apply = function(ply, wep)
-		local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+		local data = Arcana.WeaponClassification.GetData(wep:GetClass())
 		if not data then return false end
 
 		return data.type == "PROJECTILE" and data.projectileClass ~= nil

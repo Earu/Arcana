@@ -32,7 +32,7 @@ end
 --   remove(ply, wep, state): remove runtime behavior when enchantment is stripped
 --   on_projectile_fired(ply, wep, proj, state): optional; called automatically by the system
 --     whenever a player fires a projectile from this enchanted weapon. Ownership is resolved
---     via Arcana.Common.ResolveProjectileOwner — no manual OnEntityCreated hook needed.
+--     via Arcana.WeaponClassification.ResolveProjectileOwner — no manual OnEntityCreated hook needed.
 --   max_stacks (number, default 1): max simultaneous applications
 --   grants_xp (bool, default true): whether a successful apply awards XP via GiveXP.
 --     Set to false for system-applied enchantments (e.g., vault restore) that should not grant XP.
@@ -139,7 +139,7 @@ function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	-- Cache projClass so the on_projectile_fired dispatcher can filter by entity class.
 	-- Arcana.Common is loaded after enchantments.lua, but this runs at runtime so it's available.
 	if SERVER and isfunction(ench.on_projectile_fired) then
-		local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+		local wepData = Arcana.WeaponClassification.GetData(wep:GetClass())
 		list[enchId]._projClass = wepData and wepData.projectileClass or nil
 	end
 
@@ -191,7 +191,7 @@ if SERVER then
 		-- projectile creation and dispatch (e.g. grenades consumed on throw).
 		local owner = (ent.GetOwner and ent:GetOwner()) or nil
 		if IsValid(owner) and owner:IsPlayer() then
-			Arcana.Common.CachePlayerProjectileWeapon(owner, ent)
+			Arcana.WeaponClassification.CachePlayerProjectileWeapon(owner, ent)
 		end
 
 		local list = ent.ArcanaEnchantments
@@ -209,38 +209,36 @@ if SERVER then
 	-- already in flight (or about to spawn) can still resolve back to its enchantments.
 	hook.Add("PlayerSwitchWeapon", "Arcana_CacheLastProjectileWeapon", function(ply, oldWep, newWep)
 		if not IsValid(oldWep) then return end
-		Arcana.Common.CachePlayerProjectileWeapon(ply, oldWep)
+		Arcana.WeaponClassification.CachePlayerProjectileWeapon(ply, oldWep)
 	end)
 
 	-- Global dispatcher for on_projectile_fired enchantment callbacks.
 	-- Fires once per created entity; defers one frame so SetOwner / CPPISetOwner have settled.
 	-- If the owner's current active weapon doesn't match the projectile, falls back to the
 	-- cached previous weapon data (covers weapon removal before dispatch).
-	-- Arcana.Common (weapon_utils, projectile_utils) is loaded after this file but is fully
-	-- available by the time any hook body executes at runtime.
 	hook.Add("OnEntityCreated", "Arcana_ProjectileFiredDispatch", function(ent)
 		timer.Simple(0, function()
 			if not IsValid(ent) then return end
 
 			local entClass = ent:GetClass()
-			local owner = Arcana.Common.ResolveProjectileOwner(ent, entClass)
+			local owner = Arcana.WeaponClassification.ResolveProjectileOwner(ent, entClass)
 			if not IsValid(owner) then return end
 
 			-- Try the current active weapon first
 			local wep = owner:GetActiveWeapon()
 			local enchants = nil
 
-			if IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "PROJECTILE" then
-				local wepData = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+			if IsValid(wep) and Arcana.WeaponClassification.Get(wep) == "PROJECTILE" then
+				local wepData = Arcana.WeaponClassification.GetData(wep:GetClass())
 				if wepData and wepData.projectileClass == entClass then
 					enchants = wep.ArcanaEnchantments
-					Arcana.Common.CachePlayerProjectileWeapon(owner, wep)
+					Arcana.WeaponClassification.CachePlayerProjectileWeapon(owner, wep)
 				end
 			end
 
 			-- Fallback: cached previous weapon (covers weapon removal before dispatch)
 			if not enchants then
-				local cache = Arcana.Common.GetCachedProjectileWeapon(owner)
+				local cache = Arcana.WeaponClassification.GetCachedProjectileWeapon(owner)
 				if cache and cache.enchantments then
 					if not cache.projClass or cache.projClass == entClass then
 						enchants = cache.enchantments

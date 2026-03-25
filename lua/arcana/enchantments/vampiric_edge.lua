@@ -42,7 +42,7 @@ local function attachHook(ply, wep, state)
 
         local active = attacker:GetActiveWeapon()
         if not IsValid(active) or active ~= wep then return end
-        if Arcana.Common.GetWeaponClassification(wep) ~= "MELEE" then return end
+        if Arcana.WeaponClassification.Get(wep) ~= "MELEE" then return end
         if not isMeleeDamage(dmginfo) then return end
 
         local now = CurTime()
@@ -74,7 +74,7 @@ Arcana:RegisterEnchantment({
         { name = "mana_crystal_shard", amount = 40 },
     },
     can_apply = function(ply, wep)
-        return IsValid(wep) and Arcana.Common.GetWeaponClassification(wep) == "MELEE"
+        return IsValid(wep) and Arcana.WeaponClassification.Get(wep) == "MELEE"
     end,
     apply = attachHook,
     remove = detachHook,

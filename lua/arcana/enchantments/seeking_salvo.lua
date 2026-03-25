@@ -44,7 +44,7 @@ Arcana:RegisterEnchantment({
 	},
 	can_apply = function(ply, wep)
 		-- Firearms that can shoot bullets (exclude melee)
-		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
+		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,

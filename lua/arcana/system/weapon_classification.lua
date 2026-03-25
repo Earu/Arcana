@@ -2,7 +2,7 @@
 -- Shared hold-type helpers used by enchantments and VFX
 
 Arcana = Arcana or {}
-Arcana.Common = Arcana.Common or {}
+Arcana.WeaponClassification = Arcana.WeaponClassification or {}
 
 local ACT_INDEX = {
 	[ACT_HL2MP_IDLE_PISTOL] = "pistol",
@@ -135,19 +135,19 @@ local HL2_PROJECTILE_CLASSES = {
 }
 
 --- Returns true when the weapon uses a melee hold type.
-function Arcana.Common.IsMeleeHoldType(wep)
+function Arcana.WeaponClassification.IsMeleeHoldType(wep)
 	local ht = getHoldType(wep)
 	return MELEE_HOLDTYPES[ht] or false
 end
 
 --- Returns true when the weapon uses a pistol hold type.
-function Arcana.Common.IsPistolHoldType(wep)
+function Arcana.WeaponClassification.IsPistolHoldType(wep)
 	local ht = getHoldType(wep)
 	return ht == "pistol" or ht == "revolver"
 end
 
 --- Returns true when the weapon uses a rifle / long-arm hold type.
-function Arcana.Common.IsRifleHoldType(wep)
+function Arcana.WeaponClassification.IsRifleHoldType(wep)
 	local ht = getHoldType(wep)
 	return ht == "ar2" or ht == "shotgun" or ht == "rpg" or ht == "crossbow" or ht == "smg" or ht == "physgun"
 end
@@ -400,7 +400,7 @@ if SERVER then
 		end
 	end
 
-	function Arcana.Common.SendWeaponClassificationCache(ply)
+	function Arcana.WeaponClassification.SendCache(ply)
 		net.Start("Arcana_UpdateWeaponClassificationCache")
 		net.WriteInt(table.Count(weaponClassificationCache), 32)
 		for className, entry in pairs(weaponClassificationCache) do
@@ -423,7 +423,7 @@ if SERVER then
 		end
 
 		file.Write(CACHE_FILE, util.TableToJSON(weaponClassificationCache, true))
-		Arcana.Common.SendWeaponClassificationCache()
+		Arcana.WeaponClassification.SendCache()
 	end
 
 	-- When static analysis finds an ents.Create call with an unresolvable argument,
@@ -490,7 +490,7 @@ if SERVER then
 		end
 	end
 
-	function Arcana.Common.GetWeaponClassification(wep)
+	function Arcana.WeaponClassification.Get(wep)
 		if not IsValid(wep) then return "UNKNOWN" end
 
 		local className = wep:GetClass()
@@ -504,7 +504,7 @@ if SERVER then
 		return classification.type
 	end
 
-	function Arcana.Common.GetWeaponClassificationData(className)
+	function Arcana.WeaponClassification.GetData(className)
 		if not isstring(className) then return nil end
 		return weaponClassificationCache[className]
 	end
@@ -548,7 +548,7 @@ if CLIENT then
 		end
 	end)
 
-	function Arcana.Common.GetWeaponClassification(wep)
+	function Arcana.WeaponClassification.Get(wep)
 		local className = wep:GetClass()
 		if not IsValid(wep) or not isstring(className) then return "UNKNOWN" end
 		local cached = weaponClassificationCache[className]
@@ -556,8 +556,186 @@ if CLIENT then
 		return "UNKNOWN"
 	end
 
-	function Arcana.Common.GetWeaponClassificationData(className)
+	function Arcana.WeaponClassification.GetData(className)
 		if not isstring(className) then return nil end
 		return weaponClassificationCache[className]
 	end
+end
+
+if SERVER then
+	--- Cache a player's current PROJECTILE weapon data so the projectile dispatcher can
+	-- recover enchantment state even if the weapon is removed before the deferred check.
+	-- Called from PlayerSwitchWeapon, EntityRemoved, and on successful dispatch.
+	-- @param ply Player
+	-- @param wep Entity  The weapon to cache (must still be valid)
+	function Arcana.WeaponClassification.CachePlayerProjectileWeapon(ply, wep)
+		if not IsValid(ply) or not IsValid(wep) then return end
+		if Arcana.WeaponClassification.Get(wep) ~= "PROJECTILE" then return end
+
+		local wepData = Arcana.WeaponClassification.GetData(wep:GetClass())
+		ply._ArcanaLastProjWeapon = {
+			wep          = wep,
+			wepClass     = wep:GetClass(),
+			projClass    = wepData and wepData.projectileClass or nil,
+			enchantments = wep.ArcanaEnchantments,
+			cachedAt     = CurTime(),
+		}
+	end
+
+	--- Retrieve the cached PROJECTILE weapon data for a player. Returns nil if the
+	-- cache has expired (>0.1s) or was never set.
+	-- @param ply Player
+	-- @return table|nil  { wep, wepClass, projClass, enchantments, cachedAt }
+	function Arcana.WeaponClassification.GetCachedProjectileWeapon(ply)
+		if not IsValid(ply) then return nil end
+		local cache = ply._ArcanaLastProjWeapon
+		if not cache then return nil end
+		if CurTime() - cache.cachedAt > 0.1 then
+			ply._ArcanaLastProjWeapon = nil
+			return nil
+		end
+		return cache
+	end
+
+	--- Resolve the player owner of a freshly-created projectile entity.
+	-- Tries GetOwner, then CPPI (community standard, not vanilla — always guard), then
+	-- spatial proximity to the closest player holding (or recently holding) a matching
+	-- PROJECTILE-classified weapon. The proximity fallback also checks the player's cached
+	-- previous weapon to handle weapons removed between fire and this deferred check.
+	-- Must be called after a timer.Simple(0) defer so ownership has had time to settle.
+	-- @param ent       Entity     The projectile entity
+	-- @param projClass string|nil Expected entity class; used only to narrow the proximity fallback
+	-- @return Player|nil
+	function Arcana.WeaponClassification.ResolveProjectileOwner(ent, projClass)
+		-- Tier 1: standard GMod owner
+		local owner = ent:GetOwner()
+		if IsValid(owner) and owner:IsPlayer() then return owner end
+
+		-- Tier 2: CPPI community standard (not part of vanilla GLua API — always guard)
+		if isfunction(ent.CPPIGetOwner) then
+			owner = ent:CPPIGetOwner()
+			if IsValid(owner) and owner:IsPlayer() then return owner end
+		end
+
+		-- Tier 3: closest player holding (or recently holding) a matching PROJECTILE weapon
+		local pos = ent:GetPos()
+		local bestPly, bestDist = nil, 300
+		for _, ply in ipairs(player.GetAll()) do
+			if not ply:Alive() then continue end
+
+			local matched = false
+
+			local wep = ply:GetActiveWeapon()
+			if IsValid(wep) and Arcana.WeaponClassification.Get(wep) == "PROJECTILE" then
+				if projClass then
+					local data = Arcana.WeaponClassification.GetData(wep:GetClass())
+					if data and data.projectileClass == projClass then matched = true end
+				else
+					matched = true
+				end
+			end
+
+			if not matched then
+				local cache = Arcana.WeaponClassification.GetCachedProjectileWeapon(ply)
+				if cache then
+					if not projClass or cache.projClass == projClass then
+						matched = true
+					end
+				end
+			end
+
+			if matched then
+				local dist = ply:GetPos():Distance(pos)
+				if dist < bestDist then bestDist = dist; bestPly = ply end
+			end
+		end
+		return bestPly
+	end
+
+	--- Tracks a projectile and calls each registered onDetonate(ent) callback when either:
+	--   a) The entity is removed (standard detonation) — primary trigger via CallOnRemove.
+	--   b) The entity's speed has been below SLOW_VEL_THRESHOLD for SLOW_VEL_DURATION seconds
+	--      — catches sticky/long-lived projectiles that never naturally remove themselves.
+	-- Multiple enchantments on the same projectile each call this independently; all callbacks
+	-- are stored in a list and fired together from a single shared CallOnRemove/velocity trigger.
+	-- Each callback fires exactly once per detonation event.
+	-- @param proj       Entity    The projectile to track
+	-- @param onDetonate function  Called as onDetonate(proj) on detonation
+	local SLOW_VEL_THRESHOLD = 30   -- units/sec; below this counts as "stuck"
+	local SLOW_VEL_DURATION  = 2.0  -- seconds of continuous low velocity before forcing detonation
+	local SLOW_VEL_MIN_AGE   = 0.5  -- ignore velocity for the first N seconds so slow-launch weapons don't misfire
+
+	local _projDetonTrack = {}
+
+	local function fireDetonCallbacks(state, ent)
+		state.fired = true
+		for _, cb in ipairs(state.callbacks) do
+			local ok, err = pcall(cb, ent)
+			if not ok then ErrorNoHalt("TrackProjectileDetonation error: " .. tostring(err) .. "\n") end
+		end
+	end
+
+	function Arcana.WeaponClassification.TrackProjectileDetonation(proj, onDetonate)
+		if not IsValid(proj) or not isfunction(onDetonate) then return end
+
+		local state = _projDetonTrack[proj]
+		if state then
+			-- Already tracking this projectile (another enchantment registered first);
+			-- just append the new callback to the shared list.
+			table.insert(state.callbacks, onDetonate)
+			return
+		end
+
+		-- First registration for this projectile: create state and hook removal.
+		state = {
+			callbacks    = { onDetonate },
+			fired        = false,
+			lowVelSince  = nil,
+			registeredAt = CurTime(),
+		}
+		_projDetonTrack[proj] = state
+
+		-- Primary trigger: a single CallOnRemove fires all callbacks together.
+		proj:CallOnRemove("Arcana_ProjDetonTrack", function(e)
+			local s = _projDetonTrack[e]
+			if not s or s.fired then
+				_projDetonTrack[e] = nil
+				return
+			end
+			_projDetonTrack[e] = nil
+			fireDetonCallbacks(s, e)
+		end)
+	end
+
+	-- Secondary trigger: velocity timeout, checked every 0.1s across all tracked projectiles.
+	timer.Create("Arcana_ProjDetonVelCheck", 0.1, 0, function()
+		local now = CurTime()
+		for ent, state in pairs(_projDetonTrack) do
+			if state.fired then
+				_projDetonTrack[ent] = nil
+				continue
+			end
+
+			if not IsValid(ent) then
+				-- CallOnRemove should have cleaned this up, but guard anyway
+				_projDetonTrack[ent] = nil
+				continue
+			end
+
+			-- Don't penalise slow-launch projectiles during their initial flight window
+			if now - state.registeredAt < SLOW_VEL_MIN_AGE then continue end
+
+			local speed = ent:GetVelocity():Length()
+			if speed < SLOW_VEL_THRESHOLD then
+				if not state.lowVelSince then
+					state.lowVelSince = now
+				elseif now - state.lowVelSince >= SLOW_VEL_DURATION then
+					_projDetonTrack[ent] = nil
+					fireDetonCallbacks(state, ent)
+				end
+			else
+				state.lowVelSince = nil  -- picked up speed again, reset the clock
+			end
+		end
+	end)
 end

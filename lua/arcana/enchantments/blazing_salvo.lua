@@ -49,7 +49,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 30 },
 	},
 	can_apply = function(ply, wep)
-		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
+		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,

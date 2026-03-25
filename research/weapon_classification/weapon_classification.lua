@@ -377,7 +377,7 @@ end
 
 --[[local output = {}
 for _, weapon in ipairs(weapons.GetList()) do
-	if Arcana.Common.IsMeleeHoldType(weapon) then continue end -- we dont care about melee weapons
+	if Arcana.WeaponClassification.IsMeleeHoldType(weapon) then continue end -- we dont care about melee weapons
 
 	local ht = getHoldType(weapon)
 	if ht == "normal" then continue end -- mostly irrelevant for this test

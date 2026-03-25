@@ -90,7 +90,7 @@ Arcana:RegisterEnchantment({
 	},
 	can_apply = function(ply, wep)
 		-- Only firearms that can shoot bullets
-		return Arcana.Common.GetWeaponClassification(wep) == "HITSCAN"
+		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
 	apply = attachHook,
 	remove = detachHook,

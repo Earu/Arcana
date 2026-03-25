@@ -72,7 +72,7 @@ Arcana:RegisterEnchantment({
 		if (not maxClip or maxClip <= 0) and wep.Primary and tonumber(wep.Primary.ClipSize) then
 			maxClip = tonumber(wep.Primary.ClipSize) or -1
 		end
-		return usesAmmo or (maxClip and maxClip > 0) and Arcana.Common.GetWeaponClassification(wep) ~= "MELEE"
+		return usesAmmo or (maxClip and maxClip > 0) and Arcana.WeaponClassification.Get(wep) ~= "MELEE"
 	end,
 	apply = attachInfiniteAmmo,
 	remove = detachInfiniteAmmo,

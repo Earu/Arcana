@@ -124,13 +124,13 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 90 },
 	},
 	can_apply = function(ply, wep)
-		local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+		local data = Arcana.WeaponClassification.GetData(wep:GetClass())
 		if not data then return false end
 
 		return data.type == "PROJECTILE" and data.projectileClass ~= nil
 	end,
 	on_projectile_fired = function(ply, wep, proj, state)
-		Arcana.Common.TrackProjectileDetonation(proj, function(e)
+		Arcana.WeaponClassification.TrackProjectileDetonation(proj, function(e)
 			if not IsValid(ply) then return end
 			spawnVortex(ply, e:GetPos())
 		end)
