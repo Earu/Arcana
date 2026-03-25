@@ -78,7 +78,7 @@ local function attachHook(ply, wep, state)
 
 		-- Must be wielding this melee weapon
 		local active = ply:GetActiveWeapon()
-		if not IsValid(active) or active ~= wep or Arcana.Common.GetWeaponClassification(wep) ~= "MELEE" then return end
+		if not IsValid(active) or active ~= wep or Arcana.WeaponClassification.Get(wep) ~= "MELEE" then return end
 
 		-- Ignore self-damage only; trigger on any non-self source (including world)
 		local attacker = dmginfo:GetAttacker()
@@ -139,7 +139,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 45 },
 	},
 	can_apply = function(ply, wep)
-		return Arcana.Common.GetWeaponClassification(wep) == "MELEE"
+		return Arcana.WeaponClassification.Get(wep) == "MELEE"
 	end,
 	apply = attachHook,
 	remove = detachHook,

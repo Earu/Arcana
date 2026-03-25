@@ -7,7 +7,7 @@ if SERVER then return end
 -- These file-scope aliases become nil if the load order changes; they are guarded with asserts
 -- that surface the problem immediately rather than silently at first render.
 assert(Arcana.Circle and Arcana.Circle.BandCircle, "enchant_vfx.lua requires circles.lua to be loaded first")
-assert(Arcana.Common and Arcana.Common.IsMeleeHoldType, "enchant_vfx.lua requires arcana/common/weapon_utils.lua to be loaded first")
+assert(Arcana.WeaponClassification and Arcana.WeaponClassification.IsMeleeHoldType, "enchant_vfx.lua requires arcana/system/weapon_classification.lua to be loaded first")
 
 local BandCircle = Arcana.Circle.BandCircle
 
@@ -103,9 +103,9 @@ local function isHeldActive(wep)
 	return IsValid(owner) and owner:GetActiveWeapon() == wep
 end
 
-local isMeleeHoldType = Arcana.Common.IsMeleeHoldType
-local isPistolHoldType = Arcana.Common.IsPistolHoldType
-local isRifleHoldType = Arcana.Common.IsRifleHoldType
+local isMeleeHoldType = Arcana.WeaponClassification.IsMeleeHoldType
+local isPistolHoldType = Arcana.WeaponClassification.IsPistolHoldType
+local isRifleHoldType = Arcana.WeaponClassification.IsRifleHoldType
 
 local function getPlayerHandPositions(ply)
 	if not IsValid(ply) then return nil, nil end

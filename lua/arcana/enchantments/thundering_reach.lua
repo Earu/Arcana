@@ -86,7 +86,7 @@ local function attachHook(ply, wep, state)
 			if not IsValid(attacker) or not attacker:IsPlayer() then return end
 			local active = attacker:GetActiveWeapon()
 			if not IsValid(active) or active ~= wep then return end
-			if Arcana.Common.GetWeaponClassification(wep) ~= "MELEE" then return end
+			if Arcana.WeaponClassification.Get(wep) ~= "MELEE" then return end
 
 			local now = CurTime()
 			local function performThunder()
@@ -130,7 +130,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 60 },
 	},
 	can_apply = function(ply, wep)
-		return Arcana.Common.GetWeaponClassification(wep) == "MELEE"
+		return Arcana.WeaponClassification.Get(wep) == "MELEE"
 	end,
 	apply = attachHook,
 	remove = detachHook,

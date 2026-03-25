@@ -29,7 +29,7 @@ local function attachIgniteHook(ply, wep, state)
 		if not IsValid(active) or active ~= wep then return end
 
 		-- Only for melee weapons
-		if Arcana.Common.GetWeaponClassification(wep) ~= "MELEE" then return end
+		if Arcana.WeaponClassification.Get(wep) ~= "MELEE" then return end
 
 		-- Filter out bullet/projectile damage: prefer club/slash or generic close-range
 		-- some weird knives use DMG_NEVERGIB
@@ -57,7 +57,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 20 },
 	},
 	can_apply = function(ply, wep)
-		return Arcana.Common.GetWeaponClassification(wep) == "MELEE"
+		return Arcana.WeaponClassification.Get(wep) == "MELEE"
 	end,
 	apply = attachIgniteHook,
 	remove = detachIgniteHook,

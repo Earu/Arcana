@@ -65,7 +65,7 @@ Arcana:RegisterEnchantment({
 		{ name = "mana_crystal_shard", amount = 75 },
 	},
 	can_apply = function(ply, wep)
-		local data = Arcana.Common.GetWeaponClassificationData(wep:GetClass())
+		local data = Arcana.WeaponClassification.GetData(wep:GetClass())
 		if not data then return false end
 
 		return data.type == "PROJECTILE" and data.projectileClass ~= nil
@@ -79,7 +79,7 @@ Arcana:RegisterEnchantment({
 			path[#path + 1] = proj:GetPos()
 		end)
 
-		Arcana.Common.TrackProjectileDetonation(proj, function(e)
+		Arcana.WeaponClassification.TrackProjectileDetonation(proj, function(e)
 			timer.Remove(timerName)
 			if not IsValid(ply) then return end
 			fireWake(ply, e:GetPos(), path)
