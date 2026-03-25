@@ -152,6 +152,8 @@ local function ensurePNGMatsLoaded()
 	for i = 65, 72 do
 		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i, "arcana/glyphs/glyph_" .. i .. ".png")
 	end
+
+	Arcana.RunHook("CircleMaterialsLoaded")
 end
 
 -- ── Shared mesh cache for cylindrical band geometry ───────────────────────────

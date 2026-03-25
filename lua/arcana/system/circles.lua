@@ -26,7 +26,7 @@ local MagicCircleManager = Arcana.Circle.MagicCircleManager
 local BandCircle = Arcana.Circle.BandCircle
 
 -- Console commands for in-game testing
-concommand.Add("magic_circle_test", function(ply, cmd, args)
+concommand.Add("arcana_circle_test", function(ply, cmd, args)
 	if not IsValid(ply) then return end
 	local tr = ply:GetEyeTrace()
 	local pos = tr.HitPos + tr.HitNormal * 5
@@ -43,12 +43,12 @@ concommand.Add("magic_circle_test", function(ply, cmd, args)
 	print("Magic circle created! ID: " .. tostring(circle) .. " Rings: " .. circle:GetRingCount() .. " Line Width: " .. lineWidth)
 end)
 
-concommand.Add("magic_circle_clear", function()
+concommand.Add("arcana_circle_clear", function()
 	MagicCircleManager:Clear()
 	print("All magic circles cleared!")
 end)
 
-concommand.Add("band_circle_test", function(ply, cmd, args)
+concommand.Add("arcana_band_circle_test", function(ply, cmd, args)
 	if not IsValid(ply) then return end
 	local tr = ply:GetEyeTrace()
 	local pos = tr.HitPos + tr.HitNormal * 8

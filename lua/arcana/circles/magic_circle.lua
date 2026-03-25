@@ -425,7 +425,14 @@ end)
 hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
 	if isSkybox then return end
 
+	local bloom = Arcana.Bloom
+	bloom.ProcessBloom(function()
+		MagicCircleManager:Draw()
+	end)
+
 	MagicCircleManager:Draw()
+
+	bloom.RenderBloom()
 end)
 
 -- Convenience functions (maintaining backward compatibility)
