@@ -12,6 +12,8 @@ if SERVER then
 	return
 end
 
+local BLOOM_ENABLED = CreateConVar("arcana_bloom", "1", FCVAR_ARCHIVE, "Enable Arcana bloom system")
+
 local Arcana = Arcana
 Arcana.Bloom = Arcana.Bloom or {
 	ProcessBloom = function() end,
@@ -86,6 +88,8 @@ local function initBloom()
 	-- Called by magic_circle.lua inside cam.Start2D() so the composite is written
 	-- before the viewmodel renders, which then draws on top and occludes the bloom.
 	function renderBloom()
+		if not BLOOM_ENABLED:GetBool() then return end
+
 		-- ── Tight bloom — 3 successive H+V passes at half-res ────────────────
 		blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
 		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 1)
@@ -109,6 +113,8 @@ local function initBloom()
 	end
 
 	local function processBloom(drawFunc)
+		if not BLOOM_ENABLED:GetBool() then return end
+
 		render.PushRenderTarget(CIRCLE_RT)
 		render.Clear(0, 0, 0, 0, true, false) -- colour only; depth is shared with the screen
 		drawFunc()
