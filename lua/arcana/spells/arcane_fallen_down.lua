@@ -8,9 +8,10 @@ if SERVER then
 	util.AddNetworkString("Arcana_FallenDown_VacuumImplosion")
 	util.AddNetworkString("Arcana_FallenDown_VacuumCollapse")
 	util.AddNetworkString("Arcana_FallenDown_BGM")
-	resource.AddFile("sound/arcana/fallen_down/bgm.wav")
-	resource.AddFile("sound/arcana/fallen_down/blast.wav")
-	resource.AddFile("sound/arcana/fallen_down/after_blast.wav")
+
+	resource.AddFile("sound/arcana/fallen_down/bgm.ogg")
+	resource.AddFile("sound/arcana/fallen_down/blast.ogg")
+	resource.AddFile("sound/arcana/fallen_down/after_blast.ogg")
 end
 
 local CHARGE_TIME = 60.0
@@ -446,16 +447,16 @@ if CLIENT then
 		if shouldStart then
 			-- Caster hears it clearly (higher volume, no DSP), others hear it in 3D with DSP
 			if caster == LocalPlayer() then
-				LocalPlayer():EmitSound("arcana/fallen_down/bgm.wav", 120, 100, 10) -- No DSP, louder
+				LocalPlayer():EmitSound("arcana/fallen_down/bgm.ogg", 120, 100, 10) -- No DSP, louder
 			else
-				caster:EmitSound("arcana/fallen_down/bgm.wav", 85, 100, 10, CHAN_AUTO, SND_NOFLAGS, 22) -- 3D with DSP
+				caster:EmitSound("arcana/fallen_down/bgm.ogg", 85, 100, 10, CHAN_AUTO, SND_NOFLAGS, 22) -- 3D with DSP
 			end
 		else
 			-- Stop for both cases
 			if caster == LocalPlayer() then
-				LocalPlayer():StopSound("arcana/fallen_down/bgm.wav")
+				LocalPlayer():StopSound("arcana/fallen_down/bgm.ogg")
 			else
-				caster:StopSound("arcana/fallen_down/bgm.wav")
+				caster:StopSound("arcana/fallen_down/bgm.ogg")
 			end
 		end
 	end)
@@ -1691,7 +1692,7 @@ if CLIENT then
 		}
 
 		-- APOCALYPTIC BEAM BLARE - DEAFENING initial impact (CLIENT-SIDE)
-		surface.PlaySound("arcana/fallen_down/blast.wav") -- PRIMARY BLAST SOUND
+		surface.PlaySound("arcana/fallen_down/blast.ogg") -- PRIMARY BLAST SOUND
 		sound.Play("ambient/explosions/explode_9.wav", targetPos, 140, 45) -- MASSIVE deep explosion
 		sound.Play("ambient/atmosphere/thunder1.wav", targetPos, 138, 35) -- Devastating thunder
 		sound.Play("ambient/explosions/explode_8.wav", targetPos, 137, 50)
@@ -1946,7 +1947,7 @@ if CLIENT then
 		local pos = net.ReadVector()
 		local radius = net.ReadFloat()
 		-- Play after blast sound when implosion starts
-		surface.PlaySound("arcana/fallen_down/after_blast.wav")
+		surface.PlaySound("arcana/fallen_down/after_blast.ogg")
 		local implosionDuration = 3.0
 		local startTime = CurTime()
 		-- Create MASSIVE particle implosion effect - reusing dust particles

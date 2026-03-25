@@ -43,6 +43,7 @@ if SERVER then
 
 	AddCSLuaFile("arcana/system/vfx/casting.lua")
 	AddCSLuaFile("arcana/system/vfx/enchants.lua")
+	AddCSLuaFile("arcana/system/vfx/bloom.lua")
 
 	AddCSLuaFile("arcana/astral_vault/config.lua")
 	AddCSLuaFile("arcana/astral_vault/vault.lua")
@@ -77,6 +78,7 @@ include("arcana/system/mana_network.lua")
 include("arcana/system/tutorial.lua")
 
 include("arcana/system/vfx/casting.lua")
+include("arcana/system/vfx/bloom.lua")
 
 include("arcana/astral_vault/config.lua")
 include("arcana/astral_vault/vault.lua")

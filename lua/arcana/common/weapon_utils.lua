@@ -46,7 +46,7 @@ local function getHoldType(wep)
 	if isNilOrEmptyString(ht) then
 		-- for SetWeaponHoldType compatibility
 		if istable(wep.ActivityTranslate) then
-			local act = wep.ActivityTranslate[ACT_HL2MP_IDLE]
+			local act = wep.ActivityTranslate[ACT_MP_STAND_IDLE]
 			if act then
 				return ACT_INDEX[act]
 			end
@@ -129,6 +129,9 @@ local HL2_PROJECTILE_CLASSES = {
 	["hunter_flechette"]     = true,
 	["grenade_helicopter"]   = true,
 	["weapon_striderbuster"] = true,
+
+	-- weird things that can be projectiles
+	["prop_physics"] = true,
 }
 
 --- Returns true when the weapon uses a melee hold type.
@@ -349,29 +352,33 @@ if SERVER then
 	-- FireBullets is checked first; finding it immediately means hitscan, which
 	-- avoids misclassifying weapons that create a shell entity after shooting.
 	-- Only if FireBullets is absent do we check for scripted ents.Create calls.
-	-- Returns: type (string), projectileClass (string or nil)
+	-- Returns: type (string), projectileClass (string or nil), needsCapture (bool)
+	--   needsCapture is true when the weapon is PROJECTILE but the class could not
+	--   be statically resolved (unresolvable variable passed to ents.Create).
 	local function classifyRangedWeapon(weapon)
 		local primaryAttack = weapon.PrimaryAttack
-		if not isfunction(primaryAttack) then return "HITSCAN", nil end
+		if not isfunction(primaryAttack) then return "HITSCAN", nil, false end
 
 		if checkForMatch(primaryAttack, weapon, {}, 1, matchFireBullets) then
-			return "HITSCAN", nil
+			return "HITSCAN", nil, false
 		end
 
 		local projClass = checkForMatch(primaryAttack, weapon, {}, 1, sourceHasScriptedCreate)
 		if projClass then
-			return "PROJECTILE", isstring(projClass) and projClass or nil
+			local resolvedClass = isstring(projClass) and projClass or nil
+			return "PROJECTILE", resolvedClass, resolvedClass == nil
 		end
 
 		local think = weapon.Think
 		if isfunction(think) then
 			projClass = checkForMatch(think, weapon, {}, 1, sourceHasScriptedCreate)
 			if projClass then
-				return "PROJECTILE", isstring(projClass) and projClass or nil
+				local resolvedClass = isstring(projClass) and projClass or nil
+				return "PROJECTILE", resolvedClass, resolvedClass == nil
 			end
 		end
 
-		return "HITSCAN", nil
+		return "HITSCAN", nil, false
 	end
 
 	local UNKNOWN_HOLDTYPES = {
@@ -415,9 +422,42 @@ if SERVER then
 			file.CreateDir("arcana")
 		end
 
-		file.Write(CACHE_FILE, util.TableToJSON(weaponClassificationCache))
-
+		file.Write(CACHE_FILE, util.TableToJSON(weaponClassificationCache, true))
 		Arcana.Common.SendWeaponClassificationCache()
+	end
+
+	-- When static analysis finds an ents.Create call with an unresolvable argument,
+	-- we try to resolve the projectile class using OnEntityCreated during the frame
+	-- PrimaryAttack is called into.
+	local PROJECTILE_CAPTURE_DISTANCE = 200 * 200 -- squared
+	local function installRuntimeProjectileCapture(wep, weaponClass)
+		if not IsValid(wep) then return end
+
+		local originalPrimaryAttack = wep.PrimaryAttack
+		wep.PrimaryAttack = function(self, ...)
+			local hookId = "Arcana_RuntimeProjectileCapture_" .. weaponClass
+			hook.Add("OnEntityCreated", hookId, function(ent)
+				print("OnEntityCreated", ent:GetClass(), weaponClass)
+				if isProjectileClass(ent:GetClass()) then
+					timer.Simple(0, function()
+						if ent:GetPos():DistToSqr(self:GetPos()) < PROJECTILE_CAPTURE_DISTANCE then
+							local entry = weaponClassificationCache[weaponClass]
+							if entry then
+								entry.projectileClass = ent:GetClass()
+								updateWeaponClassificationCache()
+								hook.Remove("OnEntityCreated", hookId)
+								self.PrimaryAttack = originalPrimaryAttack
+							end
+						end
+					end)
+				end
+			end)
+
+			timer.Simple(2, function()
+				hook.Remove("OnEntityCreated", hookId)
+			end)
+			return originalPrimaryAttack(self, ...)
+		end
 	end
 
 	local function classifyWeapon(wep)
@@ -438,9 +478,13 @@ if SERVER then
 		elseif UNKNOWN_HOLDTYPES[holdType] then
 			return { type = "UNKNOWN", holdType = holdType }
 		else
-			local wepType, projClass = classifyRangedWeapon(wep)
+			local wepType, projClass, needsCapture = classifyRangedWeapon(wep)
 			if wepType == "HITSCAN" and (holdType == "grenade" or className:find("grenade") or className:find("nade")) then
 				wepType = "PROJECTILE"
+			end
+
+			if needsCapture then
+				installRuntimeProjectileCapture(wep, className)
 			end
 
 			return { type = wepType, holdType = holdType, projectileClass = projClass }
@@ -470,7 +514,14 @@ if SERVER then
 	hook.Add("WeaponEquip", "Arcana_UpdateWeaponClassificationCache", function(wep)
 		if not IsValid(wep) then return end
 		local className = wep:GetClass()
-		if weaponClassificationCache[className] then return end
+		local cached = weaponClassificationCache[className]
+		if cached then
+			-- Already classified but projectileClass still unknown: try to resolve it at runtime.
+			if cached.type == "PROJECTILE" and not cached.projectileClass then
+				installRuntimeProjectileCapture(wep, className)
+			end
+			return
+		end
 
 		timer.Simple(0.1, function()
 			if not IsValid(wep) then return end
