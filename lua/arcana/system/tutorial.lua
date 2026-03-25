@@ -53,11 +53,11 @@ if system.IsWindows() then
 		})
 	end
 
-	if file.Exists("shaders/fxc/arcana_crystal_surface_ps30.vcs", "GAME") and file.Exists("shaders/fxc/arcana_crystal_surface_vs30.vcs", "GAME") then
+	WaitForShaderMounted({"arcana_crystal_surface_ps30", "arcana_crystal_surface_vs30"}, function(available)
+		if not available then return end
+
 		initTreeShaderMaterial()
-	else
-		hook.Add("ShaderMounted", "arcana_tree_crystal_dispersion", initTreeShaderMaterial)
-	end
+	end)
 end
 
 -- Tutorial state
