@@ -40,6 +40,18 @@ float4 main(PS_IN i) : COLOR
 	col += SAMPLE(i.uv + step * 4) * W[4];
 	col += SAMPLE(i.uv - step * 4) * W[4];
 
+	// Chromatic aberration — active only in the composite pass (CA_STRENGTH > 0).
+	// Applied before perceptual boost and intensity so all three channels receive
+	// the same uniform scaling afterwards.  Red is pushed outward from the screen
+	// centre, blue inward, creating the classic lens-fringe split on bloom edges.
+	// The effect grows with distance from the screen centre so it is strongest at
+	// the corners, just like a real lens.
+	if (CA_STRENGTH > 0.001) {
+		float2 dir = i.uv - float2(0.5, 0.5);
+		col.r = SAMPLE(i.uv + dir * CA_STRENGTH).r;
+		col.b = SAMPLE(i.uv - dir * CA_STRENGTH).b;
+	}
+
 	// Perceptual equalisation: dark-appearing colours (e.g. blues) have a low
 	// Rec.709 luminance and bloom dimmer at the same RGB value.  Apply the
 	// correction only during the composite passthrough (DIR_X = DIR_Y = 0) so
@@ -56,17 +68,6 @@ float4 main(PS_IN i) : COLOR
 	// Force full alpha so the additive composite uses the full RGB contribution
 	// regardless of what alpha the source texture had.
 	col.a = 1.0;
-
-	// Chromatic aberration — active only in the composite pass (CA_STRENGTH > 0).
-	// Red is pushed outward from the screen centre, blue inward, creating the
-	// classic lens-fringe split on the bloom/glow edges.  The effect grows with
-	// distance from the screen centre so it is strongest at the corners, just
-	// like a real lens.
-	if (CA_STRENGTH > 0.001) {
-		float2 dir = i.uv - float2(0.5, 0.5);
-		col.r = SAMPLE(i.uv + dir * CA_STRENGTH).r * intensity;
-		col.b = SAMPLE(i.uv - dir * CA_STRENGTH).b * intensity;
-	}
 
 	return col;
 }
