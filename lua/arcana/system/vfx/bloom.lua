@@ -20,56 +20,54 @@ Arcana.Bloom = Arcana.Bloom or {
 	RenderBloom = function() end
 }
 
-if not system.IsWindows() then return end
-
-local scrW, scrH = ScrW(), ScrH()
-
--- Full-res: captures the raw circles each frame.
-local CIRCLE_RT = GetRenderTarget("arcana_circles_rt", scrW, scrH)
-
--- Half-res ping-pong: tight bloom.
-local BLOOM_RT_A = GetRenderTarget("arcana_bloom_rt_a", scrW / 2, scrH / 2)
-local BLOOM_RT_B = GetRenderTarget("arcana_bloom_rt_b", scrW / 2, scrH / 2)
-
--- Quarter-res ping-pong: wide glow fog.
-local GLOW_RT_A = GetRenderTarget("arcana_glow_rt_a", scrW / 4, scrH / 4)
-local GLOW_RT_B = GetRenderTarget("arcana_glow_rt_b", scrW / 4, scrH / 4)
-
--- Single material reused for blur passes and the composite passthrough.
-local blurMat
-
--- Run one H or V blur pass: reads srcRT, writes blurred output to dstRT.
--- intensity is baked into col.rgb so the composite can use ONE/ONE blending.
-local function blurPass(srcRT, dstRT, dirX, dirY, radius, intensity)
-	render.PushRenderTarget(dstRT)
-	render.Clear(0, 0, 0, 0)
-	blurMat:SetTexture("$basetexture", srcRT)
-	blurMat:SetFloat("$c0_x", dirX)
-	blurMat:SetFloat("$c0_y", dirY)
-	blurMat:SetFloat("$c0_z", radius)
-	blurMat:SetFloat("$c1_x", intensity)
-	blurMat:SetFloat("$c1_y", 0.0) -- CA must be off during blur passes
-	render.SetMaterial(blurMat)
-	render.DrawScreenQuad()
-	render.PopRenderTarget()
-end
-
--- Draw srcRT additively with optional chromatic aberration.
--- Uses the blur shader in passthrough mode: dir=(0,0) → step=0 → all 9 taps
--- hit the same UV → output = 1.0 × centre pixel.
--- caStrength controls the red/blue radial split: 0 = none, ~0.02 = visible.
-local function additiveComposite(srcRT, caStrength)
-	blurMat:SetTexture("$basetexture", srcRT)
-	blurMat:SetFloat("$c0_x", 0.0)
-	blurMat:SetFloat("$c0_y", 0.0)
-	blurMat:SetFloat("$c0_z", 0.0)
-	blurMat:SetFloat("$c1_x", 1.0) -- intensity already baked into the RT
-	blurMat:SetFloat("$c1_y", caStrength or 0.0)
-	render.SetMaterial(blurMat)
-	render.DrawScreenQuad()
-end
-
 local function initBloom()
+	local scrW, scrH = ScrW(), ScrH()
+
+	-- Full-res: captures the raw circles each frame.
+	local CIRCLE_RT = GetRenderTarget("arcana_circles_rt", scrW, scrH)
+
+	-- Half-res ping-pong: tight bloom.
+	local BLOOM_RT_A = GetRenderTarget("arcana_bloom_rt_a", scrW / 2, scrH / 2)
+	local BLOOM_RT_B = GetRenderTarget("arcana_bloom_rt_b", scrW / 2, scrH / 2)
+
+	-- Quarter-res ping-pong: wide glow fog.
+	local GLOW_RT_A = GetRenderTarget("arcana_glow_rt_a", scrW / 4, scrH / 4)
+	local GLOW_RT_B = GetRenderTarget("arcana_glow_rt_b", scrW / 4, scrH / 4)
+
+	-- Single material reused for blur passes and the composite passthrough.
+	local blurMat
+
+	-- Run one H or V blur pass: reads srcRT, writes blurred output to dstRT.
+	-- intensity is baked into col.rgb so the composite can use ONE/ONE blending.
+	local function blurPass(srcRT, dstRT, dirX, dirY, radius, intensity)
+		render.PushRenderTarget(dstRT)
+		render.Clear(0, 0, 0, 0)
+		blurMat:SetTexture("$basetexture", srcRT)
+		blurMat:SetFloat("$c0_x", dirX)
+		blurMat:SetFloat("$c0_y", dirY)
+		blurMat:SetFloat("$c0_z", radius)
+		blurMat:SetFloat("$c1_x", intensity)
+		blurMat:SetFloat("$c1_y", 0.0) -- CA must be off during blur passes
+		render.SetMaterial(blurMat)
+		render.DrawScreenQuad()
+		render.PopRenderTarget()
+	end
+
+	-- Draw srcRT additively with optional chromatic aberration.
+	-- Uses the blur shader in passthrough mode: dir=(0,0) → step=0 → all 9 taps
+	-- hit the same UV → output = 1.0 × centre pixel.
+	-- caStrength controls the red/blue radial split: 0 = none, ~0.02 = visible.
+	local function additiveComposite(srcRT, caStrength)
+		blurMat:SetTexture("$basetexture", srcRT)
+		blurMat:SetFloat("$c0_x", 0.0)
+		blurMat:SetFloat("$c0_y", 0.0)
+		blurMat:SetFloat("$c0_z", 0.0)
+		blurMat:SetFloat("$c1_x", 1.0) -- intensity already baked into the RT
+		blurMat:SetFloat("$c1_y", caStrength or 0.0)
+		render.SetMaterial(blurMat)
+		render.DrawScreenQuad()
+	end
+
 	blurMat = CreateShaderMaterial("arcana_bloom_blur", {
 		["$pixshader"] = "arcana_bloom_ps30",
 		["$vertexshader"] = "arcana_passthrough_vs30",
