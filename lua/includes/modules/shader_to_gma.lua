@@ -263,6 +263,11 @@ if CLIENT then
 
 	local internalHookIndex = 0
 	function WaitForShaderMounted(shaderNames, callback)
+		if not system.IsWindows() then
+			callback(false)
+			return
+		end
+
 		if not istable(shaderNames) and isstring(shaderNames) then shaderNames = { shaderNames } end
 
 		for _, shaderName in pairs(shaderNames) do
