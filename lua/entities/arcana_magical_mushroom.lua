@@ -98,13 +98,6 @@ if SERVER then
 		timer.Simple(0.6, function()
 			if IsValid(self) then self:SetGlowStrength(1) end
 		end)
-
-		-- Soft cooldown sparkle burst for others to see
-		local ed = EffectData()
-		ed:SetOrigin(self:WorldSpaceCenter())
-		util.Effect("cball_bounce", ed, true, true)
-
-		-- Do not remove; keep mushroom in world
 	end
 
 	-- Periodic random spore drops
@@ -121,10 +114,6 @@ if SERVER then
 					ent:Spawn()
 
 					constraint.NoCollide(ent, self, 0, 0)
-
-					local ed = EffectData()
-					ed:SetOrigin(ent:WorldSpaceCenter())
-					util.Effect("cball_bounce", ed, true, true)
 				end
 			end
 		end
