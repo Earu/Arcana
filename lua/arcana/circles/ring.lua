@@ -53,13 +53,6 @@ local RING_TYPES = {
 local MAGIC_EJECT_SOUNDS = { "ambient/energy/zap1.wav", "ambient/energy/zap2.wav", "ambient/energy/zap3.wav" }
 
 local shader_available = false
-if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
-	shader_available = file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME")
-	hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
-		shader_available = true
-	end)
-end
-
 local loadedTextures = {}
 
 -- Helper: create a circle material wrapping a texture (custom shader when available)
@@ -117,20 +110,11 @@ local PNG_RING_MATS         = nil   -- keyed by RING_TYPES value; nil until firs
 local PNG_PATTERN_LINE_MATS = nil   -- array of 3 PATTERN_LINES variant materials
 local PNG_BAND_MATS         = nil   -- array of 3 BAND_RING variant materials
 local PNG_GLYPH_MATS        = {}    -- keyed by char code 65-72
-local BUILT_WITH_SHADER    = false
 
-local function ensurePNGMatsLoaded()
-	if PNG_RING_MATS then
-		-- this bit makes sure to rebuild the materials if the shader is available
-		local shouldReturn = true
-		if not BUILT_WITH_SHADER and shader_available then
-			shouldReturn = false
-		end
-		if shouldReturn then return end
-	end
+local function ensurePNGMatsLoaded(forceRebuild)
+	if PNG_RING_MATS and not forceRebuild then return end
 
-	local nameSuffix = shader_available and "_shader" or ""
-	BUILT_WITH_SHADER = shader_available
+	local nameSuffix = "_" .. FrameNumber()
 	PNG_PATTERN_LINE_MATS = {
 		CreateCircleMaterial("arcana_png_pattern_1" .. nameSuffix, "arcana/rings/ring_pattern_lines.png"),
 		CreateCircleMaterial("arcana_png_pattern_2" .. nameSuffix, "arcana/rings/ring_pattern_lines_2.png"),
@@ -154,7 +138,20 @@ local function ensurePNGMatsLoaded()
 		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i .. nameSuffix, "arcana/glyphs/glyph_" .. i .. ".png")
 	end
 
-	Arcana.RunHook("CircleMaterialsLoaded")
+	Arcana.RunHook("CircleMaterialsLoaded", shader_available)
+end
+
+if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
+	if file.Exists("shaders/fxc/arcana_circle_ps30.vcs", "GAME") then
+		shader_available = true
+		ensurePNGMatsLoaded(true)
+	else
+		shader_available = false
+		hook.Add("ShaderMounted", "MagicCircle_ShaderMounted", function()
+			shader_available = true
+			ensurePNGMatsLoaded(true)
+		end)
+	end
 end
 
 -- ── Shared mesh cache for cylindrical band geometry ───────────────────────────
