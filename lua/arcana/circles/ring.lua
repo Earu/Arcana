@@ -139,15 +139,10 @@ local function initPNGMats()
 end
 
 hook.Add("Initialize", "MagicCircle_Initialize", function()
-	if system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
-		WaitForShaderMounted({"arcana_circle_ps30", "arcana_passthrough_vs30"}, function(available)
-			SHADER_AVAILABLE = available
-			initPNGMats()
-		end)
-	else
-		SHADER_AVAILABLE = false
+	WaitForShaderMounted({"arcana_circle_ps30", "arcana_passthrough_vs30"}, function(available)
+		SHADER_AVAILABLE = available
 		initPNGMats()
-	end
+	end)
 end)
 
 -- ── Shared mesh cache for cylindrical band geometry ───────────────────────────

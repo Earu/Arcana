@@ -181,13 +181,20 @@ if SERVER then
 end
 
 if CLIENT then
-	SHADER_MOUNTED = false
+	SHADER_MOUNTED = _G.SHADER_MOUNTED or false
 	net.Receive("shader_to_gma", function()
 		local base64 = net.ReadString()
+		local reason
 		if base64 == "" then
-			log("Nothing to mount")
+			reason = "Nothing to mount"
+		elseif not system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
+			reason = "Shaders not supported on this platform"
+		end
+
+		if reason then
+			log(reason)
 			SHADER_MOUNTED = true
-			hook.Run("ShaderMounted", {})
+			hook.Run("ShaderMounted", reason)
 			return
 		end
 
@@ -245,7 +252,6 @@ if CLIENT then
 	function CreateShaderMaterial(name, opts)
 		local key_values = util.KeyValuesToTable(shader_mat, false, true)
 
-		local ignored_shaders = {}
 		if opts then
 			for k, v in pairs(opts) do
 				key_values[k] = v
