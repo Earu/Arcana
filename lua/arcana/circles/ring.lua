@@ -129,28 +129,29 @@ local function ensurePNGMatsLoaded()
 		if shouldReturn then return end
 	end
 
+	local nameSuffix = shader_available and "_shader" or ""
 	BUILT_WITH_SHADER = shader_available
 	PNG_PATTERN_LINE_MATS = {
-		CreateCircleMaterial("arcana_png_pattern_1", "arcana/rings/ring_pattern_lines.png"),
-		CreateCircleMaterial("arcana_png_pattern_2", "arcana/rings/ring_pattern_lines_2.png"),
-		CreateCircleMaterial("arcana_png_pattern_3", "arcana/rings/ring_pattern_lines_3.png"),
+		CreateCircleMaterial("arcana_png_pattern_1" .. nameSuffix, "arcana/rings/ring_pattern_lines.png"),
+		CreateCircleMaterial("arcana_png_pattern_2" .. nameSuffix, "arcana/rings/ring_pattern_lines_2.png"),
+		CreateCircleMaterial("arcana_png_pattern_3" .. nameSuffix, "arcana/rings/ring_pattern_lines_3.png"),
 	}
 
 	PNG_BAND_MATS = {
-		CreateCircleMaterial("arcana_png_band_1", "arcana/rings/ring_band.png"),
-		CreateCircleMaterial("arcana_png_band_2", "arcana/rings/ring_band_2.png"),
-		CreateCircleMaterial("arcana_png_band_3", "arcana/rings/ring_band_3.png"),
+		CreateCircleMaterial("arcana_png_band_1" .. nameSuffix, "arcana/rings/ring_band.png"),
+		CreateCircleMaterial("arcana_png_band_2" .. nameSuffix, "arcana/rings/ring_band_2.png"),
+		CreateCircleMaterial("arcana_png_band_3" .. nameSuffix, "arcana/rings/ring_band_3.png"),
 	}
 
 	PNG_RING_MATS = {
-		[RING_TYPES.SIMPLE_LINE]   = CreateCircleMaterial("arcana_png_simple",    "arcana/rings/ring_simple_line.png"),
+		[RING_TYPES.SIMPLE_LINE]   = CreateCircleMaterial("arcana_png_simple" .. nameSuffix,    "arcana/rings/ring_simple_line.png"),
 		[RING_TYPES.PATTERN_LINES] = PNG_PATTERN_LINE_MATS[1],   -- overridden per-ring via ring.patternVariant
-		[RING_TYPES.RUNE_STAR]     = CreateCircleMaterial("arcana_png_rune_star", "arcana/rings/ring_rune_star.png"),
-		[RING_TYPES.STAR_RING]     = CreateCircleMaterial("arcana_png_star",      "arcana/rings/ring_star_ring.png"),
+		[RING_TYPES.RUNE_STAR]     = CreateCircleMaterial("arcana_png_rune_star" .. nameSuffix, "arcana/rings/ring_rune_star.png"),
+		[RING_TYPES.STAR_RING]     = CreateCircleMaterial("arcana_png_star" .. nameSuffix,      "arcana/rings/ring_star_ring.png"),
 	}
 
 	for i = 65, 72 do
-		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i, "arcana/glyphs/glyph_" .. i .. ".png")
+		PNG_GLYPH_MATS[i] = CreateCircleMaterial("arcana_png_glyph_" .. i .. nameSuffix, "arcana/glyphs/glyph_" .. i .. ".png")
 	end
 
 	Arcana.RunHook("CircleMaterialsLoaded")
