@@ -6,8 +6,6 @@ local function log(...)
 end
 
 if SERVER then
-	resource.AddWorkshop("3542644649") -- gshader
-
 	local function lowerFixPath(p)
 		p = string.gsub(p, "\\", "/")
 		p = string.TrimLeft(p, "/")
