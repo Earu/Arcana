@@ -210,14 +210,14 @@ if CLIENT then
 		local fileName = "shader_to_gma_" .. os.time() .. ".gma"
 		file.Write(fileName, data)
 
-		local ok, files_or_err = game.MountGMA("data/" .. fileName)
+		local ok, filesOrErr = game.MountGMA("data/" .. fileName)
 		if not ok then
-			log("Failed to mount GMA:", files_or_err)
+			log("Failed to mount GMA:", filesOrErr)
 		else
 			log("Mounted GMA")
-			PrintTable(files_or_err)
+			PrintTable(filesOrErr)
+			hook.Run("ShaderMounted", filesOrErr)
 			SHADER_MOUNTED = true
-			hook.Run("ShaderMounted", files_or_err)
 		end
 	end)
 
@@ -270,21 +270,34 @@ if CLIENT then
 
 		if not istable(shaderNames) and isstring(shaderNames) then shaderNames = { shaderNames } end
 
+		local allAvailable = true
 		for _, shaderName in pairs(shaderNames) do
-			if file.Exists("shaders/fxc/" .. shaderName .. ".vcs", "GAME") then
-				callback(true)
-				return
+			if not file.Exists("shaders/fxc/" .. shaderName .. ".vcs", "GAME") then
+				allAvailable = false
+				break
 			end
+		end
+
+		if allAvailable then
+			callback(true)
+			return
 		end
 
 		if not SHADER_MOUNTED then
 			local hookName = "shader_to_gma_WaitForShaderMounted_" .. internalHookIndex
 			internalHookIndex = internalHookIndex + 1
 
-			hook.Add("ShaderMounted", "shader_to_gma_WaitForShaderMounted", function()
-				local allAvailable = true
-				for _, shaderName in pairs(shaderNames) do
-					if not file.Exists("shaders/fxc/" .. shaderName .. ".vcs", "GAME") then
+			hook.Add("ShaderMounted", hookName, function(filesOrErr)
+				if not istable(filesOrErr) then
+					hook.Remove("ShaderMounted", hookName)
+					callback(false)
+					return
+				end
+
+				allAvailable = true
+				for _, shaderName in pairs(filesOrErr) do
+					local shaderPath = "shaders/fxc/" .. shaderName .. ".vcs"
+					if not table.HasValue(shaderNames, shaderPath) then
 						allAvailable = false
 						break
 					end
