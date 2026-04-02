@@ -293,9 +293,9 @@ if CLIENT then
 				end
 
 				allAvailable = true
-				for _, shaderName in pairs(filesOrErr) do
+				for _, shaderName in pairs(shaderNames) do
 					local shaderPath = "shaders/fxc/" .. shaderName .. ".vcs"
-					if not table.HasValue(shaderNames, shaderPath) then
+					if not table.HasValue(filesOrErr, shaderPath) then
 						allAvailable = false
 						break
 					end
