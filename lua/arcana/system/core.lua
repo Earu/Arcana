@@ -392,6 +392,9 @@ function Arcana:RegisterRitualSpell(opts)
 			coin_cost = tonumber(opts.ritual_coin_cost) or 1000,
 			items = istable(opts.ritual_items) and opts.ritual_items or {},
 			on_activate = nil,
+			replenishable = opts.ritual_replenishable == true,
+			replenish_cost = tonumber(opts.ritual_replenish_cost) or 0,
+			on_replenish = nil,
 		}
 
 		-- Wrap on_activate to provide a stable signature and access to caster
@@ -399,6 +402,15 @@ function Arcana:RegisterRitualSpell(opts)
 			local userFn = opts.on_activate
 
 			cfg.on_activate = function(selfEnt, activatingPly)
+				userFn(selfEnt, activatingPly, caster)
+			end
+		end
+
+		-- Wrap on_replenish similarly
+		if isfunction(opts.on_replenish) then
+			local userFn = opts.on_replenish
+
+			cfg.on_replenish = function(selfEnt, activatingPly)
 				userFn(selfEnt, activatingPly, caster)
 			end
 		end

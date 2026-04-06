@@ -16,6 +16,8 @@ Arcana:RegisterRitualSpell({
 	ritual_items = {
 		battery = 10
 	},
+	ritual_replenishable = true,
+	ritual_replenish_cost = 500,
 	on_activate = function(selfEnt, ply, caster)
 		local tr = util.TraceLine({
 			start = selfEnt:GetPos(),
@@ -36,6 +38,16 @@ Arcana:RegisterRitualSpell({
 			end
 		end
 
-		SafeRemoveEntityDelayed(thunder, 60 * 5)
+		local timerName = "Arcana_Ritual_Thunder_Timer_" .. selfEnt:EntIndex()
+		timer.Create(timerName, 60 * 5, 1, function()
+			SafeRemoveEntity(selfEnt._stormEntity)
+		end)
+		selfEnt._stormEntity = thunder
+	end,
+	on_replenish = function(selfEnt, ply, caster)
+		local timerName = "Arcana_Ritual_Thunder_Timer_" .. selfEnt:EntIndex()
+		timer.Create(timerName, 60 * 5, 1, function()
+			SafeRemoveEntity(selfEnt._stormEntity)
+		end)
 	end,
 })
