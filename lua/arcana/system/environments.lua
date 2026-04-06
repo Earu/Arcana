@@ -93,6 +93,38 @@ function Envs:GetActive()
 	return self.Active
 end
 
+-- Extend the lifetime of the currently active environment.
+-- id (optional): if provided, only extends if the active environment matches.
+-- duration (optional): seconds to add; defaults to the environment's registered lifetime.
+function Envs:ExtendDuration(id, duration)
+	if not SERVER then return false end
+
+	local ctx = self.Active
+	if not ctx then return false, "No active environment" end
+	if id and ctx.id ~= id then return false, "Active environment is not " .. tostring(id) end
+
+	local def = ctx.def
+	local ext = tonumber(duration) or (def and tonumber(def.lifetime)) or 300
+	ctx.expires = ctx.expires + ext
+
+	-- Replace the expiry timer with the updated remaining time
+	local tname = "Arcana_EnvExpire_" .. tostring(ctx.id)
+	timer.Create(tname, math.max(1, ctx.expires - CurTime()), 1, function()
+		if Envs.Active == ctx then Envs:Stop("time elapsed") end
+	end)
+
+	-- Re-broadcast so clients update their expiry state
+	net.Start("Arcana_EnvStart")
+	net.WriteString(tostring(ctx.id or ""))
+	net.WriteVector(ctx.origin or Vector(0, 0, 0))
+	net.WriteFloat(tonumber(ctx.started or CurTime()) or CurTime())
+	net.WriteFloat(tonumber(ctx.expires) or CurTime())
+	net.WriteFloat(tonumber(ctx.effective_radius or 0) or 0)
+	net.Broadcast()
+
+	return true
+end
+
 -- Stop and cleanup the active environment, if any
 function Envs:Stop(reason)
 	local env = self.Active

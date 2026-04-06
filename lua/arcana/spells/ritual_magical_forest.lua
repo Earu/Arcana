@@ -32,6 +32,8 @@ Arcana:RegisterRitualSpell({
 
 		return true
 	end,
+	ritual_replenishable = true,
+	ritual_replenish_cost = 5000,
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
 
@@ -48,5 +50,13 @@ Arcana:RegisterRitualSpell({
         end
 
         selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 70, 110)
+	end,
+	on_replenish = function(selfEnt, activatingPly, caster)
+		if not SERVER then return end
+
+		local Envs = Arcana.Environments
+		if Envs and Envs.ExtendDuration then
+			Envs:ExtendDuration("magical_forest")
+		end
 	end,
 })

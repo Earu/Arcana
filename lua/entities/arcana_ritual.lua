@@ -30,6 +30,30 @@ end
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "ExpireAt")
 	self:NetworkVar("String", 0, "RitualId")
+	self:NetworkVar("Bool", 0, "IsReplenishable")
+	self:NetworkVar("Bool", 1, "IsActivated")
+	self:NetworkVar("Int", 0, "ReplenishCost")
+	self:NetworkVar("Float", 1, "TotalLifetime")
+
+	if CLIENT then
+		self:NetworkVarNotify("IsActivated", function(ent, _, _, new)
+			if not new then return end
+			ent._lastBandFraction = nil
+			ent._lastScaleUpdate = nil
+
+			if ent._circle then
+				ent._circle:Destroy()
+				ent._circle = nil
+			end
+		end)
+
+		self:NetworkVarNotify("ExpireAt", function(ent, _, old, new)
+			if new > old + 1 then
+				ent._lastBandFraction = nil
+				surface.PlaySound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
+			end
+		end)
+	end
 end
 
 if SERVER then
@@ -74,8 +98,41 @@ if SERVER then
 	end
 
 	function ENT:Use(ply)
-		if self._hasActivated then return end
 		if not IsValid(ply) or not ply:IsPlayer() then return end
+
+		-- Replenish branch: ritual is already activated and can be replenished
+		if self:GetIsActivated() and self._replenishable then
+			local replenishCost = self:GetReplenishCost()
+
+			if replenishCost > 0 and Arcana:GetCoins(ply) < replenishCost then
+				if Arcana and Arcana.SendErrorNotification then
+					Arcana:SendErrorNotification(ply, "Insufficient coins to replenish ritual")
+				end
+
+				self:EmitSound("buttons/button8.wav", 60, 110)
+
+				return
+			end
+
+			if replenishCost > 0 then
+				Arcana:TakeCoins(ply, replenishCost, "Replenish ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
+			end
+
+			-- Extend lifetime by one full period; SetExpireAt triggers NetworkVarNotify on clients
+			self:SetExpireAt(self:GetExpireAt() + self._lifetime)
+
+			if self._onReplenish then
+				self:_onReplenish(ply)
+			end
+
+			self:EmitSound("arcana/arcane_" .. math.random(1, 3) .. ".ogg", 75, 100)
+
+			return
+		end
+
+		-- Normal activation guard
+		if self._hasActivated then return end
+
 		-- Check requirements against the player who pressed use
 		local coinsOk = true
 
@@ -116,7 +173,7 @@ if SERVER then
 			Arcana:TakeItem(ply, itemName, amt)
 		end
 
-		-- Tell clients to evolve the circle then remove the entity after a short delay
+		-- Tell clients to evolve the circle then finalise the entity
 		local evolveDur = 3.0
 		net.Start("Arcana_Ritual_Activated")
 		net.WriteEntity(self)
@@ -131,12 +188,18 @@ if SERVER then
 		end
 
 		timer.Simple(evolveDur + 0.1, function()
-			if IsValid(self) then
-				-- Callback
-				if self._onActivate then
-					self:_onActivate(ply)
-				end
+			if not IsValid(self) then return end
 
+			if self._onActivate then
+				self:_onActivate(ply)
+			end
+
+			if self._replenishable then
+				self._lockedPos = self:GetPos()
+				-- Reset expiry to a full lifetime from now so the first period is fair
+				self:SetExpireAt(CurTime() + self._lifetime)
+				self:SetIsActivated(true)
+			else
 				self:Remove()
 			end
 		end)
@@ -145,14 +208,21 @@ if SERVER then
 	end
 
 	function ENT:Configure(config)
-		-- config: { id, owner, coin_cost, items = {name=amt}, on_activate = function(self) end, lifetime }
+		-- config: { id, owner, coin_cost, items = {name=amt}, on_activate = function(self) end, lifetime,
+		--           replenishable, replenish_cost, on_replenish }
 		self._requirements = shallowCopy(config.items or {})
 		self._coinCost = tonumber(config.coin_cost or 0) or 0
 		self._owner = IsValid(config.owner) and config.owner or nil
 		self._onActivate = isfunction(config.on_activate) and config.on_activate or nil
+		self._onReplenish = isfunction(config.on_replenish) and config.on_replenish or nil
 		self._lifetime = math.max(1, tonumber(config.lifetime or 300) or 300)
+		self._replenishable = config.replenishable == true
 		self:SetRitualId(tostring(config.id or ""))
 		self:SetExpireAt(CurTime() + self._lifetime)
+		self:SetIsReplenishable(self._replenishable)
+		self:SetIsActivated(false)
+		self:SetReplenishCost(math.Clamp(tonumber(config.replenish_cost or 0) or 0, 0, 2147483647))
+		self:SetTotalLifetime(self._lifetime)
 		self:_Sync()
 	end
 
@@ -191,15 +261,14 @@ if SERVER then
 		end
 
 		self:NextThink(CurTime() + 0.1)
-
 		return true
 	end
 
 	function ENT:PhysicsSimulate(phys, dt)
 		if not IsValid(phys) then return end
 		phys:Wake()
-		local start = self:GetPos() + VECTOR_ABOVE_ORB
 
+		local start = self:GetIsActivated() and self._lockedPos or self:GetPos() + VECTOR_ABOVE_ORB
 		local tr = util.TraceLine({
 			start = start,
 			endpos = start - VECTOR_DOWN,
@@ -208,7 +277,6 @@ if SERVER then
 		})
 
 		local floatPos = tr.HitPos + Vector(0, 0, 50 + 5 * math.sin(CurTime()))
-
 		local shadowParams = {
 			secondstoarrive = 0.2,
 			pos = floatPos,
@@ -249,10 +317,13 @@ if CLIENT then
 
 	local ritualState = {}
 
+	local VECTOR_ZERO = Vector(0, 0, 0)
 	function ENT:Initialize()
 		self._glowMat = Material("sprites/light_glow02_add")
 		self._circle = nil
 		self._bands = nil
+		self._fxEmitter = ParticleEmitter(self:GetPos(), false)
+		self._fxNextParticle = 0
 	end
 
 	net.Receive("Arcana_Ritual_Update", function()
@@ -316,6 +387,56 @@ if CLIENT then
 		if self._bands then
 			self._bands:Remove()
 		end
+
+		if self._fxEmitter then
+			self._fxEmitter:Finish()
+			self._fxEmitter = nil
+		end
+	end
+
+	function ENT:_SpawnRitualParticles()
+		if not self._fxEmitter then return end
+
+		local center = self:WorldSpaceCenter()
+		local col = self:GetColor()
+
+		-- One particle per call; spawned at 0.03s intervals so there are always
+		-- ~70 particles drifting at any given moment (dieTime / interval).
+		local dir = VectorRand()
+		dir:Normalize()
+		local pos = center + dir * 5 * math.Rand(3, 8)
+
+		local p = self._fxEmitter:Add("sprites/light_glow02_add", pos)
+		if p then
+			p:SetStartAlpha(180)
+			p:SetEndAlpha(0)
+			p:SetStartSize(math.Rand(4, 7))
+			p:SetEndSize(math.Rand(1, 2))
+			p:SetDieTime(math.Rand(1.8, 2.5))
+			p:SetVelocity(dir * math.Rand(15, 30))
+			p:SetAirResistance(15)
+			p:SetGravity(VECTOR_ZERO)
+			p:SetRoll(math.Rand(-180, 180))
+			p:SetRollDelta(math.Rand(-0.4, 0.4))
+			p:SetColor(col.r, col.g, col.b)
+		end
+	end
+
+	function ENT:Think()
+		if self._fxEmitter then
+			self._fxEmitter:SetPos(self:GetPos())
+		end
+
+		if self:GetIsActivated() and self._fxEmitter then
+			local now = CurTime()
+			if now >= (self._fxNextParticle or 0) then
+				self:_SpawnRitualParticles()
+				self._fxNextParticle = now + 0.1
+			end
+		end
+
+		self:SetNextClientThink(CurTime())
+		return true
 	end
 
 	local MagicCircle = Arcana.Circle.MagicCircle
@@ -326,34 +447,37 @@ if CLIENT then
 	local TEXT_OFFSET = Vector(0, 0, 24)
 	function ENT:DrawTranslucent()
 		local color = self:GetColor()
+		local isActivated = self:GetIsActivated()
 
-		-- Create and maintain a static magic circle under the orb
-		if not self._circle then
-			local pos = self:GetPos() + VECTOR_SLIGHTLY_ABOVE
-			local ang = Angle(0, 180, 180)
-			local ritualId = self:GetRitualId()
-			local seed = (isstring(ritualId) and #ritualId > 0) and tonumber(util.CRC(ritualId)) or nil
-			self._circle = MagicCircle.new(pos, ang, color, 100, 100, 2, seed)
-			MagicCircleManager:Add(self._circle)
+		-- Create and maintain a static magic circle under the orb (pre-activation only)
+		if not isActivated then
+			if not self._circle then
+				local pos = self:GetPos() + VECTOR_SLIGHTLY_ABOVE
+				local ang = Angle(0, 180, 180)
+				local ritualId = self:GetRitualId()
+				local seed = (isstring(ritualId) and #ritualId > 0) and tonumber(util.CRC(ritualId)) or nil
+				self._circle = MagicCircle.new(pos, ang, color, 100, 100, 2, seed)
+				MagicCircleManager:Add(self._circle)
+			end
+
+			if self._circle then
+				local tr = util.TraceLine({
+					start = self:GetPos() + VECTOR_ABOVE_ORB,
+					endpos = self:GetPos() - VECTOR_DOWN,
+					mask = MASK_SOLID,
+					filter = self,
+				})
+
+				self._circle.position = tr.HitPos + VECTOR_SLIGHTLY_ABOVE
+				self._circle.angles = Angle(0, 180, 180)
+			end
 		end
 
-		if self._circle then
-			local tr = util.TraceLine({
-				start = self:GetPos() + VECTOR_ABOVE_ORB,
-				endpos = self:GetPos() - VECTOR_DOWN,
-				mask = MASK_SOLID,
-				filter = self,
-			})
-
-			self._circle.position = tr.HitPos + VECTOR_SLIGHTLY_ABOVE
-			self._circle.angles = Angle(0, 180, 180)
-		end
-
-		-- glowy orb similar to altar
+		-- glowy orb
 		if self._glowMat then
 			local pos = self:WorldSpaceCenter()
 			local t = CurTime()
-			local pulse = 0.5 + 0.5 * math.sin(t * 3.2)
+			local pulse = isActivated and (0.6 + 0.4 * math.sin(t * 2.0)) or (0.5 + 0.5 * math.sin(t * 3.2))
 			local size = 200 + 60 * pulse
 			render.SetMaterial(self._glowMat)
 			render.DrawSprite(pos, size, size, Color(color.r, color.g, color.b, 230))
@@ -364,14 +488,14 @@ if CLIENT then
 				dl.r = color.r
 				dl.g = color.g
 				dl.b = color.b
-				dl.brightness = 2
+				dl.brightness = isActivated and 3 or 2
 				dl.Decay = 600
-				dl.Size = 120
+				dl.Size = isActivated and 180 or 120
 				dl.DieTime = t + 0.1
 			end
 		end
 
-		-- Client-side BandCircle VFX around the ritual orb so we can scale it
+		-- Client-side BandCircle VFX around the ritual orb
 		if not self._bands and BandCircle then
 			local baseColor = self:GetColor()
 			local pos = self:WorldSpaceCenter()
@@ -382,7 +506,6 @@ if CLIENT then
 				self._bands.position = pos
 				self._bands.angles = ang
 
-				-- Bands config mirrors previous server call
 				self._bands:AddBand(20, 5, {
 					p = 20,
 					y = 60,
@@ -404,51 +527,30 @@ if CLIENT then
 		end
 
 		if self._bands then
-			-- keep the bands following the entity and adjust color to match ritual
 			self._bands.position = self:WorldSpaceCenter()
 			self._bands.angles = self:GetAngles()
 			self._bands.color = self:GetColor()
 		end
 
-		-- Client-side BandCircle VFX around the ritual orb so we can scale it
-		if not self._bands and BandCircle then
-			local baseColor = self:GetColor()
-			local pos = self:WorldSpaceCenter()
-			local ang = self:GetAngles()
-			self._bands = BandCircle.Create(pos, ang, baseColor, 80, 0)
+		-- Activated-state visuals for replenishable rituals
+		if isActivated then
+			-- Band weakening: scale bands progressively down as lifetime drains
+			local totalLifetime = self:GetTotalLifetime()
 
-			if self._bands then
-				self._bands.position = pos
-				self._bands.angles = ang
+			if totalLifetime > 0 and self._bands then
+				local remaining = math.max(0, self:GetExpireAt() - CurTime())
+				local fraction = math.Clamp(remaining / totalLifetime, 0, 1)
 
-				-- Bands config mirrors previous server call
-				self._bands:AddBand(20, 5, {
-					p = 20,
-					y = 60,
-					r = 10
-				}, 2)
-
-				self._bands:AddBand(32, 4, {
-					p = -30,
-					y = -40,
-					r = 0
-				}, 2)
-
-				self._bands:AddBand(26, 6, {
-					p = -10,
-					y = -20,
-					r = 60
-				}, 2)
+				if not self._lastBandFraction or math.abs(self._lastBandFraction - fraction) > 0.02
+					or not self._lastScaleUpdate or CurTime() - self._lastScaleUpdate > 2 then
+					self._lastBandFraction = fraction
+					self._lastScaleUpdate = CurTime()
+					self._bands:SetScale(10 * fraction, 2)
+				end
 			end
 		end
 
-		if self._bands then
-			-- keep the bands following the entity and adjust color to match ritual
-			self._bands.position = self:WorldSpaceCenter()
-			self._bands.angles = self:GetAngles()
-			self._bands.color = self:GetColor()
-		end
-
+		-- HUD panel
 		local data = ritualState[self]
 		if not data then return end
 
@@ -456,6 +558,8 @@ if CLIENT then
 		local ang = LocalPlayer():EyeAngles()
 		ang:RotateAroundAxis(ang:Right(), 90)
 		ang:RotateAroundAxis(ang:Up(), -90)
+		local key = input.LookupBinding("+use") or "UNBOUND"
+		local remain = math.max(0, (data.expireAt or 0) - CurTime())
 
 		cam.Start3D2D(pos, ang, 0.06)
 		surface.SetDrawColor(decoPanel)
@@ -463,20 +567,30 @@ if CLIENT then
 		surface.SetDrawColor(gold)
 		surface.DrawOutlinedRect(-180, -90, 360, 180, 2)
 		draw.SimpleText(string.upper((self:GetRitualId():gsub("%_", " ")) or "RITUAL"), "Arcana_Ritual_Title", 0, -70, paleGold, TEXT_ALIGN_CENTER)
-		local y = -40
-		draw.SimpleText("Coins: " .. tostring(data.coins or 0), "Arcana_Ritual_Row", -160, y, color_white)
-		y = y + 20
 
-		for name, amt in pairs(data.items or {}) do
-			local cleanName = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(name) and _G.msitems.GetInventoryInfo(name).name or name
-			draw.SimpleText(tostring(cleanName) .. ": x" .. tostring(amt), "Arcana_Ritual_Row", -160, y, color_white)
-			y = y + 18
+		if isActivated and self:GetIsReplenishable() then
+			-- Post-activation HUD: show replenish info
+			local replenishCost = self:GetReplenishCost()
+			draw.SimpleText("ACTIVATED", "Arcana_Ritual_Title", 0, -40, Color(100, 220, 100, 255), TEXT_ALIGN_CENTER)
+			draw.SimpleText("Remaining: " .. string.NiceTime(remain), "Arcana_Ritual_Row", -160, 0, color_white)
+			draw.SimpleText("Replenish: " .. tostring(replenishCost) .. " coins", "Arcana_Ritual_Row", -160, 20, color_white)
+			draw.SimpleText("Press [" .. string.upper(key) .. "] to replenish", "Arcana_Ritual_Row", -160, 56, color_white)
+		else
+			-- Pre-activation HUD: show activation requirements
+			local y = -40
+			draw.SimpleText("Coins: " .. tostring(data.coins or 0), "Arcana_Ritual_Row", -160, y, color_white)
+			y = y + 20
+
+			for name, amt in pairs(data.items or {}) do
+				local cleanName = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(name) and _G.msitems.GetInventoryInfo(name).name or name
+				draw.SimpleText(tostring(cleanName) .. ": x" .. tostring(amt), "Arcana_Ritual_Row", -160, y, color_white)
+				y = y + 18
+			end
+
+			draw.SimpleText(string.format("Expires in %s", string.NiceTime(remain)), "Arcana_Ritual_Row", -160, 45, color_white)
+			draw.SimpleText("Press [" .. string.upper(key) .. "] to activate", "Arcana_Ritual_Row", -160, 66, color_white)
 		end
 
-		local remain = math.max(0, (data.expireAt or 0) - CurTime())
-		local key = input.LookupBinding("+use") or "UNBOUND"
-		draw.SimpleText(string.format("Expires in %s", string.NiceTime(remain)), "Arcana_Ritual_Row", -160, 45, color_white)
-		draw.SimpleText("Press [" .. string.upper(key) .. "] to activate", "Arcana_Ritual_Row", -160, 66, color_white)
 		cam.End3D2D()
 	end
 end
