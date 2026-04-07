@@ -38,16 +38,9 @@ Arcana:RegisterRitualSpell({
 			end
 		end
 
-		local timerName = "Arcana_Ritual_Thunder_Timer_" .. selfEnt:EntIndex()
-		timer.Create(timerName, 60 * 5, 1, function()
-			SafeRemoveEntity(selfEnt._stormEntity)
-		end)
 		selfEnt._stormEntity = thunder
+		selfEnt:DeleteOnRemove(thunder)
 	end,
 	on_replenish = function(selfEnt, ply, caster)
-		local timerName = "Arcana_Ritual_Thunder_Timer_" .. selfEnt:EntIndex()
-		timer.Create(timerName, 60 * 5, 1, function()
-			SafeRemoveEntity(selfEnt._stormEntity)
-		end)
 	end,
 })

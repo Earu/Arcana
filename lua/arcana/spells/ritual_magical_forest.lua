@@ -5,6 +5,8 @@ local ACCEPTABLE_SURFACE_TYPES = {
 	[MAT_SNOW] = true,
 }
 
+local FOREST_LIFETIME = 60 * 60
+
 Arcana:RegisterRitualSpell({
 	id = "ritual_magical_forest",
 	name = "Ritual: Magical Forest",
@@ -17,6 +19,7 @@ Arcana:RegisterRitualSpell({
 	cost_amount = 10000,
 	cast_time = 10.0,
 	ritual_color = Color(0, 99, 0),
+	ritual_lifetime = FOREST_LIFETIME,
 	ritual_items = {
 		banana = 20,
 		melon = 20,
@@ -49,6 +52,13 @@ Arcana:RegisterRitualSpell({
             return
         end
 
+		selfEnt:CallOnRemove("StopForestEnv", function()
+			local active = Envs:GetActive()
+			if active and active.id == "magical_forest" then
+				Envs:Stop("ritual ended")
+			end
+		end)
+
         selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 70, 110)
 	end,
 	on_replenish = function(selfEnt, activatingPly, caster)
@@ -56,7 +66,7 @@ Arcana:RegisterRitualSpell({
 
 		local Envs = Arcana.Environments
 		if Envs and Envs.ExtendDuration then
-			Envs:ExtendDuration("magical_forest")
+			Envs:ExtendDuration("magical_forest", FOREST_LIFETIME)
 		end
 	end,
 })
