@@ -1,11 +1,12 @@
 #include "common.hlsl"
 
-// Constants0: x = time for noise animation
+// Constants0: x = time for noise animation, y = alpha multiplier (0-1)
 // Constants1: xyz = color tint (0-1)
-#define TIME    Constants0.x
-#define COLOR_R Constants1.x
-#define COLOR_G Constants1.y
-#define COLOR_B Constants1.z
+#define TIME      Constants0.x
+#define ALPHA_MUL Constants0.y
+#define COLOR_R   Constants1.x
+#define COLOR_G   Constants1.y
+#define COLOR_B   Constants1.z
 
 struct PS_IN
 {
@@ -151,8 +152,8 @@ float4 main(PS_IN i) : COLOR
 	// Apply noise to color
 	float3 finalColor = targetColor * brightnessMod * i.color.rgb;
 
-	// Use the enhanced alpha for smooth edges, combined with vertex alpha
-	float finalAlpha = saturate(alpha * 1.5) * i.color.a;
+	// Use the enhanced alpha for smooth edges, combined with vertex alpha and external multiplier
+	float finalAlpha = saturate(alpha * 1.5) * i.color.a * ALPHA_MUL;
 
 	// Return fullbright color (no lighting applied)
 	return float4(finalColor, finalAlpha);

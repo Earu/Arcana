@@ -91,6 +91,7 @@ local function CreateCircleMaterial(name, textureName)
 		["$additive"]    = 0,
 		["$ignorez"]     = 0,
 		["$c0_x"]        = 0.0,
+		["$c0_y"]        = 1.0,
 		["$c1_x"]        = 1.0,
 		["$c1_y"]        = 1.0,
 		["$c1_z"]        = 1.0,
@@ -330,6 +331,7 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 	-- Update custom shader colour parameters when available
 	if pngMat.SetFloat then
 		pngMat:SetFloat("$c0_x", CurTime())
+		pngMat:SetFloat("$c0_y", (color.a or 255) / 255)
 		pngMat:SetFloat("$c1_x", color.r / 255)
 		pngMat:SetFloat("$c1_y", color.g / 255)
 		pngMat:SetFloat("$c1_z", color.b / 255)
@@ -369,6 +371,7 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 				-- custom shader outputs the correct colour (not the time=0 default).
 				if gm.SetFloat then
 					gm:SetFloat("$c0_x", CurTime())
+					gm:SetFloat("$c0_y", (color.a or 255) / 255)
 					gm:SetFloat("$c1_x", color.r / 255)
 					gm:SetFloat("$c1_y", color.g / 255)
 					gm:SetFloat("$c1_z", color.b / 255)
@@ -478,6 +481,7 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	if self.bandMat.SetFloat then
 		self.bandMat:SetFloat("$alpha", (color.a or 255) / 255)
 		self.bandMat:SetFloat("$c0_x", CurTime())
+		self.bandMat:SetFloat("$c0_y", (color.a or 255) / 255)
 		self.bandMat:SetFloat("$c1_x", color.r / 255)
 		self.bandMat:SetFloat("$c1_y", color.g / 255)
 		self.bandMat:SetFloat("$c1_z", color.b / 255)
