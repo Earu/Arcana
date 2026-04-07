@@ -118,8 +118,9 @@ if SERVER then
 				Arcana:TakeCoins(ply, replenishCost, "Replenish ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
 			end
 
-			-- Extend lifetime by one full period; SetExpireAt triggers NetworkVarNotify on clients
-			self:SetExpireAt(self:GetExpireAt() + self._lifetime)
+			-- Extend lifetime by one full period, capped at 3x the configured lifetime from now
+			local maxExpiry = CurTime() + self._lifetime * 3
+			self:SetExpireAt(math.min(self:GetExpireAt() + self._lifetime, maxExpiry))
 
 			if self._onReplenish then
 				self:_onReplenish(ply)
