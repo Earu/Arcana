@@ -41,9 +41,23 @@ function ENT:SetupDataTables()
 			ent._lastBandFraction = nil
 			ent._lastScaleUpdate = nil
 
-			if ent._circle then
-				ent._circle:Destroy()
-				ent._circle = nil
+			if ent:GetIsReplenishable() then
+				-- Replenishable: keep the evolved circle, remove bands
+				if ent._circle then
+					ent._circle.isEvolving = false
+				end
+
+				if ent._bands then
+					ent._bands:Remove()
+					ent._bands = nil
+				end
+				ent._bandsRemoved = true
+			else
+				-- Non-replenishable: destroy the circle (ritual entity is about to be removed)
+				if ent._circle then
+					ent._circle:Destroy()
+					ent._circle = nil
+				end
 			end
 		end)
 
@@ -357,7 +371,7 @@ if CLIENT then
 			ent._circle:StartEvolving(math.max(0.1, duration or 2.0), -1) -- upward
 		end
 
-		-- Animate the client-side bands scale so they pulse on activation
+		-- Animate the client-side bands scale on activation
 		if ent._bands then
 			local bandDuration = math.max(0.1, (duration or 2.0) - 1)
 
@@ -450,8 +464,10 @@ if CLIENT then
 		local color = self:GetColor()
 		local isActivated = self:GetIsActivated()
 
-		-- Create and maintain a static magic circle under the orb (pre-activation only)
-		if not isActivated then
+		-- Create and maintain a static magic circle under the orb
+		-- Pre-activation: always shown. Post-activation: kept for replenishable rituals.
+		local showCircle = not isActivated or (isActivated and self:GetIsReplenishable())
+		if showCircle then
 			if not self._circle then
 				local pos = self:GetPos() + VECTOR_SLIGHTLY_ABOVE
 				local ang = Angle(0, 180, 180)
@@ -497,7 +513,7 @@ if CLIENT then
 		end
 
 		-- Client-side BandCircle VFX around the ritual orb
-		if not self._bands and BandCircle then
+		if not self._bands and not self._bandsRemoved and BandCircle then
 			local baseColor = self:GetColor()
 			local pos = self:WorldSpaceCenter()
 			local ang = self:GetAngles()
@@ -533,23 +549,6 @@ if CLIENT then
 			self._bands.color = self:GetColor()
 		end
 
-		-- Activated-state visuals for replenishable rituals
-		if isActivated then
-			-- Band weakening: scale bands progressively down as lifetime drains
-			local totalLifetime = self:GetTotalLifetime()
-
-			if totalLifetime > 0 and self._bands then
-				local remaining = math.max(0, self:GetExpireAt() - CurTime())
-				local fraction = math.Clamp(remaining / totalLifetime, 0, 1)
-
-				if not self._lastBandFraction or math.abs(self._lastBandFraction - fraction) > 0.02
-					or not self._lastScaleUpdate or CurTime() - self._lastScaleUpdate > 2 then
-					self._lastBandFraction = fraction
-					self._lastScaleUpdate = CurTime()
-					self._bands:SetScale(10 * fraction, 2)
-				end
-			end
-		end
 
 		-- HUD panel
 		local data = ritualState[self]

@@ -392,7 +392,6 @@ if CLIENT then
 		local a = self:_ComputeAlpha()
 		local r = self:GetRadius()
 		local color = Color(BAND_COLOR.r, BAND_COLOR.g, BAND_COLOR.b, a * 0.15)
-		local sphereAlpha = a * 0.15
 
 		render.SetMaterial(SPHERE_MAT)
 		render.DrawSphere(self:GetPos(), r * 0.94, 32, 32, color)
