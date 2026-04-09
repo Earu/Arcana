@@ -2,7 +2,7 @@ AddCSLuaFile()
 
 ENT.Type         = "nextbot"
 ENT.Base         = "base_nextbot"
-ENT.PrintName    = "Lich"
+ENT.PrintName    = "Skeleton Lich"
 ENT.Category     = "Arcana"
 ENT.Spawnable    = false
 ENT.AdminOnly    = false
@@ -145,7 +145,7 @@ end
 
 function ENT:SpawnFunction(ply, tr, classname)
 	if not tr or not tr.Hit then return end
-	local ent = ents.Create(classname or "arcana_lich")
+	local ent = ents.Create(classname or "arcana_skeleton_lich")
 	if not IsValid(ent) then return end
 	ent:SetPos(tr.HitPos + tr.HitNormal * 2)
 	ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
@@ -299,7 +299,7 @@ function ENT:_FireLightningStrike(targetPos)
 			local pos = targetPos + s.offset
 
 			Arcana.Common.SpawnTeslaBurst(pos, {
-				targetname   = "arcana_lich",
+				targetname   = "arcana_skeleton_lich",
 				color        = "160 60 255",
 				radius       = 280, beamcount_min = 10, beamcount_max = 16,
 				thick_min    = 8,   thick_max     = 14,
@@ -771,7 +771,7 @@ if CLIENT then
 		local ang = fwd:Angle()
 		ang:RotateAroundAxis(ang:Right(), 90)
 
-		local seed   = tonumber(util.CRC("arcana_lich"))
+		local seed   = tonumber(util.CRC("arcana_skeleton_lich"))
 		local circle = Arcana.Circle.MagicCircle.CreateMagicCircle(
 			lich:WorldSpaceCenter() + fwd * 30, ang,
 			Color(160, 60, 255, 255), 4, 38, castTime, 2, seed

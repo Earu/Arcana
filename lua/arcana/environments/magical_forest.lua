@@ -593,7 +593,7 @@ local function spawnGraveyard(ctx)
 				if Arcana.Environments.Active ~= ctx then return end
 
 				local isFlamingSkull = math.random() < 0.15 -- 15% chance to spawn a lich
-				local sk = isFlamingSkull and ents.Create("arcana_lich") or ents.Create("arcana_skeleton")
+				local sk = isFlamingSkull and ents.Create("arcana_skeleton_lich") or ents.Create("arcana_skeleton")
 				if not IsValid(sk) then return end
 
 				sk:SetPos(isFlamingSkull and summonPos + Vector(0, 0, 100) or summonPos)
