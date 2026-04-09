@@ -187,22 +187,15 @@ function ENT:_FireAtTarget()
 	local targetPos = self._target:WorldSpaceCenter()
 	local dir = (targetPos - myPos):GetNormalized()
 
-	-- Create purple fireball
-	local fireball = ents.Create("arcana_fireball_purple")
+	local fireball = ents.Create("arcana_fireball")
 	if not IsValid(fireball) then return end
 
+	fireball.FireballColor = Color(160, 60, 255, 255)
 	fireball:SetPos(myPos + dir * 20)
 	fireball:SetAngles(dir:Angle())
-	fireball:SetOwner(self)
-	fireball:SetSpellOwner(self)
 	fireball:Spawn()
 	fireball:Activate()
-
-	-- Set velocity
-	local phys = fireball:GetPhysicsObject()
-	if IsValid(phys) then
-		phys:SetVelocity(dir * PROJECTILE_SPEED)
-	end
+	Arcana.Common.LaunchProjectile(fireball, self, dir)
 
 	self:EmitSound("ambient/fire/gascan_ignite1.wav", 70, math.random(90, 110), 0.8)
 end

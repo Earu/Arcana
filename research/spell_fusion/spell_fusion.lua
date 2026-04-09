@@ -272,7 +272,7 @@ ctx.forwardLike (Vector — normalised aim direction), ctx.castTime (number), ct
 - Arcana.Status.Frost.Apply(ent, opts) — opts: slowMult, duration
 
 ## Arcana entity classes (ents.Create)
-arcana_fireball, arcana_fireball_purple, arcana_missile, arcana_ice_bolt,
+arcana_fireball, arcana_missile, arcana_ice_bolt,
 arcana_lightning_orb, arcana_lightning_storm, arcana_blackhole, arcana_glyph_orb,
 arcana_crystal_shard, arcana_portal, arcana_corrupted_area, arcana_corrupted_wisp,
 arcana_corrupted_wisp_heavy, arcana_flaming_skull, arcana_soul, arcana_fairy,

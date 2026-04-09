@@ -14,6 +14,7 @@ ENT.OrbMaxTargetsPerTick = 6
 ENT.OrbExplodeDamage = 85
 ENT.OrbExplodeRadius = 400
 ENT.MaxLifetime = 6
+ENT.OrbColor = Color(170, 210, 255, 255) -- override before Spawn() to tint the orb
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Entity", 0, "SpellOwner")
@@ -38,12 +39,13 @@ if SERVER then
 			phys:Wake()
 		end
 
-		self:SetColor(Color(170, 210, 255, 255))
+		local orbColor = self.OrbColor or Color(170, 210, 255, 255)
+		self:SetColor(orbColor)
 		self:SetMaterial("models/debug/debugwhite")
 
 		-- Add a couple of sprites for a bright electric core
 		local addSprite = Arcana.Common.AddEntitySprite
-		addSprite(self, "sprites/light_glow02_add.vmt", Color(150, 200, 255), 1.2, "ArcanaLO_S2")
+		addSprite(self, "sprites/light_glow02_add.vmt", orbColor, 1.2, "ArcanaLO_S2")
 		self.Created = CurTime()
 		self._nextTick = CurTime() + (self.OrbTickInterval or 0.25)
 
@@ -84,10 +86,11 @@ if SERVER then
 		end
 	end
 
-	local function spawnTeslaBurst(pos, radius)
+	local function spawnTeslaBurst(pos, radius, color)
+		local colorStr = color and string.format("%d %d %d", color.r, color.g, color.b) or "170 210 255"
 		return Arcana.Common.SpawnTeslaBurst(pos, {
 			targetname = "arcana_lightning_orb",
-			color = "170 210 255",
+			color = colorStr,
 			radius = radius, beamcount_min = 4, beamcount_max = 7,
 			thick_min = 4, thick_max = 7,
 			lifetime_min = 0.08, lifetime_max = 0.12,
@@ -100,6 +103,7 @@ if SERVER then
 		local owner = self:GetSpellOwner()
 		local center = self:WorldSpaceCenter()
 		local radius = self.OrbRadius or 180
+		local orbColor = self:GetColor()
 		local targets = {}
 
 		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
@@ -136,7 +140,7 @@ if SERVER then
 		end
 
 		if #targets > 0 then
-			spawnTeslaBurst(center, radius)
+			spawnTeslaBurst(center, radius, orbColor)
 		end
 
 		for _, tgt in ipairs(targets) do
@@ -151,6 +155,7 @@ if SERVER then
 			net.Start("Arcana_LightningOrbZap", true)
 			net.WriteVector(center)
 			net.WriteVector(tgt:WorldSpaceCenter())
+			net.WriteColor(orbColor)
 			net.Broadcast()
 		end
 	end
@@ -188,6 +193,7 @@ if SERVER then
 		-- Send explosion visual to clients
 		net.Start("Arcana_LightningOrbExplode", true)
 		net.WriteVector(pos)
+		net.WriteColor(self:GetColor())
 		net.Broadcast()
 
 		self:Remove()
@@ -195,7 +201,6 @@ if SERVER then
 end
 
 if CLIENT then
-	local LIGHTNING_COLOR = Color(170, 210, 255)
 	local matBeam = Material("effects/laser1")
 	local matFlare = Material("effects/blueflare1")
 	local matGlow = Material("sprites/light_glow02_add")
@@ -207,10 +212,12 @@ if CLIENT then
 	net.Receive("Arcana_LightningOrbZap", function()
 		local startPos = net.ReadVector()
 		local endPos = net.ReadVector()
+		local color = net.ReadColor()
 
 		table.insert(Arcana.LightningOrbZaps, {
 			startPos = startPos,
 			endPos = endPos,
+			color = color,
 			dieTime = CurTime() + 0.2,
 			startTime = CurTime()
 		})
@@ -219,9 +226,11 @@ if CLIENT then
 	-- Receive explosion
 	net.Receive("Arcana_LightningOrbExplode", function()
 		local pos = net.ReadVector()
+		local color = net.ReadColor()
 
 		table.insert(Arcana.LightningOrbExplosions, {
 			pos = pos,
+			color = color,
 			dieTime = CurTime() + 0.4,
 			startTime = CurTime()
 		})
@@ -238,7 +247,7 @@ if CLIENT then
 					p:SetEndAlpha(0)
 					p:SetStartSize(math.Rand(15, 30))
 					p:SetEndSize(0)
-					p:SetColor(LIGHTNING_COLOR.r, LIGHTNING_COLOR.g, LIGHTNING_COLOR.b)
+					p:SetColor(color.r, color.g, color.b)
 					p:SetVelocity(VectorRand() * 400)
 					p:SetAirResistance(80)
 					p:SetGravity(Vector(0, 0, -120))
@@ -296,6 +305,8 @@ if CLIENT then
 					arcPath[seg] = pos
 				end
 
+				local c = zap.color
+
 				-- White core
 				render.StartBeam(segments + 1)
 				for seg = 0, segments do
@@ -305,12 +316,12 @@ if CLIENT then
 				end
 				render.EndBeam()
 
-				-- Blue outer
+				-- Tinted outer
 				render.StartBeam(segments + 1)
 				for seg = 0, segments do
 					local t = seg / segments
 					local width = 18 * flicker
-					render.AddBeam(arcPath[seg], width, t, Color(LIGHTNING_COLOR.r, LIGHTNING_COLOR.g, LIGHTNING_COLOR.b, alpha * 0.7))
+					render.AddBeam(arcPath[seg], width, t, Color(c.r, c.g, c.b, alpha * 0.7))
 				end
 				render.EndBeam()
 			end
@@ -329,21 +340,22 @@ if CLIENT then
 
 				-- Expanding electric sphere
 				local size = Lerp(frac, 200, 600)
+				local c = exp.color
 
 				render.SetMaterial(matGlow)
 				render.DrawSprite(exp.pos, size, size, Color(255, 255, 255, alpha * 0.7))
-				render.DrawSprite(exp.pos, size * 1.5, size * 1.5, Color(LIGHTNING_COLOR.r, LIGHTNING_COLOR.g, LIGHTNING_COLOR.b, alpha * 0.4))
+				render.DrawSprite(exp.pos, size * 1.5, size * 1.5, Color(c.r, c.g, c.b, alpha * 0.4))
 
 				render.SetMaterial(matFlare)
-				render.DrawSprite(exp.pos, size * 0.7, size * 0.7, Color(LIGHTNING_COLOR.r, LIGHTNING_COLOR.g, LIGHTNING_COLOR.b, alpha))
+				render.DrawSprite(exp.pos, size * 0.7, size * 0.7, Color(c.r, c.g, c.b, alpha))
 
 				-- Dynamic light
 				local dlight = DynamicLight(math.random(20000, 29999))
 				if dlight then
 					dlight.pos = exp.pos
-					dlight.r = 255
-					dlight.g = 255
-					dlight.b = 255
+					dlight.r = c.r
+					dlight.g = c.g
+					dlight.b = c.b
 					dlight.brightness = Lerp(frac, 8, 2)
 					dlight.Decay = 3000
 					dlight.Size = size * 1.2
@@ -380,6 +392,8 @@ if CLIENT then
 			self._lastPos = pos
 			local back = -vel:GetNormalized()
 
+			local c = self:GetColor()
+
 			-- Electric sparks trailing (more)
 			for i = 1, 5 do
 				local p = self.Emitter:Add("effects/spark", pos + VectorRand() * 4)
@@ -393,7 +407,7 @@ if CLIENT then
 					p:SetEndSize(0)
 					p:SetRoll(math.Rand(0, 360))
 					p:SetRollDelta(math.Rand(-8, 8))
-					p:SetColor(180, 220, 255)
+					p:SetColor(c.r, c.g, c.b)
 					p:SetAirResistance(80)
 					p:SetCollide(false)
 				end
@@ -412,7 +426,7 @@ if CLIENT then
 				p2:SetEndSize(40 + math.random(0, 15))
 				p2:SetRoll(math.Rand(0, 360))
 				p2:SetRollDelta(math.Rand(-1, 1))
-				p2:SetColor(170, 210, 255)
+				p2:SetColor(c.r, c.g, c.b)
 				p2:SetAirResistance(70)
 				p2:SetCollide(false)
 			end
