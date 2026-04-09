@@ -12,6 +12,7 @@ ENT.FireballRadius = 150
 ENT.FireballDamage = 120
 ENT.FireballIgniteTime = 5
 ENT.MaxLifetime = 6
+ENT.FireballColor = Color(255, 120, 40, 255) -- override before Spawn() to tint all visuals
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Entity", 0, "SpellOwner")
@@ -34,13 +35,14 @@ if SERVER then
 			phys:Wake()
 		end
 
-		self:SetColor(Color(255, 120, 40, 255))
+		local fbColor = self.FireballColor or Color(255, 120, 40, 255)
+		self:SetColor(fbColor)
 		self:SetMaterial("models/debug/debugwhite")
-		util.SpriteTrail(self, 0, Color(255, 140, 60, 220), true, 18, 2, 0.45, 1 / 128, "trails/smoke.vmt")
+		util.SpriteTrail(self, 0, Color(fbColor.r, fbColor.g, fbColor.b, 220), true, 18, 2, 0.45, 1 / 128, "trails/smoke.vmt")
 
 		local addSprite = Arcana.Common.AddEntitySprite
-		addSprite(self, "sprites/orangecore1.vmt", Color(255, 180, 80), 0.35, "ArcanaFB_S1")
-		addSprite(self, "sprites/light_glow02_add.vmt", Color(255, 140, 60), 0.6, "ArcanaFB_S2")
+		addSprite(self, "sprites/orangecore1.vmt", fbColor, 0.35, "ArcanaFB_S1")
+		addSprite(self, "sprites/light_glow02_add.vmt", fbColor, 0.6, "ArcanaFB_S2")
 		self.Created = CurTime()
 
 		timer.Simple(self.MaxLifetime, function()
@@ -132,6 +134,8 @@ if CLIENT then
 			self._lastPos = pos
 			local back = -vel:GetNormalized()
 
+			local c = self:GetColor()
+
 			for i = 1, 3 do
 				local p = self.Emitter:Add("effects/yellowflare", pos + VectorRand() * 2)
 				if p then
@@ -143,7 +147,7 @@ if CLIENT then
 					p:SetEndSize(0)
 					p:SetRoll(math.Rand(0, 360))
 					p:SetRollDelta(math.Rand(-3, 3))
-					p:SetColor(255, 160 + math.random(0, 40), 60)
+					p:SetColor(c.r, c.g, c.b)
 					p:SetLighting(false)
 					p:SetAirResistance(60)
 					p:SetGravity(Vector(0, 0, -50))
@@ -163,7 +167,7 @@ if CLIENT then
 					p:SetEndSize(30 + math.random(0, 12))
 					p:SetRoll(math.Rand(0, 360))
 					p:SetRollDelta(math.Rand(-1, 1))
-					p:SetColor(255, 120 + math.random(0, 60), 40)
+					p:SetColor(c.r, c.g, c.b)
 					p:SetLighting(false)
 					p:SetAirResistance(70)
 					p:SetGravity(Vector(0, 0, 20))
@@ -194,9 +198,9 @@ if CLIENT then
 		if dlight then
 			local c = self:GetColor()
 			dlight.pos = self:GetPos()
-			dlight.r = c.r or 255
-			dlight.g = math.max(80, c.g or 140)
-			dlight.b = 40
+			dlight.r = c.r
+			dlight.g = c.g
+			dlight.b = c.b
 			dlight.brightness = 2.6 + math.Rand(0, 0.6)
 			dlight.Decay = 900
 			dlight.Size = 180
