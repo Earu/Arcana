@@ -332,7 +332,7 @@ function Arcana:RegisterSpell(spellData)
 		spellData.on_register(spell)
 	end
 
-	self:Print("Registered spell '" .. spell.name .. "' (ID: " .. spell.id .. "')\n")
+	self:Print("Registered spell '" .. spell.name .. "' (ID: " .. spell.id .. "')")
 	return true
 end
 
