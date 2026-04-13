@@ -84,7 +84,7 @@ Arcana:RegisterSpell({
 		cloud:SetHealth(999999)
 		cloud:SetMaxHealth(999999)
 
-		if cloud.CPPISetOwner then
+		if cloud.CPPISetOwner and caster:IsPlayer() then
 			cloud:CPPISetOwner(caster)
 		end
 

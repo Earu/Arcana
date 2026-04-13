@@ -47,7 +47,7 @@ local function attachHook(ply, wep, state)
 			local normal = tr.HitNormal or Vector(0, 0, 1)
 
 			local tesla = spawnTeslaBurst(hitPos)
-			if IsValid(tesla) and tesla.CPPISetOwner then
+			if IsValid(tesla) and tesla.CPPISetOwner and attacker:IsPlayer() then
 				tesla:CPPISetOwner(attacker)
 			end
 

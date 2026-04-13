@@ -68,7 +68,7 @@ if SERVER then
 					missile:SetSpellOwner(caster)
 				end
 
-				if missile.CPPISetOwner then
+				if missile.CPPISetOwner and caster:IsPlayer() then
 					missile:CPPISetOwner(caster)
 				end
 

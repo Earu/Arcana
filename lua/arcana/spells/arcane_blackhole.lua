@@ -262,7 +262,7 @@ Arcana:RegisterSpell({
 			util.Effect("cball_explode", ed, true, true)
 			util.Effect("ManhackSparks", ed, true, true)
 
-			if blackhole.CPPISetOwner then
+			if blackhole.CPPISetOwner and caster:IsPlayer() then
 				blackhole:CPPISetOwner(caster)
 			end
 

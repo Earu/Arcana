@@ -33,7 +33,7 @@ Arcana:RegisterRitualSpell({
 		if thunder.CPPISetOwner then
 			local owner = IsValid(caster) and caster or ply
 
-			if IsValid(owner) then
+			if IsValid(owner) and owner:IsPlayer() then
 				thunder:CPPISetOwner(owner)
 			end
 		end
