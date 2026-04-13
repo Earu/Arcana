@@ -85,7 +85,7 @@ Arcana:RegisterSpell({
 					rock:SetMoveType(MOVETYPE_VPHYSICS)
 					rock:SetSolid(SOLID_VPHYSICS)
 
-					if rock.CPPISetOwner then
+					if rock.CPPISetOwner and caster:IsPlayer() then
 						rock:CPPISetOwner(caster)
 					end
 

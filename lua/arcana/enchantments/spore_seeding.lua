@@ -28,7 +28,7 @@ local function spawnCloud(attacker, pos)
 	marker:SetNotSolid(true)
 	marker:SetHealth(999999)
 	marker:SetMaxHealth(999999)
-	if marker.CPPISetOwner then marker:CPPISetOwner(attacker) end
+	if marker.CPPISetOwner and attacker:IsPlayer() then marker:CPPISetOwner(attacker) end
 
 	local phys = marker:GetPhysicsObject()
 	if IsValid(phys) then

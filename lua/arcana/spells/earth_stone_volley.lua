@@ -29,7 +29,7 @@ Arcana:RegisterSpell({
 			pebble:SetPos(start + VectorRand() * 10 + Vector(0, 0, 8))
 			pebble:Spawn()
 
-			if pebble.CPPISetOwner then
+			if pebble.CPPISetOwner and caster:IsPlayer() then
 				pebble:CPPISetOwner(caster)
 			end
 

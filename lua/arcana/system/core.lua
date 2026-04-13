@@ -381,7 +381,7 @@ function Arcana:RegisterRitualSpell(opts)
 		ent:Spawn()
 		ent:Activate()
 
-		if ent.CPPISetOwner then
+		if ent.CPPISetOwner and caster:IsPlayer() then
 			ent:CPPISetOwner(caster)
 		end
 

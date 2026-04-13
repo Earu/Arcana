@@ -260,7 +260,7 @@ Arcana:RegisterSpell({
 							pillar:Spawn()
 							pillar:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
 
-							if pillar.CPPISetOwner then
+							if pillar.CPPISetOwner and caster:IsPlayer() then
 								pillar:CPPISetOwner(caster)
 							end
 
@@ -349,7 +349,7 @@ Arcana:RegisterSpell({
 						debris:SetModelScale(math.Rand(2.5, 4.5), 0)
 						debris:Ignite(math.random(8, 15), 0)
 
-						if debris.CPPISetOwner then
+						if debris.CPPISetOwner and caster:IsPlayer() then
 							debris:CPPISetOwner(caster)
 						end
 

@@ -85,7 +85,7 @@ local function zapNearestTarget(proj, attacker)
 	net.Broadcast()
 
 	local tesla = spawnZapTesla(tpos)
-	if IsValid(tesla) and tesla.CPPISetOwner then
+	if IsValid(tesla) and tesla.CPPISetOwner and attacker:IsPlayer() then
 		tesla:CPPISetOwner(attacker)
 	end
 end

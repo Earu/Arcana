@@ -108,7 +108,7 @@ if SERVER then
 			timer.Simple(chainDelay * i, function()
 				if not IsValid(tgt) or tgt == attacker then return end
 				local tesla = spawnFn(tpos)
-				if IsValid(tesla) and tesla.CPPISetOwner then
+				if IsValid(tesla) and tesla.CPPISetOwner and attacker:IsPlayer() then
 					tesla:CPPISetOwner(attacker)
 				end
 				local dmg = DamageInfo()

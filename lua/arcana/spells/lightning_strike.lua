@@ -105,7 +105,7 @@ Arcana:RegisterSpell({
 				local normal = Vector(0, 0, 1)
 				local tesla = spawnTeslaBurst(targetPos + s.offset)
 
-				if IsValid(tesla) and tesla.CPPISetOwner then
+				if IsValid(tesla) and tesla.CPPISetOwner and caster:IsPlayer() then
 					tesla:CPPISetOwner(caster)
 				end
 

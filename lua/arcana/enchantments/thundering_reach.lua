@@ -33,7 +33,7 @@ local function fireThunderLine(attacker, wep, baseDamage)
 	for i = 1, steps do
 		local p = start + dir * (i * spacing)
 		local tesla = spawnTeslaBurst(p)
-		if IsValid(tesla) and tesla.CPPISetOwner then
+		if IsValid(tesla) and tesla.CPPISetOwner and attacker:IsPlayer() then
 			tesla:CPPISetOwner(attacker)
 		end
 	end

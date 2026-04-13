@@ -38,7 +38,7 @@ if Arcana then
 			local mushroom = ents.Create("arcana_magical_mushroom")
 			if IsValid(mushroom) and IsValid(caster) then
 				mushroom:SetPos(selfEnt:GetPos() - Vector(0, 0, 80))
-				if mushroom.CPPISetOwner then
+				if mushroom.CPPISetOwner and caster:IsPlayer() then
 					mushroom:CPPISetOwner(caster)
 				end
 				mushroom:Spawn()
