@@ -53,7 +53,7 @@ if SERVER then
 		if not IsValid(ent) or not IsValid(caster) then return end
 		if ent.SetOwner then ent:SetOwner(caster) end
 		if ent.SetSpellOwner then ent:SetSpellOwner(caster) end
-		if ent.CPPISetOwner then ent:CPPISetOwner(caster) end
+		if ent.CPPISetOwner and caster:IsPlayer() then ent:CPPISetOwner(caster) end
 		if ent.LaunchTowards and isvector(direction) then ent:LaunchTowards(direction) end
 	end
 
