@@ -40,7 +40,6 @@ function ENT:SetupDataTables()
 		self:NetworkVarNotify("HitTime", function(ent, _, old, new)
 			if new <= old then return end
 			ent._flashStart = CurTime()
-			ent:EmitSound("physics/glass/glass_impact_bullet4.wav", 70, 180, 0.6)
 		end)
 	end
 end
