@@ -64,7 +64,7 @@ function ENT:SetupDataTables()
 		self:NetworkVarNotify("ExpireAt", function(ent, _, old, new)
 			if new > old + 1 then
 				ent._lastBandFraction = nil
-				surface.PlaySound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
+				ent:EmitSound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
 			end
 		end)
 	end
@@ -382,7 +382,7 @@ if CLIENT then
 			end)
 		end
 
-		surface.PlaySound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
+		ent:EmitSound("arcana/arcane_" .. math.random(1, 3) .. ".ogg")
 	end)
 
 	function ENT:Draw()
