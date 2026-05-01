@@ -33,20 +33,23 @@ end
 
 -- Shared scale application helper so clients render the correct size
 function ENT:_ApplyScale(scale)
+	if self._isApplyingScale then return end
+	self._isApplyingScale = true
+
 	-- Ensure sane defaults even if called before Initialize
 	self._minScale = self._minScale or 0.35
 	self._maxScale = self._maxScale or 2.2
 	local s = math.Clamp(tonumber(scale) or 1, self._minScale, self._maxScale)
 
-	if SERVER then
-		self:SetModelScale(s)
-		self:Activate()
-	end
+	self:SetModelScale(s)
+	self:Activate()
 
 	-- adjust absorb radius with size subtly
 	if self.SetAbsorbRadius then
 		self:SetAbsorbRadius(520 * (0.6 + (s - self._minScale) / (self._maxScale - self._minScale + 0.0001) * 0.8))
 	end
+
+	self._isApplyingScale = false
 end
 
 -- Health scales with crystal size. Server-only state is fine; health is ephemeral.
