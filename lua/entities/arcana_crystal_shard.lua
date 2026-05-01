@@ -19,6 +19,7 @@ if SERVER then
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
 		self:SetTrigger(true)
+		self:SetCollisionGroup(COLLISION_GROUP_INTERACTIVE_DEBRIS)
 		local phys = self:GetPhysicsObject()
 
 		if IsValid(phys) then
