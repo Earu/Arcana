@@ -397,11 +397,20 @@ function MagicCircleManager:Update()
 	end
 end
 
-function MagicCircleManager:Draw()
+local losTrace = { mask = MASK_OPAQUE }
+local function circleHasBloomLOS(circle)
+	losTrace.start = EyePos()
+	losTrace.endpos = circle.position
+	local tr = util.TraceLine(losTrace)
+
+	return not tr.Hit
+end
+
+function MagicCircleManager:Draw(forBloomPass)
 	for _, circle in ipairs(self.circles) do
 		if circle.Draw then
 			local manual = (circle.IsDrawnManually and circle:IsDrawnManually()) or false
-			if not manual then
+			if not manual and not (forBloomPass and circle.bloomRequiresLOS and not circleHasBloomLOS(circle)) then
 				circle:Draw()
 			end
 		end
@@ -424,15 +433,33 @@ end)
 
 hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
 	if isSkybox then return end
+	local circles = MagicCircleManager.circles
+	local n = #circles
+	if n == 0 then return end
+
+	local anyBloom = false
+	for i = 1, n do
+		local c = circles[i]
+		local manual = (c.IsDrawnManually and c:IsDrawnManually()) or false
+		if not manual and not (c.bloomRequiresLOS and not circleHasBloomLOS(c)) then
+			anyBloom = true
+			break
+		end
+	end
 
 	local bloom = Arcana.Bloom
-	bloom.ProcessBloom(function()
-		MagicCircleManager:Draw()
-	end)
 
-	MagicCircleManager:Draw()
+	if anyBloom then
+		bloom.ProcessBloom(function()
+			MagicCircleManager:Draw(true)
+		end)
+	end
 
-	bloom.RenderBloom()
+	MagicCircleManager:Draw(false)
+
+	if anyBloom then
+		bloom.RenderBloom()
+	end
 end)
 
 -- Convenience functions (maintaining backward compatibility)
