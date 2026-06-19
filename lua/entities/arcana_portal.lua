@@ -163,6 +163,7 @@ if CLIENT then
 	local circleColor = Color(120, 200, 255, 255)
 
 	function ENT:Initialize()
+		self:SetNoDraw(true)
 		self._circle = nil
 	end
 
@@ -174,10 +175,9 @@ if CLIENT then
 		self._circle = nil
 	end
 
-	local MagicCircle = Arcana.Circle.MagicCircle
-	local MagicCircleManager = Arcana.Circle.MagicCircleManager
-
 	local function ensureCircle(self)
+		local MagicCircle = Arcana.Circle.MagicCircle
+		local MagicCircleManager = Arcana.Circle.MagicCircleManager
 		if not MagicCircle or not MagicCircle.new then return end
 		if self._circle and self._circle.IsActive and self._circle:IsActive() then return end
 		local pos = self:GetPos() + self:GetUp() * 2
@@ -186,6 +186,7 @@ if CLIENT then
 		local size = math.max(80, self:GetRadius() * 1.5)
 		local intensity = 50 -- Higher intensity for more complex circles
 		self._circle = MagicCircle.new(pos, ang, circleColor, intensity, size, 2.5)
+		self._circle.bloomRequiresLOS = true
 		MagicCircleManager:Add(self._circle)
 	end
 
