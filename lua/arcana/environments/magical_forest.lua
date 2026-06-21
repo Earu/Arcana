@@ -74,7 +74,7 @@ local function freeze(ent)
 end
 
 local FOREST_RANGE = 8000
-local TREE_COUNT = 600
+local TREE_COUNT = 400
 local TREE_LOG_COUNT = 3
 
 local deadTrees = {
@@ -617,8 +617,8 @@ end
 Envs:RegisterEnvironment({
 	id = "magical_forest",
 	name = "Magical Forest",
-	lifetime = 60 * 60,
-	lock_duration = 60 * 60,
+	lifetime = 60 * 20,
+	lock_duration = 60 * 20,
 	min_radius = 2500,
 	max_radius = FOREST_RANGE,
 	spawn_base = function(ctx)
