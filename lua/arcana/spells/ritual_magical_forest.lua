@@ -5,7 +5,7 @@ local ACCEPTABLE_SURFACE_TYPES = {
 	[MAT_SNOW] = true,
 }
 
-local FOREST_LIFETIME = 60 * 60
+local FOREST_LIFETIME = 60 * 20
 
 Arcana:RegisterRitualSpell({
 	id = "ritual_magical_forest",
