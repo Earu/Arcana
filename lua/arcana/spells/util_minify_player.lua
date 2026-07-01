@@ -28,7 +28,7 @@ Arcana:RegisterSpell({
 	id = "minify_player",
 	name = "Minify",
 	description = "Minifies the target player of the spell momentarily, or yourself if no player is in your crosshair!",
-	category = Arcana.CATEGORIES.COMBAT,
+	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 4,
 	knowledge_cost = 1,
 	cooldown = 10.0,
