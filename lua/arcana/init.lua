@@ -76,6 +76,9 @@ include("arcana/soul_mode.lua")
 
 includePath("arcana/common")
 
+-- Tutorial scenes (must load after arcana/system/tutorial.lua)
+includePath("arcana/scenes")
+
 if SERVER then
 	include("arcana/system/mana_crystals.lua")
 	include("arcana/system/default_inventory.lua")
