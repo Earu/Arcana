@@ -18,6 +18,8 @@ if SERVER then
 	--   - splashRadius: number (default 100)
 	--   - splashDamage: number (default 18)
 	--   - filter: table of entities to ignore (default {attacker})
+	--   - beamWidth: number (default 14) visual thickness of the beam
+	--   - color: Color (default Color(180,120,255)) visual tint of the beam
 	function Arcana.Common.SpearBeam(attacker, origin, direction, options)
 		if not SERVER then return end
 		if not IsValid(attacker) then return end
@@ -29,6 +31,8 @@ if SERVER then
 		local splashRadius = options.splashRadius or 100
 		local splashDamage = options.splashDamage or 18
 		local filter = options.filter or {attacker}
+		local beamWidth = options.beamWidth or 14
+		local beamColor = options.color or Color(180, 120, 255)
 
 		local dir = direction:GetNormalized()
 
@@ -43,12 +47,15 @@ if SERVER then
 		local hitPos = tr.HitPos
 		local hitEnt = tr.Entity
 
-		-- Impact visuals (only if we hit something)
+		-- Impact visuals (only if we hit something). Callers that draw their own impact
+		-- (e.g. a custom explosion) can pass noImpactEffect to skip the default one.
 		if tr.Hit then
-			local ed = EffectData()
-			ed:SetOrigin(hitPos)
-			util.Effect("cball_explode", ed, true, true)
-			util.Decal("FadingScorch", hitPos + tr.HitNormal * 8, hitPos - tr.HitNormal * 8)
+			if not options.noImpactEffect then
+				local ed = EffectData()
+				ed:SetOrigin(hitPos)
+				util.Effect("cball_explode", ed, true, true)
+				util.Decal("FadingScorch", hitPos + tr.HitNormal * 8, hitPos - tr.HitNormal * 8)
+			end
 
 			-- Direct hit damage
 			if IsValid(hitEnt) then
@@ -71,6 +78,8 @@ if SERVER then
 		net.Start("Arcana_SpearBeam", true)
 		net.WriteVector(origin)
 		net.WriteVector(hitPos)
+		net.WriteFloat(beamWidth)
+		net.WriteColor(beamColor, false)
 		net.Broadcast()
 	end
 end
@@ -174,7 +183,8 @@ if CLIENT then
 	net.Receive("Arcana_SpearBeam", function()
 		local startPos = net.ReadVector()
 		local endPos = net.ReadVector()
-		local col = Color(180, 120, 255)
+		local baseWidth = net.ReadFloat()
+		local col = net.ReadColor(false)
 
 		-- Particle effects
 		local center = (startPos + endPos) * 0.5
@@ -214,7 +224,7 @@ if CLIENT then
 			lifeTime = 0.3,
 			dieTime = CurTime() + 0.3,
 			startTime = CurTime(),
-			baseWidth = 14,
+			baseWidth = baseWidth or 14,
 		}
 	end)
 end
