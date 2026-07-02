@@ -527,7 +527,9 @@ local function applyCostForSpell(ply, spell)
 		if Arcana:GetCoins(ply) >= spell.cost_amount then
 			Arcana:TakeCoins(ply, spell.cost_amount, "Spell: " .. spell.name)
 		else
-			-- Affordable-range coin shortfall: fall back to health damage
+			-- Affordable-range coin shortfall: fall back to health damage.
+			-- Announce it first so listeners can react if this payment proves lethal.
+			runHook("SpellCoinShortfall", ply, spell)
 			takeDamageInfo(ply, buildDamageInfo(ply, spell.cost_amount))
 		end
 	elseif spell.cost_type == Arcana.COST_TYPES.HEALTH then
