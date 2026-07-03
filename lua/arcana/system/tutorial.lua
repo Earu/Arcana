@@ -93,6 +93,9 @@ Tutorial.finalText = ""
 				choices = {
 					{ text = "Choice 1", next = "next_node_id", onSelect = function() end },
 					{ text = "Choice 2", next = "another_node_id" },
+					-- subtext: optional out-of-character mechanics line shown
+					-- under the choice (e.g. what the choice grants/inflicts)
+					{ text = "Choice 3", next = "id", subtext = "Get X and Y for 1h" },
 				},
 			}
 		},
@@ -608,19 +611,32 @@ function Tutorial:CreateChoiceButtons(choices)
 	local padding = 60
 	local btnSpacing = 12
 	local btnHeight = 45
+	local btnHeightSub = 62 -- Taller when the choice carries a subtext line
 	local btnWidth = panelW - padding * 2
-	local startY = panelY + panelH - padding - (#choices * (btnHeight + btnSpacing)) + btnSpacing
+
+	-- Heights vary per choice, so lay the stack out bottom-up from its total
+	local totalHeight = 0
+
+	for i, choice in ipairs(choices) do
+		totalHeight = totalHeight + (choice.subtext and btnHeightSub or btnHeight)
+		if i > 1 then
+			totalHeight = totalHeight + btnSpacing
+		end
+	end
+
+	local curY = panelY + panelH - padding - totalHeight
 
 	for i, choice in ipairs(choices) do
 		local btnX = (scrW - btnWidth) * 0.5
-		local btnY = startY + (i - 1) * (btnHeight + btnSpacing)
+		local thisHeight = choice.subtext and btnHeightSub or btnHeight
 
 		local btn = vgui.Create("DButton")
-		btn:SetPos(btnX, btnY)
-		btn:SetSize(btnWidth, btnHeight)
+		btn:SetPos(btnX, curY)
+		btn:SetSize(btnWidth, thisHeight)
 		btn:SetText("")
 		btn:SetCursor("hand")
 		btn:SetVisible(false) -- Will be shown when animation completes
+		curY = curY + thisHeight + btnSpacing
 
 		-- Store choice data
 		btn.choiceData = choice
@@ -644,19 +660,30 @@ function Tutorial:CreateChoiceButtons(choices)
 				surface.DrawOutlinedRect(0, 0, w, h, 2)
 			end
 
+			-- With a subtext the main line sits higher to make room for it
+			local mainY = choice.subtext and h * 0.32 or h * 0.5
+
 			-- Bullet point (list style)
 			local bulletX = 20
-			local bulletY = h * 0.5
 			local bulletSize = 4
-			draw.RoundedBox(bulletSize, bulletX - bulletSize / 2, bulletY - bulletSize / 2, bulletSize, bulletSize,
+			draw.RoundedBox(bulletSize, bulletX - bulletSize / 2, mainY - bulletSize / 2, bulletSize, bulletSize,
 				hovered and Color(255, 230, 150) or Color(220, 180, 70))
 
 			-- Choice text with shadow
 			local textX = 40
-			draw.SimpleText(choice.text, "Arcana_Ancient", textX + 1, h * 0.5 + 1,
+			draw.SimpleText(choice.text, "Arcana_Ancient", textX + 1, mainY + 1,
 				Color(0, 0, 0, 180), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			draw.SimpleText(choice.text, "Arcana_Ancient", textX, h * 0.5,
+			draw.SimpleText(choice.text, "Arcana_Ancient", textX, mainY,
 				hovered and Color(255, 230, 150) or Color(220, 180, 70), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+
+			-- Mechanics subtext: dimmer, smaller line under the choice
+			if choice.subtext then
+				local subY = h * 0.72
+				draw.SimpleText(choice.subtext, "Arcana_AncientSmall", textX + 1, subY + 1,
+					Color(0, 0, 0, 160), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				draw.SimpleText(choice.subtext, "Arcana_AncientSmall", textX, subY,
+					hovered and Color(220, 195, 140) or Color(165, 140, 90), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
 		end
 
 		btn.DoClick = function()
