@@ -132,12 +132,14 @@ if SERVER then
 		return true
 	end
 
-	-- The burst of light, dust and sound as matter turns to gold
+	-- The burst of light, dust and sound as matter turns to gold.
+	-- The trailing `true` bypasses the prediction filter, otherwise the acting
+	-- player (grabbing with the physgun/gravgun) would never see their own effect.
 	local function dispatchGoldEffect(pos, scale)
 		local ed = EffectData()
 		ed:SetOrigin(pos)
 		ed:SetScale(scale or 1)
-		util.Effect("arcana_midas_gold", ed)
+		util.Effect("arcana_midas_gold", ed, true, true)
 	end
 
 	local function turnPropToGold(ply, ent)
