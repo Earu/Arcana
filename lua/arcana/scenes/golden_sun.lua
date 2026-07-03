@@ -669,6 +669,7 @@ local NODES = {
 		choices = {
 			{
 				text = "Give me the gold.",
+				subtext = "Receive 25,000 coins and the Midas Touch affliction for 1 hour.",
 				["next"] = "ACCEPTED",
 				onSelect = function()
 					cookie.Set("arcana_golden_sun_choice", "accepted")
@@ -679,6 +680,7 @@ local NODES = {
 			},
 			{
 				text = "No. Keep it.",
+				subtext = "Decline the bargain. Nothing happens.",
 				["next"] = "REFUSED",
 				onSelect = function()
 					cookie.Set("arcana_golden_sun_choice", "refused")
