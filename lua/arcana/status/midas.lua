@@ -51,6 +51,8 @@ Midas.WeaponWhitelist = {
 	["gmod_camera"] = true,
 	["weapon_fists"] = true,
 	["grimoire"] = true,
+	["none"] = true,
+	["hands"] = true,
 }
 
 function Midas.IsActive(ply)
