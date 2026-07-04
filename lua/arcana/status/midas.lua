@@ -172,6 +172,10 @@ if SERVER then
 		return false
 	end
 
+	hook.Add("OnPlayerPhysicsPickup", "Arcana_Midas", function(ply, ent)
+		return handleGrab(ply, ent)
+	end)
+
 	hook.Add("PhysgunPickup", "Arcana_Midas", function(ply, ent)
 		return handleGrab(ply, ent)
 	end)
