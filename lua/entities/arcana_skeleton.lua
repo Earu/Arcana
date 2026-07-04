@@ -133,7 +133,6 @@ function ENT:EquipSword()
 	sword:Spawn()
 	sword:SetParent(self)
 	sword:AddEffects(EF_PARENT_ANIMATES)
-	sword:SetKeyValue("classname", "Rusted Sword")
 
 	local boneId = self:LookupBone(SWORD_BONE) or 0
 	if boneId and boneId > 0 then
