@@ -106,12 +106,22 @@ function ENT:Initialize()
 	end
 end
 
+scripted_ents.Register({
+	PrintName = "Rusted Sword",
+	ClassName = "arcana_rusted_sword",
+	Type = "anim",
+}, "arcana_rusted_sword")
+
+if CLIENT then
+	language.Add("arcana_rusted_sword", "Rusted Sword")
+end
+
 -- Creates and parents a visual sword to the skeleton's right hand
 function ENT:EquipSword()
 	if not SERVER then return end
 	if IsValid(self._sword) then self._sword:Remove() end
 
-	local sword = ents.Create("prop_dynamic")
+	local sword = ents.Create("arcana_rusted_sword")
 	if not IsValid(sword) then return end
 	sword:SetModel(SWORD_MODEL)
 	sword:SetMaterial(SWORD_MATERIAL)
