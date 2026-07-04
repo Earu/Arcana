@@ -80,8 +80,8 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 		self:SetUseType(SIMPLE_USE)
+		
 		local phys = self:GetPhysicsObject()
-
 		if IsValid(phys) then
 			phys:Wake()
 			phys:EnableGravity(false)
@@ -148,35 +148,36 @@ if SERVER then
 		-- Normal activation guard
 		if self._hasActivated then return end
 
-		-- Check requirements against the player who pressed use
-		local coinsOk = true
+		-- Check requirements against the player who pressed use; collect ALL unmet ones
+		local missing = {}
 
 		if self._coinCost > 0 then
-			coinsOk = Arcana:GetCoins(ply) >= self._coinCost
+			local haveCoins = Arcana:GetCoins(ply)
+
+			if haveCoins < self._coinCost then
+				missing[#missing + 1] = tostring(self._coinCost - haveCoins) .. " coins"
+			end
 		end
 
-		if not coinsOk then
+		for itemName, amt in pairs(self._requirements or {}) do
+			local need = amt or 1
+			local have = Arcana:GetItemCount(ply, itemName)
+
+			if have < need then
+				local info = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(itemName)
+				local cleanName = (info and info.name) or itemName
+				missing[#missing + 1] = tostring(cleanName) .. " x" .. tostring(need - have)
+			end
+		end
+
+		if #missing > 0 then
 			if Arcana and Arcana.SendErrorNotification then
-				Arcana:SendErrorNotification(ply, "Insufficient coins")
+				Arcana:SendErrorNotification(ply, "Missing: " .. table.concat(missing, ", "))
 			end
 
 			self:EmitSound("buttons/button8.wav", 60, 110)
 
 			return
-		end
-
-		for itemName, amt in pairs(self._requirements or {}) do
-			local have = Arcana:GetItemCount(ply, itemName)
-
-			if have < (amt or 1) then
-				if Arcana and Arcana.SendErrorNotification then
-					Arcana:SendErrorNotification(ply, "Missing item: " .. tostring(itemName))
-				end
-
-				self:EmitSound("buttons/button8.wav", 60, 110)
-
-				return
-			end
 		end
 
 		-- Consume from the player who activated
@@ -313,6 +314,20 @@ if CLIENT then
 	local decoPanel = Color(32, 24, 18, 240)
 	local gold = Color(198, 160, 74, 255)
 	local paleGold = Color(222, 198, 120, 255)
+	local red = Color(220, 90, 80, 255)
+	local green = Color(120, 220, 120, 255)
+
+	local function formatDuration(secs)
+		secs = math.max(0, math.floor(secs))
+		local h = math.floor(secs / 3600)
+		local m = math.floor((secs % 3600) / 60)
+		local s = secs % 60
+
+		if h > 0 then return string.format("%dh %dm %ds", h, m, s) end
+		if m > 0 then return string.format("%dm %ds", m, s) end
+
+		return string.format("%ds", s)
+	end
 
 	surface.CreateFont("Arcana_Ritual_Title", {
 		font = "Georgia",
@@ -334,6 +349,15 @@ if CLIENT then
 
 	local VECTOR_ZERO = Vector(0, 0, 0)
 	function ENT:Initialize()
+		-- base_anim entities have no client-side physics object, so eye traces pass straight
+		-- through the orb (the look-at HUD relies on GetEyeTrace hitting it). Build a collision
+		-- object from the model here. The server owns the real position; we keep this volume
+		-- aligned in Think and never let it simulate.
+		self:PhysicsInit(SOLID_VPHYSICS)
+		self:SetSolid(SOLID_VPHYSICS)
+		self:SetMoveType(MOVETYPE_NONE)
+		self:PhysWake()
+
 		self._glowMat = Material("sprites/light_glow02_add")
 		self._circle = nil
 		self._bands = nil
@@ -438,6 +462,20 @@ if CLIENT then
 	end
 
 	function ENT:Think()
+		-- Keep the client-side collision volume on the networked position so eye traces
+		-- track the orb as the server floats it around. MOVETYPE_NONE keeps the entity's
+		-- position purely networked; we just teleport the (non-simulating) phys to match.
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			if self:GetMoveType() ~= MOVETYPE_NONE then
+				self:SetMoveType(MOVETYPE_NONE)
+			end
+
+			phys:EnableMotion(false)
+			phys:SetPos(self:GetPos())
+			phys:SetAngles(self:GetAngles())
+		end
+
 		if self._fxEmitter then
 			self._fxEmitter:SetPos(self:GetPos())
 		end
@@ -459,7 +497,6 @@ if CLIENT then
 	local MagicCircleManager = Arcana.Circle.MagicCircleManager
 
 	local VECTOR_SLIGHTLY_ABOVE = Vector(0, 0, 2)
-	local TEXT_OFFSET = Vector(0, 0, 24)
 	function ENT:DrawTranslucent()
 		local color = self:GetColor()
 		local isActivated = self:GetIsActivated()
@@ -548,49 +585,156 @@ if CLIENT then
 			self._bands.angles = self:GetAngles()
 			self._bands.color = self:GetColor()
 		end
+	end
 
+	-- Screen-space HUD: shown when the player looks at a ritual orb
+	local hudAlpha = 0
+	local hudTarget = nil
+	local function findLookedAtRitual()
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
 
-		-- HUD panel
-		local data = ritualState[self]
+		-- GetEyeTrace() is cached by the engine (one trace per tick), so this is cheap.
+		local ent = ply:GetEyeTrace().Entity
+		if not IsValid(ent) or ent:GetClass() ~= "arcana_ritual" then return end
+
+		return ent
+	end
+
+	local function drawRitualHUD(ent, alpha)
+		local data = ritualState[ent]
 		if not data then return end
 
-		local pos = self:WorldSpaceCenter() + TEXT_OFFSET
-		local ang = LocalPlayer():EyeAngles()
-		ang:RotateAroundAxis(ang:Right(), 90)
-		ang:RotateAroundAxis(ang:Up(), -90)
-		local key = input.LookupBinding("+use") or "UNBOUND"
+		local lp = LocalPlayer()
+		local isActivated = ent:GetIsActivated()
+		local replenishable = ent:GetIsReplenishable()
+		local key = string.upper(input.LookupBinding("+use") or "UNBOUND")
 		local remain = math.max(0, (data.expireAt or 0) - CurTime())
+		local title = string.upper((ent:GetRitualId() or ""):gsub("%_", " "))
+		if title == "" then title = "RITUAL" end
 
-		cam.Start3D2D(pos, ang, 0.06)
-		surface.SetDrawColor(decoPanel)
-		surface.DrawRect(-180, -90, 360, 180)
-		surface.SetDrawColor(gold)
-		surface.DrawOutlinedRect(-180, -90, 360, 180, 2)
-		draw.SimpleText(string.upper((self:GetRitualId():gsub("%_", " ")) or "RITUAL"), "Arcana_Ritual_Title", 0, -70, paleGold, TEXT_ALIGN_CENTER)
+		-- Build the body rows first so the panel can size itself to fit.
+		-- A row is either {text, color} or {sep = true} for a divider line.
+		local rows = {}
+		local reqMet = true
 
-		if isActivated and self:GetIsReplenishable() then
-			-- Post-activation HUD: show replenish info
-			local replenishCost = self:GetReplenishCost()
-			draw.SimpleText("ACTIVATED", "Arcana_Ritual_Title", 0, -40, Color(100, 220, 100, 255), TEXT_ALIGN_CENTER)
-			draw.SimpleText("Remaining: " .. string.NiceTime(remain), "Arcana_Ritual_Row", -160, 0, color_white)
-			draw.SimpleText("Replenish: " .. tostring(replenishCost) .. " coins", "Arcana_Ritual_Row", -160, 20, color_white)
-			draw.SimpleText("Press [" .. string.upper(key) .. "] to replenish", "Arcana_Ritual_Row", -160, 56, color_white)
+		if isActivated and replenishable then
+			local replenishCost = ent:GetReplenishCost()
+			local haveCoins = Arcana:GetCoins(lp) or 0
+			local canAfford = haveCoins >= replenishCost
+			if not canAfford then reqMet = false end
+
+			rows[#rows + 1] = {text = "ACTIVATED", color = green}
+			rows[#rows + 1] = {text = "Remaining: " .. formatDuration(remain)}
+			rows[#rows + 1] = {sep = true}
+
+			local costText = "Replenish: " .. tostring(replenishCost) .. " coins"
+			if not canAfford then
+				costText = costText .. " (missing " .. tostring(replenishCost - haveCoins) .. ")"
+			end
+			rows[#rows + 1] = {text = costText, color = canAfford and color_white or red}
 		else
-			-- Pre-activation HUD: show activation requirements
-			local y = -40
-			draw.SimpleText("Coins: " .. tostring(data.coins or 0), "Arcana_Ritual_Row", -160, y, color_white)
-			y = y + 20
+			-- Coins requirement
+			local needCoins = data.coins or 0
+			local haveCoins = Arcana:GetCoins(lp) or 0
+			local coinsOk = haveCoins >= needCoins
+			if not coinsOk then reqMet = false end
 
-			for name, amt in pairs(data.items or {}) do
-				local cleanName = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(name) and _G.msitems.GetInventoryInfo(name).name or name
-				draw.SimpleText(tostring(cleanName) .. ": x" .. tostring(amt), "Arcana_Ritual_Row", -160, y, color_white)
-				y = y + 18
+			local coinText = "Coins: " .. tostring(needCoins)
+			if not coinsOk then
+				coinText = coinText .. " (missing " .. tostring(needCoins - haveCoins) .. ")"
+			end
+			rows[#rows + 1] = {text = coinText, color = coinsOk and color_white or red}
+
+			-- Item requirements
+			local items = data.items or {}
+			if next(items) then
+				rows[#rows + 1] = {sep = true}
+
+				for name, amt in pairs(items) do
+					local info = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(name)
+					local cleanName = (info and info.name) or name
+					local have = Arcana:GetItemCount(lp, name) or 0
+					local itemOk = have >= amt
+					if not itemOk then reqMet = false end
+
+					local itemText = tostring(cleanName) .. ": x" .. tostring(amt)
+					if not itemOk then
+						itemText = itemText .. " (missing x" .. tostring(amt - have) .. ")"
+					end
+					rows[#rows + 1] = {text = itemText, color = itemOk and color_white or red}
+				end
 			end
 
-			draw.SimpleText(string.format("Expires in %s", string.NiceTime(remain)), "Arcana_Ritual_Row", -160, 45, color_white)
-			draw.SimpleText("Press [" .. string.upper(key) .. "] to activate", "Arcana_Ritual_Row", -160, 66, color_white)
+			-- Expire timer, separated from the requirements above
+			rows[#rows + 1] = {sep = true}
+			rows[#rows + 1] = {text = "Expires in " .. formatDuration(remain)}
 		end
 
-		cam.End3D2D()
+		local promptText, promptColor
+		if not reqMet then
+			promptText, promptColor = "Requirements not met", red
+		elseif isActivated and replenishable then
+			promptText, promptColor = "Press [" .. key .. "] to replenish", paleGold
+		else
+			promptText, promptColor = "Press [" .. key .. "] to activate", paleGold
+		end
+
+		-- Panel geometry
+		local padding = 16
+		local titleH = 30
+		local rowH = 22
+		local sepH = 13
+		local promptH = 26
+		local panelW = 380
+
+		local bodyH = 0
+		for _, row in ipairs(rows) do
+			bodyH = bodyH + (row.sep and sepH or rowH)
+		end
+		local panelH = padding + titleH + bodyH + 8 + promptH + padding
+
+		-- Centered on screen
+		local x = (ScrW() - panelW) * 0.5
+		local y = (ScrH() - panelH) * 0.5
+
+		local a = math.floor(alpha * 255)
+		surface.SetDrawColor(decoPanel.r, decoPanel.g, decoPanel.b, math.floor(decoPanel.a / 255 * a))
+		surface.DrawRect(x, y, panelW, panelH)
+		surface.SetDrawColor(gold.r, gold.g, gold.b, a)
+		surface.DrawOutlinedRect(x, y, panelW, panelH, 2)
+
+		local cx = x + panelW * 0.5
+		draw.SimpleText(title, "Arcana_Ritual_Title", cx, y + padding, Color(paleGold.r, paleGold.g, paleGold.b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+
+		local ty = y + padding + titleH
+
+		for _, row in ipairs(rows) do
+			if row.sep then
+				local ly = math.floor(ty + sepH * 0.5)
+				surface.SetDrawColor(gold.r, gold.g, gold.b, math.floor(a * 0.45))
+				surface.DrawLine(x + padding, ly, x + panelW - padding, ly)
+				ty = ty + sepH
+			else
+				local col = row.color or color_white
+				draw.SimpleText(row.text, "Arcana_Ritual_Row", x + padding, ty, Color(col.r, col.g, col.b, a), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+				ty = ty + rowH
+			end
+		end
+
+		draw.SimpleText(promptText, "Arcana_Ritual_Row", cx, y + panelH - padding, Color(promptColor.r, promptColor.g, promptColor.b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 	end
+
+	hook.Add("HUDPaint", "Arcana_Ritual_HUD", function()
+		local ent = findLookedAtRitual()
+
+		-- Remember the last ritual looked at so we can keep drawing it while fading out
+		if IsValid(ent) then hudTarget = ent end
+		if not IsValid(hudTarget) then hudTarget = nil end
+
+		hudAlpha = math.Approach(hudAlpha, IsValid(ent) and 1 or 0, FrameTime() * 6)
+		if hudAlpha <= 0.01 or not hudTarget then return end
+
+		drawRitualHUD(hudTarget, hudAlpha)
+	end)
 end
