@@ -311,9 +311,11 @@ if SERVER then
 end
 
 if CLIENT then
-	local decoPanel = Color(32, 24, 18, 240)
-	local gold = Color(198, 160, 74, 255)
-	local paleGold = Color(222, 198, 120, 255)
+	-- Palette mirrors ArtDeco's ritual frame (see ArtDeco.DrawRitualFrame / ritualColors in grimoire.lua)
+	local frameBg = Color(46, 36, 26, 235) -- ArtDeco.Colors.cardIdle
+	local frameOuter = Color(160, 130, 60, 220) -- ArtDeco.Colors.brassInner
+	local gold = Color(198, 160, 74, 255) -- ArtDeco.Colors.gold
+	local paleGold = Color(222, 198, 120, 255) -- ArtDeco.Colors.paleGold
 	local red = Color(220, 90, 80, 255)
 	local green = Color(120, 220, 120, 255)
 
@@ -699,10 +701,15 @@ if CLIENT then
 		local y = (ScrH() - panelH) * 0.5
 
 		local a = math.floor(alpha * 255)
-		surface.SetDrawColor(decoPanel.r, decoPanel.g, decoPanel.b, math.floor(decoPanel.a / 255 * a))
+
+		-- Ritual frame matching ArtDeco.DrawRitualFrame: background + double outlined border,
+		-- with the HUD fade alpha applied on top of the frame's own alphas.
+		surface.SetDrawColor(frameBg.r, frameBg.g, frameBg.b, math.floor(frameBg.a / 255 * a))
 		surface.DrawRect(x, y, panelW, panelH)
-		surface.SetDrawColor(gold.r, gold.g, gold.b, a)
+		surface.SetDrawColor(frameOuter.r, frameOuter.g, frameOuter.b, a)
 		surface.DrawOutlinedRect(x, y, panelW, panelH, 2)
+		surface.SetDrawColor(gold.r, gold.g, gold.b, math.floor(200 / 255 * a))
+		surface.DrawOutlinedRect(x + 3, y + 3, panelW - 6, panelH - 6, 1)
 
 		local cx = x + panelW * 0.5
 		draw.SimpleText(title, "Arcana_Ritual_Title", cx, y + padding, Color(paleGold.r, paleGold.g, paleGold.b, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
