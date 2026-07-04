@@ -365,13 +365,17 @@ if CLIENT then
 		return true
 	end
 
-	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
-	local render_GetScreenEffectTexture = _G.render.GetScreenEffectTexture
+	-- (no longer uses render.UpdateScreenEffectTexture / render.GetScreenEffectTexture) because of this there were conflicts
 	local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
 	local render_MaterialOverride = _G.render.MaterialOverride
 	local render_CopyRenderTargetToTexture = _G.render.CopyRenderTargetToTexture
 	local render_SetBlend = _G.render.SetBlend
 	local DYNAMIC_LIGHT_OFFSET = Vector(0, 0, 50)
+
+	local CRYSTAL_RT_NAME = "arcana_crystal_refract_rt"
+	local function GetCrystalRefractRT()
+		return GetRenderTarget(CRYSTAL_RT_NAME, ScrW(), ScrH())
+	end
 	function ENT:Draw()
 		local distSqr = EyePos():DistToSqr(self:GetPos())
 		local dist = math.sqrt(distSqr)
@@ -394,7 +398,6 @@ if CLIENT then
 				self:DrawModel()
 				render_SetBlend(1)
 			else
-				render_UpdateScreenEffectTexture()
 				render_OverrideDepthEnable(true, true) -- no Z write
 
 				-- draw base model underneath at a low alpha to unify color
@@ -410,8 +413,8 @@ if CLIENT then
 				local baseDisp = 0.5 * (0.6 + 0.4 * fade)
 				local perPassOpacity = (1 / PASSES) * fade * spawnFade
 
-				-- start from current screen
-				local scr = render_GetScreenEffectTexture()
+				local scr = GetCrystalRefractRT()
+				render_CopyRenderTargetToTexture(scr)
 				SHADER_MAT:SetTexture("$basetexture", scr)
 				SHADER_MAT:SetFloat("$c2_x", RealTime())
 				SHADER_MAT:SetFloat("$c1_w", 0.25)
