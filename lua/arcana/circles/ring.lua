@@ -95,24 +95,7 @@ local function CreateCircleMaterial(name, textureName)
 		["$c1_x"]        = 1.0,
 		["$c1_y"]        = 1.0,
 		["$c1_z"]        = 1.0,
-		["$c2_x"]        = 0.0, -- world-depth clip toggle (bloom capture only)
 	})
-end
-
--- During the bloom capture the RT's depth buffer holds no scene depth, so the
--- circle shader clips occluded pixels against the engine's resolved depth
--- texture instead ($texture1 + $c2_x toggle).  Outside the capture the flag is
--- cleared and the regular z-test applies (screen draws, HUD/2D usage).
-local function applyDepthClip(mat)
-	local bloom = Arcana.Bloom
-	local depthTex = bloom and bloom.GetDepthClipTexture and bloom.GetDepthClipTexture()
-
-	if depthTex then
-		mat:SetTexture("$texture1", depthTex)
-		mat:SetFloat("$c2_x", 1)
-	else
-		mat:SetFloat("$c2_x", 0)
-	end
 end
 
 -- ── PNG material system ───────────────────────────────────────────────────────
@@ -352,7 +335,6 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 		pngMat:SetFloat("$c1_x", color.r / 255)
 		pngMat:SetFloat("$c1_y", color.g / 255)
 		pngMat:SetFloat("$c1_z", color.b / 255)
-		applyDepthClip(pngMat)
 	end
 
 	local pxToWorld  = self.radius / PNG_RING_RADIUS_PX
@@ -393,7 +375,6 @@ function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 					gm:SetFloat("$c1_x", color.r / 255)
 					gm:SetFloat("$c1_y", color.g / 255)
 					gm:SetFloat("$c1_z", color.b / 255)
-					applyDepthClip(gm)
 				end
 				surface_SetMaterial(gm)
 				if SHADER_AVAILABLE then
@@ -504,7 +485,6 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 		self.bandMat:SetFloat("$c1_x", color.r / 255)
 		self.bandMat:SetFloat("$c1_y", color.g / 255)
 		self.bandMat:SetFloat("$c1_z", color.b / 255)
-		applyDepthClip(self.bandMat)
 	end
 
 	render_SetMaterial(self.bandMat)
@@ -540,7 +520,6 @@ local function apply2DColor(mat, color, alpha)
 		mat:SetFloat("$c1_x", r / 255)
 		mat:SetFloat("$c1_y", g / 255)
 		mat:SetFloat("$c1_z", b / 255)
-		applyDepthClip(mat) -- always off here; clears a stale capture flag
 	end
 	surface_SetMaterial(mat)
 	if SHADER_AVAILABLE then

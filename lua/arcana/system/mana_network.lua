@@ -224,7 +224,8 @@ if CLIENT then
 	end)
 
 	local MAX_RENDER_DIST = 2000 * 2000
-	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function()
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_ManaNetwork_Draw", function(bDrawingDepth)
+		if bDrawingDepth then return end
 		local eye = EyePos()
 		local now = CurTime()
 		local write = 1

@@ -603,8 +603,8 @@ if CLIENT then
         towerBeams[#towerBeams + 1] = { s = s, e = e, col = col, w = w, start = CurTime(), life = 0.35 }
     end)
 
-    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Beams", function(_, isSkybox)
-        if isSkybox then return end
+    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Beams", function(bDrawingDepth, isSkybox)
+        if bDrawingDepth or isSkybox then return end
         local now = CurTime()
 
         for i = #towerBeams, 1, -1 do
@@ -689,8 +689,8 @@ if CLIENT then
         end
     end)
 
-    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Tracers", function(_, isSkybox)
-        if isSkybox then return end
+    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Tracers", function(bDrawingDepth, isSkybox)
+        if bDrawingDepth or isSkybox then return end
         local now = CurTime()
 
         for i = #towerTracers, 1, -1 do
@@ -792,8 +792,8 @@ if CLIENT then
         end
     end)
 
-    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Impacts", function(_, isSkybox)
-        if isSkybox then return end
+    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Impacts", function(bDrawingDepth, isSkybox)
+        if bDrawingDepth or isSkybox then return end
         local now = CurTime()
 
         for i = #towerImpacts, 1, -1 do

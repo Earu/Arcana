@@ -254,7 +254,8 @@ if CLIENT then
 	end)
 
 	-- Central glow sprites that pulse and grow toward collapse
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_GravityCollapse_Render", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_GravityCollapse_Render", function(bDrawingDepth)
+		if bDrawingDepth then return end
 		local now = CurTime()
 
 		for _, v in ipairs(activeVortices) do
@@ -277,7 +278,8 @@ if CLIENT then
 		end
 	end)
 
-	hook.Add("PostDrawOpaqueRenderables", "Arcana_GravityCollapse_DLight", function()
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_GravityCollapse_DLight", function(bDrawingDepth)
+		if bDrawingDepth then return end
 		local now = CurTime()
 
 		for i, v in ipairs(activeVortices) do

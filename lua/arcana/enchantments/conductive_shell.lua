@@ -241,7 +241,8 @@ if CLIENT then
 	end)
 
 	-- Dynamic light on each tracked projectile, matching arcana_lightning_orb ENT:Draw
-	hook.Add("PostDrawOpaqueRenderables", "Arcana_ConductiveShell_DLight", function()
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_ConductiveShell_DLight", function(bDrawingDepth)
+		if bDrawingDepth then return end
 		local now = CurTime()
 		for ent in pairs(trackedEntities) do
 			if not IsValid(ent) then continue end

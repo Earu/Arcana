@@ -468,8 +468,8 @@ if CLIENT then
 		table.insert(Arcana.CrawlSkullImpacts, { pos = pos, startTime = CurTime(), dieTime = CurTime() + 0.35 })
 	end)
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_CrawlSkullImpactRender", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_CrawlSkullImpactRender", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 		local curTime = CurTime()
 		for i = #Arcana.CrawlSkullImpacts, 1, -1 do
 			local imp = Arcana.CrawlSkullImpacts[i]

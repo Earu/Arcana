@@ -420,8 +420,8 @@ if CLIENT then
 	}, "lightning_strike")
 
 	-- Hook to render additional lightning effects based on networked strike information
-	hook.Add("PostDrawTranslucentRenderables", "LightningStormAdditionalEffects", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "LightningStormAdditionalEffects", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 
 		for _, ent in pairs(ents.FindByClass("arcana_lightning_storm")) do
 			if IsValid(ent) then
