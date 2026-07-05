@@ -2,13 +2,19 @@
 
 // Constants0: x = blur direction X (1 or 0), y = blur direction Y (0 or 1), z = radius scale (texels)
 // Constants1: x = bloom intensity multiplier, y = chromatic aberration strength (0 = off)
-// Constants2: x = snapshot-diff mode (1 = output max($basetexture - $texture1, 0))
-#define DIR_X       Constants0.x
-#define DIR_Y       Constants0.y
-#define RADIUS      Constants0.z
-#define INTENSITY   Constants1.x
-#define CA_STRENGTH Constants1.y
-#define DIFF_MODE   Constants2.x
+// Constants2: x = snapshot-diff mode (1 = output max($basetexture - $texture1, 0)),
+//             y = daylight boost — scales the captured contribution with
+//                 background luminance (0 = off)
+//             z = dark-colour boost cap — max perceptual equalisation factor
+//                 for low-luminance hues like purple/deep green (1 = off)
+#define DIR_X          Constants0.x
+#define DIR_Y          Constants0.y
+#define RADIUS         Constants0.z
+#define INTENSITY      Constants1.x
+#define CA_STRENGTH    Constants1.y
+#define DIFF_MODE      Constants2.x
+#define DAYLIGHT_BOOST Constants2.y
+#define DARK_BOOST_CAP Constants2.z
 
 struct PS_IN { float2 uv : TEXCOORD0; };
 
@@ -34,9 +40,25 @@ float4 main(PS_IN i) : COLOR
 	// and cancel out exactly (a blend-op subtract cannot guarantee that).
 	if (DIFF_MODE > 0.5)
 	{
-		float3 diff = tex2D(TexBase, i.uv).rgb - tex2D(Tex1, i.uv).rgb;
+		float3 before = tex2D(Tex1, i.uv).rgb;
+		float3 diff = max(tex2D(TexBase, i.uv).rgb - before, float3(0.0, 0.0, 0.0));
 
-		return float4(max(diff, float3(0.0, 0.0, 0.0)), 1.0);
+		// Bright backgrounds swallow the circles' blended contribution, and
+		// the screen-blend composite attenuates it again — so daylight scenes
+		// barely bloom.  Compensate by scaling the contribution with the
+		// background luminance; dark scenes (luma ~0) are unaffected.
+		float bgLuma = dot(before, float3(0.2126, 0.7152, 0.0722));
+		diff *= 1.0 + DAYLIGHT_BOOST * bgLuma;
+
+		// Perceptual equalisation: dark or saturated-dark hues (purple, deep
+		// green) add little luminance and would barely bloom.  Normalise by
+		// the contribution's own luma so hue drives the glow, not brightness.
+		// Applied here, per-pixel before the blur dilutes the signal (this
+		// replaces the old weaker version that ran in the composite pass).
+		float luma = dot(diff, float3(0.2126, 0.7152, 0.0722));
+		diff *= clamp(pow(max(luma, 0.001), -0.45), 1.0, max(DARK_BOOST_CAP, 1.0));
+
+		return float4(diff, 1.0);
 	}
 
 	// TexBaseSize = (1/srcWidth, 1/srcHeight), provided by screenspace_general via common.hlsl c4
@@ -65,18 +87,19 @@ float4 main(PS_IN i) : COLOR
 		col.b = SAMPLE(i.uv - dir * CA_STRENGTH).b;
 	}
 
-	// Perceptual equalisation: dark-appearing colours (e.g. blues) have a low
-	// Rec.709 luminance and bloom dimmer at the same RGB value.  Apply the
-	// correction only during the composite passthrough (DIR_X = DIR_Y = 0) so
-	// it runs exactly once instead of compounding across every blur pass.
-	if (DIR_X + DIR_Y < 0.5) {
-		float luma = dot(col.rgb, float3(0.2126, 0.7152, 0.0722));
-		float perceptualBoost = clamp(pow(max(luma, 0.001), -0.35), 1.0, 2.5);
-		col.rgb *= perceptualBoost;
-	}
+	// (Perceptual equalisation for dark colours now happens in the snapshot
+	// diff pass above, per-pixel before the blur — not here.)
 
 	float intensity = INTENSITY > 0.001 ? INTENSITY : 2.0;
 	col.rgb *= intensity;
+
+	// Composite passthrough only (dir = 0): the pipeline works in linear light
+	// but the screen framebuffer is gamma-encoded — re-encode on the way out or
+	// the halo's small linear values get displayed ~4-6x darker than intended.
+	// Blur passes (dir != 0) write to linear-read RTs and must stay linear.
+	if (DIR_X + DIR_Y < 0.5) {
+		col.rgb = pow(max(col.rgb, 0.0), 0.4545);
+	}
 
 	// Force full alpha so the additive composite uses the full RGB contribution
 	// regardless of what alpha the source texture had.

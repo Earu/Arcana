@@ -142,7 +142,7 @@ end
 hook.Add("Initialize", "MagicCircle_Initialize", function()
 	WaitForShaderMounted({"arcana_circle_ps30", "arcana_passthrough_vs30"}, function(available)
 		SHADER_AVAILABLE = available
-		initPNGMats()
+		timer.Simple(1, initPNGMats)
 	end)
 end)
 

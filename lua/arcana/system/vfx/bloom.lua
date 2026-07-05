@@ -96,7 +96,10 @@ local function initBloom()
 		["$c0_z"] = 4.0,
 		["$c1_x"] = 1.0,
 		["$c1_y"] = 0.0,
+		-- Constants must be declared here or runtime SetFloat calls are ignored
 		["$c2_x"] = 0.0, -- snapshot-diff mode, enabled only for the diff pass
+		["$c2_y"] = 0.0, -- daylight boost (set per diff pass)
+		["$c2_z"] = 1.0, -- dark-hue boost cap (set per diff pass)
 	})
 
 	-- Full pipeline: blur passes then additive composite with chromatic aberration.
@@ -106,15 +109,18 @@ local function initBloom()
 		-- ── Tight bloom — 3 successive H+V passes at half-res ────────────────
 		blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
 		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 1)
+		blurPass(BLOOM_RT_B, BLOOM_RT_A, 1, 0, 1, 1)
+		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 1)
 		blurPass(BLOOM_RT_B, BLOOM_RT_A, 1, 0, 2, 1)
-		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 2, 1)
-		blurPass(BLOOM_RT_B, BLOOM_RT_A, 1, 0, 3, 1)
-		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 3, 0.9) -- bake bloom intensity
+		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 2, 0.9) -- bake bloom intensity
 		-- ── Glow fog — 2 successive H+V passes at quarter-res ────────────────
-		blurPass(BLOOM_RT_B, GLOW_RT_A, 1, 0, 2, 1)
-		blurPass(GLOW_RT_A, GLOW_RT_B, 0, 1, 2, 1)
-		blurPass(GLOW_RT_B, GLOW_RT_A, 1, 0, 3, 1)
-		blurPass(GLOW_RT_A, GLOW_RT_B, 0, 1, 3, 0.3) -- bake glow intensity
+		-- Radii/intensity retuned after the composite gamma re-encode: the
+		-- re-encode lifts faint tails ~4-6x, so the wide fog needs far less
+		-- energy than it did when those tails were being gamma-crushed.
+		blurPass(BLOOM_RT_B, GLOW_RT_A, 1, 0, 1, 1)
+		blurPass(GLOW_RT_A, GLOW_RT_B, 0, 1, 1, 1)
+		blurPass(GLOW_RT_B, GLOW_RT_A, 1, 0, 1, 1)
+		blurPass(GLOW_RT_A, GLOW_RT_B, 0, 1, 1, 0.12) -- bake glow intensity
 		-- ── Screen-blend composite ───────────────────────────────────────────
 		-- Screen: dst' = src*(1-dst) + dst.  Behaves like additive in dark areas
 		-- but shrinks the contribution where the framebuffer is already bright,
@@ -156,6 +162,15 @@ local function initBloom()
 		blurMat:SetTexture("$basetexture", SNAPSHOT_POST)
 		blurMat:SetTexture("$texture1", SNAPSHOT_PRE)
 		blurMat:SetFloat("$c2_x", 1.0)
+		-- Bright backgrounds swallow the circles' contribution twice (alpha blending at
+		-- capture, screen blend at composite), so daylight bloom reads weak.  This
+		-- scales the captured contribution with background luminance: 0 = off,
+		-- ~2 = roughly restores dark-scene punch on a full-daylight background.
+		blurMat:SetFloat("$c2_y", 2)
+		-- Max perceptual boost for dark hues (purple, deep green): their
+		-- contribution carries little luminance and would barely bloom, so the
+		-- shader normalises it by luma, capped at this factor.  1 = off.
+		blurMat:SetFloat("$c2_z", 5)
 		render.SetMaterial(blurMat)
 		render.DrawScreenQuad()
 		blurMat:SetFloat("$c2_x", 0.0)
