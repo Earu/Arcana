@@ -555,7 +555,42 @@ local function createBandsForViewModel(wep, count, style)
 	}
 end
 
+-- Stamps the viewmodel's depth into the engine's resolved depth texture so the
+-- bloom capture's world-depth clip (see bloom.lua / arcana_circle_ps30) also
+-- occludes against the gun.  The engine depth pass only renders the world
+-- scene — viewmodels are never in it.  $COLOR_DEPTH makes the DepthWrite
+-- shader output ProjPos.w / 4000, matching the depth texture's encoding, and
+-- view-space depth is projection-independent so the viewmodel FOV is fine.
+local vmDepthMat = CreateMaterial("arcana_vm_depthwrite", "DepthWrite", {
+	["$COLOR_DEPTH"] = "1",
+})
+
+-- DrawModel on the viewmodel re-fires PostDrawViewModel; guards the hook below
+local stampingVMDepth = false
+
+local function drawViewModelDepth(vm, ply)
+	if not render.GetResolvedFullFrameDepth then return end
+	local depthTex = render.GetResolvedFullFrameDepth()
+	if not depthTex then return end
+
+	stampingVMDepth = true
+	render.PushRenderTarget(depthTex)
+	render.ClearDepth() -- RT depth is not the scene's; the VM needs a clean z-buffer to self-occlude
+	render.MaterialOverride(vmDepthMat)
+	vm:DrawModel()
+	local hands = ply.GetHands and ply:GetHands()
+
+	if IsValid(hands) then
+		hands:DrawModel()
+	end
+
+	render.MaterialOverride()
+	render.PopRenderTarget()
+	stampingVMDepth = false
+end
+
 hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, wep)
+	if stampingVMDepth then return end
 	if not IsValid(ply) or ply ~= LocalPlayer() then return end
 	-- If third person or weapon mismatch, ensure any lingering state is cleared for this player
 	if (not IsValid(wep)) or (wep ~= ply:GetActiveWeapon()) or ply:ShouldDrawLocalPlayer() then
@@ -612,6 +647,7 @@ hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, w
 
 	-- Draw immediately in the viewmodel pass to avoid one-frame lag
 	if s.bc.Draw then
+		drawViewModelDepth(vm, ply)
 		Arcana.Bloom.ProcessBloom(function()
 			s.bc:Draw()
 		end)

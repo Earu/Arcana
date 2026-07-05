@@ -15,9 +15,58 @@ end
 local BLOOM_ENABLED = CreateConVar("arcana_bloom", "1", FCVAR_ARCHIVE, "Enable Arcana bloom system")
 
 local Arcana = Arcana
+
+-- ── World-depth occlusion for the bloom capture ───────────────────────────────
+-- The capture RT's depth buffer is NOT the scene's depth buffer (RT depth is a
+-- separate buffer shared among render targets), so circles rendered into the RT
+-- cannot be z-tested against the world.  Instead the engine's SSAO depth pass is
+-- enabled while bloom is in use, and arcana_circle_ps30 clips occluded pixels
+-- against _rt_ResolvedFullFrameDepth ($texture1, $c2_x toggle).
+local lastBloomFrame = -100 -- last frame ProcessBloom ran (drives NeedsDepthPass)
+local depthPassFrame = -100 -- last frame the engine was told to render the depth pass
+local captureActive = false -- true while inside a ProcessBloom capture
+
+-- Pre-create the resolved depth RT as 32-bit float BEFORE the engine lazily
+-- creates it 8-bit on the first depth pass: 8 bits over the 4000-unit range is
+-- ~15.7 units per step, which wrongly occludes circle pixels near geometry
+-- (e.g. the lower half of a circle lying on the ground).  Must run at file
+-- load, ahead of any NeedsDepthPass-triggered pass; if the RT somehow already
+-- exists this returns it unchanged.
+if system.IsWindows() and render.GetResolvedFullFrameDepth then
+	GetRenderTargetEx(
+		"_rt_resolvedfullframedepth",
+		1, 1, -- ignored with RT_SIZE_FULL_FRAME_BUFFER
+		RT_SIZE_FULL_FRAME_BUFFER,
+		MATERIAL_RT_DEPTH_SHARED,
+		bit.bor(4, 8, 256, 512), -- CLAMPS | CLAMPT | NOMIP | NOLOD
+		0,
+		27 -- IMAGE_FORMAT_R32F
+	)
+end
+
+hook.Add("NeedsDepthPass", "arcana_bloom_depth", function()
+	if not BLOOM_ENABLED:GetBool() then return end
+	if FrameNumber() - lastBloomFrame > 3 then return end
+
+	depthPassFrame = FrameNumber()
+
+	return true
+end)
+
+-- Returns the resolved depth texture while a bloom capture is running and the
+-- depth pass is fresh; nil otherwise (normal draws keep using the real z-test).
+local function getDepthClipTexture()
+	if not captureActive then return nil end
+	if not render.GetResolvedFullFrameDepth then return nil end
+	if FrameNumber() - depthPassFrame > 1 then return nil end
+
+	return render.GetResolvedFullFrameDepth()
+end
+
 Arcana.Bloom = Arcana.Bloom or {
 	ProcessBloom = function() end,
-	RenderBloom = function() end
+	RenderBloom = function() end,
+	GetDepthClipTexture = getDepthClipTexture,
 }
 
 local function initBloom()
@@ -113,15 +162,21 @@ local function initBloom()
 	local function processBloom(drawFunc)
 		if not BLOOM_ENABLED:GetBool() then return end
 
+		lastBloomFrame = FrameNumber()
 		render.PushRenderTarget(CIRCLE_RT)
-		render.Clear(0, 0, 0, 0, true, false) -- colour only; depth is shared with the screen
+		-- Clear depth too: the RT depth buffer holds garbage from other RT work,
+		-- world occlusion is handled in-shader via GetDepthClipTexture instead.
+		render.Clear(0, 0, 0, 0, true, true)
+		captureActive = true
 		drawFunc()
+		captureActive = false
 		render.PopRenderTarget()
 	end
 
 	Arcana.Bloom = {
 		ProcessBloom = processBloom,
 		RenderBloom = renderBloom,
+		GetDepthClipTexture = getDepthClipTexture,
 	}
 end
 
