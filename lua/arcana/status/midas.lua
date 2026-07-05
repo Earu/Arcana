@@ -154,6 +154,9 @@ if SERVER then
 		local phys = ent:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:SetMass(math.Clamp(phys:GetMass() * GOLD_MASS_MULT, GOLD_MASS_MIN, GOLD_MASS_MAX))
+			-- Server side this only affects physics behavior; impact sounds come
+			-- from the client physobj, mirrored via NW_GOLDED in the CLIENT block
+			construct.SetPhysProp(ply, ent, 0, phys, {Material = "metal"})
 		end
 
 		dispatchGoldEffect(ent:WorldSpaceCenter(), math.Clamp(ent:BoundingRadius() / 20, 0.6, 5))
@@ -188,6 +191,11 @@ if SERVER then
 		return handleGrab(ply, ent)
 	end)
 
+	-- Solid gold does not splinter: gilded things shrug off all damage
+	hook.Add("EntityTakeDamage", "Arcana_Midas_Unbreakable", function(ent)
+		if isGolded(ent) then return true end
+	end)
+
 	-- Golden husk of a weapon: a gold prop dropped at pos, that then crumbles
 	local function dropGoldenHusk(mdl, pos, ang)
 		if not mdl or mdl == "" or not util.IsValidModel(mdl) then return end
@@ -203,6 +211,11 @@ if SERVER then
 		husk:SetNW2Bool(NW_GOLDED, true)
 		husk.PhysgunDisabled = true
 		husk:SetCollisionGroup(COLLISION_GROUP_WEAPON) -- Falls to the ground, never blocks players
+
+		local phys = husk:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:SetMaterial("metal") -- Clang comes from the clients' NW_GOLDED mirror
+		end
 
 		-- Crumble away after a moment
 		timer.Simple(HUSK_LIFETIME, function()
@@ -351,6 +364,31 @@ if SERVER then
 end
 
 if CLIENT then
+	-- PhysObj:SetMaterial only changes impact sounds when called client-side,
+	-- so gilded entities mirror the server's metal surface property here to
+	-- get the metallic clang instead of e.g. wood
+	local function makeMetallic(ent)
+		if not IsValid(ent) then return false end
+
+		local phys = ent:GetPhysicsObject()
+		if not IsValid(phys) then return false end
+
+		phys:SetMaterial("metal")
+
+		return true
+	end
+
+	hook.Add("EntityNetworkedVarChanged", "Arcana_Midas_Metallic", function(ent, name, _, golded)
+		if name ~= NW_GOLDED or not golded then return end
+
+		-- Client physics can lag entity creation by a tick
+		if not makeMetallic(ent) then
+			timer.Simple(0, function()
+				makeMetallic(ent)
+			end)
+		end
+	end)
+
 	-- Gild the held weapon's viewmodel while it turns to gold in the hands
 	local GILD_TAG = "Arcana_Midas_GildVM"
 	local goldVMMaterial = Material(GOLD_MATERIAL)
