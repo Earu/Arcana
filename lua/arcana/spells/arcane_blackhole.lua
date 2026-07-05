@@ -319,8 +319,8 @@ if CLIENT then
 	end
 
 	-- Render lightning arcs from dark star
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_Blackhole_RenderLightning", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_Blackhole_RenderLightning", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 
 		local curTime = CurTime()
 
@@ -382,8 +382,8 @@ if CLIENT then
 
 	-- Render dark star (fiery growing orb)
 	local darkStarRenderHook = "Arcana_Blackhole_RenderDarkStar"
-	hook.Add("PostDrawTranslucentRenderables", darkStarRenderHook, function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", darkStarRenderHook, function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 
 		for caster, data in pairs(darkStarData) do
 			if not IsValid(caster) or not data.active then
@@ -640,8 +640,8 @@ if CLIENT then
 				}
 
 				local pulseHook = "Arcana_Blackhole_EnergyPulse1_" .. tostring(caster)
-				hook.Add("PostDrawTranslucentRenderables", pulseHook, function(_, isSkybox)
-					if isSkybox then return end
+				hook.Add("PostDrawTranslucentRenderables", pulseHook, function(bDrawingDepth, isSkybox)
+					if bDrawingDepth or isSkybox then return end
 
 					if not pulseData then
 						hook.Remove("PostDrawTranslucentRenderables", pulseHook)
@@ -697,8 +697,8 @@ if CLIENT then
 				}
 
 				local pulseHook = "Arcana_Blackhole_EnergyPulse2_" .. tostring(caster)
-				hook.Add("PostDrawTranslucentRenderables", pulseHook, function(_, isSkybox)
-					if isSkybox then return end
+				hook.Add("PostDrawTranslucentRenderables", pulseHook, function(bDrawingDepth, isSkybox)
+					if bDrawingDepth or isSkybox then return end
 
 					if not pulseData then
 						hook.Remove("PostDrawTranslucentRenderables", pulseHook)
@@ -1017,8 +1017,8 @@ if CLIENT then
 					}
 
 					local beamHook = "Arcana_Blackhole_RadialBeams_" .. tostring(caster)
-					hook.Add("PostDrawTranslucentRenderables", beamHook, function(_, isSkybox)
-						if isSkybox then return end
+					hook.Add("PostDrawTranslucentRenderables", beamHook, function(bDrawingDepth, isSkybox)
+						if bDrawingDepth or isSkybox then return end
 
 						if not beamData then
 							hook.Remove("PostDrawTranslucentRenderables", beamHook)
@@ -1063,8 +1063,8 @@ if CLIENT then
 				}
 
 				local shockwaveHook = "Arcana_Blackhole_Shockwave_" .. tostring(caster)
-				hook.Add("PostDrawTranslucentRenderables", shockwaveHook, function(_, isSkybox)
-					if isSkybox then return end
+				hook.Add("PostDrawTranslucentRenderables", shockwaveHook, function(bDrawingDepth, isSkybox)
+					if bDrawingDepth or isSkybox then return end
 
 					if not shockwaveData then
 						hook.Remove("PostDrawTranslucentRenderables", shockwaveHook)

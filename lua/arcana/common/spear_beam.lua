@@ -91,8 +91,8 @@ if CLIENT then
 	local matFlare = Material("effects/blueflare1")
 	local spearBeams = spearBeams or {}
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderSpearBeams", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderSpearBeams", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 		if not spearBeams or #spearBeams == 0 then return end
 
 		local curTime = CurTime()

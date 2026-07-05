@@ -2,11 +2,13 @@
 
 // Constants0: x = blur direction X (1 or 0), y = blur direction Y (0 or 1), z = radius scale (texels)
 // Constants1: x = bloom intensity multiplier, y = chromatic aberration strength (0 = off)
+// Constants2: x = snapshot-diff mode (1 = output max($basetexture - $texture1, 0))
 #define DIR_X       Constants0.x
 #define DIR_Y       Constants0.y
 #define RADIUS      Constants0.z
 #define INTENSITY   Constants1.x
 #define CA_STRENGTH Constants1.y
+#define DIFF_MODE   Constants2.x
 
 struct PS_IN { float2 uv : TEXCOORD0; };
 
@@ -26,6 +28,17 @@ static const float W[5] = {
 
 float4 main(PS_IN i) : COLOR
 {
+	// Snapshot-diff mode: isolate the circles' visible screen contribution as
+	// max(after - before, 0).  Both snapshots are sampled by this same draw,
+	// so HDR tonemap scaling and blend state apply to both terms identically
+	// and cancel out exactly (a blend-op subtract cannot guarantee that).
+	if (DIFF_MODE > 0.5)
+	{
+		float3 diff = tex2D(TexBase, i.uv).rgb - tex2D(Tex1, i.uv).rgb;
+
+		return float4(max(diff, float3(0.0, 0.0, 0.0)), 1.0);
+	}
+
 	// TexBaseSize = (1/srcWidth, 1/srcHeight), provided by screenspace_general via common.hlsl c4
 	float2 step = float2(DIR_X, DIR_Y) * TexBaseSize * max(1.0, RADIUS);
 

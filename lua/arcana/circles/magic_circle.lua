@@ -422,8 +422,11 @@ hook.Add("Think", "MagicCircleManager_Update", function()
 	MagicCircleManager:Update()
 end)
 
-hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_, isSkybox)
-	if isSkybox then return end
+hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(bDrawingDepth, isSkybox)
+	-- Never draw during the depth pass: the scene is re-rendered into the
+	-- depth buffer and anything drawn here would write RGB garbage into it
+	-- (including our own bloom composite, which then breaks its own occlusion)
+	if bDrawingDepth or isSkybox then return end
 	local circles = MagicCircleManager.circles
 	local n = #circles
 	if n == 0 then return end
@@ -440,16 +443,15 @@ hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_
 
 	local bloom = Arcana.Bloom
 
+	-- ProcessBloom draws the circles to the screen (real z-buffer occlusion)
+	-- and captures their visible contribution for the blur passes.
 	if anyBloom then
 		bloom.ProcessBloom(function()
 			MagicCircleManager:Draw()
 		end)
-	end
-
-	MagicCircleManager:Draw()
-
-	if anyBloom then
 		bloom.RenderBloom()
+	else
+		MagicCircleManager:Draw()
 	end
 end)
 

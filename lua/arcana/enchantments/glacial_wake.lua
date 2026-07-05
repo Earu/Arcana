@@ -245,7 +245,8 @@ if CLIENT then
 		end
 	end
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_GlacialWake_Render", function()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_GlacialWake_Render", function(bDrawingDepth)
+		if bDrawingDepth then return end
 		local now      = CurTime()
 		local toRemove = {}
 
@@ -300,7 +301,8 @@ if CLIENT then
 	end)
 
 	-- Dynamic light at the impact point: cold white, bright flash that fades quickly
-	hook.Add("PostDrawOpaqueRenderables", "Arcana_GlacialWake_DLight", function()
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_GlacialWake_DLight", function(bDrawingDepth)
+		if bDrawingDepth then return end
 		local now = CurTime()
 		for i, wake in ipairs(activeWakes) do
 			if now >= wake.dieTime then continue end

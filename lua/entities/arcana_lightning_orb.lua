@@ -276,8 +276,8 @@ if CLIENT then
 	end)
 
 	-- Render lightning arcs and explosions
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLightningOrbEffects", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLightningOrbEffects", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 
 		local curTime = CurTime()
 

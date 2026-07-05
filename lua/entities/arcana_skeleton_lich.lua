@@ -682,8 +682,8 @@ if CLIENT then
 		table.insert(Arcana.LichChains, { startPos = sPos, endPos = ePos, dieTime = CurTime() + 0.25, startTime = CurTime() })
 	end)
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLichLightning", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_RenderLichLightning", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 		local now = CurTime()
 
 		-- Flashes
@@ -782,7 +782,8 @@ if CLIENT then
 		if circle.StartEvolving then circle:StartEvolving(castTime, nil) end
 
 		local hookId = "Arcana_LichCircle_" .. lich:EntIndex()
-		hook.Add("PostDrawOpaqueRenderables", hookId, function()
+		hook.Add("PostDrawOpaqueRenderables", hookId, function(bDrawingDepth)
+			if bDrawingDepth then return end
 			if not IsValid(lich) or not circle.IsActive or not circle:IsActive() then
 				hook.Remove("PostDrawOpaqueRenderables", hookId)
 				return

@@ -1093,8 +1093,8 @@ if CLIENT then
 
 	-- ── Rendering ─────────────────────────────────────────────────────────────
 
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_IceOblivionRay_Render", function(_, isSkybox)
-		if isSkybox then return end
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_IceOblivionRay_Render", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
 
 		local curTime = CurTime()
 

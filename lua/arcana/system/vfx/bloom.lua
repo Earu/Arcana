@@ -1,8 +1,15 @@
 -- Arcana Magic Circle Bloom — custom screenspace bloom + glow pipeline.
--- Captures circles to a render target each frame, applies multiple separable
--- Gaussian blur passes (half-res for tight bloom, quarter-res for wide glow),
--- then composites both layers additively inside a cam.Start2D() pass so the
--- viewmodel renders after and naturally occludes the bloom.  No HDR required.
+-- Circles are drawn straight to the screen, where the engine's real z-buffer
+-- occludes them exactly (world, props, viewmodel — no depth-texture tricks).
+-- Their visible contribution is isolated by diffing framebuffer snapshots
+-- (after - before) into a render target, which then feeds multiple separable
+-- Gaussian blur passes (half-res tight bloom, quarter-res wide glow) that are
+-- composited back with a screen blend.  No HDR required.
+--
+-- NOTE: the engine's SSAO depth pass (_rt_ResolvedFullFrameDepth) was tried
+-- and abandoned for this: it randomly contains scene colors for entities
+-- depending on view angle (engine-side, reproduces on Windows), making it
+-- unusable as an occlusion source.
 require("shader_to_gma")
 
 if SERVER then
@@ -16,63 +23,17 @@ local BLOOM_ENABLED = CreateConVar("arcana_bloom", "1", FCVAR_ARCHIVE, "Enable A
 
 local Arcana = Arcana
 
--- ── World-depth occlusion for the bloom capture ───────────────────────────────
--- The capture RT's depth buffer is NOT the scene's depth buffer (RT depth is a
--- separate buffer shared among render targets), so circles rendered into the RT
--- cannot be z-tested against the world.  Instead the engine's SSAO depth pass is
--- enabled while bloom is in use, and arcana_circle_ps30 clips occluded pixels
--- against _rt_ResolvedFullFrameDepth ($texture1, $c2_x toggle).
-local lastBloomFrame = -100 -- last frame ProcessBloom ran (drives NeedsDepthPass)
-local depthPassFrame = -100 -- last frame the engine was told to render the depth pass
-local captureActive = false -- true while inside a ProcessBloom capture
-
--- Pre-create the resolved depth RT as 32-bit float BEFORE the engine lazily
--- creates it 8-bit on the first depth pass: 8 bits over the 4000-unit range is
--- ~15.7 units per step, which wrongly occludes circle pixels near geometry
--- (e.g. the lower half of a circle lying on the ground).  Must run at file
--- load, ahead of any NeedsDepthPass-triggered pass; if the RT somehow already
--- exists this returns it unchanged.
-if system.IsWindows() and render.GetResolvedFullFrameDepth then
-	GetRenderTargetEx(
-		"_rt_resolvedfullframedepth",
-		1, 1, -- ignored with RT_SIZE_FULL_FRAME_BUFFER
-		RT_SIZE_FULL_FRAME_BUFFER,
-		MATERIAL_RT_DEPTH_SHARED,
-		bit.bor(4, 8, 256, 512), -- CLAMPS | CLAMPT | NOMIP | NOLOD
-		0,
-		27 -- IMAGE_FORMAT_R32F
-	)
-end
-
-hook.Add("NeedsDepthPass", "arcana_bloom_depth", function()
-	if not BLOOM_ENABLED:GetBool() then return end
-	if FrameNumber() - lastBloomFrame > 3 then return end
-
-	depthPassFrame = FrameNumber()
-
-	return true
-end)
-
--- Returns the resolved depth texture while a bloom capture is running and the
--- depth pass is fresh; nil otherwise (normal draws keep using the real z-test).
-local function getDepthClipTexture()
-	if not captureActive then return nil end
-	if not render.GetResolvedFullFrameDepth then return nil end
-	if FrameNumber() - depthPassFrame > 1 then return nil end
-
-	return render.GetResolvedFullFrameDepth()
-end
-
+-- ProcessBloom owns drawing the circles to the screen, so the stub must still
+-- run the draw callback or circles vanish before shaders are mounted.
 Arcana.Bloom = Arcana.Bloom or {
-	ProcessBloom = function() end,
+	ProcessBloom = function(drawFunc) drawFunc() end,
 	RenderBloom = function() end,
-	GetDepthClipTexture = getDepthClipTexture,
 }
 
 local function initBloom()
 	local scrW, scrH = ScrW(), ScrH()
 
-	-- Full-res: captures the raw circles each frame.
+	-- Full-res: holds the circles' visible screen contribution each frame.
 	local CIRCLE_RT = GetRenderTarget("arcana_circles_rt", scrW, scrH)
 
 	-- Half-res ping-pong: tight bloom.
@@ -82,6 +43,10 @@ local function initBloom()
 	-- Quarter-res ping-pong: wide glow fog.
 	local GLOW_RT_A = GetRenderTarget("arcana_glow_rt_a", scrW / 4, scrH / 4)
 	local GLOW_RT_B = GetRenderTarget("arcana_glow_rt_b", scrW / 4, scrH / 4)
+
+	-- Full-res: framebuffer snapshots taken before/after the circles are drawn.
+	local SNAPSHOT_PRE = GetRenderTarget("arcana_bloom_snap_pre", scrW, scrH)
+	local SNAPSHOT_POST = GetRenderTarget("arcana_bloom_snap_post", scrW, scrH)
 
 	-- Single material reused for blur passes and the composite passthrough.
 	local blurMat
@@ -121,19 +86,20 @@ local function initBloom()
 		["$pixshader"] = "arcana_bloom_ps30",
 		["$vertexshader"] = "arcana_passthrough_vs30",
 		["$basetexture"] = CIRCLE_RT:GetName(),
+		["$texture1"] = SNAPSHOT_PRE:GetName(),
 		["$alpha_blend"] = 0,
 		["$linearread_basetexture"] = 1,
+		["$linearread_texture1"] = 1, -- must match basetexture so the diff cancels exactly
 		["$linearwrite"] = 1,
 		["$c0_x"] = 1.0,
 		["$c0_y"] = 0.0,
 		["$c0_z"] = 4.0,
 		["$c1_x"] = 1.0,
 		["$c1_y"] = 0.0,
+		["$c2_x"] = 0.0, -- snapshot-diff mode, enabled only for the diff pass
 	})
 
 	-- Full pipeline: blur passes then additive composite with chromatic aberration.
-	-- Called by magic_circle.lua inside cam.Start2D() so the composite is written
-	-- before the viewmodel renders, which then draws on top and occludes the bloom.
 	function renderBloom()
 		if not BLOOM_ENABLED:GetBool() then return end
 
@@ -159,24 +125,46 @@ local function initBloom()
 		render.OverrideBlend(false)
 	end
 
+	-- Capture by screen diff: snapshot the framebuffer, draw the circles to the
+	-- screen (the real z-buffer occludes them exactly), snapshot again, then
+	-- subtract.  CIRCLE_RT ends up holding only the circles' visible
+	-- contribution, already masked by world/prop/viewmodel occlusion.
 	local function processBloom(drawFunc)
-		if not BLOOM_ENABLED:GetBool() then return end
+		if not BLOOM_ENABLED:GetBool() then
+			-- Bloom off: still responsible for putting the circles on screen
+			drawFunc()
 
-		lastBloomFrame = FrameNumber()
-		render.PushRenderTarget(CIRCLE_RT)
-		-- Clear depth too: the RT depth buffer holds garbage from other RT work,
-		-- world occlusion is handled in-shader via GetDepthClipTexture instead.
-		render.Clear(0, 0, 0, 0, true, true)
-		captureActive = true
+			return
+		end
+
+		-- A: screen before the circles
+		render.CopyRenderTargetToTexture(SNAPSHOT_PRE)
+
+		-- Circles drawn to the screen, z-tested against the real scene depth
 		drawFunc()
-		captureActive = false
+
+		-- B: screen after
+		render.CopyRenderTargetToTexture(SNAPSHOT_POST)
+
+		-- CIRCLE_RT = max(B - A, 0) → the circles' contribution only.  Done in
+		-- the bloom shader (diff mode) rather than a subtractive blend op:
+		-- both snapshots are sampled by the same draw, so HDR tonemap scaling
+		-- affects them identically and cancels instead of causing full-screen
+		-- bloom while the eye-adaptation is catching up.
+		render.PushRenderTarget(CIRCLE_RT)
+		render.Clear(0, 0, 0, 0)
+		blurMat:SetTexture("$basetexture", SNAPSHOT_POST)
+		blurMat:SetTexture("$texture1", SNAPSHOT_PRE)
+		blurMat:SetFloat("$c2_x", 1.0)
+		render.SetMaterial(blurMat)
+		render.DrawScreenQuad()
+		blurMat:SetFloat("$c2_x", 0.0)
 		render.PopRenderTarget()
 	end
 
 	Arcana.Bloom = {
 		ProcessBloom = processBloom,
 		RenderBloom = renderBloom,
-		GetDepthClipTexture = getDepthClipTexture,
 	}
 end
 
