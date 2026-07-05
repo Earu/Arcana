@@ -186,7 +186,6 @@ if CLIENT then
 		local size = math.max(80, self:GetRadius() * 1.5)
 		local intensity = 50 -- Higher intensity for more complex circles
 		self._circle = MagicCircle.new(pos, ang, circleColor, intensity, size, 2.5)
-		self._circle.bloomRequiresLOS = true
 		MagicCircleManager:Add(self._circle)
 	end
 

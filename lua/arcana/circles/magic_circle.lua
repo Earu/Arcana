@@ -397,20 +397,11 @@ function MagicCircleManager:Update()
 	end
 end
 
-local losTrace = { mask = MASK_OPAQUE }
-local function circleHasBloomLOS(circle)
-	losTrace.start = EyePos()
-	losTrace.endpos = circle.position
-	local tr = util.TraceLine(losTrace)
-
-	return not tr.Hit
-end
-
-function MagicCircleManager:Draw(forBloomPass)
+function MagicCircleManager:Draw()
 	for _, circle in ipairs(self.circles) do
 		if circle.Draw then
 			local manual = (circle.IsDrawnManually and circle:IsDrawnManually()) or false
-			if not manual and not (forBloomPass and circle.bloomRequiresLOS and not circleHasBloomLOS(circle)) then
+			if not manual then
 				circle:Draw()
 			end
 		end
@@ -441,7 +432,7 @@ hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_
 	for i = 1, n do
 		local c = circles[i]
 		local manual = (c.IsDrawnManually and c:IsDrawnManually()) or false
-		if not manual and not (c.bloomRequiresLOS and not circleHasBloomLOS(c)) then
+		if not manual then
 			anyBloom = true
 			break
 		end
@@ -451,11 +442,11 @@ hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(_
 
 	if anyBloom then
 		bloom.ProcessBloom(function()
-			MagicCircleManager:Draw(true)
+			MagicCircleManager:Draw()
 		end)
 	end
 
-	MagicCircleManager:Draw(false)
+	MagicCircleManager:Draw()
 
 	if anyBloom then
 		bloom.RenderBloom()

@@ -35,4 +35,6 @@ struct VS_OUTPUT
 	float4 projPos      : POSITION;
 	float2 uv           : TEXCOORD0;
 	float4 color        : TEXCOORD1;
+	// linear view-space depth (clip-space w), for manual depth tests in the PS
+	float projW         : TEXCOORD2;
 };

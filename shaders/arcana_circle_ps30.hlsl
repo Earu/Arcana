@@ -2,16 +2,20 @@
 
 // Constants0: x = time for noise animation, y = alpha multiplier (0-1)
 // Constants1: xyz = color tint (0-1)
-#define TIME      Constants0.x
-#define ALPHA_MUL Constants0.y
-#define COLOR_R   Constants1.x
-#define COLOR_G   Constants1.y
-#define COLOR_B   Constants1.z
+// Constants2: x = world-depth clip toggle (1 = clip against $texture1 depth)
+#define TIME       Constants0.x
+#define ALPHA_MUL  Constants0.y
+#define COLOR_R    Constants1.x
+#define COLOR_G    Constants1.y
+#define COLOR_B    Constants1.z
+#define DEPTH_CLIP Constants2.x
 
 struct PS_IN
 {
 	float2 uv        : TEXCOORD0;
 	float4 color     : TEXCOORD1;
+	float  projW     : TEXCOORD2;
+	float2 vpos      : VPOS;
 };
 
 // Simple 2D noise function
@@ -57,6 +61,23 @@ float fbm(float2 p)
 
 float4 main(PS_IN i) : COLOR
 {
+	// Manual world-depth test for the bloom capture pass: the render target's
+	// own depth buffer holds no scene depth, so occlusion is done here against
+	// the engine's resolved depth ($texture1 = _rt_ResolvedFullFrameDepth,
+	// which stores linear view depth / 4000, see Shaders/DepthWrite).
+	if (DEPTH_CLIP > 0.5)
+	{
+		float2 screenUV = (i.vpos + 0.5) * Tex1Size;
+		float rawDepth = tex2D(Tex1, screenUV).r;
+
+		// ~0 means nothing wrote depth there (e.g. sky) -> treat as far away
+		if (rawDepth > 0.0001)
+		{
+			// Small bias so circles flush against geometry don't self-clip
+			clip(rawDepth * 4000.0 - i.projW + 2.0);
+		}
+	}
+
 	// Calculate pixel size for neighbor sampling
 	float2 pixelSize = TexBaseSize;
 
