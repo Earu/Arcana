@@ -23,6 +23,9 @@ function ENT:UpdateTransmitState()
 end
 
 if SERVER then
+	resource.AddShader("arcana_corruption_ps30")
+	resource.AddShader("arcana_blit_ps30")
+
 	function ENT:Initialize()
 		self:SetModel("models/props_borealis/bluebarrel001.mdl")
 		self:SetMoveType(MOVETYPE_NONE)
@@ -403,13 +406,13 @@ if CLIENT then
 	end
 
 	local VECTOR_ZERO = Vector(0, 0, 0)
-	function ENT:_DrawSphere(on_draw)
+	function ENT:_DrawSphere(on_draw, radiusScale)
 		if not IsValid(self) then return end
 
 		local world_pos = self:GetPos()
 		local player_pos = LocalPlayer():GetPos()
 		local distance = player_pos:Distance(world_pos)
-		local radius = math.max(1, self:GetRadius() or 500)
+		local radius = math.max(1, self:GetRadius() or 500) * (radiusScale or 1)
 
 		-- Remap intensity k in [0.5..2.0] -> s in [0..1], ensure visibility <0.9
 		local k = math.Clamp(self:GetIntensity() or 1, 0, 2)
@@ -451,6 +454,195 @@ if CLIENT then
 	local SHADER_MAT = Material("effects/water_warp01")
 	local CVAR_DRAW_CORRUPTION = CreateConVar("arcana_draw_corruption", "1", FCVAR_ARCHIVE, "Draw the corruption effect")
 
+	-- Custom corruption shader: analytic sphere with noise-eaten flame edges
+	-- and dark relief veins (see shaders/arcana_corruption_ps30.hlsl).  The
+	-- stencil sphere is expanded so the flame licks have room outside the
+	-- radius; the visual boundary itself is computed in the shader.
+	local STENCIL_EXPAND = 1.4
+	local corruptionMat, blitMat, maskBlurMat
+
+	-- Screen-space mask of "world geometry inside the sphere": its blurred
+	-- edge is exactly the sphere/world intersection curve, which the shader
+	-- uses to draw flames along terrain, cliffs and buildings.
+	local CORR_SNAP_RT = GetRenderTarget("arcana_corr_snap", ScrW(), ScrH())
+	local CORR_MASK_RT = GetRenderTarget("arcana_corr_mask", ScrW(), ScrH())
+	local CORR_MBLUR_A = GetRenderTarget("arcana_corr_mblur_a", ScrW() / 2, ScrH() / 2)
+	local CORR_MBLUR_B = GetRenderTarget("arcana_corr_mblur_b", ScrW() / 2, ScrH() / 2)
+
+	WaitForShaderMounted({"arcana_corruption_ps30", "arcana_blit_ps30", "arcana_bloom_ps30", "arcana_passthrough_vs30"}, function(available)
+		if not available then return end
+
+		corruptionMat = CreateShaderMaterial("arcana_corruption_fx", {
+			["$pixshader"] = "arcana_corruption_ps30",
+			["$vertexshader"] = "arcana_passthrough_vs30",
+			["$basetexture"] = "_rt_FullFrameFB",
+			["$texture1"] = CORR_MBLUR_B:GetName(), -- blurred intersection mask
+			["$alpha_blend"] = 0,
+			-- every constant component set at runtime MUST be declared here,
+			-- otherwise SetFloat on it is silently ignored
+			["$c0_x"] = 0.0, ["$c0_y"] = 0.0, ["$c0_z"] = 0.0, ["$c0_w"] = 1.0, -- sphere centre, radius
+			["$c1_x"] = 0.0, ["$c1_y"] = 0.0, ["$c1_z"] = 0.0, ["$c1_w"] = 0.0, -- eye pos, time
+			["$c2_x"] = 1.0, ["$c2_y"] = 0.0, ["$c2_z"] = 0.0, ["$c2_w"] = 0.0, -- camera forward, strength
+			["$c3_x"] = 0.0, ["$c3_y"] = 1.0, ["$c3_z"] = 0.0, ["$c3_w"] = 1.0, -- camera right * tan(fov/2), vertical scale
+		})
+
+		-- Raw tinted blit: restores the screen snapshot without the tonemap
+		-- scaling UnlitGeneric would apply; the tint rasterises mask channels
+		blitMat = CreateShaderMaterial("arcana_corruption_blit", {
+			["$pixshader"] = "arcana_blit_ps30",
+			["$vertexshader"] = "arcana_passthrough_vs30",
+			["$basetexture"] = CORR_SNAP_RT:GetName(),
+			["$alpha_blend"] = 0,
+			["$c0_x"] = 1.0, ["$c0_y"] = 1.0, ["$c0_z"] = 1.0, ["$c0_w"] = 1.0, -- tint
+		})
+
+		-- Separable gaussian for softening the mask (reuses the bloom shader)
+		maskBlurMat = CreateShaderMaterial("arcana_corruption_maskblur", {
+			["$pixshader"] = "arcana_bloom_ps30",
+			["$vertexshader"] = "arcana_passthrough_vs30",
+			["$basetexture"] = CORR_MASK_RT:GetName(),
+			["$alpha_blend"] = 0,
+			["$c0_x"] = 1.0, ["$c0_y"] = 0.0, ["$c0_z"] = 3.0, -- blur dir + radius
+			["$c1_x"] = 1.0, ["$c1_y"] = 0.0, -- intensity, CA off
+			["$c2_x"] = 0.0, ["$c2_y"] = 0.0, ["$c2_z"] = 1.0, -- diff mode off
+		})
+	end)
+
+	local function maskBlurPass(srcRT, dstRT, dirX, dirY, radius)
+		render.PushRenderTarget(dstRT)
+		render.Clear(0, 0, 0, 0)
+		maskBlurMat:SetTexture("$basetexture", srcRT)
+		maskBlurMat:SetFloat("$c0_x", dirX)
+		maskBlurMat:SetFloat("$c0_y", dirY)
+		maskBlurMat:SetFloat("$c0_z", radius)
+		render.SetMaterial(maskBlurMat)
+		render.DrawScreenQuad()
+		render.PopRenderTarget()
+	end
+
+	local function setBlitTint(r, g, bl, a)
+		blitMat:SetFloat("$c0_x", r)
+		blitMat:SetFloat("$c0_y", g)
+		blitMat:SetFloat("$c0_z", bl)
+		blitMat:SetFloat("$c0_w", a)
+	end
+
+	-- Rasterises the intersection mask on the real framebuffer (stencils need
+	-- the scene depth buffer, which render targets do not have).  Two stencil
+	-- bit-planes:
+	--   bit 1: world surface inside the TRUE sphere (front surface in front
+	--          of it, back surface behind it) -> mask RED channel
+	--   bit 2: the EXPANDED sphere's front surface is visible at this pixel
+	--          (not hidden behind foreground world) -> mask GREEN channel.
+	--          Expanded, so the flame shell beyond the silhouette is counted
+	--          as visible instead of being capped at the sphere's edge.
+	-- The screen is snapshotted and restored around the rasterisation.
+	local function buildIntersectionMask(self, radius, eyeInside)
+		render.CopyRenderTargetToTexture(CORR_SNAP_RT)
+
+		render.SetStencilEnable(true)
+		render.SetStencilTestMask(255)
+		render.ClearStencil()
+		render.SetStencilFailOperation(STENCIL_KEEP)
+		render.SetMaterial(INVISIBLE_MAT)
+
+		local matrix = Matrix()
+		matrix:SetTranslation(self:GetPos())
+
+		-- Common op state: mark on z-pass, keep on z-fail
+		render.SetStencilCompareFunction(STENCIL_ALWAYS)
+		render.SetStencilPassOperation(STENCIL_REPLACE)
+		render.SetStencilZFailOperation(STENCIL_KEEP)
+
+		local trueScale = Vector(radius, radius, radius)
+		local expandedScale = trueScale * STENCIL_EXPAND
+
+		-- GREEN source (bit 2): "the effect at this pixel is not hidden
+		-- behind foreground world".  Fully inside the volume there is no
+		-- suppression at all (fullscreen quad below); everywhere else,
+		-- visible = world beyond the expanded volume (expanded BACK faces
+		-- z-pass) OR behind the true front surface (folded into the
+		-- true-front draw further down).  One formulation for all outside
+		-- distances.
+		if not eyeInside then
+			matrix:SetScale(expandedScale)
+			render.SetStencilWriteMask(2)
+			render.SetStencilReferenceValue(2)
+			cam.PushModelMatrix(matrix)
+			render.DrawSphere(VECTOR_ZERO, -1, 24, 24)
+			cam.PopModelMatrix()
+		end
+
+		-- RED source (bit 1): world surface inside the TRUE sphere
+		matrix:SetScale(trueScale)
+		cam.PushModelMatrix(matrix)
+
+		if eyeInside then
+			-- Front surface is behind the eye: a pixel is inside the volume
+			-- iff its geometry is closer than the back surface (z-fail)
+			render.SetStencilWriteMask(1)
+			render.SetStencilReferenceValue(1)
+			render.SetStencilPassOperation(STENCIL_KEEP)
+			render.SetStencilZFailOperation(STENCIL_REPLACE)
+			render.DrawSphere(VECTOR_ZERO, -1, 24, 24)
+			render.SetStencilPassOperation(STENCIL_REPLACE)
+			render.SetStencilZFailOperation(STENCIL_KEEP)
+		else
+			-- Front faces z-pass -> inside-candidate (bit 1) + "world behind
+			-- the true front surface counts as visible" (bit 2)
+			render.SetStencilWriteMask(3)
+			render.SetStencilReferenceValue(3)
+			render.DrawSphere(VECTOR_ZERO, 1, 24, 24)
+			-- Back faces z-pass -> geometry beyond the sphere, clear bit 1
+			render.SetStencilWriteMask(1)
+			render.SetStencilReferenceValue(0)
+			render.DrawSphere(VECTOR_ZERO, -1, 24, 24)
+		end
+
+		cam.PopModelMatrix()
+
+		-- Rasterise the bit-planes into colour channels (additive)
+		render.Clear(0, 0, 0, 255, false, false)
+		render.SetStencilPassOperation(STENCIL_KEEP)
+		render.SetStencilCompareFunction(STENCIL_EQUAL)
+		blitMat:SetTexture("$basetexture", "vgui/white")
+		render.OverrideBlend(true, BLEND_ONE, BLEND_ONE, BLENDFUNC_ADD)
+
+		-- RED: inside
+		render.SetStencilTestMask(1)
+		render.SetStencilReferenceValue(1)
+		setBlitTint(1, 0, 0, 1)
+		render.SetMaterial(blitMat)
+		render.DrawScreenQuad()
+
+		-- GREEN: effect not hidden by foreground world (fullscreen only when
+		-- fully inside the volume)
+		if eyeInside then
+			render.SetStencilEnable(false)
+		else
+			render.SetStencilTestMask(2)
+			render.SetStencilReferenceValue(2)
+		end
+
+		setBlitTint(0, 1, 0, 1)
+		render.SetMaterial(blitMat)
+		render.DrawScreenQuad()
+
+		render.OverrideBlend(false)
+		render.SetStencilEnable(false)
+		render.CopyRenderTargetToTexture(CORR_MASK_RT)
+
+		-- Restore the screen exactly
+		setBlitTint(1, 1, 1, 1)
+		blitMat:SetTexture("$basetexture", CORR_SNAP_RT)
+		render.SetMaterial(blitMat)
+		render.DrawScreenQuad()
+
+		-- Soft edge for the visibility fade
+		maskBlurPass(CORR_MASK_RT, CORR_MBLUR_A, 1, 0, 3)
+		maskBlurPass(CORR_MBLUR_A, CORR_MBLUR_B, 0, 1, 3)
+	end
+
 	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
 	local render_SetMaterial = _G.render.SetMaterial
 	local render_DrawScreenQuad = _G.render.DrawScreenQuad
@@ -459,14 +651,79 @@ if CLIENT then
 	local mat_SetInt = FindMetaTable("IMaterial").SetInt
 	local math_Clamp = _G.math.Clamp
 	local math_max = _G.math.max
+	-- Intensity k in [0.5..2] -> effect strength s in [0..1]
+	local function effectStrength(self)
+		local k = math_Clamp(self:GetIntensity() or 1, 0, 2)
+		local s0 = math_Clamp((k - 0.5) / 1.5, 0, 1)
+		local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
+
+		return math_Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
+	end
+
 	function ENT:_DrawCorruption()
 		if not CVAR_DRAW_CORRUPTION:GetBool() then return end
 
+		if corruptionMat then
+			-- Custom shader path: one pass does the grading, refraction and the
+			-- noise-eaten flame boundary.  The expanded stencil only culls and
+			-- provides world occlusion.
+			local radius = math_max(1, self:GetRadius() or 500)
+			local eyeInside = EyePos():Distance(self:GetPos()) < radius
+			buildIntersectionMask(self, radius, eyeInside)
+
+			self:_DrawSphere(function()
+				-- Raw intensity: the shader computes the grading strength and
+				-- the flame ramp (invisible < 1.25, fully black at 2) from it
+				local k = math_Clamp(self:GetIntensity() or 1, 0, 2)
+				local vs = render.GetViewSetup(true)
+				local origin, ang = vs.origin, vs.angles
+				local fwd = ang:Forward()
+				local right = ang:Right()
+				local up = ang:Up()
+
+				-- Calibrate the shader's ray reconstruction against the real
+				-- projection via ToScreen probes: for a point at fwd + right,
+				-- the ray model gives ndcX = 1 / halfW (and likewise up/halfH),
+				-- so measuring where the engine actually projects it yields
+				-- exact half-tangents — immune to fov/aspect conventions.
+				local probeR = (origin + (fwd + right) * 512):ToScreen()
+				local probeU = (origin + (fwd + up) * 512):ToScreen()
+				local ndcR = (probeR.x / ScrW()) * 2 - 1
+				local ndcU = 1 - (probeU.y / ScrH()) * 2
+				local halfW = 1 / math.max(0.05, ndcR)
+				local halfH = 1 / math.max(0.05, ndcU)
+				local pos = self:GetPos()
+
+				render_UpdateScreenEffectTexture()
+				corruptionMat:SetTexture("$basetexture", render.GetScreenEffectTexture())
+				corruptionMat:SetFloat("$c0_x", pos.x)
+				corruptionMat:SetFloat("$c0_y", pos.y)
+				corruptionMat:SetFloat("$c0_z", pos.z)
+				corruptionMat:SetFloat("$c0_w", radius)
+				corruptionMat:SetFloat("$c1_x", origin.x)
+				corruptionMat:SetFloat("$c1_y", origin.y)
+				corruptionMat:SetFloat("$c1_z", origin.z)
+				-- wrapped: unbounded CurTime degrades the noise hash precision
+				corruptionMat:SetFloat("$c1_w", math.fmod(CurTime(), 1000))
+				corruptionMat:SetFloat("$c2_x", fwd.x)
+				corruptionMat:SetFloat("$c2_y", fwd.y)
+				corruptionMat:SetFloat("$c2_z", fwd.z)
+				corruptionMat:SetFloat("$c2_w", k)
+				corruptionMat:SetFloat("$c3_x", right.x * halfW)
+				corruptionMat:SetFloat("$c3_y", right.y * halfW)
+				corruptionMat:SetFloat("$c3_z", right.z * halfW)
+				corruptionMat:SetFloat("$c3_w", halfH)
+				render_SetMaterial(corruptionMat)
+				render_DrawScreenQuad(true)
+			end, STENCIL_EXPAND)
+
+			return
+		end
+
+		-- Legacy fallback (no custom shaders, e.g. non-Windows): hard sphere
+		-- silhouette with color modify + water warp
 		self:_DrawSphere(function()
-			local k = math_Clamp(self:GetIntensity() or 1, 0, 2)
-			local s0 = math_Clamp((k - 0.5) / 1.5, 0, 1)
-			local sSmooth = (s0 * s0) * (3 - 2 * s0) -- smoothstep(0..1)
-			local s = math_Clamp(0.5 * (s0 + sSmooth) + 0.08, 0, 1)
+			local s = effectStrength(self)
 
 			-- Compute post-process values from s: moderate contrast, clear desaturation, slight darken
 			local cm = {
@@ -525,6 +782,8 @@ if CLIENT then
 		return true
 	end
 
+	-- The world-intersection flames make the boundary readable from inside,
+	-- so no interior wall sphere is drawn anymore.
 	function ENT:DrawTranslucent()
 	end
 
