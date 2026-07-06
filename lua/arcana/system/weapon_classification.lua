@@ -483,6 +483,104 @@ if SERVER then
 		end
 	end
 
+	-- A weapon can only produce a shot right now if its fire cooldown elapsed and,
+	-- when it consumes ammo, it has some left. Used to gate out dry fires.
+	local function canWeaponFireNow(wep, usesAmmo)
+		return wep:GetNextPrimaryFire() <= CurTime() and (not usesAmmo or wep:HasAmmo())
+	end
+
+	-- Persistent PrimaryAttack wrapper for HITSCAN weapons confirmed to fire no
+	-- actual bullets (usesBullets == false, e.g. weapon_hl1_gauss). Synthesizes an
+	-- Arcana_ShotFired event per shot: builds a Bullet-like data table (see
+	-- https://wiki.facepunch.com/gmod/Structures/Bullet), fires a trace from the
+	-- owner's shoot position and invokes data.Callback with it, mirroring what the
+	-- engine does for real FireBullets calls. Bullet-based weapons get the same
+	-- event from the EntityFireBullets relay below instead.
+	local SHOT_TRACE_DISTANCE = 56756 -- FireBullets default Distance
+	local function installShotEventEmitter(wep)
+		if not IsValid(wep) then return end
+		if wep._ArcanaShotEmitter then return end
+		if not isfunction(wep.PrimaryAttack) then return end -- engine weapons cannot be wrapped
+
+		wep._ArcanaShotEmitter = true
+		local usesAmmo = Arcana.WeaponClassification.UsesAmmo(wep)
+		local originalPrimaryAttack = wep.PrimaryAttack
+		wep.PrimaryAttack = function(self, ...)
+			local owner = self:GetOwner()
+			local canFire = canWeaponFireNow(self, usesAmmo) and IsValid(owner) and owner:IsPlayer()
+
+			-- Capture the muzzle state before the attack runs; the original
+			-- consumes ammo and sets the next fire time.
+			local src, dir
+			if canFire then
+				src = owner:GetShootPos()
+				dir = owner:GetAimVector()
+			end
+
+			local ret = originalPrimaryAttack(self, ...)
+			if not canFire then return ret end
+
+			local data = {
+				Attacker = owner,
+				Damage = 0,
+				Force = 1,
+				Distance = SHOT_TRACE_DISTANCE,
+				HullSize = 0,
+				Num = 1,
+				Tracer = 1,
+				AmmoType = game.GetAmmoName(self:GetPrimaryAmmoType() or -1) or "",
+				Dir = dir,
+				Spread = Vector(0, 0, 0),
+				Src = src,
+				IgnoreEntity = owner,
+				ArcanaSynthesized = true, -- distinguishes this from real engine bullets
+			}
+
+			-- Handlers may set/wrap data.Callback or adjust Dir/Src, like they
+			-- would in an EntityFireBullets hook
+			Arcana.RunHook("ShotFired", owner, self, data)
+
+			local tr = util.TraceLine({
+				start = data.Src,
+				endpos = data.Src + data.Dir * (data.Distance or SHOT_TRACE_DISTANCE),
+				filter = {owner, self},
+				mask = MASK_SHOT,
+			})
+
+			if isfunction(data.Callback) then
+				local dmgInfo = DamageInfo()
+				dmgInfo:SetAttacker(owner)
+				dmgInfo:SetInflictor(self)
+				dmgInfo:SetDamage(data.Damage or 0)
+				dmgInfo:SetDamageType(DMG_BULLET)
+
+				local ok, err = pcall(data.Callback, owner, tr, dmgInfo)
+				if not ok then
+					ErrorNoHalt("Arcana synthesized shot callback error: " .. tostring(err) .. "\n")
+				end
+			end
+
+			return ret
+		end
+	end
+
+	-- Relays engine bullet fire into the Arcana_ShotFired event so bullet-based
+	-- and no-bullet weapons (see installShotEventEmitter) share a single event.
+	hook.Add("EntityFireBullets", "Arcana_ShotFiredRelay", function(ent, data)
+		local owner, wep
+		if ent:IsPlayer() then
+			owner, wep = ent, ent:GetActiveWeapon()
+		elseif ent:IsWeapon() then
+			owner, wep = ent:GetOwner(), ent
+		else
+			return
+		end
+
+		if not IsValid(wep) or not IsValid(owner) or not owner:IsPlayer() then return end
+		Arcana.RunHook("ShotFired", owner, wep, data)
+		-- do not return anything here, returning false would block the bullets
+	end)
+
 	-- Some HITSCAN-classified weapons never call FireBullets (e.g. weapon_hl1_gauss
 	-- deals damage via traces). When static analysis could not tell (usesBullets is
 	-- nil), we listen for an EntityFireBullets event attributable to the weapon
@@ -496,8 +594,7 @@ if SERVER then
 		local originalPrimaryAttack = wep.PrimaryAttack
 		wep.PrimaryAttack = function(self, ...)
 			-- Dry fires cannot prove anything: only arm detection when the weapon can shoot
-			local canFire = self:GetNextPrimaryFire() <= CurTime() and (not usesAmmo or self:HasAmmo())
-			if canFire then
+			if canWeaponFireNow(self, usesAmmo) then
 				local hookId = "Arcana_RuntimeBulletCapture_" .. weaponClass
 				local detected = false
 				hook.Add("EntityFireBullets", hookId, function(ent)
@@ -527,7 +624,11 @@ if SERVER then
 					end
 
 					if IsValid(self) then
+						-- Restore before wrapping so the emitter wraps the true original
 						self.PrimaryAttack = originalPrimaryAttack
+						if entry and entry.usesBullets == false then
+							installShotEventEmitter(self)
+						end
 					end
 				end)
 			end
@@ -618,10 +719,14 @@ if SERVER then
 				installRuntimeProjectileCapture(wep, className)
 			end
 
-			-- usesBullets still undetermined (false means the runtime capture already
-			-- concluded the weapon fires no bullets): try to determine it at runtime.
-			if cached.type == "HITSCAN" and cached.usesBullets == nil then
-				installRuntimeBulletCapture(wep, className)
+			if cached.type == "HITSCAN" then
+				if cached.usesBullets == nil then
+					-- usesBullets still undetermined: try to determine it at runtime.
+					installRuntimeBulletCapture(wep, className)
+				elseif cached.usesBullets == false then
+					-- Confirmed no-bullet weapon: synthesize Arcana_ShotFired events.
+					installShotEventEmitter(wep)
+				end
 			end
 			return
 		end

@@ -1,16 +1,15 @@
-local function attachHook(ply, wep, state)
-	if not IsValid(ply) or not IsValid(wep) then return end
-
-	state._hookId = string.format("Arcana_Ench_BlazingSalvo_%d_%d", wep:EntIndex(), ply:EntIndex())
-	hook.Add("EntityFireBullets", state._hookId, function(ent, data)
-		if not IsValid(ent) or not ent:IsPlayer() then return end
-
-		local active = ent:GetActiveWeapon()
-		if not IsValid(active) or active ~= wep then return end
-
-		ply = wep:GetOwner() -- refresh player based on wep ownership
-		if not IsValid(ply) then return end
-
+Arcana:RegisterEnchantment({
+	id = "blazing_salvo",
+	name = "Blazing Salvo",
+	description = "Fires a fireball every second while shooting this weapon.",
+	cost_coins = 1000,
+	cost_items = {
+		{ name = "mana_crystal_shard", amount = 30 },
+	},
+	can_apply = function(ply, wep)
+		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
+	end,
+	on_shot_fired = function(ply, wep, data, state)
 		-- rate limit using state
 		local now = CurTime()
 		state._next = state._next or 0
@@ -31,28 +30,7 @@ local function attachHook(ply, wep, state)
 				{ radius = 13, height = 3, spin = { p = 60 * 50, y = -45 * 50, r = 0 }, lineWidth = 2 },
 			})
 		end
-	end)
-end
-
-local function detachHook(ply, wep, state)
-	if not state or not state._hookId then return end
-	hook.Remove("EntityFireBullets", state._hookId)
-	state._hookId = nil
-end
-
-Arcana:RegisterEnchantment({
-	id = "blazing_salvo",
-	name = "Blazing Salvo",
-	description = "Fires a fireball every second while shooting this weapon.",
-	cost_coins = 1000,
-	cost_items = {
-		{ name = "mana_crystal_shard", amount = 30 },
-	},
-	can_apply = function(ply, wep)
-		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
-	apply = attachHook,
-	remove = detachHook,
 })
 
 

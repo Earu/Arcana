@@ -45,16 +45,19 @@ local function applyFrostbite(attacker, target, hitPos)
 	sound.Play("physics/glass/glass_impact_bullet1.wav", impact, 70, 130)
 end
 
-local function attachHook(ply, wep, state)
-	if not IsValid(ply) or not IsValid(wep) then return end
-
-	state._hookId = string.format("Arcana_Ench_FrostbiteRounds_%d_%d", wep:EntIndex(), ply:EntIndex())
-	hook.Add("EntityFireBullets", state._hookId, function(ent, data)
-		if not IsValid(ent) or not ent:IsPlayer() then return end
-
-		local active = ent:GetActiveWeapon()
-		if not IsValid(active) or active ~= wep then return end
-
+Arcana:RegisterEnchantment({
+	id = "frostbite_rounds",
+	name = "Frostbite Rounds",
+	description = "Bullets freeze the struck target with chilling slow and cold VFX.",
+	cost_coins = 1000,
+	cost_items = {
+		{ name = "mana_crystal_shard", amount = 50 },
+	},
+	can_apply = function(ply, wep)
+		-- Ranged hitscan firearms, with or without real bullets
+		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
+	end,
+	on_shot_fired = function(ply, wep, data, state)
 		local existingCallback = data.Callback
 		data.Callback = function(attacker, tr, dmginfo)
 			if isfunction(existingCallback) then
@@ -71,29 +74,7 @@ local function attachHook(ply, wep, state)
 
 			applyFrostbite(attacker, hitEnt, tr.HitPos)
 		end
-	end)
-end
-
-local function detachHook(ply, wep, state)
-	if not state or not state._hookId then return end
-	hook.Remove("EntityFireBullets", state._hookId)
-	state._hookId = nil
-end
-
-Arcana:RegisterEnchantment({
-	id = "frostbite_rounds",
-	name = "Frostbite Rounds",
-	description = "Bullets freeze the struck target with chilling slow and cold VFX.",
-	cost_coins = 1000,
-	cost_items = {
-		{ name = "mana_crystal_shard", amount = 50 },
-	},
-	can_apply = function(ply, wep)
-		-- Only firearms that can shoot bullets
-		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
-	apply = attachHook,
-	remove = detachHook,
 })
 
 
