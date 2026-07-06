@@ -9,7 +9,6 @@ local render_SetMaterial = _G.render.SetMaterial
 local render_SetColorModulation = _G.render.SetColorModulation
 local render_SetBlend = _G.render.SetBlend
 local render_SetLightingMode = _G.render.SetLightingMode
-local render_OverrideDepthEnable = _G.render.OverrideDepthEnable
 local CreateMaterial = _G.CreateMaterial
 local cam_Start3D2D = _G.cam.Start3D2D
 local cam_End3D2D = _G.cam.End3D2D
@@ -65,9 +64,10 @@ local function CreateCircleMaterial(name, textureName)
 		baseTexture = loadedTextures[textureName]
 	end
 
+	local isBand = textureName:match("band") ~= nil
+
 	if not SHADER_AVAILABLE then
-		local isModel = textureName:match("band")
-		return CreateMaterial(name .. "_" .. FrameNumber(), isModel and "VertexLitGeneric" or "UnlitGeneric", {
+		return CreateMaterial(name .. "_" .. FrameNumber(), isBand and "VertexLitGeneric" or "UnlitGeneric", {
 			["$basetexture"] = baseTexture,
 			["$translucent"] = 1,
 			["$vertexalpha"] = 1,
@@ -75,7 +75,7 @@ local function CreateCircleMaterial(name, textureName)
 			["$nolod"]       = 1,
 			["$nocull"]      = 1,
 			["$additive"]    = 0,
-			["$model"]       = isModel and 1 or 0,
+			["$model"]       = isBand and 1 or 0,
 		})
 	end
 
@@ -90,6 +90,16 @@ local function CreateCircleMaterial(name, textureName)
 		["$nocull"]      = 1,
 		["$additive"]    = 0,
 		["$ignorez"]     = 0,
+		-- Band meshes live in the 3D scene: they must z-test against world and
+		-- viewmodel depth but never write their own (translucent VFX). Unlike
+		-- stock shaders, screenspace_general defaults to NO depth test at all,
+		-- so it has to be enabled explicitly. Do NOT replace this with
+		-- render.OverrideDepthEnable(true, true): that forces depth WRITES too,
+		-- which breaks SWEPs that custom-draw their viewmodel after our hooks
+		-- (e.g. TF2 packs) - the gun fails the z-test against the rings' stamped
+		-- depth and the rings show through it.
+		["$depthtest"]   = isBand and 1 or 0,
+		["$writedepth"]  = 0,
 		["$c0_x"]        = 0.0,
 		["$c0_y"]        = 1.0,
 		["$c1_x"]        = 1.0,
@@ -495,9 +505,10 @@ function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)
 	end
 	render_SetBlend((color.a or 255) / 255)
 	render_SetLightingMode(1)
-	render_OverrideDepthEnable(true, true)
+	-- Depth behavior comes from the material itself ($depthtest 1/$writedepth 0
+	-- on the custom shader, standard translucent shadow state on the fallback):
+	-- z-test against the scene, no depth writes. See CreateCircleMaterial.
 	self.bandMesh:Draw()
-	render_OverrideDepthEnable(false, false)
 	render_SetLightingMode(0)
 	render_SetColorModulation(1, 1, 1)
 	render_SetBlend(1)
