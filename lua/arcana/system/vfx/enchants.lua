@@ -537,8 +537,8 @@ local function createBandsForViewModel(wep, count, style)
 	local owner = IsValid(wep) and wep:GetOwner() or LocalPlayer()
 	local col = getPhysgunColorFor(wep)
 	local bc = BandCircle.Create(owner:EyePos(), owner:EyeAngles(), col, 40, 0)
-	if bc and bc.SetDrawnManually then bc:SetDrawnManually(true) end
 	if not bc then return nil end
+	if bc.SetDrawnManually then bc:SetDrawnManually(true) end
 
 	style = style or "axis"
 	local ringCount = math.min(3, count)
@@ -621,6 +621,13 @@ hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, w
 			s.bc:Draw()
 		end)
 		Arcana.Bloom.RenderBloom()
+		-- The bloom passes push/pop render targets, which resets the engine's
+		-- viewmodel depth-range hack (DepthRange 0-0.1). SWEPs that custom-draw
+		-- their viewmodel after the hooks (TF2 packs do this from their own
+		-- SWEP:PostDrawViewModel, which the gamemode calls after us) would then
+		-- z-test against real world depth and clip into the map. Re-apply the
+		-- hack for the remainder of the viewmodel pass.
+		render.DepthRange(0, 0.1)
 	end
 end)
 
