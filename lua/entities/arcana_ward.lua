@@ -71,25 +71,35 @@ if SERVER then
 		self:_RegisterHooks()
 	end
 
+	function ENT:_OnShotFired(data)
+		local center = self:GetPos()
+		local radius = self:GetRadius()
+		local src    = data.Src
+
+		if src:Distance(center) <= radius then return end
+
+		local hitPos = RaySphereIntersect(src, data.Dir, center, radius)
+		if not hitPos then return end
+
+		local dist = (hitPos - src):Length()
+		if data.Distance and dist > data.Distance then return end
+
+		self:_SpawnPlate(hitPos)
+		self:_TriggerFlash()
+	end
+
 	function ENT:_RegisterHooks()
-		local idx     = self:EntIndex()
-		local hookKey = "Arcana_Ward_" .. idx
+		-- Player shots, including hitscan weapons that fire no real bullets
+		hook.Add("Arcana_ShotFired", self, function(_, shooter, wep, data)
+			self:_OnShotFired(data)
+		end)
 
+		-- Non-player bullets (NPCs, turrets, ...); player shots are covered above
 		hook.Add("EntityFireBullets", self, function(_, shooter, data)
-			local center = self:GetPos()
-			local radius = self:GetRadius()
-			local src    = data.Src
+			if IsValid(shooter) and shooter:IsPlayer() then return end
+			if IsValid(shooter) and shooter:IsWeapon() and IsValid(shooter:GetOwner()) and shooter:GetOwner():IsPlayer() then return end
 
-			if src:Distance(center) <= radius then return end
-
-			local hitPos = RaySphereIntersect(src, data.Dir, center, radius)
-			if not hitPos then return end
-
-			local dist = (hitPos - src):Length()
-			if data.Distance and dist > data.Distance then return end
-
-			self:_SpawnPlate(hitPos)
-			self:_TriggerFlash()
+			self:_OnShotFired(data)
 		end)
 
 		hook.Add("EntityTakeDamage", self, function(_, target, dmginfo)

@@ -33,6 +33,10 @@ end
 --   on_projectile_fired(ply, wep, proj, state): optional; called automatically by the system
 --     whenever a player fires a projectile from this enchanted weapon. Ownership is resolved
 --     via Arcana.WeaponClassification.ResolveProjectileOwner — no manual OnEntityCreated hook needed.
+--   on_shot_fired(ply, wep, data, state): optional; called automatically by the system whenever
+--     a player shoots this enchanted HITSCAN weapon, whether it fires real bullets (relayed from
+--     EntityFireBullets) or not (synthesized trace shot, data.ArcanaSynthesized == true). data is
+--     a Bullet structure table; set/wrap data.Callback to react to the shot's impact.
 --   max_stacks (number, default 1): max simultaneous applications
 --   grants_xp (bool, default true): whether a successful apply awards XP via GiveXP.
 --     Set to false for system-applied enchantments (e.g., vault restore) that should not grant XP.
@@ -62,13 +66,14 @@ function Arcana:RegisterEnchantment(def)
 		-- Applicability: return (bool, reason) — reason is a human-readable string on failure, matching can_cast contract
 		can_apply = def.can_apply, -- function(ply, wep) -> (bool, reason?)
 		on_projectile_fired = def.on_projectile_fired, -- function(ply, wep, proj, state)
+		on_shot_fired = def.on_shot_fired, -- function(ply, wep, data, state)
 		-- Apply/remove: attach runtime behavior (e.g., hooks) to the weapon
 		apply = def.apply,   -- function(ply, wep, state)
 		remove = def.remove, -- function(ply, wep, state)
 		-- Optional: maximum stacks or config
 		max_stacks = tonumber(def.max_stacks or 1) or 1,
 		-- Whether a successful apply grants XP (default true); set false for system-applied enchantments
-		grants_xp = (def.grants_xp ~= false),
+		grants_xp = def.grants_xp ~= false,
 	}
 
 	Arcana.RegisteredEnchantments[id] = ench
@@ -226,26 +231,33 @@ if SERVER then
 
 			-- Try the current active weapon first
 			local wep = owner:GetActiveWeapon()
+			local matched = false
 			local enchants = nil
 
 			if IsValid(wep) and Arcana.WeaponClassification.Get(wep) == "PROJECTILE" then
 				local wepData = Arcana.WeaponClassification.GetData(wep:GetClass())
 				if wepData and wepData.projectileClass == entClass then
+					matched = true
 					enchants = wep.ArcanaEnchantments
 					Arcana.WeaponClassification.CachePlayerProjectileWeapon(owner, wep)
 				end
 			end
 
 			-- Fallback: cached previous weapon (covers weapon removal before dispatch)
-			if not enchants then
+			if not matched then
 				local cache = Arcana.WeaponClassification.GetCachedProjectileWeapon(owner)
-				if cache and cache.enchantments then
-					if not cache.projClass or cache.projClass == entClass then
-						enchants = cache.enchantments
-						wep = cache.wep
-					end
+				if cache and (not cache.projClass or cache.projClass == entClass) then
+					matched = true
+					enchants = cache.enchantments
+					wep = cache.wep
 				end
 			end
+
+			if not matched then return end
+
+			-- Public event: fires for any player-attributed projectile, enchanted or not.
+			-- wep can be NULL here when the firing weapon was already removed (e.g. grenades).
+			Arcana.RunHook("ProjectileFired", owner, wep, ent)
 
 			if not enchants then return end
 
@@ -262,5 +274,24 @@ if SERVER then
 				end
 			end
 		end)
+	end)
+
+	-- Global dispatcher for on_shot_fired enchantment callbacks. The Arcana_ShotFired
+	-- event is emitted by weapon_classification.lua for every attributable primary
+	-- shot: relayed from EntityFireBullets for bullet weapons, synthesized from a
+	-- PrimaryAttack wrapper for HITSCAN weapons that fire no bullets.
+	hook.Add("Arcana_ShotFired", "Arcana_ShotFiredDispatch", function(owner, wep, data)
+		local enchants = wep.ArcanaEnchantments
+		if not enchants then return end
+
+		for enchId, state in pairs(enchants) do
+			local ench = (Arcana.RegisteredEnchantments or {})[enchId]
+			if not ench or not isfunction(ench.on_shot_fired) then continue end
+
+			local ok, err = pcall(ench.on_shot_fired, owner, wep, data, state)
+			if not ok then
+				ErrorNoHalt("Enchantment on_shot_fired error [" .. enchId .. "]: " .. tostring(err) .. "\n")
+			end
+		end
 	end)
 end

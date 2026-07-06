@@ -15,42 +15,6 @@ local function fireArcaneSpear(caster, origin, dir)
 	caster:EmitSound("arcana/arcane_1.ogg", 70, 120)
 end
 
-local function attachHook(ply, wep, state)
-	if not IsValid(ply) or not IsValid(wep) then return end
-
-	-- Angle accumulator to place spear origins around the player in a ring
-	state._angle = math.Rand(0, math.pi * 2)
-	state._hookId = string.format("Arcana_Ench_ArcaneRounds_%d_%d", wep:EntIndex(), ply:EntIndex())
-	hook.Add("EntityFireBullets", state._hookId, function(ent, data)
-		if not IsValid(ent) or not ent:IsPlayer() then return end
-
-		local active = ent:GetActiveWeapon()
-		if not IsValid(active) or active ~= wep then return end
-
-		local num = math.max(1, tonumber(data.Num or 1) or 1)
-		local caster = ent
-		local forward = caster:GetAimVector()
-		local right = caster:GetRight()
-		local up = caster:GetUp()
-		local center = caster:WorldSpaceCenter()
-		local ringRadius = 26
-
-		for i = 1, num do
-			state._angle = (state._angle or 0) + math.pi * 0.38 -- ~68.4° step to distribute
-			local ca = math.cos(state._angle)
-			local sa = math.sin(state._angle)
-			local origin = center + right * (ca * ringRadius) + forward * (sa * ringRadius) + up * 8
-			fireArcaneSpear(caster, origin, forward)
-		end
-	end)
-end
-
-local function detachHook(ply, wep, state)
-	if not state or not state._hookId then return end
-	hook.Remove("EntityFireBullets", state._hookId)
-	state._hookId = nil
-end
-
 Arcana:RegisterEnchantment({
 	id = "arcane_rounds",
 	name = "Arcane Rounds",
@@ -62,8 +26,26 @@ Arcana:RegisterEnchantment({
 	can_apply = function(ply, wep)
 		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
-	apply = attachHook,
-	remove = detachHook,
+	on_shot_fired = function(ply, wep, data, state)
+		-- Angle accumulator to place spear origins around the player in a ring
+		state._angle = state._angle or math.Rand(0, math.pi * 2)
+
+		local num = math.max(1, tonumber(data.Num or 1) or 1)
+		local caster = ply
+		local forward = caster:GetAimVector()
+		local right = caster:GetRight()
+		local up = caster:GetUp()
+		local center = caster:WorldSpaceCenter()
+		local ringRadius = 26
+
+		for i = 1, num do
+			state._angle = state._angle + math.pi * 0.38 -- ~68.4° step to distribute
+			local ca = math.cos(state._angle)
+			local sa = math.sin(state._angle)
+			local origin = center + right * (ca * ringRadius) + forward * (sa * ringRadius) + up * 8
+			fireArcaneSpear(caster, origin, forward)
+		end
+	end,
 })
 
 

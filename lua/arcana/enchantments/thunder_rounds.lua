@@ -24,16 +24,19 @@ local function applyLightningDamage(attacker, hitPos)
 	})
 end
 
-local function attachHook(ply, wep, state)
-	if not IsValid(ply) or not IsValid(wep) then return end
-
-	state._hookId = string.format("Arcana_Ench_ThunderRounds_%d_%d", wep:EntIndex(), ply:EntIndex())
-	hook.Add("EntityFireBullets", state._hookId, function(ent, data)
-		if not IsValid(ent) or not ent:IsPlayer() then return end
-
-		local active = ent:GetActiveWeapon()
-		if not IsValid(active) or active ~= wep then return end
-
+Arcana:RegisterEnchantment({
+	id = "thunder_rounds",
+	name = "Thunder Rounds",
+	description = "Each bullet impact calls a lightning AoE, chaining to nearby foes.",
+	cost_coins = 2000,
+	cost_items = {
+		{ name = "mana_crystal_shard", amount = 80 },
+	},
+	can_apply = function(ply, wep)
+		-- Ranged hitscan firearms, with or without real bullets
+		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
+	end,
+	on_shot_fired = function(ply, wep, data, state)
 		-- Wrap any existing bullet callback to inject our lightning AoE on hit
 		local existingCallback = data.Callback
 		data.Callback = function(attacker, tr, dmginfo)
@@ -54,27 +57,5 @@ local function attachHook(ply, wep, state)
 			impactVFX(hitPos, normal)
 			applyLightningDamage(attacker, hitPos, normal)
 		end
-	end)
-end
-
-local function detachHook(ply, wep, state)
-	if not state or not state._hookId then return end
-	hook.Remove("EntityFireBullets", state._hookId)
-	state._hookId = nil
-end
-
-Arcana:RegisterEnchantment({
-	id = "thunder_rounds",
-	name = "Thunder Rounds",
-	description = "Each bullet impact calls a lightning AoE, chaining to nearby foes.",
-	cost_coins = 2000,
-	cost_items = {
-		{ name = "mana_crystal_shard", amount = 80 },
-	},
-	can_apply = function(ply, wep)
-		-- Only firearms that can shoot bullets
-		return Arcana.WeaponClassification.Get(wep) == "HITSCAN"
 	end,
-	apply = attachHook,
-	remove = detachHook,
 })
