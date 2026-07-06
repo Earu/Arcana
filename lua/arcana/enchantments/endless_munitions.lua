@@ -56,12 +56,7 @@ Arcana:RegisterEnchantment({
 	can_apply = function(ply, wep)
 		if not IsValid(wep) then return false end
 		-- Eligible if weapon uses primary ammo or has a finite clip
-		local usesAmmo = (wep.GetPrimaryAmmoType and wep:GetPrimaryAmmoType() or -1) ~= -1
-		local maxClip = wep.GetMaxClip1 and (wep:GetMaxClip1() or -1) or -1
-		if (not maxClip or maxClip <= 0) and wep.Primary and tonumber(wep.Primary.ClipSize) then
-			maxClip = tonumber(wep.Primary.ClipSize) or -1
-		end
-		return usesAmmo or (maxClip and maxClip > 0) and Arcana.WeaponClassification.Get(wep) ~= "MELEE"
+		return Arcana.WeaponClassification.UsesAmmo(wep) and Arcana.WeaponClassification.Get(wep) ~= "MELEE"
 	end,
 	apply = attachInfiniteAmmo,
 	remove = detachInfiniteAmmo,

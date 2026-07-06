@@ -152,6 +152,19 @@ function Arcana.WeaponClassification.IsRifleHoldType(wep)
 	return ht == "ar2" or ht == "shotgun" or ht == "rpg" or ht == "crossbow" or ht == "smg" or ht == "physgun"
 end
 
+--- Returns true when the weapon uses primary ammo or has a finite clip.
+function Arcana.WeaponClassification.UsesAmmo(wep)
+	if not IsValid(wep) then return false end
+
+	local usesAmmo = (wep.GetPrimaryAmmoType and wep:GetPrimaryAmmoType() or -1) ~= -1
+	local maxClip = wep.GetMaxClip1 and (wep:GetMaxClip1() or -1) or -1
+	if (not maxClip or maxClip <= 0) and wep.Primary and tonumber(wep.Primary.ClipSize) then
+		maxClip = tonumber(wep.Primary.ClipSize) or -1
+	end
+
+	return usesAmmo or (maxClip and maxClip > 0) or false
+end
+
 if SERVER then
 	local ENTITY_META = FindMetaTable("Entity")
 	local WEAPON_META = FindMetaTable("Weapon")
@@ -352,15 +365,22 @@ if SERVER then
 	-- FireBullets is checked first; finding it immediately means hitscan, which
 	-- avoids misclassifying weapons that create a shell entity after shooting.
 	-- Only if FireBullets is absent do we check for scripted ents.Create calls.
-	-- Returns: type (string), projectileClass (string or nil), needsCapture (bool)
-	--   needsCapture is true when the weapon is PROJECTILE but the class could not
-	--   be statically resolved (unresolvable variable passed to ents.Create).
+	-- Returns: type (string), projectileClass (string or nil), needsCapture (bool),
+	--   usesBullets (bool or nil)
+	--   needsCapture is true when the classification is incomplete and runtime
+	--   capture is required: PROJECTILE whose class could not be statically resolved
+	--   (unresolvable variable passed to ents.Create), or the catch-all HITSCAN
+	--   result where usesBullets is still undetermined.
+	--   usesBullets is true when the weapon was confirmed to fire actual bullets:
+	--   either FireBullets was found in the source, or PrimaryAttack is not a Lua
+	--   function (engine weapon, which cannot be analyzed nor wrapped). It is nil
+	--   for the catch-all HITSCAN result, where runtime capture resolves it later.
 	local function classifyRangedWeapon(weapon)
 		local primaryAttack = weapon.PrimaryAttack
-		if not isfunction(primaryAttack) then return "HITSCAN", nil, false end
+		if not isfunction(primaryAttack) then return "HITSCAN", nil, false, true end
 
 		if checkForMatch(primaryAttack, weapon, {}, 1, matchFireBullets) then
-			return "HITSCAN", nil, false
+			return "HITSCAN", nil, false, true
 		end
 
 		local projClass = checkForMatch(primaryAttack, weapon, {}, 1, sourceHasScriptedCreate)
@@ -378,7 +398,7 @@ if SERVER then
 			end
 		end
 
-		return "HITSCAN", nil, false
+		return "HITSCAN", nil, true, nil
 	end
 
 	local UNKNOWN_HOLDTYPES = {
@@ -408,6 +428,10 @@ if SERVER then
 			net.WriteString(entry.type or "UNKNOWN")
 			net.WriteString(entry.holdType or "")
 			net.WriteString(entry.projectileClass or "")
+			-- usesBullets is a tri-state: nil = undetermined, false = confirmed no bullets
+			net.WriteBool(entry.usesBullets ~= nil)
+			net.WriteBool(entry.usesBullets == true)
+			net.WriteBool(entry.usesAmmo == true)
 		end
 
 		if IsValid(ply) then
@@ -459,34 +483,108 @@ if SERVER then
 		end
 	end
 
+	-- Some HITSCAN-classified weapons never call FireBullets (e.g. weapon_hl1_gauss
+	-- deals damage via traces). When static analysis could not tell (usesBullets is
+	-- nil), we listen for an EntityFireBullets event attributable to the weapon
+	-- within 2s of PrimaryAttack. Dry fires are gated out, so a shot that actually
+	-- went out also proves the negative: seen -> true, timeout -> false, both final.
+	local function installRuntimeBulletCapture(wep, weaponClass)
+		if not IsValid(wep) then return end
+		if not isfunction(wep.PrimaryAttack) then return end -- engine weapons cannot be wrapped
+
+		local usesAmmo = Arcana.WeaponClassification.UsesAmmo(wep)
+		local originalPrimaryAttack = wep.PrimaryAttack
+		wep.PrimaryAttack = function(self, ...)
+			-- Dry fires cannot prove anything: only arm detection when the weapon can shoot
+			local canFire = self:GetNextPrimaryFire() <= CurTime() and (not usesAmmo or self:HasAmmo())
+			if canFire then
+				local hookId = "Arcana_RuntimeBulletCapture_" .. weaponClass
+				local detected = false
+				hook.Add("EntityFireBullets", hookId, function(ent)
+					if ent ~= self and ent ~= self:GetOwner() then return end
+
+					-- The cache entry may not exist yet (capture can be installed before
+					-- classifyWeapon returns); the timeout below concludes from this flag.
+					detected = true
+
+					local entry = weaponClassificationCache[weaponClass]
+					if entry then
+						entry.usesBullets = true
+						updateWeaponClassificationCache()
+						hook.Remove("EntityFireBullets", hookId)
+						self.PrimaryAttack = originalPrimaryAttack
+					end
+					-- do not return anything here, returning false would block the bullets
+				end)
+
+				timer.Simple(2, function()
+					hook.Remove("EntityFireBullets", hookId)
+
+					local entry = weaponClassificationCache[weaponClass]
+					if entry and entry.usesBullets == nil then
+						entry.usesBullets = detected
+						updateWeaponClassificationCache()
+					end
+
+					if IsValid(self) then
+						self.PrimaryAttack = originalPrimaryAttack
+					end
+				end)
+			end
+
+			return originalPrimaryAttack(self, ...)
+		end
+	end
+
 	local function classifyWeapon(wep)
 		local className = wep:GetClass()
 		local holdType = getHoldType(wep)
+		local usesAmmo = Arcana.WeaponClassification.UsesAmmo(wep)
 
 		local hl2Type = HL2_WEAPON_CLASSIFICATIONS[className]
 		if hl2Type then
-			local entry = { type = hl2Type, holdType = holdType }
+			local entry = { type = hl2Type, holdType = holdType, usesAmmo = usesAmmo }
 			if hl2Type == "PROJECTILE" then
 				entry.projectileClass = HL2_WEAPON_PROJECTILE_CLASSES[className]
+				entry.usesBullets = false
+			elseif hl2Type == "HITSCAN" then
+				entry.usesBullets = true
 			end
 			return entry
 		end
 
 		if MELEE_HOLDTYPES[holdType] then
-			return { type = "MELEE", holdType = holdType }
+			return { type = "MELEE", holdType = holdType, usesAmmo = usesAmmo }
 		elseif UNKNOWN_HOLDTYPES[holdType] then
-			return { type = "UNKNOWN", holdType = holdType }
+			return { type = "UNKNOWN", holdType = holdType, usesAmmo = usesAmmo }
 		else
-			local wepType, projClass, needsCapture = classifyRangedWeapon(wep)
+			local wepType, projClass, needsCapture, usesBullets = classifyRangedWeapon(wep)
 			if wepType == "HITSCAN" and (holdType == "grenade" or className:find("grenade") or className:find("nade")) then
 				wepType = "PROJECTILE"
 			end
 
-			if needsCapture then
-				installRuntimeProjectileCapture(wep, className)
+			-- A PROJECTILE result means FireBullets was absent from the source
+			-- (it is checked first), so usesBullets is a known negative there.
+			-- This also overrides the value carried through a grenade-heuristic flip.
+			if wepType == "PROJECTILE" then
+				usesBullets = false
 			end
 
-			return { type = wepType, holdType = holdType, projectileClass = projClass }
+			if needsCapture then
+				if wepType == "PROJECTILE" then
+					installRuntimeProjectileCapture(wep, className)
+				else
+					installRuntimeBulletCapture(wep, className)
+				end
+			end
+
+			return {
+				type = wepType,
+				holdType = holdType,
+				projectileClass = projClass,
+				usesBullets = usesBullets,
+				usesAmmo = usesAmmo
+			}
 		end
 	end
 
@@ -519,6 +617,12 @@ if SERVER then
 			if cached.type == "PROJECTILE" and not cached.projectileClass then
 				installRuntimeProjectileCapture(wep, className)
 			end
+
+			-- usesBullets still undetermined (false means the runtime capture already
+			-- concluded the weapon fires no bullets): try to determine it at runtime.
+			if cached.type == "HITSCAN" and cached.usesBullets == nil then
+				installRuntimeBulletCapture(wep, className)
+			end
 			return
 		end
 
@@ -536,14 +640,27 @@ if CLIENT then
 	net.Receive("Arcana_UpdateWeaponClassificationCache", function()
 		local count = net.ReadInt(32)
 		for i = 1, count do
-			local className       = net.ReadString()
-			local wepType         = net.ReadString()
-			local holdType        = net.ReadString()
-			local projectileClass = net.ReadString()
+			local className        = net.ReadString()
+			local wepType          = net.ReadString()
+			local holdType         = net.ReadString()
+			local projectileClass  = net.ReadString()
+			local hasUsesBullets   = net.ReadBool()
+			local usesBulletsValue = net.ReadBool()
+			local usesAmmo         = net.ReadBool()
+
+			-- usesBullets is a tri-state:
+			-- nil = undetermined, false = confirmed no bullets, true = fires bullets
+			local usesBullets = nil
+			if hasUsesBullets then
+				usesBullets = usesBulletsValue
+			end
+
 			weaponClassificationCache[className] = {
-				type           = wepType,
-				holdType       = holdType ~= "" and holdType or nil,
+				type            = wepType,
+				holdType        = holdType ~= "" and holdType or nil,
 				projectileClass = projectileClass ~= "" and projectileClass or nil,
+				usesBullets     = usesBullets,
+				usesAmmo        = usesAmmo,
 			}
 		end
 	end)
