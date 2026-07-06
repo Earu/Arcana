@@ -30,20 +30,9 @@ local function attachInfiniteAmmo(ply, wep, state)
 			end
 		end
 
-		-- Resolve max secondary clip size
-		local maxClip2 = -1
-		if active.GetMaxClip2 then
-			maxClip2 = tonumber(active:GetMaxClip2() or -1) or -1
-		end
-		if (not maxClip2 or maxClip2 <= 0) and active.Secondary and tonumber(active.Secondary.ClipSize) then
-			maxClip2 = tonumber(active.Secondary.ClipSize) or -1
-		end
-
-		if maxClip2 and maxClip2 > 0 then
-			local cur2 = tonumber(active:Clip2() or 0) or 0
-			if cur2 < maxClip2 then
-				active:SetClip2(maxClip2)
-			end
+		if active:Ammo1() < 2 then
+			local primaryAmmoType = wep:GetPrimaryAmmoType()
+			ply:SetAmmo(2, primaryAmmoType)
 		end
 	end)
 end
