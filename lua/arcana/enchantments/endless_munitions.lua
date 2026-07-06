@@ -30,7 +30,8 @@ local function attachInfiniteAmmo(ply, wep, state)
 			end
 		end
 
-		if active:Ammo1() < 2 then
+		-- SWEP:Ammo1 is not valid for engine weapons like ar2
+		if isfunction(active.Ammo1) and active:Ammo1() < 2 then
 			local primaryAmmoType = wep:GetPrimaryAmmoType()
 			ply:SetAmmo(2, primaryAmmoType)
 		end
