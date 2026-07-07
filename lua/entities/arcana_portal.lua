@@ -179,11 +179,12 @@ if CLIENT then
 		local MagicCircle = Arcana.Circle.MagicCircle
 		local MagicCircleManager = Arcana.Circle.MagicCircleManager
 		if not MagicCircle or not MagicCircle.new then return end
+
 		if self._circle and self._circle.IsActive and self._circle:IsActive() then return end
 		local pos = self:GetPos() + self:GetUp() * 2
 		local ang = self:GetAngles()
 		ang:RotateAroundAxis(ang:Forward(), 180)
-		local size = math.max(80, self:GetRadius() * 1.5)
+		local size = math.max(25, self:GetRadius() * 1.5)
 		local intensity = 50 -- Higher intensity for more complex circles
 		self._circle = MagicCircle.new(pos, ang, circleColor, intensity, size, 2.5)
 		MagicCircleManager:Add(self._circle)
