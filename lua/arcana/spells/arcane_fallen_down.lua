@@ -1401,7 +1401,7 @@ if CLIENT then
 					table.remove(auraParticles, i)
 				else
 					-- Update position
-					local dt = now - p.startTime
+					--local dt = now - p.startTime
 					p.pos = p.pos + p.velocity * FrameTime()
 					-- Calculate fade
 					local lifetime = p.dieTime - p.startTime
@@ -1564,7 +1564,7 @@ if CLIENT then
 
 			local now = CurTime()
 			local elapsed = now - chargeStartTime
-			local midPhaseStart = CHARGE_TIME / 2 -- 30 seconds
+			--local midPhaseStart = CHARGE_TIME / 2 -- 30 seconds
 			local finalPhaseStart = CHARGE_TIME - 2 -- 58 seconds
 
 			-- Phase 1: Progressive effects from 30s to 58s
@@ -1801,7 +1801,7 @@ if CLIENT then
 	net.Receive("Arcana_FallenDown_BeamTick", function()
 		local targetPos = net.ReadVector()
 		local currentRadius = net.ReadFloat()
-		local progress = net.ReadFloat()
+		--local progress = net.ReadFloat()
 		-- HEAVY DUST and energy particles
 		local emitter = ParticleEmitter(targetPos)
 
@@ -2220,13 +2220,13 @@ if CLIENT then
 	end)
 
 	-- Render the beam from sky
+	local matBeamLightning = Material("effects/laser1")
+	local matSmoke = Material("particle/smokesprites_0001")
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_FallenDown_RenderBeam", function(bDrawingDepth, isSkybox)
 		if bDrawingDepth or isSkybox then return end
 
 		local curTime = CurTime()
 		-- Render and clean up lightning arcs
-		local matBeamLightning = Material("effects/laser1")
-
 		for i = #fallenDownLightningArcs, 1, -1 do
 			local arc = fallenDownLightningArcs[i]
 
@@ -2365,14 +2365,13 @@ if CLIENT then
 			render.DrawSprite(skyPos, currentRadius * 2.5, currentRadius * 2.5, Color(200, 230, 255, 240))
 			render.DrawSprite(skyPos, currentRadius * 1.5, currentRadius * 1.5, Color(255, 255, 255, 220))
 			-- HEAVY DUST CLOUD around the cylinder edge
-			local matSmoke = Material("particle/smokesprites_0001")
 			render.SetMaterial(matSmoke)
 			-- Create dust ring segments around the cylinder
 			local dustSegments = 32
 
 			for seg = 0, dustSegments - 1 do
 				local angle = (seg / dustSegments) * math.pi * 2
-				local nextAngle = ((seg + 1) / dustSegments) * math.pi * 2
+				--local nextAngle = ((seg + 1) / dustSegments) * math.pi * 2
 
 				-- Multiple dust layers at different heights
 				for heightIdx = 0, 8 do
