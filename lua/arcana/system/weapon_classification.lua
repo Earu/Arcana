@@ -642,7 +642,7 @@ if SERVER then
 		local holdType = getHoldType(wep)
 		local usesAmmo = Arcana.WeaponClassification.UsesAmmo(wep)
 
-		local hl2Type = HL2_WEAPON_CLASSIFICATIONS[className]
+		local hl2Type = HL2_WEAPON_CLASSIFICATIONS[className] and not weapons.Get(className) -- we check for weapons.Get because addons can override class names for HL2
 		if hl2Type then
 			local entry = { type = hl2Type, holdType = holdType, usesAmmo = usesAmmo }
 			if hl2Type == "PROJECTILE" then
