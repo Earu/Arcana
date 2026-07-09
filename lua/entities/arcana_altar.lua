@@ -621,9 +621,11 @@ if CLIENT then
 			local kpOk = (data.knowledge_points or 0) >= (sp.knowledge_cost or 1)
 			local isDivinePact = sp.is_divine_pact == true
 			local isRitual = sp.is_ritual == true
+			local isCrafted = sp.is_crafted == true
 
-			-- Exclude Divine Pacts from the altar, but separate rituals from regular spells
-			if not already and levelOk and kpOk and not isDivinePact then
+			-- Exclude Divine Pacts and crafted spells (spellcraft has its own
+			-- station) from the altar; separate rituals from regular spells
+			if not already and levelOk and kpOk and not isDivinePact and not isCrafted then
 				local item = {
 					id = sid,
 					spell = sp

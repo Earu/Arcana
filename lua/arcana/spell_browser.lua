@@ -296,6 +296,8 @@ local function OpenSpellBrowser()
 				spellType = "Divine Pact"
 			elseif isRitual then
 				spellType = "Ritual"
+			elseif sp.is_crafted then
+				spellType = "Crafted"
 			end
 			-- Divine pact spells don't require knowledge points - they're granted at level
 			local kpDisplay = isDivinePact and "--" or numberOr(1, sp.knowledge_cost)
