@@ -120,6 +120,20 @@ if SERVER then
 			if rider == "aurum" then
 				target.ArcanaAurumBrand = CurTime() + 4
 				target.ArcanaAurumBrander = IsValid(caster) and caster or nil
+
+				-- The brand must read on the victim: golden rings while it lasts.
+				Arcana:SendAttachBandVFX(target, Color(255, 210, 90, 255), 26, 4, {
+					{ radius = 20, height = 6, spin = { p = 0, y = 40, r = 0 }, lineWidth = 2 },
+				}, "spellcraft_aurum")
+
+				-- Sandbox NPC death ragdolls are clientside; force a serverside
+				-- one so the gold statue is actually visible (CreateEntityRagdoll).
+				if target.SetShouldServerRagdoll then
+					target:SetShouldServerRagdoll(true)
+				end
+
+				-- Stacking aurum damage briefly seizes players solid gold.
+				P.AddAurumHeat(target, compiled.damage)
 			end
 		elseif rider == "frost" then
 			if Arcana.Status and Arcana.Status.Frost then
@@ -372,31 +386,99 @@ if SERVER then
 		return true
 	end
 
-	-- Aurum: victims that die while branded turn to gold.
+	-- Aurum: victims that die while branded are left as gold statues.
 	local GOLD_MATERIAL = "models/player/shared/gold_player"
-	local function goldify(ent)
-		if not IsValid(ent) then return end
-		if (ent.ArcanaAurumBrand or 0) < CurTime() then return end
-		timer.Simple(0, function()
-			-- Gild the freshly-created ragdoll, or the entity itself.
-			local rag = ent.GetRagdollEntity and IsValid(ent:GetRagdollEntity()) and ent:GetRagdollEntity() or nil
-			local target = rag or ent
-			if IsValid(target) then
-				target:SetMaterial(GOLD_MATERIAL)
-				target:SetColor(Color(255, 226, 140))
+	local GOLD_TINT = Color(255, 226, 140)
+
+	local function isBranded(ent)
+		return IsValid(ent) and (ent.ArcanaAurumBrand or 0) >= CurTime()
+	end
+
+	-- Stacking aurum damage on a living player briefly seizes them in gold:
+	-- frozen solid for a moment, then released. Heat resets if hits stop landing.
+	local SEIZE_THRESHOLD = 120  -- accumulated aurum damage to trigger
+	local SEIZE_DURATION = 1.2
+	local SEIZE_COOLDOWN = 8     -- per-victim; prevents chain-freezing
+	local HEAT_WINDOW = 4        -- seconds without an aurum hit before heat resets
+
+	local function seizePlayer(ply)
+		if not ply:Alive() then return end
+		ply.ArcanaAurumSeizeCooldown = CurTime() + SEIZE_COOLDOWN
+		ply.ArcanaAurumHeat = 0
+
+		local prevMat = ply:GetMaterial()
+		local prevCol = ply:GetColor()
+		ply:Freeze(true)
+		ply:Extinguish()
+		ply:SetMaterial(GOLD_MATERIAL)
+		ply:SetColor(GOLD_TINT)
+		ply:EmitSound("physics/metal/metal_solid_impact_hard" .. math.random(1, 3) .. ".wav", 75, 90)
+		P.Burst(ply:WorldSpaceCenter(), 60, GOLD_TINT)
+
+		timer.Simple(SEIZE_DURATION, function()
+			if not IsValid(ply) then return end
+			ply:Freeze(false)
+			ply:SetMaterial(prevMat or "")
+			ply:SetColor(prevCol or Color(255, 255, 255))
+			ply:EmitSound("physics/metal/metal_box_impact_soft" .. math.random(1, 3) .. ".wav", 70, 130)
+		end)
+	end
+
+	function P.AddAurumHeat(target, amount)
+		if not IsValid(target) or not target:IsPlayer() then return end
+		if CurTime() < (target.ArcanaAurumSeizeCooldown or 0) then return end
+
+		-- Rolling accumulator: hits refresh the window, silence resets it.
+		if CurTime() - (target.ArcanaAurumLastHit or 0) > HEAT_WINDOW then
+			target.ArcanaAurumHeat = 0
+		end
+		target.ArcanaAurumLastHit = CurTime()
+		target.ArcanaAurumHeat = (target.ArcanaAurumHeat or 0) + (tonumber(amount) or 0)
+
+		if target.ArcanaAurumHeat >= SEIZE_THRESHOLD then
+			seizePlayer(target)
+		end
+	end
+
+	-- Gild a ragdoll, let it settle for a beat, then seize it solid.
+	local function gildRagdoll(rag)
+		if not IsValid(rag) then return end
+		rag:SetMaterial(GOLD_MATERIAL)
+		rag:SetColor(GOLD_TINT)
+
+		timer.Simple(0.5, function()
+			if not IsValid(rag) then return end
+			for i = 0, rag:GetPhysicsObjectCount() - 1 do
+				local phys = rag:GetPhysicsObjectNum(i)
+				if IsValid(phys) then
+					phys:SetMaterial("metal")
+					phys:EnableMotion(false)
+				end
 			end
 		end)
 	end
 
+	-- Players get serverside death ragdolls (base gamemode CreateRagdoll).
 	hook.Add("PlayerDeath", "Arcana_Spellcraft_AurumGold", function(victim)
-		goldify(victim)
+		if not isBranded(victim) then return end
+		timer.Simple(0, function()
+			if IsValid(victim) and victim.GetRagdollEntity then
+				gildRagdoll(victim:GetRagdollEntity())
+			end
+		end)
 	end)
-	hook.Add("OnNPCKilled", "Arcana_Spellcraft_AurumGold", function(npc)
-		goldify(npc)
+
+	-- NPC ragdolls are clientside by default; the brand forces a serverside one
+	-- (SetShouldServerRagdoll in ApplyEssenceHit), which lands in this hook.
+	hook.Add("CreateEntityRagdoll", "Arcana_Spellcraft_AurumGold", function(owner, ragdoll)
+		if isBranded(owner) then
+			gildRagdoll(ragdoll)
+		end
 	end)
+
+	-- NextBots and other odd entities: best-effort gild before removal.
 	hook.Add("EntityRemoved", "Arcana_Spellcraft_AurumGoldNextbot", function(ent)
-		-- NextBots that gib on death: best-effort gild before removal.
-		if IsValid(ent) and (ent.ArcanaAurumBrand or 0) >= CurTime() then
+		if isBranded(ent) and ent.IsNextBot and ent:IsNextBot() then
 			ent:SetMaterial(GOLD_MATERIAL)
 		end
 	end)
