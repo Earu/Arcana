@@ -528,6 +528,10 @@ local function apply2DColor(mat, color, alpha)
 	local a = alpha or (color and color.a) or 255
 	if mat.SetFloat then
 		mat:SetFloat("$c0_x", CurTime())
+		-- Materials are shared with the 3D ring renderer, which writes its fade
+		-- alpha into $c0_y (see Ring draw). Reset it here or UI circles inherit
+		-- whatever alpha the last fading world circle left behind.
+		mat:SetFloat("$c0_y", a / 255)
 		mat:SetFloat("$c1_x", r / 255)
 		mat:SetFloat("$c1_y", g / 255)
 		mat:SetFloat("$c1_z", b / 255)

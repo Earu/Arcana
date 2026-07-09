@@ -20,6 +20,8 @@ if SERVER then
 	--   - filter: table of entities to ignore (default {attacker})
 	--   - beamWidth: number (default 14) visual thickness of the beam
 	--   - color: Color (default Color(180,120,255)) visual tint of the beam
+	--   - damageType: number (default DMG_DISSOLVE|DMG_ENERGYBEAM) for direct + splash
+	--   - onHit: function(hitEnt, hitPos, hitNormal) called on impact (optional)
 	function Arcana.Common.SpearBeam(attacker, origin, direction, options)
 		if not SERVER then return end
 		if not IsValid(attacker) then return end
@@ -33,6 +35,7 @@ if SERVER then
 		local filter = options.filter or {attacker}
 		local beamWidth = options.beamWidth or 14
 		local beamColor = options.color or Color(180, 120, 255)
+		local damageType = options.damageType or bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM)
 
 		local dir = direction:GetNormalized()
 
@@ -58,10 +61,10 @@ if SERVER then
 			end
 
 			-- Direct hit damage
-			if IsValid(hitEnt) then
+			if IsValid(hitEnt) and damage > 0 then
 				local dmg = DamageInfo()
 				dmg:SetDamage(damage)
-				dmg:SetDamageType(bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM))
+				dmg:SetDamageType(damageType)
 				dmg:SetAttacker(attacker)
 				dmg:SetInflictor(attacker)
 				dmg:SetDamagePosition(hitPos)
@@ -70,7 +73,12 @@ if SERVER then
 
 			-- Splash damage around impact
 			if splashDamage > 0 and splashRadius > 0 then
-				Arcana:BlastDamage(attacker, hitPos, splashRadius, splashDamage, { damageType = DMG_DISSOLVE, ignoreAttacker = true })
+				Arcana:BlastDamage(attacker, hitPos, splashRadius, splashDamage, { damageType = damageType, ignoreAttacker = true })
+			end
+
+			-- Impact callback (essence riders, custom effects)
+			if isfunction(options.onHit) then
+				options.onHit(hitEnt, hitPos, tr.HitNormal)
 			end
 		end
 
@@ -131,7 +139,7 @@ if CLIENT then
 				end
 				render.EndBeam()
 
-				-- LAYER 2: Main purple beam
+				-- LAYER 2: Main colored beam
 				render.StartBeam(steps + 1)
 				for j = 0, steps do
 					local t = j / steps
@@ -141,13 +149,13 @@ if CLIENT then
 				end
 				render.EndBeam()
 
-				-- LAYER 3: Outer glow
+				-- LAYER 3: Outer glow (tinted like the beam)
 				render.StartBeam(steps + 1)
 				for j = 0, steps do
 					local t = j / steps
 					local p = a + dir * (len * t)
 					local w = baseWidth * 2.2 * fadeFrac
-					render.AddBeam(p, w, t, Color(180, 140, 255, math.floor(70 * fadeFrac)))
+					render.AddBeam(p, w, t, Color(b.col.r, b.col.g, b.col.b, math.floor(70 * fadeFrac)))
 				end
 				render.EndBeam()
 
@@ -197,7 +205,7 @@ if CLIENT then
 				dir:Normalize()
 			end
 
-			-- Muzzle particles
+			-- Muzzle particles (tinted like the beam)
 			for i = 1, 12 do
 				local p = emitter:Add("effects/blueflare1", startPos)
 				if p then
@@ -206,7 +214,7 @@ if CLIENT then
 					p:SetEndAlpha(0)
 					p:SetStartSize(math.Rand(8, 16))
 					p:SetEndSize(0)
-					p:SetColor(180, 140, 255)
+					p:SetColor(col.r, col.g, col.b)
 					local forward = dir or Vector(1, 0, 0)
 					p:SetVelocity(forward * math.Rand(80, 150) + VectorRand() * 40)
 					p:SetAirResistance(130)

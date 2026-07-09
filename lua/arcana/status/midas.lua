@@ -359,6 +359,9 @@ if SERVER then
 			Arcana:GiveCoins(ply, ENCOUNTER_COIN_REWARD, "The Golden Sun's Bargain")
 		end
 
+		-- Striking the bargain also earns the hidden Aurum essence for crafted spells.
+		ply:SetPData("arcana_golden_sun_accepted", "1")
+
 		Midas.Apply(ply)
 	end)
 end

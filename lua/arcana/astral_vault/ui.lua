@@ -186,6 +186,10 @@ local function openVault(items)
 		drawGalaxyBackground(pnl, w, h, VAULT.seed)
 		ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 		draw.SimpleText(string.upper("Astral Vault"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
+
+		-- Summon cost stated once, instead of under every slot card.
+		local summonCost = "Summon: " .. string.Comma(tonumber(VAULT_CFG.SUMMON_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.SUMMON_SHARDS) or 0) .. " shards"
+		draw.SimpleText(summonCost, "Arcana_AncientSmall", w - 48, 16, ArtDeco.Colors.textDim, TEXT_ALIGN_RIGHT)
 	end
 
 	-- Style close button like enchanter
@@ -299,19 +303,6 @@ local function openVault(items)
 		return summon
 	end
 
-	local function buildCostPanel(card, it)
-		local costPanel = vgui.Create("DPanel", card)
-		costPanel:SetPaintBackground(false)
-		costPanel.Paint = function(pnl, w, h)
-			if not it then return end
-			draw.SimpleText("Costs", "Arcana_AncientSmall", 0, 0, COLOR_SUBTEXT)
-			draw.SimpleText("- " .. string.Comma(tonumber(VAULT_CFG.SUMMON_COINS) or 0) .. " coins", "Arcana_AncientSmall", 0, 16, COLOR_COST_TEXT)
-			draw.SimpleText("- " .. string.Comma(tonumber(VAULT_CFG.SUMMON_SHARDS) or 0) .. " shards", "Arcana_AncientSmall", 0, 32, COLOR_COST_TEXT)
-		end
-		if not it then costPanel:SetVisible(false) end
-		return costPanel
-	end
-
 	local function buildDeleteButton(card, it)
 		local delBtn = vgui.Create("DButton", card)
 		delBtn:SetText("")
@@ -351,7 +342,6 @@ local function openVault(items)
 		local model    = buildModelPanel(card, it)
 		local enchList = buildEnchantList(card, it)
 		local summon   = buildSummonButton(card, it)
-		local costPanel = buildCostPanel(card, it)
 		local delBtn   = buildDeleteButton(card, it)
 
 		local sub = vgui.Create("DLabel", card)
@@ -370,8 +360,6 @@ local function openVault(items)
 			sub:SetSize(w - pad * 2, 16)
 			enchList:SetPos(pad, modelTop + mH + 20)
 			enchList:SetSize(w - pad * 2, h - (modelTop + mH + 20) - 70)
-			costPanel:SetSize(w - pad * 2, 48)
-			costPanel:SetPos(pad, h - 55 - 52)
 			summon:SetSize(w - pad * 2, 42)
 			summon:SetPos(pad, h - 55)
 			delBtn:SetPos(w - delBtn:GetWide() - 6, 6)
@@ -407,10 +395,11 @@ local function openVault(items)
 
 	container.PerformLayout = function() layoutCards() end
 
-	-- Bottom imprint button spanning full width
+	-- Bottom imprint button spanning full width. Two lines like the spellcraft
+	-- CREATE SPELL button: label above, cost below, no overlap.
 	local imprintBtn = vgui.Create("DButton", frame)
 	imprintBtn:Dock(BOTTOM)
-	imprintBtn:SetTall(40)
+	imprintBtn:SetTall(46)
 	imprintBtn:DockMargin(12, 12, 12, 12)
 	imprintBtn:SetText("")
 	imprintBtn.Paint = function(pnl, w, h)
@@ -421,13 +410,9 @@ local function openVault(items)
 		local frameCol = enabled and ArtDeco.Colors.gold or COLOR_BUTTON_FRAME_DISABLED
 		ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 8)
 		local txtCol = enabled and ArtDeco.Colors.textBright or COLOR_BUTTON_TEXT_DISABLED
-		draw.SimpleText("Imprint Current Weapon", "Arcana_AncientLarge", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		local sub = "Cost: " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
-		surface.SetFont("Arcana_AncientSmall")
-		local tw, th = surface.GetTextSize(sub)
-
-		-- Draw a smaller, tighter subtext closer to center line
-		draw.SimpleText(sub, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 6, COLOR_SUBTEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("Imprint Current Weapon", "Arcana_Ancient", w * 0.5, h * 0.5 - 9, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		local sub = string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
+		draw.SimpleText(sub, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 10, COLOR_SUBTEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 	-- Enable/disable imprint based on weapon presence, vault space and affordability
 	imprintBtn.Think = function(pnl)

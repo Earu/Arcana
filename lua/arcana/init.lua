@@ -76,6 +76,11 @@ include("arcana/soul_mode.lua")
 
 includePath("arcana/common")
 
+-- Spell crafting: shared catalog/runtime, server persistence, client UI.
+-- Loads after common (runtime uses Arcana.Common) and before spells/entities that
+-- rely on it only at call time.
+includePath("arcana/spellcraft")
+
 -- Tutorial scenes (must load after arcana/system/tutorial.lua)
 includePath("arcana/scenes")
 
