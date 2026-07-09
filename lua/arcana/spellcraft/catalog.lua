@@ -119,7 +119,9 @@ P.Essences = {
 	arcane    = { id = "arcane",    label = "Arcane",    order = 7, points = 8,  rider = "arcane",    damageType = bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM), color = Color(180, 120, 255), damageMult = 1.15, unlock = { coins = 50000, shards = 12 },
 	              desc = "Pure force, struck harder than any element." },
 	-- Not a gift of the gods: earned only by accepting the Golden Sun's bargain.
-	aurum     = { id = "aurum",     label = "Aurum",     order = 8, points = 10, rider = "aurum",     damageType = bit.bor(DMG_BURN, DMG_DISSOLVE),     color = Color(255, 210, 90),  bargain = true,
+	-- No DMG_DISSOLVE here: dissolve kills disintegrate the corpse, and aurum
+	-- needs a ragdoll left behind to turn into a statue.
+	aurum     = { id = "aurum",     label = "Aurum",     order = 8, points = 10, rider = "aurum",     damageType = bit.bor(DMG_BURN, DMG_SLOWBURN),     color = Color(255, 210, 90),  bargain = true,
 	              desc = "Golden fire. Those it consumes are left as gilded statues." },
 }
 
