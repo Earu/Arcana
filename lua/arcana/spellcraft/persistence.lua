@@ -78,7 +78,8 @@ function P.HasEssence(ply, essenceId)
 end
 
 function P.HasBargain(ply)
-	return ply:GetPData(BARGAIN_PDATA, "0") == "1"
+	local v = ply:GetPData(BARGAIN_PDATA, "0")
+	return v == "1" or v == "true"
 end
 
 -- Base per-server state for a player, with consecration filled for a given def.

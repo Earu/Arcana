@@ -49,6 +49,14 @@ if SERVER then
 		local now = CurTime()
 		if now < (self._nextUse or 0) then return end
 		self._nextUse = now + self.UseCooldown
+
+		-- Re-sync activation state (essences, activations, Golden Sun bargain)
+		-- before the menu opens, so changes made mid-session are picked up
+		-- without a reconnect.
+		if Arcana.Spellcraft and Arcana.Spellcraft.SendState then
+			Arcana.Spellcraft.SendState(ply)
+		end
+
 		net.Start("Arcana_OpenSpellcraftMenu")
 		net.WriteEntity(self)
 		net.Send(ply)
