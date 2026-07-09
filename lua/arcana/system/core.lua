@@ -110,9 +110,7 @@ Arcana.CATEGORIES = {
 	COMBAT = "combat",
 	UTILITY = "utility",
 	PROTECTION = "protection",
-	SUMMONING = "summoning",
-	DIVINATION = "divination",
-	ENCHANTMENT = "enchantment"
+	ENCHANTMENT = "enchantment",
 }
 
 -- Persistence (player data, SQL, SyncPlayerData, SendErrorNotification) → arcana/persistence.lua

@@ -2,7 +2,7 @@ Arcana:RegisterRitualSpell({
 	id = "ritual_of_thunder",
 	name = "Ritual: Thunder",
 	description = "A ritual that summons a thunder cloud.",
-	category = Arcana.CATEGORIES.UTILITY,
+	category = Arcana.CATEGORIES.COMBAT,
 	level_required = 5,
 	knowledge_cost = 1,
 	cooldown = 60 * 10,
