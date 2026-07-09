@@ -96,6 +96,9 @@ end
 function Arcana:CanUnlockSpell(ply, spellId)
 	local spell = self.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
+	-- Crafted spells are per-player and managed by the spellcraft system; they
+	-- can never be unlocked through the knowledge system.
+	if spell.is_crafted then return false, "This spell cannot be unlocked here" end
 	local data = self:GetPlayerData(ply)
 	if not data then return false, "Player data not loaded" end
 	if data.unlocked_spells[spellId] then return false, "Already unlocked" end
