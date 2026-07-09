@@ -635,8 +635,8 @@ if CLIENT then
 				row.Paint = function(pnl, w, h)
 					local hovered = pnl:IsHovered()
 					local selected = (caster:GetSelectedSpell() == item.id)
-					local bg = selected and Color(58, 64, 44, 235) or (hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle)
-					local frameCol = selected and Color(120, 200, 100) or ArtDeco.Colors.gold
+					local bg = selected and Color(58, 44, 32, 235) or (hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle)
+					local frameCol = selected and Color(255, 255, 255, 255) or ArtDeco.Colors.gold
 
 					ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
 					ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)

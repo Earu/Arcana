@@ -56,7 +56,12 @@ if SERVER then
 	local function serializeUnlockedSpells(unlocked)
 		local arr = {}
 		for id, v in pairs(unlocked or {}) do
-			if v then arr[#arr + 1] = id end
+			-- Crafted crafted spells live in the player's clientside file and a per-server
+			-- activation table, never in arcane_players. Skip them so the merge-on-save
+			-- union cannot resurrect a dissolved crafted spell.
+			if v and not string.StartsWith(tostring(id), "spellcraft_") then
+				arr[#arr + 1] = id
+			end
 		end
 		return util.TableToJSON(arr or {}) or "[]"
 	end

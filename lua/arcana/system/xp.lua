@@ -182,7 +182,7 @@ function Arcana:GetTotalSpentKnowledgePoints(unlockedSpells)
 	for spellId, unlocked in pairs(unlockedSpells or {}) do
 		if unlocked then
 			local spell = self.RegisteredSpells[spellId]
-			if spell and not spell.is_divine_pact then
+			if spell and not spell.is_divine_pact and not spell.is_crafted then
 				spent = spent + (tonumber(spell.knowledge_cost) or 0)
 			end
 		end

@@ -121,7 +121,7 @@ if SERVER then
 		-- Spawn a fresh weapon entity for display
 		local wep = ents.Create(cls)
 		if not IsValid(wep) then return end
-		
+
 		wep:Spawn()
 		wep:Activate()
 		wep:SetOwner(NULL)
@@ -360,7 +360,6 @@ if SERVER then
 		local chance = ent:ComputeSuccessChance(ply)
 		local successes = 0
 		for _, it in ipairs(enchs) do
-			local hasMana = (ent._receivingUntil or 0) > CurTime()
 			if math.Rand(0, 1) <= chance then
 				Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
 				successes = successes + 1
@@ -1282,7 +1281,7 @@ if CLIENT then
 							bg = Color(46, 36, 26, 235)
 						end
 						ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
-						local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and ArtDeco.Colors.textBright) or ArtDeco.Colors.gold
+						local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and Color(255, 255, 255, 255)) or ArtDeco.Colors.gold
 						ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
 						draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, ArtDeco.Colors.textBright)
 						if isApplied then
