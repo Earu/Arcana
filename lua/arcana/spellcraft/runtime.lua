@@ -22,6 +22,13 @@ function P.IsSpellcraftId(id)
 	return isstring(id) and string.StartsWith(id, P.ID_PREFIX)
 end
 
+-- Aurum statue constants, shared: the server brands victims and cleans up the
+-- networked ragdoll shell; each client gilds the visual ragdoll it created.
+local GOLD_MATERIAL = "models/player/shared/gold_player"
+local GOLD_TINT = Color(255, 226, 140)
+local STATUE_LIFETIME = 20
+local AURUM_BRAND_NW = "ArcanaAurumBrand"
+
 ----------------------------------------------------------------------
 -- Shared: build an Arcana spell table from a stored definition.
 -- On the server the spell gets the real cast + eligibility check; on the client
@@ -118,19 +125,15 @@ if SERVER then
 		if rider == "ignite" or rider == "aurum" then
 			target:Ignite(3)
 			if rider == "aurum" then
-				target.ArcanaAurumBrand = CurTime() + 4
+				-- The brand is networked: death ragdolls are CLIENTSIDE entities,
+				-- so each client decides to gild in CreateClientsideRagdoll.
+				target:SetNWFloat(AURUM_BRAND_NW, CurTime() + 4)
 				target.ArcanaAurumBrander = IsValid(caster) and caster or nil
 
 				-- The brand must read on the victim: golden rings while it lasts.
 				Arcana:SendAttachBandVFX(target, Color(255, 210, 90, 255), 26, 4, {
 					{ radius = 20, height = 6, spin = { p = 0, y = 40, r = 0 }, lineWidth = 2 },
 				}, "spellcraft_aurum")
-
-				-- Sandbox NPC death ragdolls are clientside; force a serverside
-				-- one so the gold statue is actually visible (CreateEntityRagdoll).
-				if target.SetShouldServerRagdoll then
-					target:SetShouldServerRagdoll(true)
-				end
 
 				-- Stacking aurum damage briefly seizes players solid gold.
 				P.AddAurumHeat(target, compiled.damage)
@@ -386,14 +389,6 @@ if SERVER then
 		return true
 	end
 
-	-- Aurum: victims that die while branded are left as gold statues.
-	local GOLD_MATERIAL = "models/player/shared/gold_player"
-	local GOLD_TINT = Color(255, 226, 140)
-
-	local function isBranded(ent)
-		return IsValid(ent) and (ent.ArcanaAurumBrand or 0) >= CurTime()
-	end
-
 	-- Stacking aurum damage on a living player briefly seizes them in gold:
 	-- frozen solid for a moment, then released. Heat resets if hits stop landing.
 	local SEIZE_THRESHOLD = 120  -- accumulated aurum damage to trigger
@@ -440,47 +435,20 @@ if SERVER then
 		end
 	end
 
-	-- Gild a ragdoll, let it settle for a beat, then seize it solid.
-	local function gildRagdoll(rag)
-		if not IsValid(rag) then return end
-		rag:SetMaterial(GOLD_MATERIAL)
-		rag:SetColor(GOLD_TINT)
-
-		timer.Simple(0.5, function()
-			if not IsValid(rag) then return end
-			for i = 0, rag:GetPhysicsObjectCount() - 1 do
-				local phys = rag:GetPhysicsObjectNum(i)
-				if IsValid(phys) then
-					phys:SetMaterial("metal")
-					phys:EnableMotion(false)
-				end
-			end
-		end)
-	end
-
-	-- Players get serverside death ragdolls (base gamemode CreateRagdoll).
+	-- Statue visuals live entirely on the client (see CreateClientsideRagdoll
+	-- below): player death ragdolls are hl2mp_ragdoll shells that spawn a
+	-- clientside ragdoll per client, and NPC corpses are clientside too. The
+	-- server only cleans up the networked shell so it cannot pile up.
 	hook.Add("PlayerDeath", "Arcana_Spellcraft_AurumGold", function(victim)
-		if not isBranded(victim) then return end
+		if victim:GetNWFloat(AURUM_BRAND_NW, 0) < CurTime() then return end
 		timer.Simple(0, function()
-			if IsValid(victim) and victim.GetRagdollEntity then
-				gildRagdoll(victim:GetRagdollEntity())
-			end
+			if not IsValid(victim) then return end
+			local rag = victim:GetRagdollEntity()
+			if not IsValid(rag) then return end
+			timer.Simple(STATUE_LIFETIME + 2, function()
+				SafeRemoveEntity(rag)
+			end)
 		end)
-	end)
-
-	-- NPC ragdolls are clientside by default; the brand forces a serverside one
-	-- (SetShouldServerRagdoll in ApplyEssenceHit), which lands in this hook.
-	hook.Add("CreateEntityRagdoll", "Arcana_Spellcraft_AurumGold", function(owner, ragdoll)
-		if isBranded(owner) then
-			gildRagdoll(ragdoll)
-		end
-	end)
-
-	-- NextBots and other odd entities: best-effort gild before removal.
-	hook.Add("EntityRemoved", "Arcana_Spellcraft_AurumGoldNextbot", function(ent)
-		if isBranded(ent) and ent.IsNextBot and ent:IsNextBot() then
-			ent:SetMaterial(GOLD_MATERIAL)
-		end
 	end)
 end
 
@@ -655,6 +623,61 @@ if CLIENT then
 	local bursts = {}
 	local matRing = Material("effects/select_ring")
 	local matGlow = Material("sprites/light_glow02_add")
+	-- Aurum gold statues, done where the corpse actually exists: death ragdolls
+	-- are CLIENTSIDE (player deaths spawn one per client via hl2mp_ragdoll, NPC
+	-- corpses are client ragdolls outright). Gilding here also inherits
+	-- client-only model swaps from addons like Outfitter, since the ragdoll is
+	-- built from (or swapped to) the model this client sees.
+	local function aurumBrandSource(owner, ragdoll)
+		if IsValid(owner) and owner:GetNWFloat(AURUM_BRAND_NW, 0) >= CurTime() then
+			return owner
+		end
+
+		-- Player death ragdolls arrive via an intermediate hl2mp_ragdoll entity,
+		-- so the branded victim may need to be found by proximity instead.
+		local pos = IsValid(ragdoll) and ragdoll:GetPos() or (IsValid(owner) and owner:GetPos() or nil)
+		if not pos then return nil end
+
+		for _, ply in ipairs(player.GetAll()) do
+			if not ply:Alive() and ply:GetNWFloat(AURUM_BRAND_NW, 0) >= CurTime() and ply:GetPos():DistToSqr(pos) < (200 * 200) then
+				return ply
+			end
+		end
+	end
+
+	hook.Add("CreateClientsideRagdoll", "Arcana_Spellcraft_AurumGold", function(owner, ragdoll)
+		if not IsValid(ragdoll) then return end
+		local source = aurumBrandSource(owner, ragdoll)
+		if not source then return end
+
+		-- Mirror the victim's clientside model (Outfitter-style addons swap
+		-- player models client-only; this ragdoll is fully clientside).
+		if source:IsPlayer() then
+			local mdl = source:GetModel()
+			if isstring(mdl) and mdl ~= "" and mdl ~= ragdoll:GetModel() and util.IsValidModel(mdl) then
+				ragdoll:SetModel(mdl)
+			end
+		end
+
+		ragdoll:SetMaterial(GOLD_MATERIAL)
+		ragdoll:SetColor(GOLD_TINT)
+
+		-- Let it settle for a beat, then seize it solid.
+		timer.Simple(0.5, function()
+			if not IsValid(ragdoll) then return end
+			for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+				local phys = ragdoll:GetPhysicsObjectNum(i)
+				if IsValid(phys) then phys:EnableMotion(false) end
+			end
+		end)
+
+		-- The engine's own ragdoll fade cleans the statue up.
+		timer.Simple(STATUE_LIFETIME, function()
+			if not IsValid(ragdoll) then return end
+			ragdoll:SetSaveValue("m_bFadingOut", true)
+		end)
+	end)
+
 	net.Receive("Arcana_Spellcraft_Burst", function()
 		local pos = net.ReadVector()
 		local radius = net.ReadFloat()
