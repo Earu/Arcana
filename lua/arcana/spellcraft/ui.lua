@@ -1283,6 +1283,26 @@ local function OpenSpellcraftMenu(machine)
 		if not IsValid(right) then return end
 		clearChildren(right)
 		buildSlotList()
+
+		-- Level gate up front: no point composing a spell you cannot create.
+		-- Carried spells still show their status in the slot list and details.
+		local st = P.GetClientState()
+		local minLevel = P.Config().minLevel
+		if (st.level or 0) < minLevel and not activeDefForSlot(state.selSlot) then
+			local locked = vgui.Create("DPanel", right)
+			locked:Dock(FILL)
+			locked.Paint = function(_, w, h)
+				local cx, cy = w * 0.5, h * 0.5
+				local t = CurTime()
+				local dim = Color(150, 132, 100)
+				Arcana.Circle.Draw2DPatternRing(2, cx, cy - 40, 70, t * 3, dim, 120)
+				Arcana.Circle.Draw2DRing(Arcana.Circle.RING_TYPES.SIMPLE_LINE, cx, cy - 40, 52, -t * 2, dim, 100)
+				draw.SimpleText("SPELL CRAFTING LOCKED", "Arcana_AncientLarge", cx, cy + 60, C.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("Requires level " .. minLevel .. ". You are level " .. (st.level or 0) .. ".", "Arcana_Ancient", cx, cy + 92, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+			return
+		end
+
 		if activeDefForSlot(state.selSlot) then
 			buildDetails(state.selSlot)
 		else
