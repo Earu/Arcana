@@ -710,5 +710,3 @@ net.Receive("Arcana_Midas_StartEncounter", function()
 		onComplete = function() end,
 	})
 end)
-
-print('awdaw')
