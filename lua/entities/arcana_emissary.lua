@@ -9,8 +9,7 @@ ENT.Base = "base_anim"
 ENT.PrintName = "The Emissary"
 ENT.Category = "Arcana"
 ENT.Spawnable = true
-ENT.AdminSpawnable = true
-ENT.AdminOnly = true
+ENT.AdminOnly = false
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.UseCooldown = 0.75
 
