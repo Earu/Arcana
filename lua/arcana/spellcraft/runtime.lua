@@ -101,19 +101,8 @@ end
 -- SERVER: casting interpreter + essence riders
 ----------------------------------------------------------------------
 if SERVER then
-	util.AddNetworkString("Arcana_Spellcraft_Burst")
-
 	local function isActor(ent)
 		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
-	end
-
-	-- Broadcast a colored burst (expanding ring + puff) at a point.
-	function P.Burst(pos, radius, color)
-		net.Start("Arcana_Spellcraft_Burst", true)
-		net.WriteVector(pos)
-		net.WriteFloat(radius)
-		net.WriteColor(color or Color(200, 200, 255), false)
-		net.Broadcast()
 	end
 
 	-- Apply ONLY the essence rider to a single actor. Base damage is dealt
@@ -223,19 +212,29 @@ if SERVER then
 			})
 		end
 
-		P.Burst(pos, radius, compiled.essenceColor)
+		-- Element-authentic burst (effects.lua): a fire hit explodes, a frost
+		-- hit shatters, lightning cracks, and so on. fxIntensity 0 skips the
+		-- burst entirely (self auras have their own continuous visuals).
+		local fxIntensity = opts.fxIntensity or 1
+		if fxIntensity > 0 then
+			P.ImpactFX(compiled.essence, pos, radius, fxIntensity)
+		end
 	end
 
 	-- A short-lived ground patch that re-applies the essence.
 	function P.SpawnLingering(caster, pos, compiled)
 		if not compiled.lingering then return end
 		local patchRadius = math.max(80, compiled.radius * 0.7)
+		local duration = 4
 		local ticks = 8 -- 4s at 0.5s
 		local tag = "Arcana_SpellcraftLinger_" .. math.floor(pos.x) .. "_" .. math.floor(pos.y) .. "_" .. math.floor(CurTime() * 100)
 		local perTick = compiled.damage * 0.25
-		local n = 0
+
+		-- Continuous dense element volume for the whole patch lifetime
+		-- (poison_cloud style), instead of sparse pulses.
+		P.ZoneFX(compiled.essence, pos, patchRadius, duration)
+
 		timer.Create(tag, 0.5, ticks, function()
-			n = n + 1
 			if not IsValid(caster) then timer.Remove(tag) return end
 			for _, ent in ipairs(ents.FindInSphere(pos, patchRadius)) do
 				if ent ~= caster and isActor(ent) and not (ent:IsPlayer() and not ent:Alive()) then
@@ -247,7 +246,6 @@ if SERVER then
 					Arcana:TakeDamageInfo(ent, dmg)
 				end
 			end
-			if n % 2 == 0 then P.Burst(pos, patchRadius, compiled.essenceColor) end
 		end)
 	end
 
@@ -282,6 +280,7 @@ if SERVER then
 				bolt:SetColor(compiled.essenceColor)
 				bolt._spellcraft = compiled
 				bolt._spellcraftCaster = caster
+				bolt:SetElement(compiled.essence)
 				bolt:SetProjectileSpeed(compiled.speed > 0 and compiled.speed or 1200)
 				bolt:Spawn()
 				bolt:Activate()
@@ -316,18 +315,24 @@ if SERVER then
 
 	function P.CastBeam(caster, srcEnt, compiled, ctx)
 		local origin, aim = resolveAim(caster, srcEnt, ctx)
-		Arcana.Common.SpearBeam(caster, origin, aim, {
-			maxDist = compiled.range > 0 and compiled.range or 2000,
-			damage = 0,          -- damage handled through AreaEssence for rider parity
-			splashDamage = 0,
-			color = compiled.essenceColor,
-			damageType = compiled.damageType,
-			noImpactEffect = true,
-			onHit = function(hitEnt, hitPos, hitNormal)
-				P.AreaEssence(caster, hitPos, compiled, { inflictor = caster })
-				P.SpawnLingering(caster, hitPos, compiled)
-			end,
+		local maxDist = compiled.range > 0 and compiled.range or 2000
+
+		local tr = util.TraceLine({
+			start = origin,
+			endpos = origin + aim * maxDist,
+			filter = { caster, srcEnt },
+			mask = MASK_SHOT,
 		})
+
+		-- Element-authentic beam visual (effects.lua): lightning arcs, flame
+		-- streams, frost mist, and so on. Damage flows through AreaEssence so
+		-- riders and the damage cap behave exactly like every other form.
+		P.BeamFX(compiled.essence, origin + aim * 16, tr.HitPos)
+
+		if tr.Hit then
+			P.AreaEssence(caster, tr.HitPos, compiled, { inflictor = caster })
+			P.SpawnLingering(caster, tr.HitPos, compiled)
+		end
 	end
 
 	function P.CastAoe(caster, srcEnt, compiled, ctx)
@@ -340,33 +345,32 @@ if SERVER then
 			mask = MASK_SHOT,
 		})
 		local pos = tr.HitPos
-		P.AreaEssence(caster, pos, compiled, { inflictor = caster })
+		P.AreaEssence(caster, pos, compiled, { inflictor = caster, fxIntensity = 1.2 })
 		P.SpawnLingering(caster, pos, compiled)
-		util.ScreenShake(pos, 5, 60, 0.3, compiled.radius * 1.5)
 	end
 
 	-- Self aura: one maintenance timer per caster; re-casting refreshes it.
 	P.SelfAuras = P.SelfAuras or {}
 	function P.CastSelf(caster, srcEnt, compiled, ctx)
 		local sid = caster:SteamID64() or tostring(caster:EntIndex())
-		local endTime = CurTime() + (compiled.duration > 0 and compiled.duration or 8)
+		local duration = compiled.duration > 0 and compiled.duration or 8
+		local endTime = CurTime() + duration
 		P.SelfAuras[sid] = endTime
 
-		Arcana:SendAttachBandVFX(caster, compiled.essenceColor, compiled.radius * 0.8, compiled.duration, {
-			{ radius = compiled.radius * 0.4, height = 16, spin = { p = 0, y = 26, r = 0 }, lineWidth = 3 },
-			{ radius = compiled.radius * 0.28, height = 10, spin = { p = 0, y = -22, r = 0 }, lineWidth = 2 },
-		}, "spellcraft_self")
+		-- Continuous element aura around the caster (effects.lua): flames, arcs,
+		-- mist... the element itself is the visual, no magic circles.
+		P.AuraFX(caster, compiled.essence, compiled.radius, duration)
 
 		local tag = "Arcana_SpellcraftSelf_" .. sid
 		local interval = math.max(0.5, compiled.tickInterval or 1.0)
 		timer.Create(tag, interval, 0, function()
 			if not IsValid(caster) or not caster:Alive() or CurTime() >= (P.SelfAuras[sid] or 0) then
 				timer.Remove(tag)
-				if IsValid(caster) then Arcana:ClearBandVFX(caster, "spellcraft_self") end
+				if IsValid(caster) then P.AuraFX(caster, compiled.essence, 0, 0) end
 				P.SelfAuras[sid] = nil
 				return
 			end
-			P.AreaEssence(caster, caster:WorldSpaceCenter(), compiled, { inflictor = caster })
+			P.AreaEssence(caster, caster:WorldSpaceCenter(), compiled, { inflictor = caster, fxIntensity = 0 })
 		end)
 	end
 
@@ -408,7 +412,7 @@ if SERVER then
 		ply:SetMaterial(GOLD_MATERIAL)
 		ply:SetColor(GOLD_TINT)
 		ply:EmitSound("physics/metal/metal_solid_impact_hard" .. math.random(1, 3) .. ".wav", 75, 90)
-		P.Burst(ply:WorldSpaceCenter(), 60, GOLD_TINT)
+		P.ImpactFX("aurum", ply:WorldSpaceCenter(), 60, 0.6)
 
 		timer.Simple(SEIZE_DURATION, function()
 			if not IsValid(ply) then return end
@@ -619,10 +623,6 @@ if CLIENT then
 		hook.Run("Arcana_Spellcraft_StateChanged")
 	end)
 
-	-- Colored burst VFX (expanding ring + puff + light) reused by every form.
-	local bursts = {}
-	local matRing = Material("effects/select_ring")
-	local matGlow = Material("sprites/light_glow02_add")
 	-- Aurum gold statues, done where the corpse actually exists: death ragdolls
 	-- are CLIENTSIDE (player deaths spawn one per client via hl2mp_ragdoll, NPC
 	-- corpses are client ragdolls outright). Gilding here also inherits
@@ -676,61 +676,6 @@ if CLIENT then
 			if not IsValid(ragdoll) then return end
 			ragdoll:SetSaveValue("m_bFadingOut", true)
 		end)
-	end)
-
-	net.Receive("Arcana_Spellcraft_Burst", function()
-		local pos = net.ReadVector()
-		local radius = net.ReadFloat()
-		local col = net.ReadColor(false)
-		bursts[#bursts + 1] = { pos = pos, radius = math.max(48, radius), col = col, life = 0.45, die = CurTime() + 0.45 }
-
-		local dl = DynamicLight(math.random(1, 60000))
-		if dl then
-			dl.pos = pos
-			dl.r, dl.g, dl.b = col.r, col.g, col.b
-			dl.brightness = 2.4
-			dl.Size = radius * 1.2
-			dl.Decay = 1200
-			dl.DieTime = CurTime() + 0.2
-		end
-
-		local emitter = ParticleEmitter(pos)
-		if emitter then
-			for i = 1, 14 do
-				local p = emitter:Add("effects/softglow", pos + VectorRand() * radius * 0.2)
-				if p then
-					p:SetVelocity(VectorRand() * radius * 1.4 + Vector(0, 0, 40))
-					p:SetDieTime(math.Rand(0.3, 0.6))
-					p:SetStartAlpha(200)
-					p:SetEndAlpha(0)
-					p:SetStartSize(math.Rand(6, 12))
-					p:SetEndSize(0)
-					p:SetColor(col.r, col.g, col.b)
-					p:SetAirResistance(80)
-					p:SetGravity(Vector(0, 0, -30))
-					p:SetLighting(false)
-				end
-			end
-			emitter:Finish()
-		end
-	end)
-
-	hook.Add("PostDrawTranslucentRenderables", "Arcana_Spellcraft_Bursts", function(depth, sky)
-		if depth or sky then return end
-		for i = #bursts, 1, -1 do
-			local b = bursts[i]
-			if CurTime() > b.die then
-				table.remove(bursts, i)
-			else
-				local frac = math.Clamp(1 - (b.die - CurTime()) / b.life, 0, 1)
-				local cur = Lerp(frac, b.radius * 0.2, b.radius)
-				local a = 220 * (1 - frac)
-				render.SetMaterial(matRing)
-				render.DrawQuadEasy(b.pos + Vector(0, 0, 3), Vector(0, 0, 1), cur, cur, Color(b.col.r, b.col.g, b.col.b, a), 0)
-				render.SetMaterial(matGlow)
-				render.DrawSprite(b.pos + Vector(0, 0, 6), cur * 0.5, cur * 0.5, Color(b.col.r, b.col.g, b.col.b, a * 0.6))
-			end
-		end
 	end)
 
 	-- Load the local store once at startup.
