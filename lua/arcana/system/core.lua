@@ -43,14 +43,24 @@ Arcana.RunHook = runHook
 if CLIENT then
 	local function arcanaAutoComplete(cmd, stringargs)
 		local input = string.lower(string.Trim(stringargs or ""))
+		local sid = IsValid(LocalPlayer()) and LocalPlayer():SteamID64() or nil
 		local out = {}
 
 		for id, sp in pairs(Arcana and Arcana.RegisteredSpells or {}) do
-			local idLower = string.lower(id)
-			local nameLower = string.lower(sp.name or id)
+			-- Crafted spells register on every client (to render other players'
+			-- casts); only the local player's own belong in their autocomplete.
+			local foreignCrafted = sp.is_crafted and sp.crafted_owner ~= sid
 
-			if input == "" or string.find(idLower, input, 1, true) or string.find(nameLower, input, 1, true) then
-				out[#out + 1] = cmd .. " " .. id
+			if not foreignCrafted then
+				local idLower = string.lower(id)
+				local nameLower = string.lower(sp.name or id)
+
+				if input == "" or string.find(idLower, input, 1, true) or string.find(nameLower, input, 1, true) then
+					-- Crafted spell ids are opaque (spellcraft_<sid64>_<slot>);
+					-- suggest the player's chosen name instead. The server
+					-- resolves names as well as ids.
+					out[#out + 1] = cmd .. " " .. (sp.is_crafted and sp.name or id)
+				end
 			end
 		end
 
@@ -59,21 +69,21 @@ if CLIENT then
 		return out
 	end
 
-	-- Forward to server so typing in client console still works
+	-- Forward to server so typing in client console still works. Args are
+	-- joined so multi-word spell names work without quotes.
 	concommand.Add("arcana", function(_, _, args)
-		local raw = tostring(args and args[1] or "")
-		local spellId = string.lower(string.Trim(raw))
+		local raw = string.Trim(table.concat(args or {}, " "))
 
-		if spellId == "" then
-			Arcana:Print("Usage: arcana <spellId>")
+		if raw == "" then
+			Arcana:Print("Usage: arcana <spell id or name>")
 
 			return
 		end
 
 		net.Start("Arcana_ConsoleCastSpell")
-		net.WriteString(spellId)
+		net.WriteString(raw)
 		net.SendToServer()
-	end, arcanaAutoComplete, "Cast an Arcana spell: arcana <spellId>")
+	end, arcanaAutoComplete, "Cast an Arcana spell: arcana <spell id or name>")
 end
 
 -- Configuration
@@ -637,12 +647,38 @@ if SERVER then
 	util.AddNetworkString("Arcana_ClearBandVFX")
 	util.AddNetworkString("Arcana_ConsoleCastSpell")
 
-	-- Handle client-forwarded console cast: "arcana <spellId>"
+	-- Resolve console input to a spell id: exact id first, then name lookup
+	-- (case-insensitive). On name ties, spells the player has unlocked win --
+	-- that makes their own crafted spells beat other players' same-named ones.
+	local function resolveSpellId(ply, raw)
+		raw = string.lower(string.Trim(raw or ""))
+		if raw == "" then return nil end
+		if Arcana.RegisteredSpells[raw] then return raw end
+
+		local data = Arcana:GetPlayerData(ply)
+		local fallback
+		for id, sp in pairs(Arcana.RegisteredSpells) do
+			if string.lower(sp.name or "") == raw then
+				if data and data.unlocked_spells[id] then return id end
+				fallback = fallback or id
+			end
+		end
+
+		return fallback
+	end
+
+	-- Handle client-forwarded console cast: "arcana <spell id or name>"
 	net.Receive("Arcana_ConsoleCastSpell", function(_, ply)
 		if not IsValid(ply) then return end
 		local raw = net.ReadString() or ""
-		local spellId = string.lower(string.Trim(raw))
-		if spellId == "" then return end
+		local spellId = resolveSpellId(ply, raw)
+
+		if not spellId then
+			Arcana:SendErrorNotification(ply, "Unknown spell \"" .. string.Trim(raw) .. "\"")
+
+			return
+		end
+
 		local canCast, reason = Arcana:CanCastSpell(ply, spellId)
 
 		if not canCast then
