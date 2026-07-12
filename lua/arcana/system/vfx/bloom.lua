@@ -102,9 +102,16 @@ local function initBloom()
 		["$c2_z"] = 1.0, -- dark-hue boost cap (set per diff pass)
 	})
 
+	-- Out of the world the engine never repaints the framebuffer, so the
+	-- screen-blend composite accumulates to saturation on the stale pixels.
+	local function eyeOutOfWorld()
+		return bit.band(util.PointContents(EyePos()), CONTENTS_SOLID) ~= 0
+	end
+
 	-- Full pipeline: blur passes then additive composite with chromatic aberration.
 	function renderBloom()
 		if not BLOOM_ENABLED:GetBool() then return end
+		if eyeOutOfWorld() then return end
 
 		-- ── Tight bloom — 3 successive H+V passes at half-res ────────────────
 		blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
@@ -136,7 +143,7 @@ local function initBloom()
 	-- subtract.  CIRCLE_RT ends up holding only the circles' visible
 	-- contribution, already masked by world/prop/viewmodel occlusion.
 	local function processBloom(drawFunc)
-		if not BLOOM_ENABLED:GetBool() then
+		if not BLOOM_ENABLED:GetBool() or eyeOutOfWorld() then
 			-- Bloom off: still responsible for putting the circles on screen
 			drawFunc()
 

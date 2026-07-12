@@ -15,11 +15,9 @@ function ENT:SetupDataTables()
 end
 
 function ENT:UpdateTransmitState()
-	if self:GetIntensity() == 0 then
-		return TRANSMIT_PVS
-	end
-
-	return TRANSMIT_ALWAYS
+	-- PVS only: players that cannot see the area must not render the
+	-- corruption (the screen-space effect corrupts stale framebuffer pixels)
+	return TRANSMIT_PVS
 end
 
 if SERVER then
@@ -662,6 +660,10 @@ if CLIENT then
 
 	function ENT:_DrawCorruption()
 		if not CVAR_DRAW_CORRUPTION:GetBool() then return end
+		-- Out of the world (noclip void / out of map bounds) the engine never
+		-- repaints the framebuffer, so the screen-space grading feeds back on
+		-- its own output and the intersection-mask rasterisation persists
+		if bit.band(util.PointContents(EyePos()), CONTENTS_SOLID) ~= 0 then return end
 
 		if corruptionMat then
 			-- Custom shader path: one pass does the grading, refraction and the
