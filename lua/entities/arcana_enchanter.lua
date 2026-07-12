@@ -1347,7 +1347,7 @@ if CLIENT then
 						ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, bg, 8)
 						local frameCol = (isApplied and Color(150, 200, 240, 255)) or (pnl._selected and Color(255, 255, 255, 255)) or ArtDeco.Colors.gold
 						ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
-						draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 36, 8, ArtDeco.Colors.textBright)
+						draw.SimpleText(ench.name or enchId, "Arcana_AncientLarge", 14, 8, ArtDeco.Colors.textBright)
 						if isApplied then
 							draw.SimpleText("Already applied", "Arcana_AncientSmall", w - 12, 10, Color(180, 220, 255, 255), TEXT_ALIGN_RIGHT)
 						end
@@ -1415,7 +1415,7 @@ if CLIENT then
 						-- Position info icon right after the enchant name
 						surface.SetFont("Arcana_AncientLarge")
 						local nameW, _ = surface.GetTextSize(ench.name or enchId)
-						local nameX = 36
+						local nameX = 14
 						infoIcon:SetPos(nameX + nameW + 8, 10)
 						-- Costs under the name
 						costLbl:SetPos(nameX, h - 24)
