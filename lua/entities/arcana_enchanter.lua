@@ -781,6 +781,97 @@ if CLIENT then
 		end
 	end
 
+	-- Semi-transparent panel fill so the themed background shows through.
+	local PANEL_BG = Color(24, 19, 12, 180)
+
+	local GLYPH_MATS
+	local function getGlyphMats()
+		if GLYPH_MATS then return GLYPH_MATS end
+		GLYPH_MATS = {}
+		for i = 65, 72 do
+			GLYPH_MATS[#GLYPH_MATS + 1] = Material("arcana/glyphs/glyph_" .. i .. ".png", "smooth")
+		end
+		return GLYPH_MATS
+	end
+
+	-- Themed background, in the family of the other stations: dark brass
+	-- plate with concentric rings radiating out from the magic circle —
+	-- the enchantment rippling through the bench — and faint runes sinking
+	-- slowly down into the weapon.
+	local function drawEnchanterBackground(w, h, seed)
+		-- Clip everything to the art-deco octagon using the stencil buffer.
+		local x, y = 6, 6
+		local ww, hh = w - 12, h - 12
+		local corner = 14
+		local pts = {
+			{x = x + corner, y = y},
+			{x = x + ww - corner, y = y},
+			{x = x + ww, y = y + corner},
+			{x = x + ww, y = y + hh - corner},
+			{x = x + ww - corner, y = y + hh},
+			{x = x + corner, y = y + hh},
+			{x = x, y = y + hh - corner},
+			{x = x, y = y + corner},
+		}
+
+		render.ClearStencil()
+		render.SetStencilEnable(true)
+		render.SetStencilWriteMask(0xFF)
+		render.SetStencilTestMask(0xFF)
+		render.SetStencilReferenceValue(1)
+		render.SetStencilCompareFunction(STENCIL_NEVER)
+		render.SetStencilFailOperation(STENCIL_REPLACE)
+		render.SetStencilPassOperation(STENCIL_KEEP)
+		render.SetStencilZFailOperation(STENCIL_KEEP)
+
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, 255)
+		surface.DrawPoly(pts)
+
+		render.SetStencilCompareFunction(STENCIL_EQUAL)
+		render.SetStencilFailOperation(STENCIL_KEEP)
+		render.SetStencilPassOperation(STENCIL_REPLACE)
+
+		-- Dark brass base, translucent enough for the blur to breathe through.
+		surface.SetDrawColor(30, 23, 13, 205)
+		surface.DrawRect(x, y, ww, hh)
+
+		local t = CurTime()
+
+		-- Concentric rings radiating from where the magic circle sits (the
+		-- left panel), creeping outward slowly and fading with distance.
+		local ccx, ccy = x + w * 0.28, y + h * 0.42
+		local maxR = math.sqrt((w - ccx) ^ 2 + (h - ccy) ^ 2)
+		local spacing = 40
+		local drift = (t * 6) % spacing
+		for r = 0, maxR, spacing do
+			local rr = r + drift
+			local a = 26 * (1 - rr / maxR)
+			if a > 0.5 then
+				surface.DrawCircle(ccx, ccy, rr, 198, 160, 74, a)
+			end
+		end
+
+		-- Runes sinking slowly toward the bench (the Emissary's rise,
+		-- inverted; stable per-seed layout, animated by time).
+		local mats = getGlyphMats()
+		math.randomseed(seed or 1)
+		for i = 1, 10 do
+			local mat = mats[math.random(1, #mats)]
+			local rx = x + math.random(24, ww - 24)
+			local baseY = math.random(0, hh)
+			local speed = math.Rand(4, 9)
+			local size = math.random(36, 80)
+			local rot = math.Rand(-10, 10)
+			local ry = y + ((baseY + t * speed) % (hh + size)) - size * 0.5
+			surface.SetDrawColor(222, 185, 110, 9 + (i % 3) * 4)
+			surface.SetMaterial(mat)
+			surface.DrawTexturedRectRotated(rx, ry, size, size, rot)
+		end
+
+		render.SetStencilEnable(false)
+	end
+
 	local function OpenEnchanterMenu(machine)
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
@@ -789,6 +880,39 @@ if CLIENT then
 		frame:Center()
 		frame:SetTitle("")
 		frame:MakePopup()
+		local bgSeed = math.random(1, 10 ^ 9)
+
+		-- Draggable by the whole header band (the stock strip is too thin).
+		-- The cursor signals the band on hover and the drag while it lasts.
+		frame:SetDraggable(false)
+		frame.OnMousePressed = function(pnl, code)
+			if code ~= MOUSE_LEFT then return end
+			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			if my <= 44 then
+				pnl._dragOffset = {mx, my}
+				pnl:MouseCapture(true)
+				pnl:SetCursor("sizeall")
+			end
+		end
+		frame.OnMouseReleased = function(pnl)
+			pnl._dragOffset = nil
+			pnl:MouseCapture(false)
+			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
+		end
+		frame.OnCursorMoved = function(pnl)
+			if pnl._dragOffset then
+				local mx, my = gui.MousePos()
+				pnl:SetPos(
+					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
+					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
+
+				return
+			end
+
+			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
+		end
 
 		-- Screen-space blur behind frame (like grimoire)
 		hook.Add("HUDPaint", frame, function()
@@ -817,7 +941,7 @@ if CLIENT then
 		end
 
 		frame.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			drawEnchanterBackground(w, h, bgSeed)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 			draw.SimpleText(string.upper("Enchanter"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
 		end
@@ -868,66 +992,23 @@ if CLIENT then
 		-- Forward declaration so Think can trigger a rebuild
 		local rebuild
 
-		-- Top bars panel
-		local topBars = vgui.Create("DPanel", content)
-		topBars:Dock(TOP)
-		topBars:SetTall(84)
-		topBars:DockMargin(0, 0, 0, 8)
-
-		topBars.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(4, 0, w - 8, h, ArtDeco.Colors.decoPanel, 12)
-			ArtDeco.DrawDecoFrame(4, 0, w - 8, h, ArtDeco.Colors.gold, 12)
-			-- Gather player amounts
-			local haveCoins = Arcana:GetCoins(ply)
-			local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
-
-			-- Draw helper
-			local function drawBar(x, y, bw, bh, label, have, need, fillCol)
-				local innerPad = 8
-				-- Label
-				draw.SimpleText(label, "Arcana_Ancient", x + innerPad, y + 4, ArtDeco.Colors.textBright)
-				-- Bar geometry
-				local labelH = draw.GetFontHeight("Arcana_Ancient") + 2
-				local barY = y + labelH
-				local barH = math.max(10, bh - labelH - 8)
-				local barW = bw - innerPad * 2
-				-- Bar frame + background
-				surface.SetDrawColor(46, 36, 26, 235)
-				surface.DrawRect(x + innerPad, barY, barW, barH)
-				-- Fill
-				local needSafe = math.max(1, math.floor(need))
-				local haveClamped = math.min(have, needSafe)
-				local frac = math.Clamp(haveClamped / needSafe, 0, 1)
-				surface.SetDrawColor(fillCol)
-				surface.DrawRect(x + innerPad + 2, barY + 2, math.floor((barW - 4) * frac), barH - 4)
-				surface.SetDrawColor(ArtDeco.Colors.gold)
-				surface.DrawOutlinedRect(x + innerPad, barY, barW, barH)
-				-- Text right-aligned
-				local txt = string.format("%s / %s", string.Comma(haveClamped), string.Comma(needSafe))
-				surface.SetFont("Arcana_AncientSmall")
-				local tw, _ = surface.GetTextSize(txt)
-				draw.SimpleText(txt, "Arcana_AncientSmall", x + bw - innerPad - tw, barY - 15, ArtDeco.Colors.textBright)
-			end
-
-			local pad = 2
-			local bw = w - pad * 2
-			local eachH = math.floor((h - pad * 3) * 0.5)
-			drawBar(pad, pad, bw, eachH, "Coins", haveCoins, needCoins, ArtDeco.Colors.xpFill)
-			drawBar(pad, pad * 2 + eachH, bw, eachH, "Crystal Shards", haveShards, needShards, Color(105, 180, 255, 220))
-		end
-
 		-- Left: Engraved circle with weapon model/name + controls
 		local left = vgui.Create("DPanel", content)
 		left:Dock(LEFT)
 		left:SetWide(520)
 		left:NoClipping(true)
 
+		local COST_COIN_COL = Color(222, 198, 120)
+		local COST_SHARD_COL = Color(105, 180, 255)
+		local COST_CHANCE_LOW = Color(220, 110, 90)
+		local COST_CHANCE_MID = Color(222, 198, 120)
+		local COST_CHANCE_HIGH = Color(140, 210, 140)
 		left.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, PANEL_BG, 12)
 			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
 
-			local cx, cy = w * 0.5, h * 0.44
-			local radius = math.min(w, h) * 0.36
+			local cx, cy = w * 0.5, h * 0.40
+			local radius = math.min(w, h) * 0.34
 			local t      = CurTime()
 
 			Draw2DRune(cx, cy, radius,        t * 2,  _runeGlyphsOuter, _circleCol, 210)
@@ -935,6 +1016,30 @@ if CLIENT then
 			Draw2DRing(RING_TYPES.SIMPLE_LINE, cx, cy, radius * 0.74, t * 2, _circleCol, 190)
 			Draw2DPattern(1, cx, cy, radius * 0.60, -t * 9, _circleCol, 210)
 			Draw2DRune(cx, cy, radius * 0.44, -t * 3, _runeGlyphs, _circleCol, 210)
+
+			-- Selection cost and success chance under the slotted weapon's
+			-- name, have / need, each line in its own color.
+			local infoY = cy + radius + 36
+			if needCoins > 0 or needShards > 0 then
+				local haveCoins = Arcana:GetCoins(ply)
+				local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
+				draw.SimpleText(string.Comma(haveCoins) .. " / " .. string.Comma(needCoins) .. " coins", "Arcana_AncientSmall", cx, infoY, COST_COIN_COL, TEXT_ALIGN_CENTER)
+				infoY = infoY + 18
+				draw.SimpleText(string.Comma(haveShards) .. " / " .. string.Comma(needShards) .. " shards", "Arcana_AncientSmall", cx, infoY, COST_SHARD_COL, TEXT_ALIGN_CENTER)
+				infoY = infoY + 18
+			end
+
+			if IsValid(machine) and (machine:GetContainedClass() or "") ~= "" then
+				local chance = math.Clamp(machine:ComputeSuccessChance(ply) or 0, 0, 1)
+				local pct = math.floor(chance * 100 + 0.5)
+				local chanceCol = COST_CHANCE_LOW
+				if chance >= 0.55 then
+					chanceCol = COST_CHANCE_HIGH
+				elseif chance >= 0.25 then
+					chanceCol = COST_CHANCE_MID
+				end
+				draw.SimpleText(pct .. "% success", "Arcana_AncientSmall", cx, infoY, chanceCol, TEXT_ALIGN_CENTER)
+			end
 		end
 
 		-- Weapon model preview centered in the circle
@@ -951,43 +1056,6 @@ if CLIENT then
 		nameLabel:SetFont("Arcana_Ancient")
 		nameLabel:SetTextColor(ArtDeco.Colors.textBright)
 		nameLabel:SetContentAlignment(5)
-
-		-- Compact success indicator at top-left above the circle
-		local successBadge = vgui.Create("DPanel", left)
-		successBadge:SetSize(110, 50)
-		successBadge:SetPos(12, 12)
-		successBadge.Paint = function(pnl, w, h)
-			if not IsValid(machine) then return end
-
-			-- Compute chance (client mirrors server logic; scales with player level when receiving)
-			local lp = LocalPlayer()
-			local chance = machine:ComputeSuccessChance(lp) or 0.05
-
-			-- Badge background
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.cardIdle, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-
-			-- Left: small ring arc gauge
-			local cx, cy = 20, h * 0.5
-			local r = 12
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			local steps = 22
-			local frac = math.Clamp(chance, 0, 1)
-			local sweep = frac * (math.pi * 1.8)
-			local px, py
-			for i = 0, steps do
-				local a = -math.pi * 0.9 + (i / steps) * sweep
-				local x = cx + math.cos(a) * r
-				local y = cy + math.sin(a) * r
-				if i > 0 then surface.DrawLine(px, py, x, y) end
-				px, py = x, y
-			end
-
-			-- Right: percentage text
-			local pct = math.floor(frac * 100 + 0.5)
-			draw.SimpleText("SUCCESS", "Arcana_AncientSmall", 40, 6, ArtDeco.Colors.paleGold)
-			draw.SimpleText(pct .. "%", "Arcana_AncientLarge", 40, h - 8, ArtDeco.Colors.textBright, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
-		end
 
 		-- Controls area
 		local controls = vgui.Create("DPanel", left)
@@ -1061,7 +1129,6 @@ if CLIENT then
 			timer.Simple(0.05, function()
 				if IsValid(machine) then
 					computeTotals()
-					topBars:InvalidateLayout(true)
 				end
 
 				if IsValid(enchantBtn) and IsValid(machine) then
@@ -1155,8 +1222,8 @@ if CLIENT then
 
 		-- Position the model and name inside left panel (centered in the circle)
 		left.PerformLayout = function(pnl, w, h)
-			local cx, cy = w * 0.5, h * 0.44
-			local radius = math.min(w, h) * 0.36
+			local cx, cy = w * 0.5, h * 0.40
+			local radius = math.min(w, h) * 0.34
 			local s = math.floor(radius * 1.5)
 			modelPanel:SetSize(s, s)
 			modelPanel:SetPos(math.floor(cx - s * 0.5), math.floor(cy - s * 0.5))
@@ -1167,7 +1234,6 @@ if CLIENT then
 		-- Initialize preview and keep it updated
 		setPreviewForClass(IsValid(machine) and machine:GetContainedClass() or "")
 		computeTotals()
-		topBars:InvalidateLayout(true)
 		refreshButtons()
 
 		frame.Think = function()
@@ -1183,7 +1249,6 @@ if CLIENT then
 				modelPanel._cls = cls
 				setPreviewForClass(cls)
 				computeTotals()
-				topBars:InvalidateLayout(true)
 				refreshButtons()
 			end
 
@@ -1193,7 +1258,6 @@ if CLIENT then
 				lastAppliedStr = curStr
 				if rebuild then rebuild() end
 				computeTotals()
-				topBars:InvalidateLayout(true)
 				refreshButtons()
 			end
 		end
@@ -1203,9 +1267,9 @@ if CLIENT then
 		right:Dock(FILL)
 
 		right.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, PANEL_BG, 12)
 			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
-			draw.SimpleText(string.upper("Enchantments"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
+			draw.SimpleText(string.upper("Available Enchantments"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 		end
 
 		local scroll = vgui.Create("DScrollPanel", right)
@@ -1313,8 +1377,6 @@ if CLIENT then
 						pnl._selected = newState
 						selected[enchId] = pnl._selected or nil
 						computeTotals()
-						topBars:InvalidateLayout(true)
-						topBars:InvalidateParent(true)
 						refreshButtons()
 						pnl:InvalidateLayout(true)
 					end
@@ -1329,7 +1391,7 @@ if CLIENT then
 					local parts = {}
 					local coinAmt = tonumber(ench.cost_coins or 0) or 0
 					if coinAmt > 0 then
-						parts[#parts + 1] = ("x" .. string.Comma(coinAmt) .. " coins")
+						parts[#parts + 1] = (string.Comma(coinAmt) .. " coins")
 					end
 
 					for _, it2 in ipairs(ench.cost_items or {}) do
@@ -1347,7 +1409,7 @@ if CLIENT then
 						parts[#parts + 1] = (string.Comma(amt) .. " " .. pretty)
 					end
 
-					costLbl:SetText(table.concat(parts, " | "))
+					costLbl:SetText(table.concat(parts, ", "))
 					costLbl:SizeToContents()
 					row.PerformLayout = function(pnl, w, h)
 						-- Position info icon right after the enchant name
@@ -1368,7 +1430,6 @@ if CLIENT then
 				end
 			end
 			computeTotals()
-			topBars:InvalidateLayout(true)
 		end
 
 		rebuild()

@@ -784,6 +784,38 @@ if CLIENT then
 		frame._arcanaTooltips = {}
 		local bgSeed = math.random(1, 10 ^ 9)
 
+		-- Draggable by the whole header band (the stock strip is too thin).
+		-- The cursor signals the band on hover and the drag while it lasts.
+		frame:SetDraggable(false)
+		frame.OnMousePressed = function(pnl, code)
+			if code ~= MOUSE_LEFT then return end
+			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			if my <= 44 then
+				pnl._dragOffset = {mx, my}
+				pnl:MouseCapture(true)
+				pnl:SetCursor("sizeall")
+			end
+		end
+		frame.OnMouseReleased = function(pnl)
+			pnl._dragOffset = nil
+			pnl:MouseCapture(false)
+			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
+		end
+		frame.OnCursorMoved = function(pnl)
+			if pnl._dragOffset then
+				local mx, my = gui.MousePos()
+				pnl:SetPos(
+					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
+					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
+
+				return
+			end
+
+			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
+		end
+
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
 			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
