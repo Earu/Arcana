@@ -654,6 +654,91 @@ if CLIENT then
 		return regularSpells, rituals
 	end
 
+	-- Semi-transparent panel fill so the themed background shows through.
+	local LIST_PANEL_BG = Color(18, 20, 16, 150)
+
+	-- Empty-state text: a slow, simple fade-in.
+	local REVEAL_COL = Color(255, 255, 255)
+	local function drawFadeInLine(text, font, cx, cy, baseCol, t)
+		REVEAL_COL.r = baseCol.r
+		REVEAL_COL.g = baseCol.g
+		REVEAL_COL.b = baseCol.b
+		REVEAL_COL.a = 255 * math.Clamp(t / 1.5, 0, 1)
+		draw.SimpleText(text, font, cx, cy, REVEAL_COL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	end
+
+	-- Themed background: dark consecrated stone, the altar's orb glowing up
+	-- from below the frame, a slow ceremonial circle behind the content, and
+	-- ember sparks rising like the pillar's glyph particles.
+	local function drawAltarBackground(w, h, seed)
+		-- Clip everything to the art-deco octagon using the stencil buffer.
+		local x, y = 6, 6
+		local ww, hh = w - 12, h - 12
+		local corner = 14
+		local pts = {
+			{x = x + corner, y = y},
+			{x = x + ww - corner, y = y},
+			{x = x + ww, y = y + corner},
+			{x = x + ww, y = y + hh - corner},
+			{x = x + ww - corner, y = y + hh},
+			{x = x + corner, y = y + hh},
+			{x = x, y = y + hh - corner},
+			{x = x, y = y + corner},
+		}
+
+		render.ClearStencil()
+		render.SetStencilEnable(true)
+		render.SetStencilWriteMask(0xFF)
+		render.SetStencilTestMask(0xFF)
+		render.SetStencilReferenceValue(1)
+		render.SetStencilCompareFunction(STENCIL_NEVER)
+		render.SetStencilFailOperation(STENCIL_REPLACE)
+		render.SetStencilPassOperation(STENCIL_KEEP)
+		render.SetStencilZFailOperation(STENCIL_KEEP)
+
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, 255)
+		surface.DrawPoly(pts)
+
+		render.SetStencilCompareFunction(STENCIL_EQUAL)
+		render.SetStencilFailOperation(STENCIL_KEEP)
+		render.SetStencilPassOperation(STENCIL_REPLACE)
+
+		-- Cold mossy stone base, distinct from the vault's night sky and the
+		-- Emissary's warm sanctum.
+		surface.SetDrawColor(10, 14, 11, 245)
+		surface.DrawRect(x, y, ww, hh)
+
+		local t = CurTime()
+
+		-- Three pattern rings spinning in the bottom-right corner at different
+		-- speeds and directions — the altar's own motif, not a full magic circle.
+		local base = math.min(ww, hh)
+		local dim = Color(226, 200, 132)
+		Arcana.Circle.Draw2DPatternRing(2, x + ww * 0.94, y + hh * 0.96, base * 0.36, t * 3, dim, 140)
+		Arcana.Circle.Draw2DPatternRing(1, x + ww * 0.76, y + hh * 0.80, base * 0.21, -t * 5, dim, 115)
+		Arcana.Circle.Draw2DPatternRing(2, x + ww * 0.62, y + hh * 0.94, base * 0.13, t * 8, dim, 95)
+
+		-- Ember sparks rising from the orb (stable per-seed layout, animated by
+		-- time), brightest near the bottom and fading as they climb.
+		math.randomseed(seed or 1)
+		for i = 1, 48 do
+			local sx = x + math.random(14, ww - 14)
+			local baseY = math.random(0, hh)
+			local speed = math.Rand(8, 22)
+			local sway = math.Rand(2, 8)
+			local phase = math.Rand(0, math.pi * 2)
+			local size = (i % 6 == 0) and 2 or 1
+			local sy = y + ((baseY - t * speed) % (hh + 6)) - 3
+			local px = sx + math.sin(t * 0.9 + phase) * sway
+			local climb = math.Clamp((sy - y) / hh, 0, 1)
+			surface.SetDrawColor(255, 226, 150, 45 + 180 * climb)
+			surface.DrawRect(px, sy, size, size)
+		end
+
+		render.SetStencilEnable(false)
+	end
+
 	local function OpenAltarMenu(altar)
 		if not Arcana then return end
 		local ply = LocalPlayer()
@@ -670,13 +755,34 @@ if CLIENT then
 			textDim = ArtDeco.Colors.textDim,
 		}
 
+		-- Unlock buttons: brass-tinted fill and a double frame so the action
+		-- stands out from the plain gold rows. Two lines, vault-imprint style:
+		-- label above, KP cost below.
+		local BTN_BG = Color(58, 46, 24, 235)
+		local BTN_BG_HOVER = Color(76, 60, 30, 235)
+		local BTN_BG_DISABLED = Color(34, 29, 20, 235)
+		local BTN_FRAME_DISABLED = Color(120, 105, 80, 255)
+		local BTN_INNER_DISABLED = Color(90, 80, 60, 160)
+		local function paintUnlockButton(pnl, w, h, cost)
+			local enabled = pnl:IsEnabled()
+			local hovered = enabled and pnl:IsHovered()
+			local bg = not enabled and BTN_BG_DISABLED or (hovered and BTN_BG_HOVER or BTN_BG)
+			ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and (hovered and ArtDeco.Colors.paleGold or ArtDeco.Colors.gold) or BTN_FRAME_DISABLED, 8)
+			ArtDeco.DrawDecoFrame(3, 3, w - 6, h - 6, enabled and ArtDeco.Colors.brassInner or BTN_INNER_DISABLED, 8)
+			local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
+			draw.SimpleText("Unlock", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(cost .. " KP", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, enabled and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(760, 520)
+		frame:SetSize(math.min(900, ScrW() - 60), math.min(620, ScrH() - 60))
 		frame:Center()
 		frame:SetTitle("")
 		frame:MakePopup()
 		-- Track tooltip panels for cleanup on close/remove
 		frame._arcanaTooltips = {}
+		local bgSeed = math.random(1, 10 ^ 9)
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
@@ -684,7 +790,7 @@ if CLIENT then
 		end)
 
 		frame.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			drawAltarBackground(w, h, bgSeed)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 			draw.SimpleText("ALTAR", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
 			-- Level and Knowledge Points chips (XP progression hidden by request)
@@ -764,10 +870,16 @@ if CLIENT then
 		local listPanel = vgui.Create("DPanel", content)
 		listPanel:Dock(FILL)
 
+		-- Semi-transparent fill so the themed background shows through.
 		listPanel.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, ArtDeco.Colors.decoPanel, 12)
+			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, LIST_PANEL_BG, 12)
 			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
 			draw.SimpleText(string.upper("Available Spells"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
+
+			if pnl._empty then
+				local t = CurTime() - (pnl._emptyStart or CurTime())
+				drawFadeInLine("The altar is silent.", "Arcana_AncientLarge", w * 0.5, h * 0.5, ArtDeco.Colors.textBright, t)
+			end
 		end
 
 		local scroll = vgui.Create("DScrollPanel", listPanel)
@@ -791,16 +903,14 @@ if CLIENT then
 			scroll:Clear()
 			local regularSpells, rituals = BuildEligibleSpellList(ply)
 
-			if #regularSpells == 0 and #rituals == 0 then
-				local lbl = vgui.Create("DLabel", scroll)
-				lbl:SetText("No spells available to unlock right now.")
-				lbl:SetFont("Arcana_AncientLarge")
-				lbl:Dock(TOP)
-				lbl:DockMargin(0, 6, 0, 0)
-				lbl:SetTextColor(ArtDeco.Colors.textDim)
-
-				return
+			-- Empty state is painted centered by listPanel.Paint; the rune
+			-- reveal restarts whenever the list becomes empty.
+			local wasEmpty = listPanel._empty
+			listPanel._empty = #regularSpells == 0 and #rituals == 0
+			if listPanel._empty and not wasEmpty then
+				listPanel._emptyStart = CurTime()
 			end
+			if listPanel._empty then return end
 
 			for _, item in ipairs(regularSpells) do
 				local sp = item.spell
@@ -817,8 +927,7 @@ if CLIENT then
 					ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, ROW_BG_COLOR, 8)
 					ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
 					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
-					local sub = string.format("Lvl %d  Cost %d KP", sp.level_required or 1, sp.knowledge_cost or 1)
-					draw.SimpleText(sub, "Arcana_AncientSmall", 12, 34, ArtDeco.Colors.paleGold)
+					draw.SimpleText("LVL. " .. (sp.level_required or 1), "Arcana_AncientSmall", 12, 34, ArtDeco.Colors.textDim)
 				end
 
 				-- Position the info icon next to the spell name
@@ -833,8 +942,8 @@ if CLIENT then
 
 				local btn = vgui.Create("DButton", row)
 				btn:Dock(RIGHT)
-				btn:DockMargin(12, 14, 12, 14)
-				btn:SetSize(90, 32)
+				btn:DockMargin(12, 10, 12, 10)
+				btn:SetSize(150, 40)
 				btn:SetText("")
 
 				-- Determine affordability live from current data
@@ -848,13 +957,7 @@ if CLIENT then
 				updateEnabled()
 
 				btn.Paint = function(pnl, w, h)
-					local enabled = pnl:IsEnabled()
-					local hovered = enabled and pnl:IsHovered()
-					local bgCol = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
-					ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 6)
-					ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 6)
-					local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
-					draw.SimpleText("Unlock", "Arcana_Ancient", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+					paintUnlockButton(pnl, w, h, sp.knowledge_cost or 1)
 				end
 
 				function btn:DoClick()
@@ -920,8 +1023,7 @@ if CLIENT then
 						-- Strip "Ritual: " prefix from name since it's already in the Rituals category
 						local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
 						draw.SimpleText(displayName, "Arcana_AncientLarge", 14, 10, ritualColors.text)
-						local sub = string.format("Lvl %d  Cost %d KP", sp.level_required or 1, sp.knowledge_cost or 1)
-						draw.SimpleText(sub, "Arcana_AncientSmall", 14, 38, ritualColors.textDim)
+						draw.SimpleText("LVL. " .. (sp.level_required or 1), "Arcana_AncientSmall", 14, 38, ritualColors.textDim)
 					end
 
 					-- Position the info icon next to the spell name
@@ -937,8 +1039,8 @@ if CLIENT then
 
 					local btn = vgui.Create("DButton", row)
 					btn:Dock(RIGHT)
-					btn:DockMargin(12, 18, 12, 18)
-					btn:SetSize(90, 32)
+					btn:DockMargin(12, 14, 12, 14)
+					btn:SetSize(150, 40)
 					btn:SetText("")
 
 					-- Determine affordability live from current data
@@ -952,13 +1054,7 @@ if CLIENT then
 					updateEnabled()
 
 					btn.Paint = function(pnl, w, h)
-						local enabled = pnl:IsEnabled()
-						local hovered = enabled and pnl:IsHovered()
-						local bgCol = hovered and ArtDeco.Colors.cardHover or ArtDeco.Colors.cardIdle
-						ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 6)
-						ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 6)
-						local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
-						draw.SimpleText("Unlock", "Arcana_Ancient", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+						paintUnlockButton(pnl, w, h, sp.knowledge_cost or 1)
 					end
 
 					function btn:DoClick()
@@ -1025,10 +1121,14 @@ if CLIENT then
 			render.DrawSprite(pos, size, size, COLOR_GLOW)
 		end
 
-		-- Lightweight glyph particles rising like sparks around the pillar top
-		surface.SetFont("MagicCircle_Medium")
+		self:DrawGlyphParticles()
+	end
 
-		-- local _, charH = surface.GetTextSize("A")
+	-- Lightweight glyph particles rising like sparks around the pillar top
+	function ENT:DrawGlyphParticles()
+		if not self._glyphParticles then return end
+
+		local t = CurTime()
 		local ply = LocalPlayer()
 		local topAng = self:GetAngles()
 
@@ -1043,8 +1143,6 @@ if CLIENT then
 		-- ensure the font and color will show up clearly
 		surface.SetFont("MagicCircle_Medium")
 		local baseTop = self:GetPos() + TOP_OFFSET
-		if not self._glyphParticles then return end
-
 		draw.NoTexture()
 
 		for _, p in ipairs(self._glyphParticles) do
@@ -1073,4 +1171,5 @@ if CLIENT then
 			end
 		end
 	end
+
 end
