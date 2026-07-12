@@ -79,25 +79,28 @@ local function drawGalaxyBackground(pnl, w, h, starSeed)
 	surface.SetDrawColor(8, 10, 22, 240)
 	surface.DrawRect(x, y, ww, hh)
 
-	-- Nebulas
-	local function nebula(cx, cy, r, cr, cg, cb, a)
+	local t = CurTime()
+
+	-- Nebulas, each breathing slowly on its own phase
+	local function nebula(cx, cy, r, cr, cg, cb, a, phase)
+		local pulse = 0.85 + 0.15 * math.sin(t * 0.35 + (phase or 0))
 		for k = r, 0, -6 do
-			local alpha = (a or 90) * (k / r)
-			surface.SetDrawColor(cr, cg, cb, alpha)
+			local alpha = (a or 90) * (k / r) * pulse
 			surface.DrawCircle(x + cx, y + cy, k, cr, cg, cb, alpha)
 		end
 	end
 
-	nebula(ww * 0.25, hh * 0.35, math.min(ww, hh) * 0.35, 58, 84, 150, 90)
-	nebula(ww * 0.68, hh * 0.62, math.min(ww, hh) * 0.42, 40, 60, 120, 70)
-	nebula(ww * 0.55, hh * 0.25, math.min(ww, hh) * 0.25, 80, 80, 140, 60)
+	nebula(ww * 0.25, hh * 0.35, math.min(ww, hh) * 0.35, 58, 84, 150, 90, 0)
+	nebula(ww * 0.68, hh * 0.62, math.min(ww, hh) * 0.42, 40, 60, 120, 70, 2.1)
+	nebula(ww * 0.55, hh * 0.25, math.min(ww, hh) * 0.25, 80, 80, 140, 60, 4.2)
 
-	-- Stars (stable per-seed)
-	surface.SetDrawColor(240, 220, 170, 255)
+	-- Stars (stable per-seed layout, gently twinkling out of phase)
 	math.randomseed(starSeed or 12345)
 	for i = 1, 220 do
 		local sx = x + math.random(6, ww - 6)
 		local sy = y + math.random(6, hh - 6)
+		local tw = 0.5 + 0.5 * math.sin(t * (0.6 + (i % 7) * 0.25) + i * 1.7)
+		surface.SetDrawColor(240, 220, 170, 90 + 165 * tw * tw)
 		surface.DrawRect(sx, sy, 1, 1)
 		if i % 9 == 0 then surface.DrawRect(sx, sy, 2, 1) end
 	end
@@ -186,10 +189,6 @@ local function openVault(items)
 		drawGalaxyBackground(pnl, w, h, VAULT.seed)
 		ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 		draw.SimpleText(string.upper("Astral Vault"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
-
-		-- Summon cost stated once, instead of under every slot card.
-		local summonCost = "Summon: " .. string.Comma(tonumber(VAULT_CFG.SUMMON_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.SUMMON_SHARDS) or 0) .. " shards"
-		draw.SimpleText(summonCost, "Arcana_AncientSmall", w - 48, 16, ArtDeco.Colors.textDim, TEXT_ALIGN_RIGHT)
 	end
 
 	-- Style close button like enchanter
@@ -220,11 +219,10 @@ local function openVault(items)
 
 	local cards = {}
 
-	local COLOR_DECO_BG = Color(24, 24, 36, 120)
+	local COLOR_DECO_BG = Color(10, 10, 18, 210)
 	local COLOR_EMPTY_TEXT = Color(200, 190, 170)
 	local COLOR_COST_TEXT = Color(210, 200, 185)
 	local COLOR_GOLD = Color(198, 160, 74, 255)
-	local COLOR_SUBTEXT = Color(170, 160, 140)
 	local COLOR_BUTTON_BG = Color(46, 36, 26, 235)
 	local COLOR_BUTTON_BG_HOVER = Color(58, 44, 32, 235)
 	local COLOR_BUTTON_FRAME_DISABLED = Color(140, 120, 90, 255)
@@ -254,6 +252,22 @@ local function openVault(items)
 		return model
 	end
 
+	-- Below the model: the weapon class as a fancy centered heading with
+	-- flanking strokes, a wide diamond divider, then the enchantments as
+	-- tarot captions — a pale-gold numeral over the name in small caps,
+	-- slim diamond dividers between them.
+	local ROMAN = {"I", "II", "III", "IV", "V"}
+	local COLOR_SEP = Color(160, 130, 60, 180)
+	local function drawDiamondDivider(mx, my, arm)
+		surface.SetDrawColor(COLOR_SEP)
+		surface.DrawRect(mx - 7 - arm, my, arm, 1)
+		surface.DrawRect(mx + 8, my, arm, 1)
+		surface.DrawLine(mx - 3, my, mx, my - 3)
+		surface.DrawLine(mx, my - 3, mx + 3, my)
+		surface.DrawLine(mx + 3, my, mx, my + 3)
+		surface.DrawLine(mx, my + 3, mx - 3, my)
+	end
+
 	local function buildEnchantList(card, it)
 		local enchList = vgui.Create("DPanel", card)
 		enchList:SetPaintBackground(false)
@@ -261,27 +275,131 @@ local function openVault(items)
 		enchList.Paint = function(pnl, w, h)
 			if not it then return end
 			local y = 0
-			for _, name in ipairs(pnl.names or {}) do
-				draw.SimpleText("- " .. name, "Arcana_AncientSmall", 0, y, COLOR_COST_TEXT)
-				y = y + 16
-				if y > h - 16 then break end
+
+			-- Class heading: pale gold, flanked by short brass strokes.
+			-- Truncated so long class names never clip at the card edges.
+			local cls = string.upper(it.class or "")
+			surface.SetFont("Arcana_AncientSmall")
+			local maxW = w - 60
+			local cw = surface.GetTextSize(cls)
+			if cw > maxW then
+				repeat
+					cls = string.sub(cls, 1, #cls - 1)
+					cw = surface.GetTextSize(cls .. "...")
+				until cw <= maxW or #cls <= 4
+				cls = cls .. "..."
+			end
+			draw.SimpleText(cls, "Arcana_AncientSmall", w * 0.5, y, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER)
+			surface.SetDrawColor(COLOR_SEP)
+			surface.DrawRect(w * 0.5 - cw * 0.5 - 26, y + 8, 18, 1)
+			surface.DrawRect(w * 0.5 + cw * 0.5 + 8, y + 8, 18, 1)
+			y = y + 19
+
+			-- Wide divider between the heading and the enchantments.
+			drawDiamondDivider(w * 0.5, y, 34)
+			y = y + 12
+
+			for i, name in ipairs(pnl.names or {}) do
+				if y > h - 26 then break end
+				draw.SimpleText(ROMAN[i] or tostring(i), "Arcana_AncientSmall", w * 0.5, y, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER)
+				y = y + 14
+				draw.SimpleText(string.upper(name), "Arcana_AncientSmall", w * 0.5, y, COLOR_COST_TEXT, TEXT_ALIGN_CENTER)
+				y = y + 17
+
+				if i < #pnl.names then
+					drawDiamondDivider(w * 0.5, y + 4, 17)
+					y = y + 11
+				end
 			end
 		end
 		if not it then enchList:SetVisible(false) end
 		return enchList
 	end
 
+	-- Hover hint for the summon button: "Summon weapon" with the have/need
+	-- costs underneath, coins in gold and shards in crystal blue, matching
+	-- the enchanter's cost readout.
+	local HINT_COIN_COL = Color(222, 198, 120)
+	local HINT_SHARD_COL = Color(105, 180, 255)
+	local function attachSummonHint(btn)
+		btn.OnCursorEntered = function(pnl)
+			if IsValid(pnl._hint) then return end
+
+			local tip = vgui.Create("DPanel")
+			tip:SetSize(220, 72)
+			tip:SetDrawOnTop(true)
+			tip:SetMouseInputEnabled(false)
+			tip.Paint = function(_, w, h)
+				ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoBg, 8)
+				ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
+				local lp = LocalPlayer()
+				local needCoins = tonumber(VAULT_CFG.SUMMON_COINS) or 0
+				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
+				draw.SimpleText("Summon weapon", "Arcana_AncientSmall", w * 0.5, 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
+				draw.SimpleText(string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(needCoins) .. " coins", "Arcana_AncientSmall", w * 0.5, 27, HINT_COIN_COL, TEXT_ALIGN_CENTER)
+				draw.SimpleText(string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards) .. " shards", "Arcana_AncientSmall", w * 0.5, 45, HINT_SHARD_COL, TEXT_ALIGN_CENTER)
+			end
+			pnl._hint = tip
+
+			local function place()
+				if not IsValid(tip) then return end
+				local mx, my = gui.MousePos()
+				tip:SetPos(math.Clamp(mx + 16, 0, ScrW() - tip:GetWide()), math.Clamp(my - 80, 0, ScrH() - tip:GetTall()))
+			end
+
+			place()
+			hook.Add("Think", "ArcanaVaultHint_" .. tostring(tip), function()
+				if not IsValid(tip) or not IsValid(pnl) or not pnl:IsHovered() then
+					hook.Remove("Think", "ArcanaVaultHint_" .. tostring(tip))
+					if IsValid(tip) then tip:Remove() end
+					return
+				end
+				place()
+			end)
+		end
+		btn.OnCursorExited = function(pnl)
+			if IsValid(pnl._hint) then pnl._hint:Remove() end
+			pnl._hint = nil
+		end
+	end
+
+	-- Round summon button: filled disc, double ring, and a sparkle sigil.
+	-- The label lives in a hover tooltip instead of on the button.
 	local function buildSummonButton(card, it)
 		local summon = vgui.Create("DButton", card)
 		summon:SetText("")
 		summon.Paint = function(pnl, w, h)
 			local enabled = pnl:IsEnabled()
 			local hovered = enabled and pnl:IsHovered()
-			ArtDeco.FillDecoPanel(0, 0, w, h, hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and ArtDeco.Colors.gold or COLOR_BUTTON_FRAME_DISABLED, 8)
-			draw.SimpleText(it and "Summon" or "Imprint", "Arcana_Ancient", w * 0.5, h * 0.5,
-				enabled and ArtDeco.Colors.textBright or COLOR_BUTTON_TEXT_DISABLED, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			local cx, cy = w * 0.5, h * 0.5
+			local r = math.min(w, h) * 0.5 - 2
+
+			draw.NoTexture()
+			local bg = hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG
+			surface.SetDrawColor(bg)
+			local pts = {}
+			local seg = 28
+			for k = 0, seg - 1 do
+				local a = (k / seg) * math.pi * 2
+				pts[#pts + 1] = {x = cx + math.cos(a) * r, y = cy + math.sin(a) * r}
+			end
+			surface.DrawPoly(pts)
+
+			local ring = enabled and (hovered and ArtDeco.Colors.paleGold or ArtDeco.Colors.gold) or COLOR_BUTTON_FRAME_DISABLED
+			surface.DrawCircle(cx, cy, r, ring.r, ring.g, ring.b, 255)
+			local inner = ArtDeco.Colors.brassInner
+			surface.DrawCircle(cx, cy, r - 3, inner.r, inner.g, inner.b, enabled and 200 or 90)
+
+			-- Sparkle sigil: long cross, short diagonals.
+			local sig = enabled and ArtDeco.Colors.paleGold or COLOR_BUTTON_TEXT_DISABLED
+			surface.SetDrawColor(sig)
+			surface.DrawLine(cx, cy - 9, cx, cy + 9)
+			surface.DrawLine(cx - 9, cy, cx + 9, cy)
+			surface.DrawLine(cx - 4, cy - 4, cx + 4, cy + 4)
+			surface.DrawLine(cx - 4, cy + 4, cx + 4, cy - 4)
 		end
+
+		attachSummonHint(summon)
 		summon.Think = function(pnl)
 			if not it then pnl:SetEnabled(false) return end
 			local lp = LocalPlayer()
@@ -327,13 +445,63 @@ local function openVault(items)
 		return delBtn
 	end
 
+	-- Tarot-style luxury frame: gold outline, an inner brass frame, and
+	-- gilded corners — the band between the outlines filled at the corner
+	-- cut, extended by a wing along each edge that tapers with a slant
+	-- toward the outer outline.
+	local TAROT_CORNER_MIRRORS = {{0, 0}, {1, 0}, {1, 1}, {0, 1}}
+	local function drawTarotFrame(w, h)
+		ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
+		ArtDeco.DrawDecoFrame(7, 7, w - 14, h - 14, ArtDeco.Colors.brassInner, 8)
+
+		-- Wings shrink on short/narrow panels so opposite corners never
+		-- collide; below a minimum reach a wing is dropped entirely.
+		local wingX = math.min(34, math.floor(w * 0.5) - 8)
+		local wingY = math.min(34, math.floor(h * 0.5) - 8)
+		local shapes = {
+			{{10, 2}, {15, 7}, {7, 15}, {2, 10}}, -- corner-cut quad
+		}
+		if wingX >= 26 then
+			shapes[#shapes + 1] = {{10, 2}, {wingX, 2}, {wingX - 8, 7}, {15, 7}}
+		end
+		if wingY >= 26 then
+			shapes[#shapes + 1] = {{2, 10}, {7, 15}, {7, wingY - 8}, {2, wingY}}
+		end
+
+		draw.NoTexture()
+		surface.SetDrawColor(ArtDeco.Colors.gold)
+		for _, m in ipairs(TAROT_CORNER_MIRRORS) do
+			for _, shape in ipairs(shapes) do
+				local pts = {}
+				for _, p in ipairs(shape) do
+					pts[#pts + 1] = {
+						x = m[1] == 0 and p[1] or (w - p[1]),
+						y = m[2] == 0 and p[2] or (h - p[2]),
+					}
+				end
+
+				-- Mirroring across one axis flips the winding; DrawPoly
+				-- needs clockwise, so reverse those.
+				if (m[1] + m[2]) == 1 then
+					local rev = {}
+					for k = #pts, 1, -1 do
+						rev[#rev + 1] = pts[k]
+					end
+					pts = rev
+				end
+
+				surface.DrawPoly(pts)
+			end
+		end
+	end
+
 	local function buildSlot(parent, it, slotIndex)
 		local card = vgui.Create("DPanel", parent)
 		card.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, COLOR_DECO_BG, 8)
-			ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
+			drawTarotFrame(w, h)
 			if it then
-				ArtDeco.DrawTruncatedText("Arcana_AncientLarge", (it.name or it.print or it.class or "Weapon"), 10, 8, ArtDeco.Colors.textBright, w - 20)
+				ArtDeco.DrawTruncatedText("Arcana_AncientLarge", (it.name or it.print or it.class or "Weapon"), 22, 11, ArtDeco.Colors.textBright, w - 56)
 			else
 				draw.SimpleText("EMPTY", "Arcana_AncientLarge", w * 0.5, h * 0.5, COLOR_EMPTY_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
@@ -344,25 +512,18 @@ local function openVault(items)
 		local summon   = buildSummonButton(card, it)
 		local delBtn   = buildDeleteButton(card, it)
 
-		local sub = vgui.Create("DLabel", card)
-		sub:SetFont("Arcana_AncientSmall")
-		sub:SetTextColor(COLOR_SUBTEXT)
-		sub:SetText(it and (it.class or "") or "")
-
 		card.PerformLayout = function(pnl, w, h)
 			local pad = 10
 			local titleH = 24
 			local modelTop = titleH + 4
-			local mH = math.floor(h * 0.62)
+			local mH = math.floor(h * 0.52)
 			model:SetPos(pad, modelTop)
 			model:SetSize(w - pad * 2, mH)
-			sub:SetPos(pad, modelTop + mH + 2)
-			sub:SetSize(w - pad * 2, 16)
-			enchList:SetPos(pad, modelTop + mH + 20)
-			enchList:SetSize(w - pad * 2, h - (modelTop + mH + 20) - 70)
-			summon:SetSize(w - pad * 2, 42)
-			summon:SetPos(pad, h - 55)
-			delBtn:SetPos(w - delBtn:GetWide() - 6, 6)
+			enchList:SetPos(pad, modelTop + mH + 6)
+			enchList:SetSize(w - pad * 2, h - (modelTop + mH + 6) - 76)
+			summon:SetSize(48, 48)
+			summon:SetPos(math.floor((w - 48) * 0.5), h - 68)
+			delBtn:SetPos(w - delBtn:GetWide() - 11, 11)
 		end
 
 		return card
@@ -399,20 +560,45 @@ local function openVault(items)
 	-- CREATE SPELL button: label above, cost below, no overlap.
 	local imprintBtn = vgui.Create("DButton", frame)
 	imprintBtn:Dock(BOTTOM)
-	imprintBtn:SetTall(46)
-	imprintBtn:DockMargin(12, 12, 12, 12)
+	imprintBtn:SetTall(58)
+	imprintBtn:DockMargin(12, 4, 12, 12)
 	imprintBtn:SetText("")
 	imprintBtn.Paint = function(pnl, w, h)
 		local enabled = pnl:IsEnabled()
 		local hovered = enabled and pnl:IsHovered()
 		local bgCol = hovered and COLOR_BUTTON_BG_HOVER or COLOR_BUTTON_BG
 		ArtDeco.FillDecoPanel(0, 0, w, h, bgCol, 8)
+
+		-- Double frame, no corner ornaments: they crowd a bar this size.
 		local frameCol = enabled and ArtDeco.Colors.gold or COLOR_BUTTON_FRAME_DISABLED
-		ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 8)
+		ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, frameCol, 8)
+		ArtDeco.DrawDecoFrame(7, 7, w - 14, h - 14, ArtDeco.Colors.brassInner, 8)
+
 		local txtCol = enabled and ArtDeco.Colors.textBright or COLOR_BUTTON_TEXT_DISABLED
-		draw.SimpleText("Imprint Current Weapon", "Arcana_Ancient", w * 0.5, h * 0.5 - 9, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		local sub = string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins, " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
-		draw.SimpleText(sub, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 10, COLOR_SUBTEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("Imprint Current Weapon", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		-- Costs, have / need, coins in gold and shards in crystal blue
+		-- around a small diamond, matching the summon hint. The whole
+		-- coins-diamond-shards block is measured and centered as one unit.
+		local lp = LocalPlayer()
+		local coinsTxt = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins"
+		local shardsTxt = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
+		surface.SetFont("Arcana_AncientSmall")
+		local cw1 = surface.GetTextSize(coinsTxt)
+		local cw2 = surface.GetTextSize(shardsTxt)
+		local gap = 10
+		local x0 = math.floor((w - (cw1 + gap + 6 + gap + cw2)) * 0.5)
+		local ty = h * 0.5 + 2
+		draw.SimpleText(coinsTxt, "Arcana_AncientSmall", x0, ty, HINT_COIN_COL)
+		draw.SimpleText(shardsTxt, "Arcana_AncientSmall", x0 + cw1 + gap + 6 + gap, ty, HINT_SHARD_COL)
+
+		local mx = x0 + cw1 + gap + 3
+		local my = ty + 8
+		surface.SetDrawColor(COLOR_SEP)
+		surface.DrawLine(mx - 3, my, mx, my - 3)
+		surface.DrawLine(mx, my - 3, mx + 3, my)
+		surface.DrawLine(mx + 3, my, mx, my + 3)
+		surface.DrawLine(mx, my + 3, mx - 3, my)
 	end
 	-- Enable/disable imprint based on weapon presence, vault space and affordability
 	imprintBtn.Think = function(pnl)
