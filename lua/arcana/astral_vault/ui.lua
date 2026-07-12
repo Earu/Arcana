@@ -111,6 +111,32 @@ end
 -- Global-ish state for live refresh
 local VAULT = {frame = nil, items = {}, rebuild = nil}
 
+-- Resolve a weapon's display name: the stored name (nickname or PrintName),
+-- falling back to the SWEP's PrintName, with "#token" localization phrases
+-- translated through language.GetPhrase.
+local function getWeaponDisplayName(it)
+	local name = it.name or it.print
+
+	if not name or name == "" or name == it.class then
+		local cls = it.class or ""
+		local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
+		name = (swep and (swep.PrintName or swep.Printname)) or cls
+	end
+
+	if isstring(name) and string.sub(name, 1, 1) == "#" then
+		local translated = language.GetPhrase(string.sub(name, 2))
+		if translated and translated ~= "" then
+			name = translated
+		end
+	end
+
+	if not name or name == "" then
+		name = it.class or "Weapon"
+	end
+
+	return name
+end
+
 local function getEnchantDisplayList(ids)
 	local out = {}
 	for _, id in ipairs(ids or {}) do
@@ -497,11 +523,12 @@ local function openVault(items)
 
 	local function buildSlot(parent, it, slotIndex)
 		local card = vgui.Create("DPanel", parent)
+		local displayName = it and getWeaponDisplayName(it) or ""
 		card.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, COLOR_DECO_BG, 8)
 			drawTarotFrame(w, h)
 			if it then
-				ArtDeco.DrawTruncatedText("Arcana_AncientLarge", (it.name or it.print or it.class or "Weapon"), 22, 11, ArtDeco.Colors.textBright, w - 56)
+				ArtDeco.DrawTruncatedText("Arcana_AncientLarge", displayName, 22, 11, ArtDeco.Colors.textBright, w - 56)
 			else
 				draw.SimpleText("EMPTY", "Arcana_AncientLarge", w * 0.5, h * 0.5, COLOR_EMPTY_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
