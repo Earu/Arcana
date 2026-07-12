@@ -65,6 +65,10 @@ if SERVER then
 
 		self.Created = CurTime()
 
+		-- Modifier state (compiled spell is assigned before Spawn by CastBolt).
+		self._bounces = self._spellcraft and self._spellcraft.ricochets or 0
+		self._pierceCount = 0
+
 		timer.Simple(self.MaxLifetime, function()
 			if IsValid(self) and not self._detonated then self:Detonate() end
 		end)
@@ -102,11 +106,40 @@ if SERVER then
 		return Arcana and Arcana.Common and Arcana.Common.IsSolidNonTrigger(ent)
 	end
 
+	local function isActorEnt(ent)
+		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+	end
+
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
 		local hit = data.HitEntity
+		local sc = self._spellcraft
+
+		-- Piercing bolts fly through actors; the Touch handler strikes them.
+		if isActorEnt(hit) and sc and sc.pierce then return end
+
 		if (IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit)) or hit:IsWorld() then
+			-- Ricochet: reflect off surfaces (never actors) while bounces remain.
+			if not isActorEnt(hit) and (self._bounces or 0) > 0 then
+				self._bounces = self._bounces - 1
+
+				local vel = data.OurOldVelocity
+				local n = data.HitNormal
+				local reflected = vel - 2 * vel:Dot(n) * n
+				timer.Simple(0, function()
+					if not IsValid(self) then return end
+					local p = self:GetPhysicsObject()
+					if IsValid(p) then p:SetVelocity(reflected) end
+				end)
+
+				self:EmitSound("physics/concrete/rock_impact_hard" .. math.random(1, 3) .. ".wav", 65, 130)
+				if Arcana.Spellcraft and Arcana.Spellcraft.ImpactFX then
+					Arcana.Spellcraft.ImpactFX(self:GetElement(), data.HitPos or self:GetPos(), 50, 0.3)
+				end
+				return
+			end
+
 			self:Detonate()
 		end
 	end
@@ -115,6 +148,42 @@ if SERVER then
 		if self._detonated then return end
 		if ent == self:GetSpellOwner() then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
+
+		local sc = self._spellcraft
+
+		-- Piercing: strike the victim directly and keep flying.
+		if isActorEnt(ent) and sc and sc.pierce then
+			self._pierced = self._pierced or {}
+			if self._pierced[ent] then return end
+			self._pierced[ent] = true
+			self._pierceCount = (self._pierceCount or 0) + 1
+
+			local caster = self._spellcraftCaster
+			if IsValid(caster) and not (ent:IsPlayer() and not ent:Alive()) then
+				local mult = self._pierceCount == 1 and 1 or 0.65
+				local dmg = DamageInfo()
+				dmg:SetDamage(sc.damage * mult)
+				dmg:SetDamageType(sc.damageType)
+				dmg:SetAttacker(caster)
+				dmg:SetInflictor(self)
+				dmg:SetDamagePosition(ent:WorldSpaceCenter())
+				Arcana:TakeDamageInfo(ent, dmg)
+				Arcana.Spellcraft.ApplyEssenceHit(caster, ent, self:GetPos(), sc)
+				Arcana.Spellcraft.ImpactFX(self:GetElement(), self:GetPos(), 60, 0.4)
+			end
+
+			-- Fly on: drop any homing lock so it doesn't orbit the victim.
+			self._homingTarget = nil
+
+			-- Spent after three victims: fizzle out (no full blast on top of
+			-- the pierced hits; the damage cap already accounts for them).
+			if self._pierceCount >= 3 then
+				self._detonated = true
+				self:Remove()
+			end
+			return
+		end
+
 		if isSolidNonTrigger(ent) then self:Detonate() end
 	end
 

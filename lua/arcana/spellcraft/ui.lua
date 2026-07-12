@@ -3,7 +3,7 @@
 -- Composing is a 4-step wizard, one minimal view at a time:
 --   1. FORM       how the spell is delivered
 --   2. ESSENCE    the nature of the magic (buy locked ones here)
---   3. MODIFIERS  optional clauses, up to four ranks
+--   3. MODIFIERS  optional clauses, up to five ranks
 --   4. RECAP      full summary, name it, pay the cost
 -- BACK/NEXT navigate; the breadcrumb jumps to any completed step. Selecting an
 -- occupied slot on the left shows that crafted spell's details/requirements instead.
@@ -932,7 +932,7 @@ local function OpenSpellcraftMenu(machine)
 
 		buildWizardHeader("ADD MODIFIERS", "Optional. Each rank costs power and raises the price. Skip ahead if you want none.")
 		buildWizardNav(function() return true end)
-		buildPowerBar(function() return slotCount() .. "/4 modifiers" end)
+		buildPowerBar(function() return slotCount() .. "/" .. P.MAX_CLAUSE_SLOTS .. " modifiers" end)
 
 		local scroll = vgui.Create("DScrollPanel", right)
 		scroll:Dock(FILL)
@@ -959,9 +959,25 @@ local function OpenSpellcraftMenu(machine)
 					local nextRank = rank + 1
 					if nextRank > clause.maxRank then return nil end -- maxed; +' is just inert
 					if level < clause.levels[nextRank] then return "Unlocks at level " .. clause.levels[nextRank] end
-					if slotCount() >= 4 then return "Modifier limit reached (4)" end
+					if slotCount() >= P.MAX_CLAUSE_SLOTS then return "Modifier limit reached (" .. P.MAX_CLAUSE_SLOTS .. ")" end
 					if clause.id == "homing" and (state.clauseRanks.widen or 0) >= 2 then return "Conflicts with Widen II" end
 					if clause.id == "widen" and nextRank >= 2 and state.clauseRanks.homing then return "Rank II conflicts with Homing" end
+
+					-- Generic pairwise conflicts (mirrors Compile), both directions.
+					for other in pairs(clause.conflicts or {}) do
+						if state.clauseRanks[other] then
+							return "Conflicts with " .. (P.Clauses[other] and P.Clauses[other].label or other)
+						end
+					end
+					for otherId, rank2 in pairs(state.clauseRanks) do
+						if rank2 > 0 then
+							local other = P.Clauses[otherId]
+							if other and other.conflicts and other.conflicts[clause.id] then
+								return "Conflicts with " .. other.label
+							end
+						end
+					end
+
 					return nil
 				end
 
