@@ -1013,14 +1013,25 @@ local function createBandsForWeapon(wep, count, style)
 
 	local ringCount = math.min(3, count)
 	local orbBase = math.max(10, effectiveSmallest * 0.9)
-	buildBandRings(bc, ringCount, style, {
+	local ringParams = {
 		base = orbBase, heightscale = math.max(3, orbBase * 0.18), zBiasStep = 0.5,
 		baseR = baseR, bandH = bandH, stepR = math.max(2.5, effectiveSmallest * 0.16),
 		totalSpan = (longest or 24) * (held and 0.35 or 0.45),
-	})
+	}
+	buildBandRings(bc, ringCount, style, ringParams)
+
+	-- Akimbo: a second identical ring set for the off-hand gun
+	local bcL
+	if style == "dual" then
+		bcL = BandCircle.Create(pos, ang, col, 80, 0)
+		if bcL then
+			buildBandRings(bcL, ringCount, style, ringParams)
+		end
+	end
 
 	return {
 		bc = bc,
+		bcL = bcL,
 		axis = axis,
 		count = count,
 		lastStr = wep:GetNWString("Arcana_EnchantIds", "[]"),
@@ -1068,7 +1079,15 @@ local function ensureVFXFor(wep)
 	local count = getEnchantCount(wep)
 	local s = ActiveVFXByEnt[wep]
 	local str = wep:GetNWString("Arcana_EnchantIds", "[]")
-	local styleWanted = (isMeleeHoldType(wep) or isPistolHoldType(wep) or isRifleHoldType(wep)) and "axis" or "orbital"
+	local holdType = (wep.GetHoldType and wep:GetHoldType() or ""):lower()
+	local styleWanted
+	if holdType == "duel" and isHeldActive(wep) then
+		styleWanted = "dual" -- akimbo: one axis ring set per hand
+	elseif isMeleeHoldType(wep) or isPistolHoldType(wep) or isRifleHoldType(wep) then
+		styleWanted = "axis"
+	else
+		styleWanted = "orbital"
+	end
 
 	if count <= 0 then
 		if s then
@@ -1129,7 +1148,21 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 			continue
 		end
 
-		if IsValid(owner) and isHeldActive(wep) and isRifleHoldType(wep) then
+		local angOverride
+		if IsValid(owner) and isHeldActive(wep) and st.style == "dual" and st.bcL then
+			-- Akimbo: one ring per hand, both slid towards the muzzles along the
+			-- aim direction (the guns track where the player looks)
+			local rp, lp = getPlayerHandPositions(owner)
+			local aim = owner:GetAimVector()
+			dir = aim
+			local fwdOff = math.max(4, (tonumber(longest) or 14) * 0.3)
+			if rp then pos = rp + aim * fwdOff end
+			if lp then st.bcL.position = lp + aim * fwdOff end
+			-- The generic builder rolls against the eye FORWARD, which is parallel
+			-- to this ring's normal (the aim) and therefore degenerate — the rings
+			-- spin wildly on look. Roll against the eye right instead.
+			angOverride = anglesFromUpRight(aim, owner:EyeAngles():Right())
+		elseif IsValid(owner) and isHeldActive(wep) and isRifleHoldType(wep) then
 			local rp, lp = getPlayerHandPositions(owner)
 			local muzzle = getMuzzleAttachmentPos(wep)
 			local leftPoint = muzzle or lp
@@ -1177,7 +1210,7 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 		-- Decide style per-frame: default to axis when not held; use orbital only for held throwable types
 		local held = IsValid(owner) and isHeldActive(wep)
 		local desiredStyle
-		if held and not (isRifleHoldType(wep) or isPistolHoldType(wep) or isMeleeHoldType(wep)) then
+		if held and st.style ~= "dual" and not (isRifleHoldType(wep) or isPistolHoldType(wep) or isMeleeHoldType(wep)) then
 			desiredStyle = "orbital"
 		else
 			desiredStyle = "axis"
@@ -1191,13 +1224,17 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 			refFwd = wep:GetForward()
 		end
 
-		local ang = buildOrientedAnglesForAxis(upAxis, owner, refFwd)
+		local ang = angOverride or buildOrientedAnglesForAxis(upAxis, owner, refFwd)
 		st.bc.position = pos
 		st.bc.angles = ang
 
 		-- Refresh color (physgun color may change)
 		local col = getPhysgunColorFor(wep)
 		st.bc.color = col
+		if st.bcL then
+			st.bcL.angles = ang
+			st.bcL.color = col
+		end
 	end
 end)
 
