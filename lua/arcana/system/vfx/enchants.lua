@@ -603,6 +603,15 @@ local function boneDescendsFrom(vm, boneId, ancestorId)
 	return false
 end
 
+local BODY_BONE_TOKENS = {"arm", "clavicle", "spine", "shoulder", "elbow", "neck", "pelvis", "finger", "wrist", "hand"}
+local function isBodyBoneName(name)
+	local lname = (name or ""):lower()
+	for _, tok in ipairs(BODY_BONE_TOKENS) do
+		if lname:find(tok, 1, true) then return true end
+	end
+	return false
+end
+
 -- Dominant axis of a local-space AABB: center, unit axis (signed towards the
 -- centroid — the heavy side is the blade on melee), length and elongation
 local function dominantAxisOfBox(mins, maxs)
@@ -626,12 +635,13 @@ end
 -- (bones often sit off it). The most elongated qualifying box wins: a thin barrel
 -- box describes the weapon line better than a chunky frame-plus-grip box.
 -- minLen filters out boxes that are just fists/fingers.
-local function getBladeHitbox(vm, anchorBoneId, minLen)
+local function getBladeHitbox(vm, anchorBoneId, minLen, excludeBody)
 	local best
 	for group = 0, (vm:GetHitboxSetCount() or 1) - 1 do
 		for hb = 0, (vm:GetHitBoxCount(group) or 0) - 1 do
 			local boneId = vm:GetHitBoxBone(hb, group)
-			if boneId and (anchorBoneId == nil or boneDescendsFrom(vm, boneId, anchorBoneId)) then
+			if boneId and (anchorBoneId == nil or boneDescendsFrom(vm, boneId, anchorBoneId))
+				and not (excludeBody and isBodyBoneName(vm:GetBoneName(boneId))) then
 				local mins, maxs = vm:GetHitBoxBounds(hb, group)
 				if mins and maxs then
 					local center, axis, len, aspect = dominantAxisOfBox(mins, maxs)
@@ -651,58 +661,86 @@ end
 -- including depth lean the hand-bone axes can't express. One-time per model,
 -- then evaluated like a real hitbox on the live bone matrix.
 local meshBladeCache = {}
-local function getBladeFromMesh(vm, anchorBoneId, minLen)
-	local key = (vm:GetModel() or "") .. "/" .. tostring(anchorBoneId)
-	local cached = meshBladeCache[key]
-	if cached ~= nil then
-		if not cached then return nil end
-		return cached.center, cached.axis, cached.len, cached.bone
-	end
-	meshBladeCache[key] = false
-	local meshes, bindPose = util.GetModelMeshes(vm:GetModel() or "", 0, 0)
-	if not (meshes and bindPose) then return nil end
-	local boxes = {}
-	for _, mesh in ipairs(meshes) do
-		for _, vert in ipairs(mesh.triangles or {}) do
-			local boneId, bestW = nil, 0.5
-			for _, w in ipairs(vert.weights or {}) do
-				if w.weight > bestW then bestW, boneId = w.weight, w.bone end
-			end
-			if boneId and (anchorBoneId == nil or boneDescendsFrom(vm, boneId, anchorBoneId)) then
-				local bind = bindPose[boneId]
-				if bind and bind.matrix then
-					local box = boxes[boneId]
-					if not box then
-						box = {
-							mins = Vector(math.huge, math.huge, math.huge),
-							maxs = Vector(-math.huge, -math.huge, -math.huge),
-						}
-						boxes[boneId] = box
+local function getBladeFromMesh(vm, anchorBoneId, minLen, excludeBody)
+	local key = (vm:GetModel() or "") .. "/" .. tostring(anchorBoneId) .. (excludeBody and "!b" or "")
+	local cands = meshBladeCache[key]
+	if cands == nil then
+		cands = {}
+		local meshes, bindPose = util.GetModelMeshes(vm:GetModel() or "", 0, 0)
+		if meshes and bindPose then
+			local boxes = {}
+			for _, mesh in ipairs(meshes) do
+				for _, vert in ipairs(mesh.triangles or {}) do
+					local boneId, bestW = nil, 0.5
+					for _, w in ipairs(vert.weights or {}) do
+						if w.weight > bestW then bestW, boneId = w.weight, w.bone end
 					end
-					-- bindPose matrices are the INVERSE bind transforms: they map
-					-- bind-pose model space straight into bone-local space
-					local lp = bind.matrix * vert.pos
-					box.mins.x = math.min(box.mins.x, lp.x)
-					box.mins.y = math.min(box.mins.y, lp.y)
-					box.mins.z = math.min(box.mins.z, lp.z)
-					box.maxs.x = math.max(box.maxs.x, lp.x)
-					box.maxs.y = math.max(box.maxs.y, lp.y)
-					box.maxs.z = math.max(box.maxs.z, lp.z)
+					if boneId and (anchorBoneId == nil or boneDescendsFrom(vm, boneId, anchorBoneId))
+						and not (excludeBody and isBodyBoneName(vm:GetBoneName(boneId))) then
+						local bind = bindPose[boneId]
+						if bind and bind.matrix then
+							local box = boxes[boneId]
+							if not box then
+								box = {
+									mins = Vector(math.huge, math.huge, math.huge),
+									maxs = Vector(-math.huge, -math.huge, -math.huge),
+								}
+								boxes[boneId] = box
+							end
+							-- bindPose matrices are the INVERSE bind transforms: they map
+							-- bind-pose model space straight into bone-local space
+							local lp = bind.matrix * vert.pos
+							box.mins.x = math.min(box.mins.x, lp.x)
+							box.mins.y = math.min(box.mins.y, lp.y)
+							box.mins.z = math.min(box.mins.z, lp.z)
+							box.maxs.x = math.max(box.maxs.x, lp.x)
+							box.maxs.y = math.max(box.maxs.y, lp.y)
+							box.maxs.z = math.max(box.maxs.z, lp.z)
+						end
+					end
 				end
 			end
+			for boneId, box in pairs(boxes) do
+				local center, axis, len, aspect = dominantAxisOfBox(box.mins, box.maxs)
+				local depth, walker = 0, boneId
+				for _ = 1, 16 do
+					walker = vm:GetBoneParent(walker)
+					if not walker or walker < 0 then break end
+					depth = depth + 1
+				end
+				cands[#cands + 1] = {center = center, axis = axis, len = len, bone = boneId, aspect = aspect, depth = depth}
+			end
+		end
+		meshBladeCache[key] = cands
+	end
+	local bestAspect = 0
+	for _, c in ipairs(cands) do
+		if c.len >= minLen then bestAspect = math.max(bestAspect, c.aspect) end
+	end
+	if bestAspect <= 0 then return nil end
+	local best, bestIsBlade
+	for _, c in ipairs(cands) do
+		-- Near-tied elongations (a balisong's blade vs its handles): a bone
+		-- literally named after the blade wins outright; otherwise resolve by
+		-- hierarchy — moving parts (handles, slides) hang off the main body
+		-- bone, which carries the blade — preferring the shallowest cluster
+		if c.len >= minLen and c.aspect >= bestAspect * 0.8 then
+			local lname = (vm:GetBoneName(c.bone) or ""):lower()
+			local isBlade = lname:find("blade", 1, true) ~= nil or lname:find("tip", 1, true) ~= nil
+			local better
+			if not best then
+				better = true
+			elseif isBlade ~= bestIsBlade then
+				better = isBlade
+			elseif c.depth ~= best.depth then
+				better = c.depth < best.depth
+			else
+				better = c.aspect > best.aspect
+			end
+			if better then best, bestIsBlade = c, isBlade end
 		end
 	end
-	local best
-	for boneId, box in pairs(boxes) do
-		local center, axis, len, aspect = dominantAxisOfBox(box.mins, box.maxs)
-		if len >= minLen and (not best or aspect > best.aspect) then
-			best = {center = center, axis = axis, len = len, bone = boneId, aspect = aspect}
-		end
-	end
-	if best then
-		meshBladeCache[key] = best
-		return best.center, best.axis, best.len, best.bone
-	end
+	return best.center, best.axis, best.len, best.bone
 end
 
 -- Viewmodel attachment positions come back FormatViewModelAttachment'd by the
@@ -793,6 +831,17 @@ local function evalVMAnchor(vm, wep, anchor, style, eyePos, eyeAng)
 			if not anchor.hbAxis then
 				-- No shipped hitboxes: measure one from the mesh's own vertices
 				anchor.hbCenter, anchor.hbAxis, anchor.hbLen, anchor.hbBone = getBladeFromMesh(vm, searchRoot, minLen)
+			end
+			-- Melee weapons can hang off a root-level weapon bone entirely outside
+			-- the hand's subtree (TF2's weapon_bone) — widen to the whole rig,
+			-- keeping body-part bones out by name so forearm boxes can't win
+			-- (which also lets the length gate drop low enough for short blades).
+			-- Dual stays subtree-only: each side must find its own gun.
+			if not anchor.hbAxis and searchRoot ~= nil and style ~= "dual" then
+				anchor.hbCenter, anchor.hbAxis, anchor.hbLen, anchor.hbBone = getBladeHitbox(vm, nil, 6, true)
+				if not anchor.hbAxis then
+					anchor.hbCenter, anchor.hbAxis, anchor.hbLen, anchor.hbBone = getBladeFromMesh(vm, nil, 6, true)
+				end
 			end
 		end
 	end
