@@ -821,31 +821,26 @@ if CLIENT then
 			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
 		end)
 
+		-- Declared here so the title chips can measure the band down to its frame.
+		local content
+
 		frame.Paint = function(pnl, w, h)
 			drawAltarBackground(w, h, bgSeed)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
-			draw.SimpleText("ALTAR", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
+
+			-- Title and chips share the band between the frame's top line and the spell
+			-- list's frame below, so they center on one line with even gaps.
+			local bandTop = 6 + 1
+			local bandBottom = IsValid(content) and (content:GetY() + 4) or (bandTop + 38)
+			local titleRight = ArtDeco.DrawTitle("Arcana_DecoTitle", "ALTAR", bandTop, bandBottom, ArtDeco.Colors.paleGold)
+
 			-- Level and Knowledge Points chips (XP progression hidden by request)
 			local data = Arcana:GetPlayerData(ply)
 
 			if data then
-				-- Level chip
-				local lvlText = "LVL " .. tostring(data.level or 1)
-				surface.SetFont("Arcana_Ancient")
-				local lvlW, lvlH = surface.GetTextSize(lvlText)
-				local chipY = 11
-				local chipX = 110
-				local lvlChipW, chipH = lvlW + 18, lvlH + 6
-				ArtDeco.FillDecoPanel(chipX, chipY, lvlChipW, chipH, ArtDeco.Colors.paleGold, 8)
-				draw.SimpleText(lvlText, "Arcana_Ancient", chipX + (lvlChipW - lvlW) * 0.5, chipY + (chipH - lvlH) * 0.5, ArtDeco.Colors.chipTextCol)
-				-- KP chip to the right
-				local kpText = "KP " .. tostring(data.knowledge_points or 0)
-				local kpW, kpH = surface.GetTextSize(kpText)
-				local gap = 10
-				local kpChipX = chipX + lvlChipW + gap
-				local kpChipW = kpW + 18
-				ArtDeco.FillDecoPanel(kpChipX, chipY, kpChipW, chipH, ArtDeco.Colors.paleGold, 8)
-				draw.SimpleText(kpText, "Arcana_Ancient", kpChipX + (kpChipW - kpW) * 0.5, chipY + (chipH - kpH) * 0.5, ArtDeco.Colors.chipTextCol)
+				local gap = 14
+				local nextX = ArtDeco.DrawChip("Arcana_Ancient", "LVL " .. tostring(data.level or 1), titleRight + gap, bandTop, bandBottom)
+				ArtDeco.DrawChip("Arcana_Ancient", "KP " .. tostring(data.knowledge_points or 0), nextX + 10, bandTop, bandBottom)
 			end
 		end
 
@@ -857,24 +852,7 @@ if CLIENT then
 			frame.btnMaxim:Hide()
 		end
 
-		if IsValid(frame.btnClose) then
-			local close = frame.btnClose
-			close:SetText("")
-			close:SetSize(26, 26)
-
-			function frame:PerformLayout(w, h)
-				if IsValid(close) then
-					close:SetPos(w - 26 - 10, 8)
-				end
-			end
-
-			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(ArtDeco.Colors.paleGold)
-				local pad = 8
-				surface.DrawLine(pad, pad, w - pad, h - pad)
-				surface.DrawLine(w - pad, pad, pad, h - pad)
-			end
-		end
+		ArtDeco.StyleCloseButton(frame)
 
 		-- Ensure tooltips are cleaned on close/remove
 		frame.OnClose = function()
@@ -895,7 +873,7 @@ if CLIENT then
 
 		frame.OnRemove = frame.OnClose
 
-		local content = vgui.Create("DPanel", frame)
+		content = vgui.Create("DPanel", frame)
 		content:Dock(FILL)
 		content:DockMargin(12, 12, 12, 12)
 		content.Paint = nil

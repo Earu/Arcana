@@ -37,10 +37,6 @@ list.Set("DesktopWindows", "ArcanaAstralVault", {
 	end
 })
 
--- Custom colors for astral vault (darker theme)
-local decoBg = Color(12, 12, 20, 235)
-local decoPanel = Color(18, 18, 28, 235)
-
 local function drawGalaxyBackground(pnl, w, h, starSeed)
 	-- Galaxy clipped to an art-deco octagon using the stencil buffer
 	local x, y = 6, 6
@@ -137,6 +133,43 @@ local function getWeaponDisplayName(it)
 	return name
 end
 
+-- Greedy word wrap at the current surface font. Returns nil when a single word
+-- is wider than maxW, since no amount of wrapping will make that fit.
+local function wrapLines(text, maxW)
+	local lines, cur = {}, nil
+
+	for word in string.gmatch(text, "%S+") do
+		local test = cur and (cur .. " " .. word) or word
+		if surface.GetTextSize(test) <= maxW then
+			cur = test
+		else
+			if not cur or surface.GetTextSize(word) > maxW then return nil end
+			lines[#lines + 1] = cur
+			cur = word
+		end
+	end
+
+	if cur then lines[#lines + 1] = cur end
+
+	return lines
+end
+
+-- Fit a weapon name into a card's title strip. Cards keep the large title font so
+-- their headings all read at one size: a long name wraps onto a second line rather
+-- than shrinking. Smaller fonts, then an ellipsis, are last resorts for a name too
+-- long to wrap into two large lines.
+local TITLE_FONTS = {"Arcana_AncientLarge", "Arcana_Ancient", "Arcana_AncientSmall"}
+local TITLE_MAX_LINES = 2
+local function fitTitle(text, maxW)
+	for _, font in ipairs(TITLE_FONTS) do
+		surface.SetFont(font)
+		local lines = wrapLines(text, maxW)
+		if lines and #lines <= TITLE_MAX_LINES then return font, lines, false end
+	end
+
+	return TITLE_FONTS[#TITLE_FONTS], {text}, true
+end
+
 local function getEnchantDisplayList(ids)
 	local out = {}
 	for _, id in ipairs(ids or {}) do
@@ -147,45 +180,8 @@ local function getEnchantDisplayList(ids)
 	return out
 end
 
-local COLOR_CHIP_BG = Color(20, 20, 28, 180)
-local COLOR_CHIP_FRAME = Color(160, 140, 110, 220)
-local function drawChip(x, y, txt, font, bgCol, frameCol)
-	surface.SetFont(font or "Arcana_AncientSmall")
-	local tw, th = surface.GetTextSize(txt)
-	local padX, padY = 6, 2
-	local w, h = tw + padX * 2, th + padY * 2
-	ArtDeco.FillDecoPanel(x, y, w, h, bgCol or COLOR_CHIP_BG, 6)
-	ArtDeco.DrawDecoFrame(x, y, w, h, frameCol or COLOR_CHIP_FRAME, 6)
-	draw.SimpleText(txt, font or "Arcana_AncientSmall", x + padX, y + padY - 1, ArtDeco.Colors.textBright)
-	return w, h
-end
-
--- Fit a model into a DModelPanel based on its bounding box
-local DIRECTION_DEFAULT = Vector(1, 1, 0.5)
-local function FitModelPanel(mp)
-	if not IsValid(mp) then return end
-
-	local ent = mp:GetEntity()
-	if not IsValid(ent) then return end
-
-	local mn, mx = ent:GetRenderBounds()
-	local size = mx - mn
-	local maxDim = math.max(math.abs(size.x), math.max(math.abs(size.y), math.abs(size.z)))
-	if maxDim < 1 then maxDim = 1 end
-
-	local radius = maxDim * 0.5
-	local center = (mn + mx) * 0.5
-	local fov = 30
-	local tanHalf = math.tan(math.rad(fov * 0.5))
-	if tanHalf <= 0 then tanHalf = 0.5 end
-
-	local dist = (radius / tanHalf) * 1.25
-	local dir = DIRECTION_DEFAULT:GetNormalized()
-	local camPos = center + dir * dist
-	mp:SetFOV(fov)
-	mp:SetCamPos(camPos)
-	mp:SetLookAt(center)
-end
+local MODEL_FOV = 30
+local MODEL_DIR = Vector(1, 1, 0.5)
 
 local function openVault(items)
 	-- If already open, just refresh contents
@@ -211,34 +207,28 @@ local function openVault(items)
 		ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
 	end)
 
+	-- Declared here so the title can measure the band down to the cards' frames.
+	local container
+
 	frame.Paint = function(pnl, w, h)
 		drawGalaxyBackground(pnl, w, h, VAULT.seed)
 		ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
-		draw.SimpleText(string.upper("Astral Vault"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
+
+		-- The title centers in the band between the frame's top line and the slot
+		-- cards below: cards sit 8px into the container and frame themselves at +2.
+		local bandTop = 6 + 1
+		local bandBottom = IsValid(container) and (container:GetY() + 10) or (bandTop + 38)
+		ArtDeco.DrawTitle("Arcana_AncientLarge", string.upper("Astral Vault"), bandTop, bandBottom, ArtDeco.Colors.paleGold)
 	end
 
-	-- Style close button like enchanter
-	if IsValid(frame.btnClose) then
-		local close = frame.btnClose
-		close:SetText("")
-		close:SetSize(26, 26)
-		function frame:PerformLayout(w, h)
-			if IsValid(close) then close:SetPos(w - 26 - 10, 8) end
-		end
-		close.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			local pad = 8
-			surface.DrawLine(pad, pad, w - pad, h - pad)
-			surface.DrawLine(w - pad, pad, pad, h - pad)
-		end
-	end
+	ArtDeco.StyleCloseButton(frame)
 
 	-- Hide minimize/maximize buttons
 	if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
 	if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
 
 	-- Single row of slot cards (max 6)
-	local container = vgui.Create("DPanel", frame)
+	container = vgui.Create("DPanel", frame)
 	container:Dock(FILL)
 	container:DockMargin(8, 8, 8, 0)
 	container.Paint = function(pnl, w, h) end
@@ -257,8 +247,8 @@ local function openVault(items)
 		local model = vgui.Create("DModelPanel", card)
 		model:SetMouseInputEnabled(false)
 		function model:LayoutEntity(ent)
-			ent:SetAngles(Angle(0, CurTime() * 15 % 360, 0))
-			FitModelPanel(self)
+			ArtDeco.SpinModelPanelEntity(ent, Angle(0, CurTime() * 15 % 360, 0))
+			ArtDeco.FitModelPanel(self, MODEL_FOV, MODEL_DIR)
 		end
 		function model:PostDrawModel(ent)
 			if Arcana and Arcana.RenderEnchantBandsForEntity then
@@ -270,7 +260,7 @@ local function openVault(items)
 			local cls = it.class or ""
 			local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
 			model:SetModel((swep and (swep.WorldModel or swep.ViewModel)) or HL2_MODELS[cls] or "models/weapons/w_pistol.mdl")
-			FitModelPanel(model)
+			ArtDeco.FitModelPanel(model, MODEL_FOV, MODEL_DIR)
 			model._EnchantCount = math.max(1, #(it.enchant_ids or {}))
 		else
 			model:SetVisible(false)
@@ -284,6 +274,9 @@ local function openVault(items)
 	-- slim diamond dividers between them.
 	local ROMAN = {"I", "II", "III", "IV", "V"}
 	local COLOR_SEP = Color(160, 130, 60, 180)
+
+	-- Ornaments and captions must share one integer center, or a half-pixel x
+	-- rounds the two halves of a divider onto different columns.
 	local function drawDiamondDivider(mx, my, arm)
 		surface.SetDrawColor(COLOR_SEP)
 		surface.DrawRect(mx - 7 - arm, my, arm, 1)
@@ -294,6 +287,18 @@ local function openVault(items)
 		surface.DrawLine(mx, my + 3, mx - 3, my)
 	end
 
+	-- draw.SimpleText's TEXT_ALIGN_CENTER lands odd-width text half a pixel left
+	-- of center; snapping the left edge ourselves keeps it on the same axis as the
+	-- diamonds. Returns the drawn text's left and right edges.
+	local function drawCenteredText(text, font, cx, y, col)
+		surface.SetFont(font)
+		local tw = surface.GetTextSize(text)
+		local tx = cx - math.floor(tw * 0.5)
+		draw.SimpleText(text, font, tx, y, col)
+
+		return tx, tx + tw
+	end
+
 	local function buildEnchantList(card, it)
 		local enchList = vgui.Create("DPanel", card)
 		enchList:SetPaintBackground(false)
@@ -301,6 +306,7 @@ local function openVault(items)
 		enchList.Paint = function(pnl, w, h)
 			if not it then return end
 			local y = 0
+			local cx = math.floor(w * 0.5)
 
 			-- Class heading: pale gold, flanked by short brass strokes.
 			-- Truncated so long class names never clip at the card edges.
@@ -315,25 +321,28 @@ local function openVault(items)
 				until cw <= maxW or #cls <= 4
 				cls = cls .. "..."
 			end
-			draw.SimpleText(cls, "Arcana_AncientSmall", w * 0.5, y, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER)
+
+			-- Strokes hang off the heading's drawn edges, so both gaps are 8px
+			-- wide whatever the text width rounds to.
+			local clsLeft, clsRight = drawCenteredText(cls, "Arcana_AncientSmall", cx, y, ArtDeco.Colors.paleGold)
 			surface.SetDrawColor(COLOR_SEP)
-			surface.DrawRect(w * 0.5 - cw * 0.5 - 26, y + 8, 18, 1)
-			surface.DrawRect(w * 0.5 + cw * 0.5 + 8, y + 8, 18, 1)
+			surface.DrawRect(clsLeft - 26, y + 8, 18, 1)
+			surface.DrawRect(clsRight + 8, y + 8, 18, 1)
 			y = y + 19
 
 			-- Wide divider between the heading and the enchantments.
-			drawDiamondDivider(w * 0.5, y, 34)
+			drawDiamondDivider(cx, y, 34)
 			y = y + 12
 
 			for i, name in ipairs(pnl.names or {}) do
 				if y > h - 26 then break end
-				draw.SimpleText(ROMAN[i] or tostring(i), "Arcana_AncientSmall", w * 0.5, y, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER)
+				drawCenteredText(ROMAN[i] or tostring(i), "Arcana_AncientSmall", cx, y, ArtDeco.Colors.paleGold)
 				y = y + 14
-				draw.SimpleText(string.upper(name), "Arcana_AncientSmall", w * 0.5, y, COLOR_COST_TEXT, TEXT_ALIGN_CENTER)
+				drawCenteredText(string.upper(name), "Arcana_AncientSmall", cx, y, COLOR_COST_TEXT)
 				y = y + 17
 
 				if i < #pnl.names then
-					drawDiamondDivider(w * 0.5, y + 4, 17)
+					drawDiamondDivider(cx, y + 4, 17)
 					y = y + 11
 				end
 			end
@@ -521,14 +530,36 @@ local function openVault(items)
 		end
 	end
 
+	local TITLE_X = 22
 	local function buildSlot(parent, it, slotIndex)
 		local card = vgui.Create("DPanel", parent)
 		local displayName = it and getWeaponDisplayName(it) or ""
+
+		-- The fitted title is recomputed only when the card's usable title width
+		-- changes; the delete button eats the right side of the strip.
+		local function titleLayout(w)
+			local maxW = w - TITLE_X - 34
+			if card._titleMaxW ~= maxW then
+				card._titleMaxW = maxW
+				card._titleFont, card._titleLines, card._titleClipped = fitTitle(displayName, maxW)
+				card._titleLineH = draw.GetFontHeight(card._titleFont)
+			end
+
+			return card._titleFont, card._titleLines, card._titleLineH, card._titleClipped, maxW
+		end
+
 		card.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, COLOR_DECO_BG, 8)
 			drawTarotFrame(w, h)
 			if it then
-				ArtDeco.DrawTruncatedText("Arcana_AncientLarge", displayName, 22, 11, ArtDeco.Colors.textBright, w - 56)
+				local font, lines, lineH, clipped, maxW = titleLayout(w)
+				if clipped then
+					ArtDeco.DrawTruncatedText(font, displayName, TITLE_X, 11, ArtDeco.Colors.textBright, maxW)
+				else
+					for i, line in ipairs(lines) do
+						draw.SimpleText(line, font, TITLE_X, 11 + (i - 1) * lineH, ArtDeco.Colors.textBright)
+					end
+				end
 			else
 				draw.SimpleText("EMPTY", "Arcana_AncientLarge", w * 0.5, h * 0.5, COLOR_EMPTY_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
@@ -542,8 +573,12 @@ local function openVault(items)
 		card.PerformLayout = function(pnl, w, h)
 			local pad = 10
 			local titleH = 24
-			local modelTop = titleH + 4
-			local mH = math.floor(h * 0.52)
+			-- A title that wrapped to a second line takes its extra height out of
+			-- the model panel, so the enchant list and summon button stay put.
+			local _, lines, lineH = titleLayout(w)
+			local extraTitleH = math.max(0, #lines - 1) * lineH
+			local modelTop = titleH + 4 + extraTitleH
+			local mH = math.max(60, math.floor(h * 0.52) - extraTitleH)
 			model:SetPos(pad, modelTop)
 			model:SetSize(w - pad * 2, mH)
 			enchList:SetPos(pad, modelTop + mH + 6)

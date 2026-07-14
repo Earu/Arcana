@@ -461,35 +461,26 @@ if CLIENT then
 			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
 		end)
 
+		-- Declared here so the title can measure the band down to the info panel's frame.
+		local content
+
 		frame.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
-			draw.SimpleText("SPELL CASTER", "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
+
+			-- The title centers in the band between the frame's top line and the
+			-- wiremod info panel's frame below it.
+			local bandTop = 6 + 1
+			local bandBottom = IsValid(content) and (content:GetY() + 4) or (bandTop + 38)
+			ArtDeco.DrawTitle("Arcana_DecoTitle", "SPELL CASTER", bandTop, bandBottom, ArtDeco.Colors.paleGold)
 		end
 
 		if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
 		if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
 
-		if IsValid(frame.btnClose) then
-			local close = frame.btnClose
-			close:SetText("")
-			close:SetSize(26, 26)
+		ArtDeco.StyleCloseButton(frame)
 
-			function frame:PerformLayout(w, h)
-				if IsValid(close) then
-					close:SetPos(w - 26 - 10, 8)
-				end
-			end
-
-			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(ArtDeco.Colors.paleGold)
-				local pad = 8
-				surface.DrawLine(pad, pad, w - pad, h - pad)
-				surface.DrawLine(w - pad, pad, pad, h - pad)
-			end
-		end
-
-		local content = vgui.Create("DPanel", frame)
+		content = vgui.Create("DPanel", frame)
 		content:Dock(FILL)
 		content:DockMargin(12, 8, 12, 12)
 		content.Paint = nil

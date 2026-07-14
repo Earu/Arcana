@@ -920,30 +920,20 @@ if CLIENT then
 			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
 		end)
 
-		-- Style close button like the rest of the UI
-		if IsValid(frame.btnClose) then
-			local close = frame.btnClose
-			close:SetText("")
-			close:SetSize(26, 26)
+		ArtDeco.StyleCloseButton(frame)
 
-			function frame:PerformLayout(w, h)
-				if IsValid(close) then
-					close:SetPos(w - 26 - 10, 8)
-				end
-			end
-
-			close.Paint = function(pnl, w, h)
-				surface.SetDrawColor(ArtDeco.Colors.gold)
-				local pad = 8
-				surface.DrawLine(pad, pad, w - pad, h - pad)
-				surface.DrawLine(w - pad, pad, pad, h - pad)
-			end
-		end
+		-- Declared here so the title can measure the band down to the panels' frames.
+		local content
 
 		frame.Paint = function(pnl, w, h)
 			drawEnchanterBackground(w, h, bgSeed)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
-			draw.SimpleText(string.upper("Enchanter"), "Arcana_AncientLarge", 18, 10, ArtDeco.Colors.paleGold)
+
+			-- The title centers in the band between the frame's top line and the
+			-- enchantment panels' frames below it.
+			local bandTop = 6 + 1
+			local bandBottom = IsValid(content) and (content:GetY() + 4) or (bandTop + 38)
+			ArtDeco.DrawTitle("Arcana_AncientLarge", string.upper("Enchanter"), bandTop, bandBottom, ArtDeco.Colors.paleGold)
 		end
 
 		if IsValid(frame.btnMinim) then
@@ -954,7 +944,7 @@ if CLIENT then
 			frame.btnMaxim:Hide()
 		end
 
-		local content = vgui.Create("DPanel", frame)
+		content = vgui.Create("DPanel", frame)
 		content:Dock(FILL)
 		content:DockMargin(12, 12, 12, 12)
 		content.Paint = nil
@@ -1043,12 +1033,16 @@ if CLIENT then
 		end
 
 		-- Weapon model preview centered in the circle
+		local PREVIEW_FOV = 32
 		local modelPanel = vgui.Create("DModelPanel", left)
 		modelPanel:SetSize(360, 360)
 		modelPanel:SetMouseInputEnabled(false)
 
 		function modelPanel:LayoutEntity(ent)
-			ent:SetAngles(Angle(0, CurTime() * 15 % 360, 0))
+			-- Spin about the model's geometry, not its origin, or off-origin weapons
+			-- (the RPG, the .357) orbit out of frame instead of turning in place.
+			ArtDeco.SpinModelPanelEntity(ent, Angle(0, CurTime() * 15 % 360, 0))
+			ArtDeco.FitModelPanel(self, PREVIEW_FOV)
 		end
 
 		local nameLabel = vgui.Create("DLabel", left)
@@ -1208,16 +1202,7 @@ if CLIENT then
 			local nice = (swep and (swep.PrintName or swep.Printname)) or cls
 			modelPanel:SetModel(model)
 			nameLabel:SetText(nice)
-			-- Camera setup
-			local ent = modelPanel:GetEntity()
-
-			if IsValid(ent) then
-				local mn, mx = ent:GetRenderBounds()
-				local size = (mx - mn):Length()
-				modelPanel:SetFOV(32)
-				modelPanel:SetCamPos(Vector(size, size, size * 0.5))
-				modelPanel:SetLookAt((mn + mx) * 0.5)
-			end
+			ArtDeco.FitModelPanel(modelPanel, PREVIEW_FOV)
 		end
 
 		-- Position the model and name inside left panel (centered in the circle)

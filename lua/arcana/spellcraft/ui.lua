@@ -383,29 +383,25 @@ local function OpenSpellcraftMenu(machine)
 		ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
 	end)
 
-	if IsValid(frame.btnClose) then
-		local close = frame.btnClose
-		close:SetText("")
-		close:SetSize(26, 26)
-		function frame:PerformLayout(w)
-			if IsValid(close) then close:SetPos(w - 36, 8) end
-		end
-		close.Paint = function(_, w, h)
-			surface.SetDrawColor(C.gold)
-			surface.DrawLine(8, 8, w - 8, h - 8)
-			surface.DrawLine(w - 8, 8, 8, h - 8)
-		end
-	end
+	ArtDeco.StyleCloseButton(frame)
 	if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
 	if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
+
+	-- Declared here so the title can measure the band down to the panels' frames.
+	local content
 
 	frame.Paint = function(_, w, h)
 		drawEmissaryBackground(w, h, bgSeed)
 		ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, C.gold, 14)
-		draw.SimpleText("THE EMISSARY", "Arcana_AncientLarge", 18, 8, C.paleGold)
+
+		-- The title centers in the band between the frame's top line and the slot
+		-- list / right pane below, which frame themselves at the content's top edge.
+		local bandTop = 6 + 1
+		local bandBottom = IsValid(content) and content:GetY() or (bandTop + 38)
+		ArtDeco.DrawTitle("Arcana_AncientLarge", "THE EMISSARY", bandTop, bandBottom, C.paleGold)
 	end
 
-	local content = vgui.Create("DPanel", frame)
+	content = vgui.Create("DPanel", frame)
 	content:Dock(FILL)
 	content:DockMargin(12, 12, 12, 12)
 	content.Paint = nil
