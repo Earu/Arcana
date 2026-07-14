@@ -19,10 +19,18 @@ local _tempTextCol = Color(236, 230, 220, 255)
 local _tempSubCol = Color(222, 198, 120, 255)
 local _tempShadowCol = Color(0, 0, 0, 255)
 local _tempMainCol = Color(255, 255, 255, 255)
+-- Ash palette, used only by the "spell forgotten" panel: cold and unlit, where every
+-- other announcement in the HUD is gold.
+local _tempForgetFill = Color(16, 17, 20, 255)
+local _tempForgetLine = Color(146, 149, 156, 255)
+local _tempForgetText = Color(198, 200, 205, 255)
 
--- Unlock announcement state
+-- Unlock announcement state. `kind` is "spell" or "forget"; forgetting reuses this
+-- slot rather than owning a second announcement, so learning and unlearning can never
+-- overlap on screen.
 local unlockAnnounce = {
 	active = false,
+	kind = "spell",
 	title = "",
 	subtitle = "",
 	startedAt = 0,
@@ -42,21 +50,39 @@ local function pickFirstSound(candidates, fallback)
 end
 
 local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId)
+	local isForget = kind == "forget"
 	unlockAnnounce.active = true
+	unlockAnnounce.kind = isForget and "forget" or "spell"
 	unlockAnnounce.spellId = spellId or ""
 
-	-- Check if this is a Divine Pact
+	-- Check if this is a Divine Pact. Pacts cannot be forgotten, so the two are
+	-- mutually exclusive and the draw path never has to reconcile them.
 	local isDivine = false
-	if spellId and Arcana.RegisteredSpells[spellId] then
+	if not isForget and spellId and Arcana.RegisteredSpells[spellId] then
 		isDivine = Arcana.RegisteredSpells[spellId].is_divine_pact == true
 	end
 
 	unlockAnnounce.isDivinePact = isDivine
-	unlockAnnounce.title = string.upper(isDivine and "Divine Pact Unlocked" or "Spell Unlocked")
+	unlockAnnounce.title = string.upper(isForget and "Spell Forgotten" or (isDivine and "Divine Pact Unlocked" or "Spell Unlocked"))
 	unlockAnnounce.subtitle = tostring(displayName or "")
 	unlockAnnounce.startedAt = CurTime()
-	unlockAnnounce.endsAt = CurTime() + (isDivine and 6.0 or 4.5) -- Longer display for Divine Pacts
+	-- Longer for Divine Pacts, shorter for a forget: undoing a choice is a smaller
+	-- moment than making one, and the panel should not linger like a reward.
+	unlockAnnounce.endsAt = CurTime() + (isDivine and 6.0 or (isForget and 3.5 or 4.5))
 	unlockAnnounce.knowledgeDelta = tonumber(knowledgeDelta or 0) or 0
+
+	if isForget then
+		-- The learn chime, dropped to a low pitch: the same note, undone. EmitSound is
+		-- used over surface.PlaySound purely because the latter cannot repitch.
+		local ply = LocalPlayer()
+
+		if IsValid(ply) then
+			ply:EmitSound(pickFirstSound({"arcana/arcane_2.ogg", "arcana/arcane_1.ogg"}, "buttons/button19.wav"), 60, 62)
+		end
+
+		return
+	end
+
 	local divineOrder = { "arcana/arcane_3.ogg", "arcana/arcane_1.ogg" }
 	local regularOrder = { "arcana/arcane_1.ogg", "arcana/arcane_2.ogg", "arcana/arcane_3.ogg" }
 	local snd = pickFirstSound(isDivine and divineOrder or regularOrder, "ambient/atmosphere/terrain_rumble1.wav")
@@ -74,6 +100,18 @@ net.Receive("Arcana_SpellUnlocked", function()
 	end
 
 	showUnlockAnnouncement("spell", name, -cost, spellId)
+end)
+
+net.Receive("Arcana_SpellForgotten", function()
+	local spellId = net.ReadString()
+	local name = net.ReadString()
+	local refund = 0
+
+	if Arcana.RegisteredSpells[spellId] then
+		refund = tonumber(Arcana.RegisteredSpells[spellId].knowledge_cost or 0) or 0
+	end
+
+	showUnlockAnnouncement("forget", name, refund, spellId)
 end)
 
 -- Notification stack (XP, coins, items - multiple notifications can be active)
@@ -528,8 +566,9 @@ local function drawUnlockAnnouncement(scrW, scrH)
 	local alpha = math.floor(255 * math.min(fadeIn, fadeOut))
 
 	local isDivine = unlockAnnounce.isDivinePact
-	local panelW = math.floor(scrW * (isDivine and 0.6 or 0.5))
-	local panelH = isDivine and 140 or 110
+	local isForget = unlockAnnounce.kind == "forget"
+	local panelW = math.floor(scrW * (isDivine and 0.6 or (isForget and 0.42 or 0.5)))
+	local panelH = isDivine and 140 or (isForget and 96 or 110)
 	local x = math.floor((scrW - panelW) * 0.5)
 	local y = math.floor(scrH * 0.16)
 
@@ -618,6 +657,59 @@ local function drawUnlockAnnouncement(scrW, scrH)
 		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 2, y + 77, _tempShadowCol, TEXT_ALIGN_CENTER)
 		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, y + 76, divineGlowCol, TEXT_ALIGN_CENTER)
 		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, y + 75, divineTextCol, TEXT_ALIGN_CENTER)
+	elseif isForget then
+		-- Forgetting reads as the inverse of learning: the same hexagon, but struck in
+		-- ash instead of gold, with no flourish and the spell's name crossed out as it
+		-- is wiped away. The refunded knowledge is the only warm note on the panel.
+		local a = alpha / 255
+		_tempForgetFill.a = math.floor(180 * a)
+		_tempForgetLine.a = math.floor(150 * a)
+		_tempForgetText.a = alpha
+
+		local m = math.max(10, math.floor(math.min(panelW, panelH) * 0.10))
+		local cy = y + panelH * 0.5
+		local pts = {
+			{x = x + m, y = y},
+			{x = x + panelW - m, y = y},
+			{x = x + panelW, y = cy},
+			{x = x + panelW - m, y = y + panelH},
+			{x = x + m, y = y + panelH},
+			{x = x, y = cy},
+		}
+
+		draw.NoTexture()
+		surface.SetDrawColor(_tempForgetFill)
+		surface.DrawPoly(pts)
+		surface.SetDrawColor(_tempForgetLine)
+
+		for i = 1, #pts do
+			local from, to = pts[i], pts[i % #pts + 1]
+			surface.DrawLine(from.x, from.y, to.x, to.y)
+		end
+
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5 + 1, y + 17, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.title, "Arcana_DecoTitle", x + panelW * 0.5, y + 16, _tempForgetText, TEXT_ALIGN_CENTER)
+
+		local nameY = y + 50
+		surface.SetFont("Arcana_AncientLarge")
+		local nameW, nameH = surface.GetTextSize(unlockAnnounce.subtitle)
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5 + 1, nameY + 1, _tempShadowCol, TEXT_ALIGN_CENTER)
+		draw.SimpleText(unlockAnnounce.subtitle, "Arcana_AncientLarge", x + panelW * 0.5, nameY, _tempForgetText, TEXT_ALIGN_CENTER)
+
+		-- The strike sweeps left to right shortly after the panel lands, so the name is
+		-- read first and then crossed out, rather than arriving already cancelled.
+		local strike = math.Clamp((now - unlockAnnounce.startedAt - 0.3) / 0.35, 0, 1)
+
+		if strike > 0 then
+			surface.SetDrawColor(_tempForgetLine)
+			surface.DrawRect(x + panelW * 0.5 - nameW * 0.5, nameY + nameH * 0.5, nameW * strike, 2)
+		end
+
+		local refund = unlockAnnounce.knowledgeDelta or 0
+
+		if refund > 0 then
+			draw.SimpleText("+" .. refund .. " KP", "Arcana_Ancient", x + panelW * 0.5, y + panelH - 28, _tempSubCol, TEXT_ALIGN_CENTER)
+		end
 	else
 		-- Regular spell/ritual unlock
 		-- Hex background + frame + subtle flourish
