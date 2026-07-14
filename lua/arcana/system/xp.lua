@@ -208,9 +208,10 @@ function Arcana:CanForgetSpell(ply, spellId)
 	local isFree = self:IsForgetFree(ply, spellId)
 	local coins, shards = self:GetForgetCost(spellId)
 
+	-- Third-party economy overrides can return nil rather than 0, so coerce before comparing.
 	if not isFree then
-		if self:GetCoins(ply) < coins then return false, "Not enough coins" end
-		if shards > 0 and self:GetItemCount(ply, self.FORGET_ITEM) < shards then return false, "Not enough mana crystal shards" end
+		if (self:GetCoins(ply) or 0) < coins then return false, "Not enough coins" end
+		if shards > 0 and (self:GetItemCount(ply, self.FORGET_ITEM) or 0) < shards then return false, "Not enough mana crystal shards" end
 	end
 
 	local ok, reason = Arcana.RunHook("CanForgetSpell", ply, spellId)
@@ -232,16 +233,17 @@ if SERVER then
 		local spellName = spell.name or spellId
 
 		if not isFree then
-			if coins > 0 and not self:TakeCoins(ply, coins, "Forgetting " .. spellName) then
-				Arcana:SendErrorNotification(ply, "Cannot forget spell: Not enough coins")
-				return false
+			-- Affordability was already established in CanForgetSpell via GetCoins/GetItemCount,
+			-- which is how the rituals and the enchanter do it. Do NOT gate on the return value
+			-- of TakeCoins/TakeItem: third-party economy overrides (see third_party.lua) commonly
+			-- forward to the host server's economy and return nil, which would read as failure
+			-- here and strand the player having paid for a spell they still have.
+			if coins > 0 then
+				self:TakeCoins(ply, coins, "Forgetting " .. spellName)
 			end
 
-			if shards > 0 and not self:TakeItem(ply, self.FORGET_ITEM, shards, "Forgetting " .. spellName) then
-				-- Hand back the coins so a half-paid price cannot swallow them.
-				if coins > 0 then self:GiveCoins(ply, coins, "Refund") end
-				Arcana:SendErrorNotification(ply, "Cannot forget spell: Not enough mana crystal shards")
-				return false
+			if shards > 0 then
+				self:TakeItem(ply, self.FORGET_ITEM, shards, "Forgetting " .. spellName)
 			end
 		end
 
