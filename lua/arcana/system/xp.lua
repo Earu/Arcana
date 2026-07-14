@@ -130,6 +130,14 @@ function Arcana:UnlockSpell(ply, spellId, force)
 	end
 	data.unlocked_spells[spellId] = true
 
+	-- Stamp the learn time so the altar can offer a brief free undo (see IsForgetFree).
+	-- Forced grants — divine pacts, the starter spell — cost nothing and are not
+	-- undoable, so they are deliberately left unstamped.
+	if not force then
+		data.unlock_times = data.unlock_times or {}
+		data.unlock_times[spellId] = CurTime()
+	end
+
 	for i = 1, 8 do
 		if not data.quickspell_slots[i] then
 			data.quickspell_slots[i] = spellId
@@ -148,6 +156,120 @@ function Arcana:UnlockSpell(ply, spellId, force)
 	self:SavePlayerData(ply)
 	Arcana.RunHook("SpellUnlocked", ply, spellId, spell.name or spellId)
 	return true
+end
+
+-- ============================================================================
+-- FORGETTING SPELLS
+-- ============================================================================
+-- Forgetting is the inverse of unlocking. Because KP is derived rather than stored
+-- (see CalculateExpectedKnowledgePoints), removing a spell from unlocked_spells IS
+-- the refund — no arithmetic, no drift. The price is therefore paid in coins and
+-- mana crystal shards, the resources a mid-game player is actually short of.
+
+Arcana.FORGET_ITEM = "mana_crystal_shard"
+
+-- Returns coins, shards.
+function Arcana:GetForgetCost(spellId)
+	local spell = self.RegisteredSpells[spellId]
+	if not spell then return 0, 0 end
+	local kc = math.max(1, tonumber(spell.knowledge_cost) or 1)
+	local coins = math.floor((self.Config.FORGET_COIN_BASE or 2000) * kc ^ (self.Config.FORGET_COIN_EXPONENT or 1.3))
+	local shards = math.ceil((self.Config.FORGET_SHARDS_PER_KP or 2) * kc)
+	return coins, shards
+end
+
+-- Seconds of free-undo left on a freshly learned spell, or 0.
+function Arcana:GetForgetGraceRemaining(ply, spellId)
+	local data = self:GetPlayerData(ply)
+	local learnedAt = data and data.unlock_times and data.unlock_times[spellId]
+	if not learnedAt then return 0 end
+	local remaining = (learnedAt + (self.Config.FORGET_GRACE_PERIOD or 300)) - CurTime()
+	return math.max(0, remaining)
+end
+
+function Arcana:IsForgetFree(ply, spellId)
+	return self:GetForgetGraceRemaining(ply, spellId) > 0
+end
+
+-- Returns ok, reason, coins, shards, isFree.
+function Arcana:CanForgetSpell(ply, spellId)
+	local spell = self.RegisteredSpells[spellId]
+	if not spell then return false, "Spell not found" end
+	if SERVER and Arcana.SaveBlockedBySteamID[ply:SteamID64()] then return false, "Player data is still loading" end
+	local data = self:GetPlayerData(ply)
+	if not data then return false, "Player data not loaded" end
+	if not data.unlocked_spells[spellId] then return false, "Spell not learned" end
+	-- Divine pacts are granted free by levelling, so forgetting one refunds nothing and
+	-- it would return on the next level anyway. Crafted spells are the Emissary's.
+	if spell.is_divine_pact then return false, "This spell was granted, not learned" end
+	if spell.is_crafted then return false, "This spell cannot be forgotten here" end
+	if data.casting_until and data.casting_until > CurTime() then return false, "You are casting" end
+
+	local isFree = self:IsForgetFree(ply, spellId)
+	local coins, shards = self:GetForgetCost(spellId)
+
+	if not isFree then
+		if self:GetCoins(ply) < coins then return false, "Not enough coins" end
+		if shards > 0 and self:GetItemCount(ply, self.FORGET_ITEM) < shards then return false, "Not enough mana crystal shards" end
+	end
+
+	local ok, reason = Arcana.RunHook("CanForgetSpell", ply, spellId)
+	if ok == false then return false, reason or "Cannot forget spell" end
+
+	return true, nil, coins, shards, isFree
+end
+
+if SERVER then
+	function Arcana:ForgetSpell(ply, spellId)
+		local canForget, reason, coins, shards, isFree = self:CanForgetSpell(ply, spellId)
+		if not canForget then
+			Arcana:SendErrorNotification(ply, "Cannot forget spell: " .. tostring(reason))
+			return false
+		end
+
+		local spell = self.RegisteredSpells[spellId]
+		local data = self:GetPlayerData(ply)
+		local spellName = spell.name or spellId
+
+		if not isFree then
+			if coins > 0 and not self:TakeCoins(ply, coins, "Forgetting " .. spellName) then
+				Arcana:SendErrorNotification(ply, "Cannot forget spell: Not enough coins")
+				return false
+			end
+
+			if shards > 0 and not self:TakeItem(ply, self.FORGET_ITEM, shards, "Forgetting " .. spellName) then
+				-- Hand back the coins so a half-paid price cannot swallow them.
+				if coins > 0 then self:GiveCoins(ply, coins, "Refund") end
+				Arcana:SendErrorNotification(ply, "Cannot forget spell: Not enough mana crystal shards")
+				return false
+			end
+		end
+
+		data.unlocked_spells[spellId] = nil
+		if data.unlock_times then data.unlock_times[spellId] = nil end
+
+		for i = 1, 8 do
+			if data.quickspell_slots[i] == spellId then
+				data.quickspell_slots[i] = nil
+			end
+		end
+
+		-- Re-derived, never incremented: the formula is the only ground truth.
+		data.knowledge_points = self:CalculateExpectedKnowledgePoints(ply)
+
+		-- Authoritative, because an ordinary save unions the spell list with the stored
+		-- row and would put the spell straight back.
+		self:SavePlayerData(ply, true)
+		self:SyncPlayerData(ply)
+
+		net.Start("Arcana_SpellForgotten")
+		net.WriteString(spellId)
+		net.WriteString(spellName)
+		net.Send(ply)
+
+		Arcana.RunHook("SpellForgotten", ply, spellId, spellName)
+		return true
+	end
 end
 
 function Arcana:GetLevel(ply)
@@ -223,12 +345,17 @@ if SERVER then
 	util.AddNetworkString("Arcana_XPUpdate")
 	util.AddNetworkString("Arcana_LevelUp")
 	util.AddNetworkString("Arcana_UnlockSpell")
+	util.AddNetworkString("Arcana_ForgetSpell")
+	util.AddNetworkString("Arcana_SpellForgotten")
 
 	local lastUnlockAttempt = {}
+	local lastForgetAttempt = {}
 	local UNLOCK_COOLDOWN = 1.0
+	local FORGET_COOLDOWN = 1.0
 
 	hook.Add("PlayerDisconnected", "Arcana_ClearUnlockCooldown", function(ply)
 		lastUnlockAttempt[ply:SteamID64()] = nil
+		lastForgetAttempt[ply:SteamID64()] = nil
 	end)
 
 	net.Receive("Arcana_UnlockSpell", function(len, ply)
@@ -238,6 +365,15 @@ if SERVER then
 		lastUnlockAttempt[sid] = now
 		local spellId = net.ReadString()
 		Arcana:UnlockSpell(ply, spellId)
+	end)
+
+	net.Receive("Arcana_ForgetSpell", function(len, ply)
+		local sid = ply:SteamID64()
+		local now = CurTime()
+		if (lastForgetAttempt[sid] or 0) + FORGET_COOLDOWN > now then return end
+		lastForgetAttempt[sid] = now
+		local spellId = net.ReadString()
+		Arcana:ForgetSpell(ply, spellId)
 	end)
 end
 

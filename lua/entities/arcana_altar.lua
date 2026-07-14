@@ -654,6 +654,45 @@ if CLIENT then
 		return regularSpells, rituals
 	end
 
+	-- The inverse of BuildEligibleSpellList: what the player has learned and could
+	-- give back. Divine pacts refund nothing and crafted spells belong to the
+	-- Emissary, so neither appears here.
+	local function BuildForgettableSpellList(ply)
+		if not Arcana or not IsValid(ply) then return {}, {} end
+		local data = Arcana:GetPlayerData(ply)
+		if not data then return {}, {} end
+		local regularSpells = {}
+		local rituals = {}
+
+		for sid in pairs(data.unlocked_spells or {}) do
+			local sp = (Arcana.RegisteredSpells or {})[sid]
+
+			if sp and not sp.is_divine_pact and not sp.is_crafted then
+				local item = {
+					id = sid,
+					spell = sp
+				}
+
+				if sp.is_ritual then
+					table.insert(rituals, item)
+				else
+					table.insert(regularSpells, item)
+				end
+			end
+		end
+
+		local function byLevel(a, b)
+			if a.spell.level_required == b.spell.level_required then return a.spell.name < b.spell.name end
+
+			return a.spell.level_required < b.spell.level_required
+		end
+
+		table.sort(regularSpells, byLevel)
+		table.sort(rituals, byLevel)
+
+		return regularSpells, rituals
+	end
+
 	-- Semi-transparent panel fill so the themed background shows through.
 	local LIST_PANEL_BG = Color(18, 20, 16, 150)
 
@@ -755,7 +794,7 @@ if CLIENT then
 			textDim = ArtDeco.Colors.textDim,
 		}
 
-		-- Unlock buttons: brass-tinted fill and a double frame so the action
+		-- Learn buttons: brass-tinted fill and a double frame so the action
 		-- stands out from the plain gold rows. Two lines, vault-imprint style:
 		-- label above, KP cost below.
 		local BTN_BG = Color(58, 46, 24, 235)
@@ -763,7 +802,7 @@ if CLIENT then
 		local BTN_BG_DISABLED = Color(34, 29, 20, 235)
 		local BTN_FRAME_DISABLED = Color(120, 105, 80, 255)
 		local BTN_INNER_DISABLED = Color(90, 80, 60, 160)
-		local function paintUnlockButton(pnl, w, h, cost)
+		local function paintLearnButton(pnl, w, h, cost)
 			local enabled = pnl:IsEnabled()
 			local hovered = enabled and pnl:IsHovered()
 			local bg = not enabled and BTN_BG_DISABLED or (hovered and BTN_BG_HOVER or BTN_BG)
@@ -771,8 +810,26 @@ if CLIENT then
 			ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and (hovered and ArtDeco.Colors.paleGold or ArtDeco.Colors.gold) or BTN_FRAME_DISABLED, 8)
 			ArtDeco.DrawDecoFrame(3, 3, w - 6, h - 6, enabled and ArtDeco.Colors.brassInner or BTN_INNER_DISABLED, 8)
 			local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
-			draw.SimpleText("Unlock", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Learn", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			draw.SimpleText(cost .. " KP", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, enabled and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+
+		-- Forget buttons echo the unlock button's shape — label above, price below — so
+		-- the two tabs read as one station. A spell still inside its grace window is
+		-- free, and says so in green rather than quoting a price.
+		local BTN_FREE = Color(150, 214, 140, 255)
+		local function paintForgetButton(pnl, w, h, coins, shards, isFree)
+			local enabled = pnl:IsEnabled()
+			local hovered = enabled and pnl:IsHovered()
+			local bg = not enabled and BTN_BG_DISABLED or (hovered and BTN_BG_HOVER or BTN_BG)
+			ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and (hovered and ArtDeco.Colors.paleGold or ArtDeco.Colors.gold) or BTN_FRAME_DISABLED, 8)
+			ArtDeco.DrawDecoFrame(3, 3, w - 6, h - 6, enabled and ArtDeco.Colors.brassInner or BTN_INNER_DISABLED, 8)
+			local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
+			draw.SimpleText("Forget", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			local price = isFree and "Free" or (string.Comma(coins) .. " coins, " .. shards .. " shards")
+			local priceCol = isFree and BTN_FREE or (enabled and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim)
+			draw.SimpleText(price, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, priceCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
 		local frame = vgui.Create("DFrame")
@@ -877,6 +934,85 @@ if CLIENT then
 		content:Dock(FILL)
 		content:DockMargin(12, 12, 12, 12)
 		content.Paint = nil
+
+		-- Forgetting is the inverse of learning, so it lives at the same station rather
+		-- than in a UI of its own. Declared ahead of the tab buttons that call it.
+		local rebuild
+		local activeTab = "learn"
+
+		-- Tabs are lettering on a rail, not panels. A filled deco box would read as a third
+		-- button alongside Unlock/Forget, and a filled octagon as a third chip alongside
+		-- LVL/KP; the selected section is instead marked by the bar it stands on.
+		local TAB_FONT = "Arcana_Ancient"
+		local TAB_RAIL = Color(198, 160, 74, 55)
+		local TAB_RAIL_HOVER = Color(222, 198, 120, 120)
+
+		-- The title band overhangs 4px into content and the list frame is inset 4px, so the
+		-- margins are offset by 8 to leave an equal band of air above and below the strip.
+		local tabStrip = vgui.Create("DPanel", content)
+		tabStrip:Dock(TOP)
+		tabStrip:SetTall(30)
+		tabStrip:DockMargin(4, 14, 4, 6)
+
+		tabStrip.Paint = function(pnl, w, h)
+			surface.SetDrawColor(TAB_RAIL)
+			surface.DrawRect(0, h - 1, w, 1)
+		end
+
+		-- Caps the ends of the active tab's bar, echoing the deco flourishes elsewhere.
+		local function drawTabDiamond(cx, cy, r, col)
+			draw.NoTexture()
+			surface.SetDrawColor(col)
+			surface.DrawPoly({
+				{x = cx, y = cy - r},
+				{x = cx + r, y = cy},
+				{x = cx, y = cy + r},
+				{x = cx - r, y = cy},
+			})
+		end
+
+		local function addTab(id, label)
+			surface.SetFont(TAB_FONT)
+			local labelW = surface.GetTextSize(label)
+
+			local tab = vgui.Create("DButton", tabStrip)
+			tab:Dock(LEFT)
+			tab:SetWide(labelW + 34)
+			tab:DockMargin(0, 0, 18, 0)
+			tab:SetText("")
+			tab:SetCursor("hand")
+
+			tab.Paint = function(pnl, w, h)
+				local active = activeTab == id
+				local hovered = pnl:IsHovered()
+				local col = active and ArtDeco.Colors.paleGold or (hovered and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim)
+				-- Centered in the space above the bar, not in the panel, so the two tabs
+				-- sit on one line regardless of which is selected.
+				draw.SimpleText(label, TAB_FONT, w * 0.5, (h - 4) * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+				if active then
+					local barY = h - 3
+					surface.SetDrawColor(ArtDeco.Colors.gold)
+					surface.DrawRect(8, barY, w - 16, 3)
+					drawTabDiamond(8, barY + 1, 4, ArtDeco.Colors.paleGold)
+					drawTabDiamond(w - 8, barY + 1, 4, ArtDeco.Colors.paleGold)
+				elseif hovered then
+					surface.SetDrawColor(TAB_RAIL_HOVER)
+					surface.DrawRect(8, h - 2, w - 16, 1)
+				end
+			end
+
+			tab.DoClick = function()
+				if activeTab == id then return end
+				activeTab = id
+				surface.PlaySound("buttons/button14.wav")
+				rebuild()
+			end
+		end
+
+		addTab("learn", "LEARN")
+		addTab("forget", "FORGET")
+
 		local listPanel = vgui.Create("DPanel", content)
 		listPanel:Dock(FILL)
 
@@ -884,11 +1020,13 @@ if CLIENT then
 		listPanel.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(4, 4, w - 8, h - 8, LIST_PANEL_BG, 12)
 			ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 12)
-			draw.SimpleText(string.upper("Available Spells"), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
+			local heading = activeTab == "forget" and "Learned Spells" or "Available Spells"
+			draw.SimpleText(string.upper(heading), "Arcana_Ancient", 14, 10, ArtDeco.Colors.paleGold)
 
 			if pnl._empty then
 				local t = CurTime() - (pnl._emptyStart or CurTime())
-				drawFadeInLine("The altar is silent.", "Arcana_AncientLarge", w * 0.5, h * 0.5, ArtDeco.Colors.textBright, t)
+				local line = activeTab == "forget" and "You have learned nothing." or "The altar is silent."
+				drawFadeInLine(line, "Arcana_AncientLarge", w * 0.5, h * 0.5, ArtDeco.Colors.textBright, t)
 			end
 		end
 
@@ -909,17 +1047,11 @@ if CLIENT then
 			surface.DrawRect(0, 0, w, h)
 		end
 
-		local function rebuild()
-			scroll:Clear()
+		local function rebuildLearn()
 			local regularSpells, rituals = BuildEligibleSpellList(ply)
-
-			-- Empty state is painted centered by listPanel.Paint; the rune
-			-- reveal restarts whenever the list becomes empty.
-			local wasEmpty = listPanel._empty
+			-- Empty state is painted centered by listPanel.Paint; rebuild() owns the
+			-- reveal timer for both tabs.
 			listPanel._empty = #regularSpells == 0 and #rituals == 0
-			if listPanel._empty and not wasEmpty then
-				listPanel._emptyStart = CurTime()
-			end
 			if listPanel._empty then return end
 
 			for _, item in ipairs(regularSpells) do
@@ -967,7 +1099,7 @@ if CLIENT then
 				updateEnabled()
 
 				btn.Paint = function(pnl, w, h)
-					paintUnlockButton(pnl, w, h, sp.knowledge_cost or 1)
+					paintLearnButton(pnl, w, h, sp.knowledge_cost or 1)
 				end
 
 				function btn:DoClick()
@@ -1064,7 +1196,7 @@ if CLIENT then
 					updateEnabled()
 
 					btn.Paint = function(pnl, w, h)
-						paintUnlockButton(pnl, w, h, sp.knowledge_cost or 1)
+						paintLearnButton(pnl, w, h, sp.knowledge_cost or 1)
 					end
 
 					function btn:DoClick()
@@ -1088,6 +1220,143 @@ if CLIENT then
 						timer.Simple(0.25, rebuild)
 					end
 				end
+			end
+		end
+
+		local function rebuildForget()
+			local regularSpells, rituals = BuildForgettableSpellList(ply)
+			listPanel._empty = #regularSpells == 0 and #rituals == 0
+			if listPanel._empty then return end
+
+			local function addForgetRow(item, isRitual)
+				local sp = item.spell
+				local refund = sp.knowledge_cost or 1
+				local displayName = isRitual and string.gsub(sp.name, "^Ritual:%s*", "") or sp.name
+				local row = vgui.Create("DPanel", scroll)
+				row:Dock(TOP)
+				row:SetTall(isRitual and 68 or 60)
+				row:DockMargin(0, 0, 0, 8)
+				local infoIcon = ArtDeco.CreateInfoIcon(row, sp.description or "No description available", 300)
+				infoIcon:SetPos(0, 0)
+
+				local pad = isRitual and 14 or 12
+				local nameY = isRitual and 10 or 8
+
+				row.Paint = function(pnl, w, h)
+					if isRitual then
+						ArtDeco.DrawRitualFrame(2, 2, w - 4, h - 4, {
+							bg = ritualColors.bg,
+							frame1 = ritualColors.frame1,
+							frame2 = ritualColors.frame2
+						})
+					else
+						ArtDeco.FillDecoPanel(2, 2, w - 4, h - 4, ArtDeco.Colors.cardIdle, 8)
+						ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
+					end
+
+					draw.SimpleText(displayName, "Arcana_AncientLarge", pad, nameY, ArtDeco.Colors.textBright)
+					draw.SimpleText(refund .. " KP", "Arcana_AncientSmall", pad, nameY + 26, ArtDeco.Colors.textDim)
+				end
+
+				row.PerformLayout = function()
+					if IsValid(infoIcon) then
+						surface.SetFont("Arcana_AncientLarge")
+						local nameW, nameH = surface.GetTextSize(displayName)
+						infoIcon:SetPos(pad + 4 + nameW, nameY + (nameH - 20) / 2)
+					end
+				end
+
+				local btn = vgui.Create("DButton", row)
+				btn:Dock(RIGHT)
+				btn:DockMargin(12, isRitual and 14 or 10, 12, isRitual and 14 or 10)
+				btn:SetSize(190, 40)
+				btn:SetText("")
+
+				-- The grace window expires on a clock and coins move underneath us, so the
+				-- price and the enabled state are re-read rather than cached at build time.
+				-- Polled a few times a second instead of every frame: CanForgetSpell runs a
+				-- third-party hook, which has no business firing at framerate.
+				local coins, shards, isFree = 0, 0, false
+				local nextPoll = 0
+
+				local function refreshPrice()
+					local ok, _, c, s, free = Arcana:CanForgetSpell(ply, item.id)
+					coins, shards, isFree = c or 0, s or 0, free or false
+					btn:SetEnabled(ok == true)
+				end
+
+				refreshPrice()
+
+				btn.Think = function()
+					if CurTime() < nextPoll then return end
+					nextPoll = CurTime() + 0.25
+					refreshPrice()
+				end
+
+				btn.Paint = function(pnl, w, h)
+					paintForgetButton(pnl, w, h, coins, shards, isFree)
+				end
+
+				function btn:DoClick()
+					local ok, reason = Arcana:CanForgetSpell(ply, item.id)
+
+					if not ok then
+						surface.PlaySound("buttons/button8.wav")
+						notification.AddLegacy(tostring(reason), NOTIFY_ERROR, 3)
+
+						return
+					end
+
+					net.Start("Arcana_ForgetSpell")
+					net.WriteString(item.id)
+					net.SendToServer()
+					surface.PlaySound("buttons/button14.wav")
+					self:SetEnabled(false)
+					timer.Simple(0.25, rebuild)
+				end
+			end
+
+			for _, item in ipairs(regularSpells) do
+				addForgetRow(item, false)
+			end
+
+			if #rituals > 0 then
+				local spacer = vgui.Create("DPanel", scroll)
+				spacer:Dock(TOP)
+				spacer:SetTall(10)
+				spacer.Paint = function() end
+
+				local ritualHeader = vgui.Create("DPanel", scroll)
+				ritualHeader:Dock(TOP)
+				ritualHeader:SetTall(19)
+				ritualHeader:DockMargin(0, 0, 0, 4)
+
+				ritualHeader.Paint = function(pnl, w, h)
+					draw.SimpleText(string.upper("Rituals"), "Arcana_Ancient", 2, 0, ArtDeco.Colors.paleGold)
+				end
+
+				for _, item in ipairs(rituals) do
+					addForgetRow(item, true)
+				end
+			end
+		end
+
+		rebuild = function()
+			-- Both tabs re-enter here on a 0.25s timer after acting, by which point the
+			-- player may have closed the altar.
+			if not IsValid(scroll) or not IsValid(listPanel) then return end
+			scroll:Clear()
+			-- The empty-state rune reveal restarts whenever the list becomes empty.
+			local wasEmpty = listPanel._empty
+
+			if activeTab == "forget" then
+				rebuildForget()
+			else
+				rebuildLearn()
+			end
+
+			if listPanel._empty and not wasEmpty then
+				listPanel._emptyStart = CurTime()
 			end
 		end
 

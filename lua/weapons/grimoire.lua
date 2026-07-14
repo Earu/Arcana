@@ -8,12 +8,16 @@ if SERVER then
 	resource.AddFile("materials/models/arcana/phong_exp.vtf")
 	resource.AddFile("materials/entities/grimoire.png")
 
-	-- Starter spell for new players
+	-- Starter spell for new players.
+	-- Granted only to a player with no spells at all, rather than to anyone missing
+	-- fireball specifically: otherwise forgetting fireball at the altar would be undone
+	-- by the next weapon swap. A player who forgets their way down to an empty book
+	-- still gets the starter back, which is the case this hook actually exists for.
 	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function(wep, ply)
 		if wep:GetClass() == "grimoire" and IsValid(ply) then
 			local data = Arcana:GetPlayerData(ply)
 
-			if data and not data.unlocked_spells["fireball"] then
+			if data and table.IsEmpty(data.unlocked_spells) then
 				Arcana:UnlockSpell(ply, "fireball", true)
 			end
 		end

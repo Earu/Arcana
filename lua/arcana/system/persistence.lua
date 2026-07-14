@@ -13,6 +13,10 @@ local function CreateDefaultPlayerData()
 		level = 1,
 		knowledge_points = (Arcana.Config and Arcana.Config.KNOWLEDGE_POINTS_PER_LEVEL) or 1,
 		unlocked_spells = {},
+		-- [spellId] = CurTime() at which the spell was learned. Runtime-only and
+		-- deliberately not persisted: it only powers the altar's brief free-undo
+		-- window, and not storing it means a reconnect cannot be used to farm one.
+		unlock_times = {},
 		spell_cooldowns = {},
 		active_effects = {},
 		quickspell_slots = {nil, nil, nil, nil, nil, nil, nil, nil},
@@ -102,8 +106,13 @@ if SERVER then
 		return slots
 	end
 
-	function Arcana:SavePlayerDataToSQL(ply, data)
-		local handled = Arcana.RunHook("SavePlayerDataToSQL", ply, data)
+	-- `authoritative` writes unlocked_spells verbatim instead of unioning it with the
+	-- stored row. Only the forget path sets it: the union below exists so a partially
+	-- loaded in-memory state can never erase spells, but that same union would instantly
+	-- resurrect a spell the player just paid to forget. xp/level keep their max() merge
+	-- either way, since forgetting never touches them.
+	function Arcana:SavePlayerDataToSQL(ply, data, authoritative)
+		local handled = Arcana.RunHook("SavePlayerDataToSQL", ply, data, authoritative)
 		if handled == true then return end
 		if not ensureDatabase() then return end
 		local sid = IsValid(ply) and ply:SteamID64() or nil
@@ -136,7 +145,9 @@ if SERVER then
 			local merged_xp = math.max(existing_xp, incoming_xp)
 			local merged_level = math.max(existing_level, incoming_level)
 			local merged_unlocked = {}
-			for id, v in pairs(existing_unlocked or {}) do if v then merged_unlocked[id] = true end end
+			if not authoritative then
+				for id, v in pairs(existing_unlocked or {}) do if v then merged_unlocked[id] = true end end
+			end
 			for id, v in pairs(incoming_unlocked_map or {}) do if v then merged_unlocked[id] = true end end
 			local merged_quick = {nil, nil, nil, nil, nil, nil, nil, nil}
 			for i = 1, 8 do
@@ -236,14 +247,17 @@ function Arcana:GetPlayerData(ply)
 	return self.PlayerData[steamid]
 end
 
-function Arcana:SavePlayerData(ply)
+-- Pass authoritative = true to overwrite the stored spell list rather than union with
+-- it. Required whenever spells are *removed* (see Arcana:ForgetSpell); harmful anywhere
+-- else, because the union is what protects a player's book from a bad in-memory state.
+function Arcana:SavePlayerData(ply, authoritative)
 	if not IsValid(ply) then return end
 	local sid = ply:SteamID64()
 	if Arcana.SaveBlockedBySteamID[sid] then return end
 	local data = self:GetPlayerData(ply)
 	data.last_save = os.time()
 	if SERVER then
-		self:SavePlayerDataToSQL(ply, data)
+		self:SavePlayerDataToSQL(ply, data, authoritative)
 	end
 	Arcana.RunHook("SavedPlayerData", ply, data)
 end
@@ -280,6 +294,7 @@ if SERVER then
 			level = data.level,
 			knowledge_points = data.knowledge_points,
 			unlocked_spells = table.Copy(data.unlocked_spells),
+			unlock_times = table.Copy(data.unlock_times or {}),
 			spell_cooldowns = table.Copy(data.spell_cooldowns),
 			quickspell_slots = table.Copy(data.quickspell_slots),
 			selected_quickslot = data.selected_quickslot,
@@ -319,6 +334,9 @@ if CLIENT then
 		data.knowledge_points = tonumber(payload.knowledge_points) or data.knowledge_points
 		if istable(payload.unlocked_spells) then
 			data.unlocked_spells = payload.unlocked_spells
+		end
+		if istable(payload.unlock_times) then
+			data.unlock_times = payload.unlock_times
 		end
 		if istable(payload.spell_cooldowns) then
 			data.spell_cooldowns = payload.spell_cooldowns

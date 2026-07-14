@@ -97,6 +97,17 @@ Arcana.Config = {
 	-- Spell Configuration
 	DEFAULT_SPELL_COOLDOWN = 1.0,
 	RITUAL_CASTING_TIME = 10.0,
+	-- Forgetting a spell at the altar refunds its knowledge cost in full and charges
+	-- coins + mana crystal shards instead. The price is superlinear in knowledge_cost
+	-- so that undoing an expensive ritual stings far more than undoing a cantrip:
+	--   coins  = FORGET_COIN_BASE × knowledge_cost ^ FORGET_COIN_EXPONENT
+	--   shards = FORGET_SHARDS_PER_KP × knowledge_cost
+	FORGET_COIN_BASE = 2000,
+	FORGET_COIN_EXPONENT = 1.3,
+	FORGET_SHARDS_PER_KP = 2,
+	-- Grace period (seconds) during which a freshly learned spell can be forgotten for
+	-- free. This is a misclick undo, not a refund policy.
+	FORGET_GRACE_PERIOD = 300,
 }
 
 -- Visual Configuration
