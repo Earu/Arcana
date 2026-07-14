@@ -104,7 +104,14 @@ local HL2_WEAPON_CLASSIFICATIONS = {
 	["weapon_medkit"]     = "UNKNOWN",
 	["gmod_tool"]         = "UNKNOWN",
 	["gmod_camera"]       = "UNKNOWN",
+
+	-- Variants of hands
+	["hands"]             = "UNKNOWN",
 	["none"]              = "UNKNOWN",
+	["passive"]           = "UNKNOWN",
+
+	-- The grimoire shouldnt be enchanted or categorised as HITSCAN
+	["grimoire"]          = "UNKNOWN", 
 }
 
 -- Known projectile entity classes for native HL2 projectile weapons.
