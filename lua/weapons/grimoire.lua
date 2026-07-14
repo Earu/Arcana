@@ -516,34 +516,33 @@ if CLIENT then
 			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8, 255)
 		end)
 
+		-- XP bar under the title, full width inside the frame. Its top also bounds the
+		-- band the title and level chip center themselves in.
+		local BAR_X = 18
+		local BAR_H = 12
+		local BAR_Y = 42
+
 		frame.Paint = function(pnl, w, h)
 			-- Full solid fallback to avoid any missing textures from default skin
 			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
-			-- Title
-			local titleText = string.upper("Grimoire")
-			surface.SetFont("Arcana_DecoTitle")
-			local tw = surface.GetTextSize(titleText)
-			draw.SimpleText(titleText, "Arcana_DecoTitle", 18, 10, ArtDeco.Colors.paleGold)
-			-- Level chip next to title
+
+			-- Title and level chip share the band between the frame's top line and the
+			-- XP bar, so they center on one line with even gaps.
+			local bandTop = 6 + 1
+			local titleRight = ArtDeco.DrawTitle("Arcana_DecoTitle", string.upper("Grimoire"), bandTop, BAR_Y, ArtDeco.Colors.paleGold)
+
 			local data = Arcana and IsValid(owner) and Arcana:GetPlayerData(owner) or nil
 
 			if data then
-				local chipText = "LVL " .. tostring(data.level or 1)
-				surface.SetFont("Arcana_Ancient")
-				local cw, ch = surface.GetTextSize(chipText)
-				local chipX = 18 + tw + 14
-				local chipY = 10
-				local chipW = cw + 18
-				local chipH = ch + 6
-				ArtDeco.FillDecoPanel(chipX, chipY, chipW, chipH, ArtDeco.Colors.paleGold, 8)
-				draw.SimpleText(chipText, "Arcana_Ancient", chipX + (chipW - cw) * 0.5, chipY + (chipH - ch) * 0.5, ArtDeco.Colors.chipTextCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-				-- XP bar under title, full width inside the frame
-				local barX = 18
+				local barX = BAR_X
 				local barW = w - 36
-				local barH = 12
-				local barY = 42
+				local barH = BAR_H
+				local barY = BAR_Y
 				local innerPad = 4
+
+				local chipText = "LVL " .. tostring(data.level or 1)
+				ArtDeco.DrawChip("Arcana_Ancient", chipText, titleRight + 14, bandTop, barY)
 
 				-- Check if player is at max level
 				local isMaxLevel = data.level >= Arcana.Config.MAX_LEVEL
@@ -583,28 +582,7 @@ if CLIENT then
 			frame.btnMaxim:Hide()
 		end
 
-		if IsValid(frame.btnClose) then
-			local close = frame.btnClose
-			close:SetText("")
-			close:SetSize(26, 26)
-
-			function frame:PerformLayout(w, h)
-				if IsValid(close) then
-					close:SetPos(w - 26 - 10, 8)
-				end
-			end
-
-			close.Paint = function(pnl, w, h)
-				--local hovered = pnl:IsHovered()
-				--Arcana_FillDecoPanel(0, 0, w, h, hovered and Color(40, 32, 24, 220) or Color(26, 22, 18, 220), 6)
-				--Arcana_DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 6)
-				-- Stylized "X"
-				surface.SetDrawColor(ArtDeco.Colors.paleGold)
-				local pad = 8
-				surface.DrawLine(pad, pad, w - pad, h - pad)
-				surface.DrawLine(w - pad, pad, pad, h - pad)
-			end
-		end
+		ArtDeco.StyleCloseButton(frame)
 
 		frame.OnClose = function()
 			self.MenuOpen = false

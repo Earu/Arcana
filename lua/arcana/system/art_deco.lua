@@ -326,6 +326,142 @@ if CLIENT then
 	end
 
 	-- ===========================================================================
+	-- FRAME CHROME (title, chips, close button)
+	-- ===========================================================================
+
+	-- Every station's frame title sits at this inset: clear of the deco frame's corner
+	-- slant, and identical from one UI to the next.
+	ArtDeco.TITLE_X = 24
+
+	-- The close sigil sits in the frame's cut corner, but well clear of it: a four-bladed
+	-- star, each blade tapering from a keystone diamond out to its tip, in the same
+	-- tapered-wing language as the tarot frame's corners. Hovering turns the seal a quarter
+	-- turn, so the saltire opens into a cross as it warms.
+	local CLOSE_SIZE = 30
+	local CLOSE_CX = 30 -- sigil's center, in from the frame's right edge
+	local CLOSE_CY = 27 -- sigil's center, down from the frame's top edge
+	local CLOSE_ARM = 9
+	local CLOSE_HOVER = Color(232, 138, 106, 255)
+	local CLOSE_SPIN = 45 -- degrees the seal turns under the cursor
+
+	--- Reskins a DFrame's stock close button as an art-deco seal seated in the frame's cut
+	-- corner. Replaces frame.PerformLayout, so pass any other layout work as opts.layout.
+	-- @param frame The DFrame
+	-- @param opts Optional {size, cx, cy, layout}
+	function ArtDeco.StyleCloseButton(frame, opts)
+		local close = frame.btnClose
+		if not IsValid(close) then return end
+
+		opts = opts or {}
+		local size = opts.size or CLOSE_SIZE
+		local cxIn = opts.cx or CLOSE_CX
+		local cyIn = opts.cy or CLOSE_CY
+
+		close:SetText("")
+		close:SetSize(size, size)
+
+		local extraLayout = opts.layout
+		function frame:PerformLayout(w, h)
+			if extraLayout then extraLayout(self, w, h) end
+			if IsValid(close) then
+				close:SetPos(math.floor(w - cxIn - size * 0.5), math.floor(cyIn - size * 0.5))
+			end
+		end
+
+		close.Paint = function(pnl, w, h)
+			local hovered = pnl:IsHovered()
+			local cx, cy = w * 0.5, h * 0.5
+			local col = hovered and CLOSE_HOVER or ArtDeco.Colors.paleGold
+			local arm = CLOSE_ARM
+
+			-- The turn eases in and out rather than snapping, so a passing cursor
+			-- reads as the seal stirring.
+			pnl._spin = Lerp(math.min(1, FrameTime() * 12), pnl._spin or 0, hovered and CLOSE_SPIN or 0)
+
+			draw.NoTexture()
+
+			for k = 0, 3 do
+				local a = math.rad(45 + k * 90 + pnl._spin)
+				local ca, sa = math.cos(a), math.sin(a)
+				local function at(px, py)
+					return cx + px * ca - py * sa, cy + px * sa + py * ca
+				end
+
+				-- A blade: tapered from the crossing out to its tip.
+				local bx1, by1 = at(3, -3)
+				local bx2, by2 = at(arm, 0)
+				local bx3, by3 = at(3, 3)
+				surface.SetDrawColor(col)
+				surface.DrawPoly({
+					{x = bx1, y = by1},
+					{x = bx2, y = by2},
+					{x = bx3, y = by3},
+				})
+			end
+
+			-- Keystone diamond at the crossing, which does not turn with the blades.
+			surface.SetDrawColor(hovered and ArtDeco.Colors.paleGold or ArtDeco.Colors.brassInner)
+			surface.DrawPoly({
+				{x = cx, y = cy - 3},
+				{x = cx + 3, y = cy},
+				{x = cx, y = cy + 3},
+				{x = cx - 3, y = cy},
+			})
+		end
+
+		return close
+	end
+
+	--- Draws a frame title, vertically centered in the same free band DrawChip uses, so a
+	-- title and any chips beside it land on one center line and their gaps match.
+	-- @param font Font name
+	-- @param text Title text
+	-- @param top First free pixel row (a DrawDecoFrame border at y is a 1px line, so pass y + 1)
+	-- @param bottom First row occupied by whatever bounds the title below
+	-- @param col Text color
+	-- @param x Left edge (defaults to ArtDeco.TITLE_X)
+	-- @return the title's right edge, to place a chip after it, and its top y
+	function ArtDeco.DrawTitle(font, text, top, bottom, col, x)
+		x = x or ArtDeco.TITLE_X
+		surface.SetFont(font)
+		local tw, th = surface.GetTextSize(text)
+		local y = top + math.floor(((bottom - top) - th) * 0.5)
+		draw.SimpleText(text, font, x, y, col)
+
+		return x + tw, y
+	end
+
+	--- Draws a title-bar chip ("LVL 100", "KP 0"), vertically centered in the free band
+	-- between the frame's top line and whatever sits below it, so the gap above the chip
+	-- matches the gap below it. Returns the chip's right edge, to place a chip after it.
+	-- @param font Font name
+	-- @param text Chip text
+	-- @param x Left edge
+	-- @param top First free pixel row (a DrawDecoFrame border at y is a 1px line, so pass y + 1)
+	-- @param bottom First row occupied by whatever bounds the chip below (an inner frame's line, a bar's top)
+	-- @param bgCol Chip fill (default paleGold)
+	-- @param textCol Chip text color (default chipTextCol)
+	function ArtDeco.DrawChip(font, text, x, top, bottom, bgCol, textCol)
+		surface.SetFont(font)
+		local tw, th = surface.GetTextSize(text)
+		local cw, ch = tw + 18, th + 6
+
+		-- An odd leftover can't split evenly between the two gaps, so spend the odd
+		-- pixel on the chip itself: a chip 1px taller reads better than uneven gaps.
+		local slack = (bottom - top) - ch
+		if slack % 2 == 1 then
+			ch = ch + 1
+			slack = slack - 1
+		end
+
+		local y = top + math.floor(slack * 0.5)
+		ArtDeco.FillDecoPanel(x, y, cw, ch, bgCol or ArtDeco.Colors.paleGold, 8)
+		draw.SimpleText(text, font, x + math.floor((cw - tw) * 0.5), y + math.floor((ch - th) * 0.5), textCol or ArtDeco.Colors.chipTextCol)
+
+		return x + cw
+	end
+
+	-- ===========================================================================
 	-- HUD NOTIFICATION HELPERS
 	-- ===========================================================================
 
@@ -559,27 +695,35 @@ if CLIENT then
 		infoIcon:SetSize(20, 20)
 		infoIcon:SetCursor("hand")
 
-		-- Draw the "i" in circle icon
+		-- Draw the "i" in circle icon. The glyph is drawn rather than typeset: centering a
+		-- font's "i" centers its text box (advance width, ascender to descender), and the
+		-- ink of a lowercase i sits nowhere near the middle of that box.
 		infoIcon.Paint = function(pnl, w, h)
-			local cx, cy = w * 0.5, h * 0.5
+			local cx, cy = math.floor(w * 0.5), math.floor(h * 0.5)
 			local radius = 8
 			surface.SetDrawColor(ArtDeco.Colors.paleGold)
 
-			-- Circle outline
+			-- Circle outline. DrawLine lights the pixel right/below its coordinate, so a
+			-- circle drawn about (cx, cy) rasterizes half a pixel down-right of it — which
+			-- is what threw the glyph off center. Drawing it about (cx, cy) - 0.5 lands its
+			-- ink symmetric about (cx, cy), where the glyph below already is.
 			local segments = 16
+			local ox, oy = cx - 0.5, cy - 0.5
 			for i = 0, segments - 1 do
 				local a1 = (i / segments) * math.pi * 2
 				local a2 = ((i + 1) / segments) * math.pi * 2
 				surface.DrawLine(
-					cx + math.cos(a1) * radius,
-					cy + math.sin(a1) * radius,
-					cx + math.cos(a2) * radius,
-					cy + math.sin(a2) * radius
+					ox + math.cos(a1) * radius,
+					oy + math.sin(a1) * radius,
+					ox + math.cos(a2) * radius,
+					oy + math.sin(a2) * radius
 				)
 			end
 
-			-- "i" text
-			draw.SimpleText("i", "Arcana_Ancient", cx, cy, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			-- The "i": a tittle over a stem. Its ink spans cy - 5 to cy + 5 and its 2px
+			-- width straddles cx, so it is centered about (cx, cy) by construction.
+			surface.DrawRect(cx - 1, cy - 5, 2, 2)
+			surface.DrawRect(cx - 1, cy - 1, 2, 6)
 		end
 
 		ArtDeco.AddTooltip(infoIcon, text or "No description available", tooltipWidth)
@@ -658,6 +802,59 @@ if CLIENT then
 
 		surface.SetDrawColor(colors.frame2.r, colors.frame2.g, colors.frame2.b, 200)
 		surface.DrawOutlinedRect(x + 3, y + 3, w - 6, h - 6, 1)
+	end
+
+	-- ===========================================================================
+	-- MODEL PANELS
+	-- ===========================================================================
+
+	local MODEL_PANEL_DIR = Vector(1, 1, 0.5)
+
+	--- Spins a model panel's entity around its geometry instead of its model origin.
+	-- Weapon world models put their origin at the grip or attachment point, which can sit
+	-- far from the geometry (the RPG's is 20 units out, most of its own radius), so a bare
+	-- SetAngles swings the model in an arc around the camera's look-at point. Offsetting
+	-- the entity by its rotated bounds center pins that center on the world origin, where
+	-- ArtDeco.FitModelPanel aims the camera — the model turns in place.
+	-- @param ent Model panel entity
+	-- @param ang Angle to spin to
+	function ArtDeco.SpinModelPanelEntity(ent, ang)
+		if not IsValid(ent) then return end
+
+		ent:SetAngles(ang)
+
+		-- Render bounds are model space: they do not rotate with the entity.
+		local mn, mx = ent:GetRenderBounds()
+		local center = (mn + mx) * 0.5
+		center:Rotate(ang)
+		ent:SetPos(-center)
+	end
+
+	--- Frames a model panel's camera on a model pinned at the origin by SpinModelPanelEntity.
+	-- The framing radius is yaw-invariant — the model's XY diagonal, or its height, whichever
+	-- is larger — so a long weapon keeps a constant size and never clips the panel as it turns.
+	-- @param panel The DModelPanel
+	-- @param fov Camera FOV (default 30)
+	-- @param dir Direction the camera sits in, from the model (default 1, 1, 0.5)
+	-- @param padding Fraction of slack around the model (default 1.15)
+	function ArtDeco.FitModelPanel(panel, fov, dir, padding)
+		if not IsValid(panel) then return end
+
+		local ent = panel:GetEntity()
+		if not IsValid(ent) then return end
+
+		local mn, mx = ent:GetRenderBounds()
+		local size = mx - mn
+		local radius = math.max(math.sqrt(size.x * size.x + size.y * size.y), math.abs(size.z)) * 0.5
+		if radius < 1 then radius = 1 end
+
+		fov = fov or 30
+		local tanHalf = math.tan(math.rad(fov * 0.5))
+		if tanHalf <= 0 then tanHalf = 0.5 end
+
+		panel:SetFOV(fov)
+		panel:SetCamPos((dir or MODEL_PANEL_DIR):GetNormalized() * (radius / tanHalf) * (padding or 1.15))
+		panel:SetLookAt(vector_origin)
 	end
 end
 
