@@ -119,16 +119,27 @@ end
 -- hook, so the detour is a boolean check otherwise. Globals keep the detour
 -- single across hot-reloads.
 Arcana._VMDrawnModels = Arcana._VMDrawnModels or {}
+-- Recording logic lives in a global reassigned on every reload so the
+-- once-installed metatable detour always runs the newest version. Two capture
+-- gates: _VMDrawCaptureFrame (viewmodel pass, armed same-frame — that works
+-- because the SWEP's own vm draws run later in the SAME pass) and
+-- _WMCaptureUntil, a rolling RealTime window for the world pass. Frame-number
+-- arming does NOT work there: FrameNumber() as read from render hooks never
+-- equals FrameNumber() as read inside entity draw calls (measured: 100 draw
+-- calls, 0 matches, while probes outside rendering saw flag == FrameNumber()).
+function Arcana._DrawModelRecord(ent)
+	local fn = FrameNumber()
+	if fn ~= Arcana._VMDrawCaptureFrame and RealTime() >= (Arcana._WMCaptureUntil or 0) then return end
+	local recs = Arcana._VMDrawnModels
+	recs[#recs + 1] = {model = ent:GetModel(), pos = ent:GetPos(), ang = ent:GetAngles(), frame = fn, time = RealTime(), ent = ent}
+	if #recs > 64 then table.remove(recs, 1) end
+end
 if CLIENT and not Arcana._DrawModelDetoured then
 	Arcana._DrawModelDetoured = true
 	local entMeta = FindMetaTable("Entity")
 	local origDrawModel = entMeta.DrawModel
 	function entMeta:DrawModel(...)
-		if Arcana._VMDrawCaptureFrame == FrameNumber() then
-			local recs = Arcana._VMDrawnModels
-			recs[#recs + 1] = {model = self:GetModel(), pos = self:GetPos(), ang = self:GetAngles(), frame = FrameNumber()}
-			if #recs > 64 then table.remove(recs, 1) end
-		end
+		Arcana._DrawModelRecord(self)
 		return origDrawModel(self, ...)
 	end
 end
@@ -136,13 +147,18 @@ end
 -- Most recent drawn-model record near a viewmodel position (raw vm space on both
 -- sides — these packs position their ents from vm bone matrices). Records whose
 -- model matches the weapon's WorldModel win: that's the prop such SWEPs paint.
-local function findDrawnModelNear(worldPos, preferModel)
+-- excludeEnt filters out the weapon entity itself: a SWEP whose DrawWorldModel
+-- just draws the entity produces a record at the entity origin, not at the mesh.
+local function findDrawnModelNear(worldPos, preferModel, excludeEnt)
 	local recs = Arcana._VMDrawnModels
 	local minFrame = FrameNumber() - 1
+	local now = RealTime()
 	local best, bestDist, bestPreferred = nil, math.huge, false
 	for i = #recs, 1, -1 do
 		local r = recs[i]
-		if r.frame >= minFrame then
+		-- Frame recency for vm records; time recency for world records (frame
+		-- counters don't compare across the render boundary, see _DrawModelRecord)
+		if (r.frame >= minFrame or (r.time and now - r.time < 0.15)) and (excludeEnt == nil or r.ent ~= excludeEnt) then
 			local d = r.pos:DistToSqr(worldPos)
 			local preferred = (r.model == preferModel)
 			if d < 900 and (preferred and not bestPreferred or preferred == bestPreferred and d < bestDist) then
@@ -613,20 +629,21 @@ local function isBodyBoneName(name)
 end
 
 -- Dominant axis of a local-space AABB: center, unit axis (signed towards the
--- centroid — the heavy side is the blade on melee), length and elongation
+-- centroid — the heavy side is the blade on melee), length, elongation, and the
+-- two cross-section extents perpendicular to the dominant axis
 local function dominantAxisOfBox(mins, maxs)
 	local size = maxs - mins
 	local axis, len = Vector(1, 0, 0), size.x
-	local second = math.max(size.y, size.z)
+	local crossA, crossB = size.y, size.z
 	if size.y > len then
-		axis, len, second = Vector(0, 1, 0), size.y, math.max(size.x, size.z)
+		axis, len, crossA, crossB = Vector(0, 1, 0), size.y, size.x, size.z
 	end
 	if size.z > len then
-		axis, len, second = Vector(0, 0, 1), size.z, math.max(size.x, size.y)
+		axis, len, crossA, crossB = Vector(0, 0, 1), size.z, size.x, size.y
 	end
 	local center = (mins + maxs) * 0.5
 	if center:Dot(axis) < 0 then axis = -axis end
-	return center, axis, len, len / math.max(1, second)
+	return center, axis, len, len / math.max(1, math.max(crossA, crossB)), crossA, crossB
 end
 
 -- Weapon meshes rigidly skinned to bones get hitboxes that tightly wrap them.
@@ -644,15 +661,19 @@ local function getBladeHitbox(vm, anchorBoneId, minLen, excludeBody)
 				and not (excludeBody and isBodyBoneName(vm:GetBoneName(boneId))) then
 				local mins, maxs = vm:GetHitBoxBounds(hb, group)
 				if mins and maxs then
-					local center, axis, len, aspect = dominantAxisOfBox(mins, maxs)
+					local center, axis, len, aspect, crossA, crossB = dominantAxisOfBox(mins, maxs)
 					if len >= minLen and (not best or aspect > best.aspect) then
-						best = {center = center, axis = axis, len = len, bone = boneId, aspect = aspect}
+						best = {
+							center = center, axis = axis, len = len, bone = boneId, aspect = aspect,
+							crossR = 0.5 * math.sqrt(crossA * crossA + crossB * crossB),
+							mins = mins, maxs = maxs,
+						}
 					end
 				end
 			end
 		end
 	end
-	if best then return best.center, best.axis, best.len, best.bone end
+	if best then return best.center, best.axis, best.len, best.bone, best.crossR, best.mins, best.maxs end
 end
 
 -- Synthetic per-bone hitbox measured from the model's own vertices, for rigs
@@ -701,14 +722,18 @@ local function getBladeFromMesh(vm, anchorBoneId, minLen, excludeBody)
 				end
 			end
 			for boneId, box in pairs(boxes) do
-				local center, axis, len, aspect = dominantAxisOfBox(box.mins, box.maxs)
+				local center, axis, len, aspect, crossA, crossB = dominantAxisOfBox(box.mins, box.maxs)
 				local depth, walker = 0, boneId
 				for _ = 1, 16 do
 					walker = vm:GetBoneParent(walker)
 					if not walker or walker < 0 then break end
 					depth = depth + 1
 				end
-				cands[#cands + 1] = {center = center, axis = axis, len = len, bone = boneId, aspect = aspect, depth = depth}
+				cands[#cands + 1] = {
+					center = center, axis = axis, len = len, bone = boneId, aspect = aspect, depth = depth,
+					crossR = 0.5 * math.sqrt(crossA * crossA + crossB * crossB),
+					mins = box.mins, maxs = box.maxs,
+				}
 			end
 		end
 		meshBladeCache[key] = cands
@@ -740,7 +765,190 @@ local function getBladeFromMesh(vm, anchorBoneId, minLen, excludeBody)
 			if better then best, bestIsBlade = c, isBlade end
 		end
 	end
-	return best.center, best.axis, best.len, best.bone
+	return best.center, best.axis, best.len, best.bone, best.crossR, best.mins, best.maxs
+end
+
+--
+-- Held (third-person) weapon geometry
+--
+-- Bonemerged world models expose live bone matrices, their own hitbox sets and
+-- mesh data, but the entity's angles are just the owner's yaw — so placement
+-- must come from per-bone geometry, never from OBB axes. Resolve a bone-local
+-- box once per model (shipped hitboxes first, mesh vertices as fallback) and
+-- evaluate it per frame on the live bone matrix.
+local heldGeoCache = {}
+local function resolveHeldWeaponGeometry(wep)
+	local mdl = wep:GetModel() or ""
+	if mdl == "" then return nil end
+	local cached = heldGeoCache[mdl]
+	if cached then
+		if not cached.fail then return cached end
+		if cached.tries >= 3 or CurTime() < cached.nextTry then return nil end
+	end
+
+	-- excludeBody first: c_models carry arm/hand bones in the world mesh. But most
+	-- w_ models hang their entire mesh off a bone literally named
+	-- ValveBiped.Bip01_R_Hand (that's how bonemerge attaches them), so when the
+	-- body filter leaves nothing, retry without it — there are no real arms in
+	-- that case, the "hand" bone IS the weapon.
+	local center, axis, len, bone, crossR, mins, maxs = getBladeHitbox(wep, nil, 8, true)
+	local source = "hitbox"
+	if not axis then
+		center, axis, len, bone, crossR, mins, maxs = getBladeFromMesh(wep, nil, 6, true)
+		source = "mesh"
+	end
+	if not axis then
+		center, axis, len, bone, crossR, mins, maxs = getBladeHitbox(wep, nil, 8, false)
+		source = "hitbox!b"
+	end
+	if not axis then
+		center, axis, len, bone, crossR, mins, maxs = getBladeFromMesh(wep, nil, 6, false)
+		source = "mesh!b"
+	end
+	if not axis then
+		-- Models may not be loaded yet; retry a couple of times before settling
+		local tries = (cached and cached.tries or 0) + 1
+		heldGeoCache[mdl] = {fail = true, tries = tries, nextTry = CurTime() + 2}
+		vfxDebugPrint("%s: held geometry unresolved (try %d) model=%s", wep:GetClass(), tries, mdl)
+		return nil
+	end
+
+	local geo = {
+		bone = bone, boneName = wep:GetBoneName(bone) or tostring(bone),
+		center = center, axis = axis, len = len, crossR = crossR,
+		mins = mins, maxs = maxs, source = source,
+	}
+	heldGeoCache[mdl] = geo
+	vfxDebugPrint("%s: held geometry via %s bone='%s' len=%.1f crossR=%.2f model=%s",
+		wep:GetClass(), source, geo.boneName, len, crossR, mdl)
+	return geo
+end
+
+-- Muzzle attachment id for axis refinement: only attachments literally named
+-- after the muzzle — numeric ones ("1") can point sideways (shell ejects etc.)
+local MUZZLE_AXIS_ATTACHMENTS = {"muzzle", "muzzle_flash", "muzzle_flash1", "muzzle_end"}
+local function getMuzzleAxisAttachmentId(wep)
+	if not (wep.LookupAttachment and wep.GetAttachment) then return nil end
+	for _, name in ipairs(MUZZLE_AXIS_ATTACHMENTS) do
+		local idx = wep:LookupAttachment(name)
+		if idx and idx > 0 then return idx end
+	end
+	return nil
+end
+
+-- Per-frame evaluation of resolved held geometry on the live bone matrix.
+-- Returns worldCenter, worldBladeDir (signed towards muzzle/tip), bonePos, boneAng;
+-- nil when the bone matrix is unavailable or garbage this frame.
+local function evalHeldGeometry(wep, st, owner)
+	-- SWEPs with a custom DrawWorldModel may paint the visible mesh as a
+	-- ClientsideModel at the hand while the entity's own bones sit stale near
+	-- the player origin (TF2 c_models: their weapon_bone has no ValveBiped
+	-- counterpart to bonemerge to). A drawn-model record of the WorldModel near
+	-- the gripping hand IS the mesh on screen — trust it over the entity bones.
+	-- Records of the weapon entity itself are excluded: those sit at the entity
+	-- origin, and entity bones are the better source there.
+	if isfunction(wep.DrawWorldModel) then
+		Arcana._WMCaptureUntil = RealTime() + 0.1
+		local handPos, handAng = getRightHandPose(owner)
+		if handPos and handAng then
+			-- Fresh record: refresh the hand-relative cache. Packs place their
+			-- throwaway models at FIXED offsets from the hand bone, so the cached
+			-- transform keeps tracking through frames where the mesh isn't
+			-- rendered (culling) and avoids the one-frame record lag.
+			local drawn = findDrawnModelNear(handPos, wep.WorldModel, wep)
+			if drawn and drawn.model == wep.WorldModel then
+				st.dwmModel = drawn.model
+				st.dwmLocalPos, st.dwmLocalAng = WorldToLocal(drawn.pos, drawn.ang, handPos, handAng)
+			end
+			if st.dwmLocalPos and st.dwmModel == wep.WorldModel then
+				local drawnPos, drawnAng = LocalToWorld(st.dwmLocalPos, st.dwmLocalAng, handPos, handAng)
+				local info = getModelBladeInfo(wep.WorldModel)
+				if info then
+					local center = LocalToWorld(info.center, angle_zero, drawnPos, drawnAng)
+					local tipEnd = LocalToWorld(info.center + info.axis, angle_zero, drawnPos, drawnAng)
+					local bladeDir = tipEnd - center
+					bladeDir:Normalize()
+					if not isMeleeHoldType(wep) and bladeDir:Dot(owner:GetAimVector()) < 0 then
+						bladeDir = -bladeDir
+					end
+					return center, bladeDir, drawnPos, drawnAng
+				end
+			end
+		end
+	end
+
+	local geo = st.geo
+	-- Always SetupBones: idle bonemerged weapons serve stale (even bind-pose)
+	-- matrices until something forces a recompute — movement used to "fix" the
+	-- rings for exactly that reason. The engine no-ops it when already set up.
+	wep:SetupBones()
+	local m = wep:GetBoneMatrix(geo.bone)
+	if not m then return nil end
+	local bonePos, boneAng = m:GetTranslation(), m:GetAngles()
+	-- Bonemerged bones report origin/garbage when the owner isn't being rendered
+	if bonePos:DistToSqr(owner:WorldSpaceCenter()) > 300 * 300 then return nil end
+	local center = LocalToWorld(geo.center, angle_zero, bonePos, boneAng)
+	local tipEnd = LocalToWorld(geo.center + geo.axis, angle_zero, bonePos, boneAng)
+	local bladeDir = tipEnd - center
+	bladeDir:Normalize()
+
+	if isMeleeHoldType(wep) then
+		-- The centroid sign marks the heavy (blade) side, but verify against the
+		-- grip once: the tip end must sit farther from the gripping hand than the
+		-- butt end. Resolved here (not at build time) because bones are only live
+		-- during rendering.
+		if st.geoSign == nil then
+			local rp = getPlayerHandPositions(owner)
+			if rp then
+				local half = geo.len * 0.5
+				local tipD = (center + bladeDir * half):DistToSqr(rp)
+				local buttD = (center - bladeDir * half):DistToSqr(rp)
+				st.geoSign = (tipD >= buttD) and 1 or -1
+			end
+		end
+		bladeDir = bladeDir * (st.geoSign or 1)
+	else
+		-- Guns: point the axis at the muzzle when the model marks one, else keep
+		-- re-checking against the owner's aim (cheap dot, and aim is the only reference)
+		if st.geoSign == nil then
+			local muzzle = getMuzzleAttachmentPos(wep)
+			if muzzle then
+				st.geoSign = ((muzzle - center):Dot(bladeDir) >= 0) and 1 or -1
+			end
+		end
+		if st.geoSign then
+			bladeDir = bladeDir * st.geoSign
+		elseif bladeDir:Dot(owner:GetAimVector()) < 0 then
+			bladeDir = -bladeDir
+		end
+
+		-- Refine axis and centerline via the muzzle attachment: bone-space AABBs
+		-- are axis-aligned in the bone frame, but gun meshes run diagonally
+		-- through it (stock low at the rear), pitching the box axis ~10 deg off
+		-- the true barrel (measured 4-13 deg on HL2 guns). The muzzle attachment
+		-- tracks the visible barrel exactly.
+		if st.muzzleAxisAtt == nil then
+			st.muzzleAxisAtt = getMuzzleAxisAttachmentId(wep) or false
+		end
+		if st.muzzleAxisAtt then
+			local att = wep:GetAttachment(st.muzzleAxisAtt)
+			if att and att.Pos then
+				local mFwd = att.Ang and att.Ang:Forward() or bladeDir
+				if mFwd:Dot(bladeDir) < 0 then mFwd = -mFwd end
+				-- Sanity gate (~25 deg): some models ship muzzle attachments with
+				-- unrelated orientations; keep the box axis in that case
+				if mFwd:Dot(bladeDir) > 0.9 then
+					bladeDir = mFwd
+				end
+				-- Slide the ring center sideways onto the barrel line through the
+				-- muzzle, keeping its position along the axis (the box centerline
+				-- averages in the stock/grip and sits off the barrel)
+				center = att.Pos + bladeDir * ((center - att.Pos):Dot(bladeDir))
+			end
+		end
+	end
+
+	return center, bladeDir, bonePos, boneAng
 end
 
 -- Viewmodel attachment positions come back FormatViewModelAttachment'd by the
@@ -965,7 +1173,7 @@ local function buildBandRings(bc, ringCount, style, p)
 		end
 	else
 		local baseR, bandH, stepR, totalSpan, zBiasStep = p.baseR, p.bandH, p.stepR, p.totalSpan, p.zBiasStep
-		local step = (ringCount > 1) and (totalSpan / (ringCount - 1)) or 0
+		local step = (ringCount > 1) and ((totalSpan or 0) / (ringCount - 1)) or 0
 		local startOffset = -0.5 * (ringCount - 1) * step
 		for i = 1, ringCount do
 			local r = baseR + (i - 1) * stepR
@@ -974,7 +1182,9 @@ local function buildBandRings(bc, ringCount, style, p)
 			if ring then
 				ring.rotationSpeed = 35
 				ring.rotationDirection = (i % 2 == 0) and 1 or -1
-				ring.zBias = startOffset + (i - 1) * step
+				-- p.zOffsets: explicit per-ring axial offsets (held-geometry melee
+				-- stations) instead of the uniform symmetric spread
+				ring.zBias = p.zOffsets and p.zOffsets[i] or (startOffset + (i - 1) * step)
 			end
 		end
 	end
@@ -985,6 +1195,70 @@ local function createBandsForWeapon(wep, count, style)
 	if count <= 0 then return nil end
 	local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
 	style = style or "axis"
+
+	-- Held weapons with resolvable model geometry get geometry-driven bands: the
+	-- follow hook positions/orients them on the live bone matrix each frame.
+	-- Melee also takes radii and per-ring stations from the geometry (one ring on
+	-- the handle, the rest along the blade); guns keep the OBB-extent sizing
+	-- (orientation-independent scalars, and the look is already tuned) and only
+	-- gain accurate position/orientation.
+	if style == "axis" and isHeldActive(wep) then
+		local geo = resolveHeldWeaponGeometry(wep)
+		if geo then
+			local col = getPhysgunColorFor(wep)
+			local bc = BandCircle.Create(wep:WorldSpaceCenter(), Angle(0, 0, 0), col, 80, 0)
+			if bc then
+				local ringCount = math.min(3, count)
+				local params
+				if isMeleeHoldType(wep) then
+					local baseR = math.Clamp(geo.crossR * 1.2, 1.5, 8)
+					-- Stations: fractions of the box length measured from the grip
+					-- end (axis is signed towards the blade). Ring 1 sits on the
+					-- handle, the rest spread over the blade.
+					local stations = {0.18}
+					local blades = ringCount - 1
+					for i = 1, blades do
+						stations[i + 1] = (blades > 1) and (0.5 + ((i - 1) / (blades - 1)) * 0.38) or 0.66
+					end
+					local zOffsets = {}
+					for i, frac in ipairs(stations) do
+						-- anglesFromUpRight yields Up OPPOSITE the requested blade
+						-- axis and zBias translates along Up, so along-blade offsets
+						-- must enter NEGATED (see the vm path's -ang:Up() slides)
+						zOffsets[i] = -((frac - 0.5) * geo.len)
+					end
+					params = {
+						baseR = baseR,
+						bandH = math.Clamp(baseR * 0.35, 1.2, 3),
+						stepR = 0,
+						zOffsets = zOffsets,
+					}
+				else
+					local smallest = math.max(4, math.min(lenX, math.min(lenY, lenZ)))
+					local effectiveSmallest = math.max(6, smallest)
+					local baseR = math.max(4, (effectiveSmallest * 0.55 * 0.9) / 2)
+					params = {
+						baseR = baseR,
+						bandH = math.max(2.5, baseR * 0.18) * 0.85,
+						stepR = math.max(2.5, effectiveSmallest * 0.16),
+						totalSpan = math.min((longest or 24) * 0.35, geo.len * 0.6),
+					}
+				end
+				buildBandRings(bc, ringCount, "axis", params)
+				return {
+					bc = bc,
+					axis = axis,
+					count = count,
+					lastStr = wep:GetNWString("Arcana_EnchantIds", "[]"),
+					held = true,
+					color = col,
+					style = style,
+					geo = geo,
+					hasGeo = true,
+				}
+			end
+		end
+	end
 	local ang
 	if style == "orbital" then
 		ang = Angle(0, 0, 0)
@@ -1102,9 +1376,11 @@ local function ensureVFXFor(wep)
 		return
 	end
 
-	-- Update if enchant set or held state changed
+	-- Update if enchant set, held state, or geometry availability changed (a model
+	-- that failed to resolve at creation may succeed on a later retry)
 	local nowHeld = isHeldActive(wep)
-	if (s.lastStr ~= str) or (s.held ~= nowHeld) or (s.style ~= styleWanted) then
+	local geoAvail = (styleWanted == "axis") and nowHeld and (resolveHeldWeaponGeometry(wep) ~= nil) or false
+	if (s.lastStr ~= str) or (s.held ~= nowHeld) or (s.style ~= styleWanted) or ((s.hasGeo or false) ~= geoAvail) then
 		destroyVFX(s)
 		ActiveVFXByEnt[wep] = createBandsForWeapon(wep, count, styleWanted)
 	end
@@ -1149,7 +1425,29 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 		end
 
 		local angOverride
-		if IsValid(owner) and isHeldActive(wep) and st.style == "dual" and st.bcL then
+		local usedGeo = false
+		if IsValid(owner) and isHeldActive(wep) and st.geo and st.style ~= "dual" then
+			-- Geometry-driven placement: box center + blade axis evaluated on the
+			-- weapon's live bone matrix. Falls through to the hand-bone heuristics
+			-- below on frames where the bone matrix is unavailable.
+			local gCenter, gDir, gBonePos, gBoneAng = evalHeldGeometry(wep, st, owner)
+			if gCenter then
+				usedGeo = true
+				pos = gCenter
+				-- Roll against the eye RIGHT: eye forward is near-parallel to a
+				-- gun's ring normal and therefore degenerate (same trick as dual)
+				angOverride = anglesFromUpRight(gDir, owner:EyeAngles():Right())
+				if VFX_DEBUG:GetInt() >= 2 then
+					render.SetColorMaterial()
+					render.DrawWireframeBox(gBonePos, gBoneAng, st.geo.mins, st.geo.maxs, Color(255, 220, 80), true)
+					render.DrawLine(gCenter, gCenter + gDir * (st.geo.len * 0.5), Color(0, 255, 0), true)
+				end
+			end
+		end
+
+		if usedGeo then
+			-- placement fully resolved above
+		elseif IsValid(owner) and isHeldActive(wep) and st.style == "dual" and st.bcL then
 			-- Akimbo: one ring per hand, both slid towards the muzzles along the
 			-- aim direction (the guns track where the player looks)
 			local rp, lp = getPlayerHandPositions(owner)
@@ -1236,6 +1534,75 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 			st.bcL.color = col
 		end
 	end
+end)
+
+--
+-- Quantitative ring-fit scorer for held weapons (iteration without screenshots):
+-- samples each ring's circumference and measures it against the resolved
+-- bone-local weapon box. Usage: arcana_enchant_vfx_score [class-substring]
+-- Columns: station = ring center's normalized position along the box (0=butt 1=tip),
+-- tilt = angle between ring plane normal and the weapon's long axis (deg),
+-- cover = % of samples within the box's axial span, gap = mean/max radial distance
+-- of samples beyond the box's circumscribed cross-section (negative = inside),
+-- off = ring center's distance from the box centerline.
+local function scoreHeldRingFit(wep, st)
+	local owner = wep:GetOwner()
+	if not IsValid(owner) then return nil, "no owner" end
+	local geo = st.geo or resolveHeldWeaponGeometry(wep)
+	if not geo then return nil, "no geometry" end
+	local center, bladeDir, bonePos, boneAng = evalHeldGeometry(wep, {geo = geo, geoSign = st.geoSign}, owner)
+	if not center then return nil, "bone matrix unavailable" end
+
+	local spanA, spanB = geo.mins:Dot(geo.axis), geo.maxs:Dot(geo.axis)
+	local spanMin, spanMax = math.min(spanA, spanB), math.max(spanA, spanB)
+	local centerCross = geo.center - geo.axis * geo.center:Dot(geo.axis)
+
+	local up, fwd, right = st.bc.angles:Up(), st.bc.angles:Forward(), st.bc.angles:Right()
+	local lines = {}
+	for i, ring in ipairs(st.bc.rings) do
+		local r = (ring.radius or 0) * (ring.currentScale or 1)
+		local ringCenter = st.bc.position + up * (ring.zBias or 0)
+		local tilt = math.deg(math.acos(math.Clamp(math.abs(up:Dot(bladeDir)), 0, 1)))
+
+		local lc = WorldToLocal(ringCenter, angle_zero, bonePos, boneAng)
+		local lcAxial = lc:Dot(geo.axis)
+		local station = (spanMax > spanMin) and ((lcAxial - spanMin) / (spanMax - spanMin)) or 0
+		local centerOff = (lc - geo.axis * lcAxial - centerCross):Length()
+
+		local inSpan, gapSum, gapMax, n = 0, 0, -math.huge, 16
+		for k = 0, n - 1 do
+			local t = (k / n) * math.pi * 2
+			local lp = WorldToLocal(ringCenter + (fwd * math.cos(t) + right * math.sin(t)) * r, angle_zero, bonePos, boneAng)
+			local axial = lp:Dot(geo.axis)
+			if axial >= spanMin - 1 and axial <= spanMax + 1 then inSpan = inSpan + 1 end
+			local gap = (lp - geo.axis * axial - centerCross):Length() - geo.crossR
+			gapSum = gapSum + gap
+			if gap > gapMax then gapMax = gap end
+		end
+		lines[#lines + 1] = string.format(
+			"  ring %d: r=%5.2f station=%5.2f tilt=%5.1f cover=%3d%% gap=%5.2f/%5.2f off=%5.2f",
+			i, r, station, tilt, math.floor(inSpan / n * 100 + 0.5), gapSum / n, gapMax, centerOff)
+	end
+	return lines, geo
+end
+
+concommand.Add("arcana_enchant_vfx_score", function(_, _, args)
+	local filter = args and args[1] and args[1]:lower() or nil
+	local scored = 0
+	for wep, st in pairs(ActiveVFXByEnt) do
+		if IsValid(wep) and st and st.bc and (not filter or wep:GetClass():lower():find(filter, 1, true)) then
+			scored = scored + 1
+			local lines, geoOrErr = scoreHeldRingFit(wep, st)
+			if not lines then
+				MsgC(Color(255, 120, 120), string.format("%s [style=%s]: %s\n", wep:GetClass(), st.style or "?", geoOrErr))
+			else
+				MsgC(Color(120, 255, 160), string.format("%s [style=%s src=%s bone=%s len=%.1f crossR=%.2f]\n",
+					wep:GetClass(), st.style or "?", geoOrErr.source, geoOrErr.boneName, geoOrErr.len, geoOrErr.crossR))
+				for _, l in ipairs(lines) do MsgC(color_white, l, "\n") end
+			end
+		end
+	end
+	if scored == 0 then MsgC(Color(255, 200, 80), "no active held enchant VFX" .. (filter and (" matching '" .. filter .. "'") or "") .. "\n") end
 end)
 
 --
