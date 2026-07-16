@@ -163,6 +163,12 @@ if SERVER then
 		self.CastingUntil = CurTime() + castTime
 		self.QueuedSpell = spellId
 
+		-- Run the BeginCasting hook so systems like target locking start their
+		-- scans. The third argument carries the casting entity (same role as
+		-- context.casterEntity later in the pipeline) so scans trace from the
+		-- entity's facing instead of the owner's crosshair.
+		Arcana.RunHook("BeginCasting", owner, spellId, self)
+
 		self:SetIsCasting(true)
 		self:SetCurrentSpell(spellId)
 		self:SetCastProgress(0)
@@ -215,6 +221,10 @@ if SERVER then
 
 				if WireLib then
 					WireLib.TriggerOutput(self, "Ready", 1)
+				end
+
+				if Arcana.Common and Arcana.Common.ClearTargetLock then
+					Arcana.Common.ClearTargetLock(self)
 				end
 
 				self.CastingUntil = 0

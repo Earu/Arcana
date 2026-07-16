@@ -5,10 +5,11 @@ local DRAIN_FRACTION = 0.50 -- fraction of the ritual's TOTAL lifetime removed p
 local RANGE = 1500
 
 if SERVER then
-	hook.Add("Arcana_BeginCasting", "RitualDrain_TargetScan", function(caster, spellId)
+	hook.Add("Arcana_BeginCasting", "RitualDrain_TargetScan", function(caster, spellId, casterEntity)
 		if spellId ~= "ritual_drain" then return end
 
-		Arcana.Common.TargetScan(caster, function(ent)
+		local srcEnt = IsValid(casterEntity) and casterEntity or caster
+		Arcana.Common.TargetScan(srcEnt, function(ent)
 			return IsValid(ent) and ent:GetClass() == "arcana_ritual"
 		end, RANGE)
 	end)
@@ -45,10 +46,11 @@ Arcana:RegisterSpell({
 	range = RANGE,
 	is_projectile = false,
 	has_target = true,
-	cast = function(caster, _, _, _)
+	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		local target = Arcana.Common.GetLockedTarget(caster)
+		local srcEnt = ctx and IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local target = Arcana.Common.GetLockedTarget(srcEnt)
 		if not IsValid(target) or target:GetClass() ~= "arcana_ritual" then return false end
 
 		local total = target:GetTotalLifetime()

@@ -1,7 +1,8 @@
 if SERVER then
-	hook.Add("Arcana_BeginCasting", "Healing_TargetScan", function(caster, spellId)
+	hook.Add("Arcana_BeginCasting", "Healing_TargetScan", function(caster, spellId, casterEntity)
 		if spellId ~= "healing" then return end
-		Arcana.Common.TargetScan(caster, function(ent)
+		local srcEnt = IsValid(casterEntity) and casterEntity or caster
+		Arcana.Common.TargetScan(srcEnt, function(ent)
 			return IsValid(ent) and ent:IsPlayer() and ent:Alive()
 		end, 400)
 	end)
@@ -24,7 +25,8 @@ Arcana:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not IsValid(caster) then return false end
 
-		local target = Arcana.Common.GetLockedTarget(caster)
+		local srcEnt = ctx and IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local target = Arcana.Common.GetLockedTarget(srcEnt)
 		if not IsValid(target) or not target:IsPlayer() or not target:Alive() then return false end
 		if target:Health() >= target:GetMaxHealth() then return false end
 		if not SERVER then return true end
