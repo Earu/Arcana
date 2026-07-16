@@ -682,17 +682,26 @@ if CLIENT then
         maxBtn:SetWide(100)
         maxBtn:SetText("")
 
-        local priceLbl = vgui.Create("DLabel", content)
+        local priceLbl = vgui.Create("DPanel", content)
         priceLbl:Dock(TOP)
         priceLbl:DockMargin(12, 2, 12, 8)
-        priceLbl:SetFont("Arcana_AncientSmall")
-        priceLbl:SetTextColor(ArtDeco.Colors.paleGold)
-        priceLbl:SetWrap(true)
+        priceLbl:SetTall(36)
+        priceLbl:SetPaintBackground(false)
+        priceLbl:SetMouseInputEnabled(false)
+        priceLbl.Paint = function(pnl, w, h)
+            ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 0, {
+                {text = "Price per spore:", color = ArtDeco.Colors.paleGold},
+                {text = string.Comma(price), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+            })
+            ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 18, {
+                {text = "You will receive:", color = ArtDeco.Colors.paleGold},
+                {text = string.Comma(pnl._receive or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+            })
+        end
         local function refreshPrice()
             local n = tonumber(entry:GetText()) or 0
             n = math.Clamp(math.floor(n), 0, have)
-            priceLbl:SetText("Price per spore: " .. string.Comma(price) .. " coins | You will receive: " .. string.Comma(n * price))
-            priceLbl:SizeToContentsY()
+            priceLbl._receive = n * price
         end
         function entry:OnValueChange() refreshPrice() end
         refreshPrice()
@@ -702,10 +711,6 @@ if CLIENT then
             if IsValid(label) then
                 label:SetWide(w - 24)
                 label:SizeToContentsY()
-            end
-            if IsValid(priceLbl) then
-                priceLbl:SetWide(w - 24)
-                priceLbl:SizeToContentsY()
             end
         end
 

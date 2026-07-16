@@ -827,9 +827,14 @@ if CLIENT then
 			ArtDeco.DrawDecoFrame(3, 3, w - 6, h - 6, enabled and ArtDeco.Colors.brassInner or BTN_INNER_DISABLED, 8)
 			local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
 			draw.SimpleText("Forget", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			local price = isFree and "Free" or (string.Comma(coins) .. " coins, " .. shards .. " shards")
-			local priceCol = isFree and BTN_FREE or (enabled and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim)
-			draw.SimpleText(price, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, priceCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			if isFree then
+				draw.SimpleText("Free", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, BTN_FREE, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			else
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 1, {
+					{text = string.Comma(coins), icon = ArtDeco.Icons.coin, color = enabled and ArtDeco.Colors.coinGold or ArtDeco.Colors.textDim},
+					{text = string.Comma(shards), icon = ArtDeco.Icons.shard, color = enabled and ArtDeco.Colors.shardBlue or ArtDeco.Colors.textDim},
+				}, TEXT_ALIGN_CENTER)
+			end
 		end
 
 		local frame = vgui.Create("DFrame")

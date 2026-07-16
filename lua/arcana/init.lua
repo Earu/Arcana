@@ -50,6 +50,8 @@ if SERVER then
 
 	resource.AddFile("materials/arcana/pattern.vmt")
 	resource.AddFile("materials/arcana/pattern_antique_stone.vmt")
+	resource.AddFile("materials/arcana/icons/coin.png")
+	resource.AddFile("materials/arcana/icons/crystal_shard.png")
 end
 
 include("arcana/system/core.lua")

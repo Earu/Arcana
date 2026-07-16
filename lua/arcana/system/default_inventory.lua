@@ -321,7 +321,8 @@ if CLIENT then
 		local itemCardH = math.floor(115 / scale)
 		local itemSpacing = math.floor(5 / scale)
 		local panelMargin = math.floor(10 / scale)
-		local headerHeight = math.floor(30 / scale)
+		-- Fonts don't scale with the panel, so the title/chip band keeps a fixed height
+		local headerHeight = 30
 		local headerGap = math.floor(5 / scale)
 
 		local panelW = (panelMargin * 2) + (itemCardW * itemsPerRow) + ((itemsPerRow - 1) * itemSpacing) + (itemSpacing * 2)
@@ -348,44 +349,20 @@ if CLIENT then
 			ArtDeco.DrawBlurRect(x, y, panel:GetWide(), panel:GetTall(), 4, 8)
 		end)
 
+		local itemsPanelY = panelMargin + headerHeight + headerGap
+
 		panel.Paint = function(pnl, w, h)
 			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoBg, math.floor(12 / scale))
 			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, math.floor(12 / scale))
-		end
 
-		local header = vgui.Create("DPanel", panel)
-		header:SetSize(panelW - (panelMargin * 2), headerHeight)
-		header:SetPos(panelMargin, panelMargin)
-		local coinIcon = Material("icon16/coins.png")
-		header.Paint = function(pnl, w, h)
-			local titleText = string.upper("Inventory")
-			surface.SetFont("Arcana_DecoTitle")
-			local titleW = surface.GetTextSize(titleText)
-			draw.SimpleText(titleText, "Arcana_DecoTitle", 0, 0, ArtDeco.Colors.paleGold, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-
+			-- Title and coin chip center in the band between the frame's top
+			-- line and the items box, like every other station UI.
+			ArtDeco.DrawTitle("Arcana_DecoTitle", string.upper("Inventory"), 1, itemsPanelY, ArtDeco.Colors.paleGold, panelMargin)
 			local coins = Arcana.Inventory.LocalCache.coins or 0
-			local chipText = string.Comma(coins)
-			surface.SetFont("Arcana_Ancient")
-			local cw, ch = surface.GetTextSize(chipText)
-
-			local iconSize = math.floor(16 / scale)
-			local iconPad = math.floor(6 / scale)
-			local chipW = cw + math.floor(36 / scale)
-			local chipH = ch + math.floor(6 / scale)
-			local chipX = w - chipW
-			local chipY = 0
-
-			ArtDeco.FillDecoPanel(chipX, chipY, chipW, chipH, ArtDeco.Colors.paleGold, math.floor(6 / scale))
-
-			surface.SetDrawColor(ArtDeco.Colors.chipTextCol)
-			surface.SetMaterial(coinIcon)
-			surface.DrawTexturedRect(chipX + iconPad, chipY + (chipH - iconSize) / 2, iconSize, iconSize)
-
-			draw.SimpleText(chipText, "Arcana_Ancient", chipX + math.floor(26 / scale), chipY + (chipH - ch) * 0.5, ArtDeco.Colors.chipTextCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+			ArtDeco.DrawChip("Arcana_Ancient", string.Comma(coins), w - panelMargin, 1, itemsPanelY, nil, nil, ArtDeco.Icons.coin, TEXT_ALIGN_RIGHT)
 		end
 
 		local itemsPanel = vgui.Create("DPanel", panel)
-		local itemsPanelY = panelMargin + headerHeight + headerGap
 		local itemsPanelH = panelH - itemsPanelY - panelMargin
 		itemsPanel:SetSize(panelW - (panelMargin * 2), itemsPanelH)
 		itemsPanel:SetPos(panelMargin, itemsPanelY)

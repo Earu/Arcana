@@ -354,8 +354,6 @@ local function openVault(items)
 	-- Hover hint for the summon button: "Summon weapon" with the have/need
 	-- costs underneath, coins in gold and shards in crystal blue, matching
 	-- the enchanter's cost readout.
-	local HINT_COIN_COL = Color(222, 198, 120)
-	local HINT_SHARD_COL = Color(105, 180, 255)
 	local function attachSummonHint(btn)
 		btn.OnCursorEntered = function(pnl)
 			if IsValid(pnl._hint) then return end
@@ -371,8 +369,12 @@ local function openVault(items)
 				local needCoins = tonumber(VAULT_CFG.SUMMON_COINS) or 0
 				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
 				draw.SimpleText("Summon weapon", "Arcana_AncientSmall", w * 0.5, 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
-				draw.SimpleText(string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(needCoins) .. " coins", "Arcana_AncientSmall", w * 0.5, 27, HINT_COIN_COL, TEXT_ALIGN_CENTER)
-				draw.SimpleText(string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards) .. " shards", "Arcana_AncientSmall", w * 0.5, 45, HINT_SHARD_COL, TEXT_ALIGN_CENTER)
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, 27, {
+					{text = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+				}, TEXT_ALIGN_CENTER)
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, 45, {
+					{text = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+				}, TEXT_ALIGN_CENTER)
 			end
 			pnl._hint = tip
 
@@ -640,27 +642,12 @@ local function openVault(items)
 		draw.SimpleText("Imprint Current Weapon", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 		-- Costs, have / need, coins in gold and shards in crystal blue
-		-- around a small diamond, matching the summon hint. The whole
-		-- coins-diamond-shards block is measured and centered as one unit.
+		-- around a small diamond, matching the summon hint.
 		local lp = LocalPlayer()
-		local coinsTxt = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0) .. " coins"
-		local shardsTxt = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0) .. " shards"
-		surface.SetFont("Arcana_AncientSmall")
-		local cw1 = surface.GetTextSize(coinsTxt)
-		local cw2 = surface.GetTextSize(shardsTxt)
-		local gap = 10
-		local x0 = math.floor((w - (cw1 + gap + 6 + gap + cw2)) * 0.5)
-		local ty = h * 0.5 + 2
-		draw.SimpleText(coinsTxt, "Arcana_AncientSmall", x0, ty, HINT_COIN_COL)
-		draw.SimpleText(shardsTxt, "Arcana_AncientSmall", x0 + cw1 + gap + 6 + gap, ty, HINT_SHARD_COL)
-
-		local mx = x0 + cw1 + gap + 3
-		local my = ty + 8
-		surface.SetDrawColor(COLOR_SEP)
-		surface.DrawLine(mx - 3, my, mx, my - 3)
-		surface.DrawLine(mx, my - 3, mx + 3, my)
-		surface.DrawLine(mx + 3, my, mx, my + 3)
-		surface.DrawLine(mx, my + 3, mx - 3, my)
+		ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 2, {
+			{text = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+			{text = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+		}, TEXT_ALIGN_CENTER, true)
 	end
 	-- Enable/disable imprint based on weapon presence, vault space and affordability
 	imprintBtn.Think = function(pnl)

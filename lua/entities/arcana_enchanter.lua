@@ -988,8 +988,6 @@ if CLIENT then
 		left:SetWide(520)
 		left:NoClipping(true)
 
-		local COST_COIN_COL = Color(222, 198, 120)
-		local COST_SHARD_COL = Color(105, 180, 255)
 		local COST_CHANCE_LOW = Color(220, 110, 90)
 		local COST_CHANCE_MID = Color(222, 198, 120)
 		local COST_CHANCE_HIGH = Color(140, 210, 140)
@@ -1013,9 +1011,13 @@ if CLIENT then
 			if needCoins > 0 or needShards > 0 then
 				local haveCoins = Arcana:GetCoins(ply)
 				local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
-				draw.SimpleText(string.Comma(haveCoins) .. " / " .. string.Comma(needCoins) .. " coins", "Arcana_AncientSmall", cx, infoY, COST_COIN_COL, TEXT_ALIGN_CENTER)
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, {
+					{text = string.Comma(haveCoins) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+				}, TEXT_ALIGN_CENTER)
 				infoY = infoY + 18
-				draw.SimpleText(string.Comma(haveShards) .. " / " .. string.Comma(needShards) .. " shards", "Arcana_AncientSmall", cx, infoY, COST_SHARD_COL, TEXT_ALIGN_CENTER)
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, {
+					{text = string.Comma(haveShards) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+				}, TEXT_ALIGN_CENTER)
 				infoY = infoY + 18
 			end
 
@@ -1369,33 +1371,38 @@ if CLIENT then
 					-- Info tooltip icon
 					local infoIcon = ArtDeco.CreateInfoIcon(row, ench.description or "No description available", 320)
 
-					-- Plain cost text under the name
-					local costLbl = vgui.Create("DLabel", row)
-					costLbl:SetFont("Arcana_AncientSmall")
-					costLbl:SetTextColor(ArtDeco.Colors.textDim)
-					local parts = {}
+					-- Cost amounts with currency icons under the name
+					local costSegs = {}
 					local coinAmt = tonumber(ench.cost_coins or 0) or 0
 					if coinAmt > 0 then
-						parts[#parts + 1] = (string.Comma(coinAmt) .. " coins")
+						costSegs[#costSegs + 1] = {text = string.Comma(coinAmt), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.textDim}
 					end
 
 					for _, it2 in ipairs(ench.cost_items or {}) do
 						local name = tostring(it2.name or "item")
 						local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
-						local pretty = name
-						if _G.msitems and _G.msitems.GetInventoryInfo then
-							local info = _G.msitems.GetInventoryInfo(name)
-							if info and info.name then
-								pretty = string.lower(info.name)
+						if name == "mana_crystal_shard" then
+							costSegs[#costSegs + 1] = {text = string.Comma(amt), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.textDim}
+						else
+							-- No icon for arbitrary items, keep the word form
+							local pretty = name
+							if _G.msitems and _G.msitems.GetInventoryInfo then
+								local info = _G.msitems.GetInventoryInfo(name)
+								if info and info.name then
+									pretty = string.lower(info.name)
+								end
 							end
-						elseif name == "mana_crystal_shard" then
-							pretty = "crystal shards"
+							costSegs[#costSegs + 1] = {text = string.Comma(amt) .. " " .. pretty, color = ArtDeco.Colors.textDim}
 						end
-						parts[#parts + 1] = (string.Comma(amt) .. " " .. pretty)
 					end
 
-					costLbl:SetText(table.concat(parts, ", "))
-					costLbl:SizeToContents()
+					local costLbl = vgui.Create("DPanel", row)
+					costLbl:SetPaintBackground(false)
+					costLbl:SetMouseInputEnabled(false)
+					costLbl.Paint = function(pnl, w, h)
+						ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 0, costSegs, TEXT_ALIGN_LEFT)
+					end
+					costLbl:SetSize(ArtDeco.MeasureCostLine("Arcana_AncientSmall", costSegs))
 					row.PerformLayout = function(pnl, w, h)
 						-- Position info icon right after the enchant name
 						surface.SetFont("Arcana_AncientLarge")

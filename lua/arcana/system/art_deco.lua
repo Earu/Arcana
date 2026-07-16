@@ -63,6 +63,10 @@ if CLIENT then
 		textBright = Color(236, 230, 220, 255),
 		textDim = Color(180, 170, 150, 255),
 
+		-- Currency colors
+		coinGold = Color(222, 198, 120, 255),
+		shardBlue = Color(105, 180, 255, 255),
+
 		-- Interactive elements
 		cardIdle = Color(46, 36, 26, 235),
 		cardHover = Color(58, 44, 32, 235),
@@ -441,10 +445,13 @@ if CLIENT then
 	-- @param bottom First row occupied by whatever bounds the chip below (an inner frame's line, a bar's top)
 	-- @param bgCol Chip fill (default paleGold)
 	-- @param textCol Chip text color (default chipTextCol)
-	function ArtDeco.DrawChip(font, text, x, top, bottom, bgCol, textCol)
+	-- @param icon Optional Material drawn before the text, tinted with textCol
+	-- @param align TEXT_ALIGN_LEFT (default, x is the left edge) or TEXT_ALIGN_RIGHT (x is the right edge)
+	function ArtDeco.DrawChip(font, text, x, top, bottom, bgCol, textCol, icon, align)
 		surface.SetFont(font)
 		local tw, th = surface.GetTextSize(text)
-		local cw, ch = tw + 18, th + 6
+		local iconSize = icon and (th - 2) or 0
+		local cw, ch = tw + 18 + (icon and (iconSize + 4) or 0), th + 6
 
 		-- An odd leftover can't split evenly between the two gaps, so spend the odd
 		-- pixel on the chip itself: a chip 1px taller reads better than uneven gaps.
@@ -454,11 +461,112 @@ if CLIENT then
 			slack = slack - 1
 		end
 
+		if align == TEXT_ALIGN_RIGHT then
+			x = x - cw
+		end
+
 		local y = top + math.floor(slack * 0.5)
 		ArtDeco.FillDecoPanel(x, y, cw, ch, bgCol or ArtDeco.Colors.paleGold, 8)
-		draw.SimpleText(text, font, x + math.floor((cw - tw) * 0.5), y + math.floor((ch - th) * 0.5), textCol or ArtDeco.Colors.chipTextCol)
+
+		local tcol = textCol or ArtDeco.Colors.chipTextCol
+		local tx = x + 9
+		if icon then
+			surface.SetDrawColor(tcol)
+			surface.SetMaterial(icon)
+			surface.DrawTexturedRect(tx, y + math.floor((ch - iconSize) * 0.5), iconSize, iconSize)
+			tx = tx + iconSize + 4
+		end
+		draw.SimpleText(text, font, tx, y + math.floor((ch - th) * 0.5), tcol)
 
 		return x + cw
+	end
+
+	-- ===========================================================================
+	-- COST LINES (amounts with currency icons)
+	-- ===========================================================================
+	-- Flat white silhouettes, tinted at draw time with the segment color
+	ArtDeco.Icons = {
+		coin = Material("arcana/icons/coin.png", "smooth"),
+		shard = Material("arcana/icons/crystal_shard.png", "smooth"),
+	}
+
+	local COST_ICON_PAD = 4
+	local COST_SEGMENT_GAP = 10
+	-- Extra room per gap when a divider diamond sits in it
+	local COST_DIVIDER_GAP = 12
+
+	local function costLineMetrics(font, segments, divider)
+		surface.SetFont(font)
+		local _, th = surface.GetTextSize("0")
+		local iconSize = th - 2
+		local gap = COST_SEGMENT_GAP + (divider and COST_DIVIDER_GAP or 0)
+		local totalW = 0
+		for i, seg in ipairs(segments) do
+			if i > 1 then
+				totalW = totalW + gap
+			end
+			totalW = totalW + surface.GetTextSize(seg.text)
+			if seg.icon then
+				totalW = totalW + COST_ICON_PAD + iconSize
+			end
+		end
+		return totalW, th, iconSize, gap
+	end
+
+	--- Measures a cost line without drawing it (see DrawCostLine)
+	-- @return Total width, height
+	function ArtDeco.MeasureCostLine(font, segments, divider)
+		local w, h = costLineMetrics(font, segments, divider)
+		return w, h
+	end
+
+	--- Draws a line of cost segments, each an amount optionally followed by a currency icon
+	-- @param font Font name
+	-- @param x Left edge (TEXT_ALIGN_LEFT), center (TEXT_ALIGN_CENTER) or right edge (TEXT_ALIGN_RIGHT)
+	-- @param y Top edge
+	-- @param segments Array of {text = string, icon = Material or nil, color = Color or nil}
+	-- @param align TEXT_ALIGN_LEFT (default), TEXT_ALIGN_CENTER or TEXT_ALIGN_RIGHT
+	-- @param divider Draw a small diamond between segments
+	-- @return Right edge of the drawn line
+	function ArtDeco.DrawCostLine(font, x, y, segments, align, divider)
+		local totalW, th, iconSize, gap = costLineMetrics(font, segments, divider)
+
+		-- Snap to whole pixels so the divider diamond doesn't split across columns
+		local cx = x
+		if align == TEXT_ALIGN_CENTER then
+			cx = math.floor(x - totalW * 0.5)
+		elseif align == TEXT_ALIGN_RIGHT then
+			cx = math.floor(x - totalW)
+		end
+
+		for i, seg in ipairs(segments) do
+			if i > 1 then
+				if divider then
+					local mx = math.floor(cx + gap * 0.5)
+					local my = math.floor(y + th * 0.5)
+					surface.SetDrawColor(ArtDeco.Colors.brassInner)
+					surface.DrawLine(mx - 3, my, mx, my - 3)
+					surface.DrawLine(mx, my - 3, mx + 3, my)
+					surface.DrawLine(mx + 3, my, mx, my + 3)
+					surface.DrawLine(mx, my + 3, mx - 3, my)
+				end
+				cx = cx + gap
+			end
+
+			local col = seg.color or ArtDeco.Colors.textBright
+			draw.SimpleText(seg.text, font, cx, y, col)
+			cx = cx + surface.GetTextSize(seg.text)
+
+			if seg.icon then
+				cx = cx + COST_ICON_PAD
+				surface.SetDrawColor(col)
+				surface.SetMaterial(seg.icon)
+				surface.DrawTexturedRect(cx, y + math.floor((th - iconSize) * 0.5), iconSize, iconSize)
+				cx = cx + iconSize
+			end
+		end
+
+		return cx
 	end
 
 	-- ===========================================================================
