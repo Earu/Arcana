@@ -1,7 +1,8 @@
 if SERVER then
-	hook.Add("Arcana_BeginCasting", "MinifyPlayer_TargetScan", function(caster, spellId)
+	hook.Add("Arcana_BeginCasting", "MinifyPlayer_TargetScan", function(caster, spellId, casterEntity)
 		if spellId ~= "minify_player" then return end
-		Arcana.Common.TargetScan(caster, function(ent)
+		local srcEnt = IsValid(casterEntity) and casterEntity or caster
+		Arcana.Common.TargetScan(srcEnt, function(ent)
 			return IsValid(ent) and ent:IsPlayer()
 		end, 1200)
 	end)
@@ -41,7 +42,8 @@ Arcana:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		local target = Arcana.Common.GetLockedTarget(caster)
+		local srcEnt = ctx and IsValid(ctx.casterEntity) and ctx.casterEntity or caster
+		local target = Arcana.Common.GetLockedTarget(srcEnt)
 		if not target or not target:IsPlayer() then
 			target = caster
 		end

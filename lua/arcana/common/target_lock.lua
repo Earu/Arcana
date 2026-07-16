@@ -24,22 +24,34 @@ if SERVER then
 	util.AddNetworkString("Arcana_TargetLocked")
 	util.AddNetworkString("Arcana_TargetUnlocked")
 
-	-- steamid64 → Entity  (locked target, once acquired)
+	-- caster Entity → Entity  (locked target, once acquired)
 	local lockedTargets = {}
 
-	-- steamid64 → { filter, range }
+	-- caster Entity → { filter, range }
 	local activeScanners = {}
+
+	-- The player who should see the lock indicator: the caster itself, or the
+	-- caster's owner when the caster is an entity (e.g. arcana_spell_caster).
+	local function getViewer(caster)
+		if caster:IsPlayer() then return caster end
+
+		local owner = caster.CPPIGetOwner and caster:CPPIGetOwner()
+		if not IsValid(owner) then owner = caster:GetNWEntity("FallbackOwner") end
+		if IsValid(owner) and owner:IsPlayer() then return owner end
+
+		return nil
+	end
 
 	--- Returns the entity locked during the cast wind-up, or nil if none yet.
 	-- The spell's cast() is responsible for validating the returned entity further.
-	-- @param caster Entity
+	-- @param caster Entity  The scanning caster (player or casting entity).
 	-- @return Entity|nil
 	function Arcana.Common.GetLockedTarget(caster)
 		if not IsValid(caster) then return nil end
 
-		local target = lockedTargets[caster:SteamID64()]
+		local target = lockedTargets[caster]
 		if not IsValid(target) then
-			lockedTargets[caster:SteamID64()] = nil
+			lockedTargets[caster] = nil
 			return nil
 		end
 
@@ -50,20 +62,17 @@ if SERVER then
 	-- The first entity for which filter(entity) returns true becomes the locked target.
 	-- The scan stops automatically on the first hit. The lock and client indicator are
 	-- cleared automatically when the spell succeeds or fails.
-	-- Derives spellId and remaining cast time from the caster's active player data.
-	-- @param caster Entity  The casting player.
+	-- Players scan along their eye trace; other entities scan along their forward axis.
+	-- @param caster Entity  The casting player or entity (e.g. arcana_spell_caster).
 	-- @param filter function(entity)->bool  Acceptance predicate (nil = accept any valid non-caster).
 	-- @param range  number  Max eye-trace distance (nil = 1000).
 	function Arcana.Common.TargetScan(caster, filter, range)
 		if not IsValid(caster) then return end
 
-		local sid = caster:SteamID64()
-
 		-- Clear any previous scan/lock before starting fresh.
-		activeScanners[sid] = nil
-		lockedTargets[sid] = nil
+		lockedTargets[caster] = nil
 
-		activeScanners[sid] = {
+		activeScanners[caster] = {
 			filter = isfunction(filter) and filter or nil,
 			range = range or 1000,
 		}
@@ -72,23 +81,29 @@ if SERVER then
 	local function clearLock(caster)
 		if not IsValid(caster) then return end
 
-		local sid = caster:SteamID64()
-		activeScanners[sid] = nil
+		activeScanners[caster] = nil
 
-		if not lockedTargets[sid] then return end
+		if not lockedTargets[caster] then return end
 
-		lockedTargets[sid] = nil
-		net.Start("Arcana_TargetUnlocked")
-		net.Send(caster)
+		lockedTargets[caster] = nil
+
+		local viewer = getViewer(caster)
+		if viewer then
+			net.Start("Arcana_TargetUnlocked")
+			net.Send(viewer)
+		end
 	end
+
+	--- Cancel an in-progress scan and drop any acquired lock for this caster.
+	-- Spells never need this; entity casters use it on their abort paths.
+	Arcana.Common.ClearTargetLock = clearLock
 
 	-- Single Think hook — runs every server frame, scans all active casters at once.
 	hook.Add("Think", "ArcanaTargetLock_Scan", function()
-		for sid, scanner in pairs(activeScanners) do
-			local caster = player.GetBySteamID64(sid)
+		for caster, scanner in pairs(activeScanners) do
 			if not IsValid(caster) then
-				activeScanners[sid] = nil
-				lockedTargets[sid] = nil
+				activeScanners[caster] = nil
+				lockedTargets[caster] = nil
 				continue
 			end
 
@@ -111,39 +126,50 @@ if SERVER then
 			if scanner.filter and not scanner.filter(target) then continue end
 
 			-- First accepted entity — lock and stop scanning.
-			lockedTargets[sid] = target
-			activeScanners[sid] = nil
+			lockedTargets[caster] = target
+			activeScanners[caster] = nil
 
-			-- Derive remaining cast time and spellId from player data so the
-			-- indicator circle matches the cast wind-up duration exactly.
-			local pdata = Arcana:GetPlayerData(caster)
-			local spellId = (pdata and pdata.casting_spell) or ""
-			local remaining = math.max(0.05, ((pdata and pdata.casting_until) or CurTime()) - CurTime())
+			-- Derive remaining cast time and spellId so the indicator circle
+			-- matches the cast wind-up duration exactly.
+			local spellId, remaining
+			if caster:IsPlayer() then
+				local pdata = Arcana:GetPlayerData(caster)
+				spellId = (pdata and pdata.casting_spell) or ""
+				remaining = math.max(0.05, ((pdata and pdata.casting_until) or CurTime()) - CurTime())
+			else
+				spellId = caster.QueuedSpell or ""
+				remaining = math.max(0.05, (caster.CastingUntil or CurTime()) - CurTime())
+			end
 
-			net.Start("Arcana_TargetLocked")
-			net.WriteEntity(target)
-			net.WriteFloat(remaining)
-			net.WriteString(spellId)
-			net.Send(caster)
+			local viewer = getViewer(caster)
+			if viewer then
+				net.Start("Arcana_TargetLocked")
+				net.WriteEntity(target)
+				net.WriteFloat(remaining)
+				net.WriteString(spellId)
+				net.Send(viewer)
+			end
 		end
 	end)
 
 	-- Automatically clear lock and indicator when the spell resolves.
-	hook.Add("Arcana_CastSpell", "ArcanaTargetLock_Clear", function(caster)
-		clearLock(caster)
-	end)
-
-	hook.Add("Arcana_CastSpellFailure", "ArcanaTargetLock_Clear", function(caster)
-		clearLock(caster)
-	end)
-
-	-- Clear stale entries on disconnect.
-	hook.Add("PlayerDisconnected", "ArcanaTargetLock_Cleanup", function(ply)
-		if IsValid(ply) then
-			local sid = ply:SteamID64()
-			activeScanners[sid] = nil
-			lockedTargets[sid] = nil
+	-- Entity casts run these hooks with the owner player as caster, so also
+	-- clear by the context's casterEntity.
+	local function onSpellResolved(caster, _, _, _, context)
+		if context and IsValid(context.casterEntity) and context.casterEntity ~= caster then
+			clearLock(context.casterEntity)
 		end
+
+		clearLock(caster)
+	end
+
+	hook.Add("Arcana_CastSpell", "ArcanaTargetLock_Clear", onSpellResolved)
+	hook.Add("Arcana_CastSpellFailure", "ArcanaTargetLock_Clear", onSpellResolved)
+
+	-- Clear stale entries when a caster (player or entity) leaves the world.
+	hook.Add("EntityRemoved", "ArcanaTargetLock_Cleanup", function(ent)
+		activeScanners[ent] = nil
+		lockedTargets[ent] = nil
 	end)
 end
 

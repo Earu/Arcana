@@ -283,7 +283,7 @@ function Arcana:StartCasting(ply, spellId)
 		pdata.casting_spell = spellId
 	end
 
-	runHook("BeginCasting", ply, spellId)
+	runHook("BeginCasting", ply, spellId, ply)
 
 	if SERVER then
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
