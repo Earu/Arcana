@@ -717,14 +717,20 @@ local function OpenSpellcraftMenu(machine)
 		local statRow2 = {
 			{ v = ("%.1fs"):format(compiled.cooldown), l = "COOLDOWN" },
 			{ v = ("%.1fs"):format(compiled.castTime), l = "CAST" },
-			{ v = string.Comma(compiled.perCastCost) .. " coins", l = "PER CAST", gold = true },
+			{ v = string.Comma(compiled.perCastCost), l = "PER CAST", gold = true, icon = ArtDeco.Icons.coin },
 		}
 
 		local colW = math.floor(infoW / 3)
 		local function drawStatRow(cols)
 			for i, s in ipairs(cols) do
 				local sx = ix + (i - 1) * colW
-				draw.SimpleText(s.v, "Arcana_AncientLarge", sx, y, s.gold and C.paleGold or C.textBright)
+				if s.icon then
+					ArtDeco.DrawCostLine("Arcana_AncientLarge", sx, y, {
+						{text = s.v, icon = s.icon, color = s.gold and C.paleGold or C.textBright},
+					})
+				else
+					draw.SimpleText(s.v, "Arcana_AncientLarge", sx, y, s.gold and C.paleGold or C.textBright)
+				end
 				draw.SimpleText(s.l, "Arcana_AncientSmall", sx, y + 28, C.textDim)
 			end
 			y = y + 56
@@ -812,8 +818,11 @@ local function OpenSpellcraftMenu(machine)
 		footer.Paint = function(_, w, h)
 			local e = hoveredLocked
 			if not e then return end
-			draw.SimpleText("Unlock " .. e.label .. ":  " .. string.Comma(e.unlock.coins) .. " coins, " .. e.unlock.shards .. " shards",
-				"Arcana_AncientSmall", w - 9, 4, C.paleGold, TEXT_ALIGN_RIGHT)
+			ArtDeco.DrawCostLine("Arcana_AncientSmall", w - 9, 4, {
+				{text = "Unlock " .. e.label .. ":", color = C.paleGold},
+				{text = string.Comma(e.unlock.coins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+				{text = string.Comma(e.unlock.shards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+			}, TEXT_ALIGN_RIGHT)
 		end
 
 		local list = vgui.Create("DScrollPanel", right)
@@ -1114,9 +1123,10 @@ local function OpenSpellcraftMenu(machine)
 			local txtCol = enabled and C.textBright or Color(160, 150, 135)
 			draw.SimpleText("CREATE SPELL", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			if compiled then
-				local cost = ("%s coins, %d shards"):format(
-					string.Comma(compiled.consecrationCoins), compiled.consecrationShards)
-				draw.SimpleText(cost, "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 1, {
+					{text = string.Comma(compiled.consecrationCoins), icon = ArtDeco.Icons.coin, color = enabled and ArtDeco.Colors.coinGold or C.textDim},
+					{text = string.Comma(compiled.consecrationShards), icon = ArtDeco.Icons.shard, color = enabled and ArtDeco.Colors.shardBlue or C.textDim},
+				}, TEXT_ALIGN_CENTER)
 			end
 		end
 		submit.DoClick = function()
@@ -1271,20 +1281,37 @@ local function OpenSpellcraftMenu(machine)
 				y = y + 26
 			end
 
+			-- Like line(), but with coin/shard amounts and their icons after the text
+			local function lineCost(ok, text, coins, shards)
+				drawMark(ix, y, ok)
+				local textW = draw.SimpleText(text, "Arcana_Ancient", ix + 22, y, ok and C.textBright or C.textDim)
+				ArtDeco.DrawCostLine("Arcana_Ancient", ix + 22 + textW + 10, y, {
+					{text = string.Comma(coins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+					{text = string.Comma(shards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+				})
+				y = y + 26
+			end
+
 			line(req.checks.level.ok, "Level " .. req.checks.level.need)
 			local ess = req.checks.essence
 			local essText = ess.label .. " element"
-			if not ess.ok then
-				essText = essText .. (ess.bargain and "  (the Golden Sun's bargain)" or
-					("  (buy in the ELEMENT step: " .. string.Comma(ess.unlock.coins) .. " coins, " .. ess.unlock.shards .. " shards)"))
+			if ess.ok then
+				line(true, essText)
+			elseif ess.bargain then
+				line(false, essText .. "  (the Golden Sun's bargain)")
+			else
+				lineCost(false, essText .. "  — buy in the ELEMENT step:", ess.unlock.coins, ess.unlock.shards)
 			end
-			line(ess.ok, essText)
 			for _, cl in ipairs(req.checks.clauses) do
 				line(cl.ok, cl.label .. (cl.rank > 1 and (" " .. cl.rank) or "") .. (cl.ok and "" or ("  (level " .. cl.need .. ")")))
 			end
 			line(req.checks.budget.ok, "Power " .. req.checks.budget.need .. " / " .. req.checks.budget.have)
 			local con = req.checks.consecrated
-			line(con.ok, con.ok and "Activated" or ("Activation cost: " .. string.Comma(con.coins) .. " coins, " .. con.shards .. " shards"))
+			if con.ok then
+				line(true, "Activated")
+			else
+				lineCost(false, "Activation cost:", con.coins, con.shards)
+			end
 		end
 	end
 

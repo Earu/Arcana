@@ -364,7 +364,7 @@ local function drawCooldownStack(scrW, scrH)
 	end
 end
 
-local coinIcon = Material("icon16/coins.png")
+local coinIcon = ArtDeco.Icons.coin
 
 local function drawNotifications(scrW, scrH)
 	if #notificationStack == 0 then return end
@@ -444,12 +444,12 @@ local function drawNotifications(scrW, scrH)
 		_tempShadowCol.a = textAlpha
 		_tempMainCol.a = textAlpha
 
-		-- Draw coin icon for coin notifications
+		-- Draw coin icon for coin notifications, tinted like the amount text
 		if notify.type == "coins_gained" or notify.type == "coins_taken" then
 			local iconSize = 16
 			local iconX = baseX - mainTextW - iconSize - 4
 			local iconY = y + 2
-			surface.SetDrawColor(255, 255, 255, textAlpha)
+			surface.SetDrawColor(_tempMainCol.r, _tempMainCol.g, _tempMainCol.b, textAlpha)
 			surface.SetMaterial(coinIcon)
 			surface.DrawTexturedRect(iconX, iconY, iconSize, iconSize)
 		end

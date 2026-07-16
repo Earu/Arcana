@@ -636,8 +636,13 @@ if CLIENT then
 					-- Cost info
 					local ca = tonumber(sp.cost_amount or 0) or 0
 					local ct = tostring(sp.cost_type or "")
-					local sub = string.format("Cost %s %s", string.Comma(ca), ct)
-					draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, ArtDeco.Colors.textDim)
+					if ct == Arcana.COST_TYPES.COINS then
+						ArtDeco.DrawCostLine("Arcana_AncientSmall", 12, 32, {
+							{text = string.Comma(ca), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.textDim},
+						})
+					else
+						draw.SimpleText(string.Comma(ca) .. " " .. ct, "Arcana_AncientSmall", 12, 32, ArtDeco.Colors.textDim)
+					end
 				end
 
 				row.DoClick = function()

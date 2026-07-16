@@ -338,6 +338,20 @@ if CLIENT then
 	function SWEP:OnRemove()
 	end
 
+	-- Draws a spell's cost as amount + coin icon (coins) or plain "amount type"
+	-- for other cost types. y is the top edge.
+	local function drawSpellCost(sp, font, x, y, col, align)
+		local ct = tostring(sp.cost_type or "")
+		local ca = tonumber(sp.cost_amount or 0) or 0
+		local seg
+		if ct == Arcana.COST_TYPES.COINS then
+			seg = {text = string.Comma(ca), icon = ArtDeco.Icons.coin, color = col}
+		else
+			seg = {text = string.Comma(ca) .. " " .. ct, color = col}
+		end
+		ArtDeco.DrawCostLine(font, x, y, {seg}, align)
+	end
+
 	local function formatCooldownTime(secs)
 		if secs >= 3600 then
 			local h = math.floor(secs / 3600)
@@ -474,9 +488,7 @@ if CLIENT then
 		if hsId and Arcana.RegisteredSpells[hsId] then
 			local sp = Arcana.RegisteredSpells[hsId]
 			draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			local ct = tostring(sp.cost_type or "")
-			local ca = tonumber(sp.cost_amount or 0) or 0
-			draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			drawSpellCost(sp, "Arcana_Ancient", cx, cy + 2, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER)
 		else
 			draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
@@ -691,9 +703,7 @@ if CLIENT then
 			if hsId and Arcana.RegisteredSpells[hsId] then
 				local sp = Arcana.RegisteredSpells[hsId]
 				draw.SimpleText(sp.name, "Arcana_AncientLarge", cx, cy - 10, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				local ct = tostring(sp.cost_type or "")
-				local ca = tonumber(sp.cost_amount or 0) or 0
-				draw.SimpleText("Cost " .. string.Comma(ca) .. " " .. ct, "Arcana_Ancient", cx, cy + 12, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				drawSpellCost(sp, "Arcana_Ancient", cx, cy + 2, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER)
 			else
 				draw.SimpleText("Empty", "Arcana_AncientLarge", cx, cy, ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
@@ -835,10 +845,7 @@ if CLIENT then
 				ArtDeco.DrawDecoFrame(2, 2, w - 4, h - 4, ArtDeco.Colors.gold, 8)
 				draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
 				-- Subline: cost only
-				local ca = tonumber(sp.cost_amount or 0) or 0
-				local ct = tostring(sp.cost_type or "")
-				local sub = string.format("Cost %s %s", string.Comma(ca), ct)
-				draw.SimpleText(sub, "Arcana_AncientSmall", 12, 32, ArtDeco.Colors.textDim)
+				drawSpellCost(sp, "Arcana_AncientSmall", 12, 32, ArtDeco.Colors.textDim)
 			end
 
 			-- Cast button on the right side of the row
@@ -984,10 +991,7 @@ if CLIENT then
 					draw.SimpleText(levelText, "Arcana_AncientSmall", 12, infoY, divinePactColors.accent)
 
 					-- Cost display
-					local ca = tonumber(sp.cost_amount or 0) or 0
-					local ct = tostring(sp.cost_type or "")
-					local sub = string.format("⟨ Cost: %s %s ⟩", string.Comma(ca), ct)
-					draw.SimpleText(sub, "Arcana_AncientSmall", 12 + levelW + 16, infoY, ColorAlpha(divinePactColors.text, 200))
+					drawSpellCost(sp, "Arcana_AncientSmall", 12 + levelW + 16, infoY, ColorAlpha(divinePactColors.text, 200))
 				end
 
 				-- Cast button
@@ -1133,10 +1137,7 @@ if CLIENT then
 					local displayName = string.gsub(sp.name, "^Ritual:%s*", "")
 					draw.SimpleText(displayName, "Arcana_AncientLarge", 14, 10, ritualColors.text)
 					-- Subline: cost only
-					local ca = tonumber(sp.cost_amount or 0) or 0
-					local ct = tostring(sp.cost_type or "")
-					local sub = string.format("Cost %s %s", string.Comma(ca), ct)
-					draw.SimpleText(sub, "Arcana_AncientSmall", 14, 36, ritualColors.textDim)
+					drawSpellCost(sp, "Arcana_AncientSmall", 14, 36, ritualColors.textDim)
 				end
 
 				row.OnCursorEntered = function(pnl)
