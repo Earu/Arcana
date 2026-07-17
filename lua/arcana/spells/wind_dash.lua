@@ -1,6 +1,7 @@
 if SERVER then
 	util.AddNetworkString("Arcana_WindDash")
 	util.AddNetworkString("Arcana_WindDashLand")
+	util.AddNetworkString("Arcana_WindDash_SkyBurst")
 end
 
 -- Wind Dash
@@ -8,6 +9,15 @@ end
 -- Grants fall damage immunity while active. Hard landing deals speed-scaled damage to entities below.
 local LEAP_FORCE  = 1250 -- Launch force for the upward leap
 local DIVE_FORCE  = 2000 -- Launch force for the downward crash
+local EMPOWERED_FORCE = LEAP_FORCE * 6 -- Windborne dash launch force while Sky Walk is active
+local EMPOWERED_YIELD = 1.0 -- How long Sky Walk's flight control yields to let this dash carry
+
+-- Sky Walk (wind_sky_walk.lua) stores its state on the player as _ArcanaSkyWalk.
+-- Reading the field directly keeps the coupling on the player-field convention.
+local function skyWalkActive(ply)
+	local st = ply._ArcanaSkyWalk
+	return istable(st) and st.untilT ~= nil and CurTime() < st.untilT
+end
 local LEAP_PITCH  = -10  -- Eye pitch threshold: below this = looking "up enough" to leap
 local DIVE_PITCH  =  5   -- Eye pitch threshold: above this = looking "down enough" to dive
 local LAND_DAMAGE_SPEED = 700 -- Speed at which a heavy landing plays heavy impact sounds
@@ -29,6 +39,8 @@ Arcana:RegisterSpell({
 
 	can_cast = function(caster)
 		if not IsValid(caster) then return false, "Invalid caster" end
+		-- Windborne (Sky Walk active): dash freely, no ground check or pitch gate.
+		if skyWalkActive(caster) then return true end
 		if caster:GetMoveType() ~= MOVETYPE_WALK then return false, "Cannot wind dash in this state" end
 
 		local pitch = caster:EyeAngles().pitch
@@ -58,6 +70,41 @@ Arcana:RegisterSpell({
 
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
+
+		-- Windborne dash: Sky Walk empowers Wind Dash into an any-direction, double-force
+		-- surge with no ground/pitch gate. Levitation owns movement, so we don't set the
+		-- ArcanaWindDash* land flags here (the land hook never fires under MOVETYPE_FLY).
+		if skyWalkActive(caster) then
+			local aim = caster:GetAimVector()
+			local dashVel = aim * EMPOWERED_FORCE
+			caster:SetVelocity(dashVel)
+			-- Sky Walk's SetupMove reads these to sustain the dash at full speed for the
+			-- window (MOVETYPE_FLY would otherwise clamp/friction the impulse away).
+			caster.ArcanaSkyWalkDashVel = dashVel
+			caster.ArcanaSkyWalkDashUntil = CurTime() + EMPOWERED_YIELD
+
+			local pos = caster:WorldSpaceCenter()
+			sound.Play("ambient/wind/wind_roar1.wav", pos, 90, 150)
+			sound.Play("weapons/physcannon/physcannon_charge.wav", pos, 78, 160)
+			-- The "bang": a low concussive boom everyone hears at the launch point.
+			sound.Play("ambient/explosions/explode_4.wav", pos, 92, math.random(125, 140))
+			sound.Play("ambient/wind/wind_hit1.wav", pos, 85, 70)
+
+			net.Start("Arcana_WindDash", true)
+			net.WriteEntity(caster)
+			net.WriteVector(aim)
+			net.WriteBool(false)
+			net.Broadcast()
+
+			-- Wind explosion + physgun-colored impact disc at the launch point.
+			net.Start("Arcana_WindDash_SkyBurst", true)
+			net.WriteVector(pos)
+			net.WriteEntity(caster)
+			net.WriteVector(aim)
+			net.Broadcast()
+
+			return true
+		end
 
 		local aimVec   = caster:GetAimVector()
 		local pitch    = caster:EyeAngles().pitch
@@ -140,6 +187,137 @@ if SERVER then
 end
 
 if CLIENT then
+	-- Expanding, fading impact discs from windborne dashes: each faces along the dash
+	-- direction and is tinted with the caster's physgun color, so it reads as a surface
+	-- the player bounced off of.
+	local skyRings = {}
+	local RING_GLOW = Material("sprites/light_glow02_add")
+	local RING_EDGE = Material("effects/select_ring")
+
+	-- The caster's physgun/weapon color as a Color (falls back to wind-blue).
+	local function physgunColor(ply)
+		if IsValid(ply) and ply.GetWeaponColor then
+			local wc = ply:GetWeaponColor()
+			return Color(math.Clamp(wc.x * 255, 0, 255), math.Clamp(wc.y * 255, 0, 255), math.Clamp(wc.z * 255, 0, 255))
+		end
+		return Color(120, 180, 255)
+	end
+
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_WindDash_SkyRing", function(bDepth, bSky)
+		if bDepth or bSky then return end
+		if #skyRings == 0 then return end
+
+		local now = CurTime()
+		for i = #skyRings, 1, -1 do
+			local r = skyRings[i]
+			local frac = (now - r.start) / r.dur
+			if frac >= 1 then
+				table.remove(skyRings, i)
+				continue
+			end
+
+			local a = 255 * (1 - frac)
+			local rad = r.size * (0.45 + frac * 1.05)
+			local c = r.col
+
+			-- Soft filled disc (both faces so it's visible from either side).
+			render.SetMaterial(RING_GLOW)
+			render.DrawQuadEasy(r.pos, r.normal, rad * 2, rad * 2, Color(c.r, c.g, c.b, a), 0)
+			render.DrawQuadEasy(r.pos, r.normal * -1, rad * 2, rad * 2, Color(c.r, c.g, c.b, a), 0)
+
+			-- Crisp expanding ring edge to sell the "circle".
+			render.SetMaterial(RING_EDGE)
+			render.DrawQuadEasy(r.pos, r.normal, rad * 2.5, rad * 2.5, Color(c.r, c.g, c.b, a), 0)
+			render.DrawQuadEasy(r.pos, r.normal * -1, rad * 2.5, rad * 2.5, Color(c.r, c.g, c.b, a), 0)
+		end
+	end)
+
+	-- Wind explosion at the launch point of a Sky Walk (windborne) dash.
+	net.Receive("Arcana_WindDash_SkyBurst", function()
+		local pos    = net.ReadVector()
+		local caster = net.ReadEntity()
+		local aim    = net.ReadVector()
+
+		local pcol = physgunColor(caster)
+
+		-- Impact disc, angled to the dash so it looks like a surface they kicked off.
+		skyRings[#skyRings + 1] = {
+			pos    = pos,
+			normal = aim,
+			col    = pcol,
+			start  = CurTime(),
+			dur    = 0.5,
+			size   = 130,
+		}
+
+		-- Arcana magic circle standing in the same plane, facing along the dash.
+		if Arcana.Circle and Arcana.Circle.MagicCircle then
+			local ang = aim:Angle()
+			ang:RotateAroundAxis(ang:Right(), 90)
+			Arcana.Circle.MagicCircle.CreateMagicCircle(pos, ang, pcol, 3, 140, 1.2, 2)
+		end
+
+		local emitter = ParticleEmitter(pos)
+		if not emitter then return end
+
+		-- Radial gust: a dense sphere of wind blasting outward from the start point.
+		for i = 1, 140 do
+			local rdir = VectorRand():GetNormalized()
+			local p = emitter:Add("effects/splash2", pos + rdir * math.Rand(4, 30))
+			if p then
+				p:SetDieTime(math.Rand(0.4, 1.0))
+				p:SetStartAlpha(math.Rand(210, 255))
+				p:SetEndAlpha(0)
+				p:SetStartSize(math.Rand(22, 42))
+				p:SetEndSize(math.Rand(5, 12))
+				p:SetRoll(math.Rand(0, 360))
+				p:SetRollDelta(math.Rand(-10, 10))
+				p:SetColor(200, 228, 255)
+				p:SetVelocity(rdir * math.Rand(700, 1700))
+				p:SetAirResistance(110)
+				p:SetGravity(Vector(0, 0, -15))
+				p:SetLighting(false)
+			end
+		end
+
+		-- Swelling smoke puffs so the blast reads as a gust, not just sparks.
+		for i = 1, 34 do
+			local rdir = VectorRand():GetNormalized()
+			local p = emitter:Add("particle/particle_smokegrenade", pos + rdir * math.Rand(4, 24))
+			if p then
+				p:SetDieTime(math.Rand(0.6, 1.2))
+				p:SetStartAlpha(math.Rand(120, 180))
+				p:SetEndAlpha(0)
+				p:SetStartSize(math.Rand(26, 44))
+				p:SetEndSize(math.Rand(80, 120))
+				p:SetRoll(math.Rand(0, 360))
+				p:SetRollDelta(math.Rand(-3, 3))
+				p:SetColor(206, 222, 242)
+				p:SetVelocity(rdir * math.Rand(200, 420))
+				p:SetAirResistance(90)
+				p:SetGravity(Vector(0, 0, 6))
+				p:SetLighting(false)
+			end
+		end
+		emitter:Finish()
+
+		-- Shockwave ring + a brief wind-blue flash.
+		local ed = EffectData()
+		ed:SetOrigin(pos)
+		ed:SetScale(3.4)
+		util.Effect("StunEffect", ed)
+
+		local dl = DynamicLight(0)
+		if dl then
+			dl.pos = pos
+			dl.r, dl.g, dl.b = 200, 228, 255
+			dl.brightness = 3.0
+			dl.Decay = 1400
+			dl.Size = 512
+			dl.DieTime = CurTime() + 0.15
+		end
+	end)
+
 	net.Receive("Arcana_WindDash", function()
 		local ply    = net.ReadEntity()
 		local aimDir = net.ReadVector()
