@@ -106,7 +106,7 @@ end)
 -- steady rate and suppress the default calc (returning a value skips GM:UpdateAnimation).
 hook.Add("UpdateAnimation", "Arcana_SkyWalk_AnimRate", function(ply)
 	if not ply:GetNW2Bool("ArcanaSkyWalkGliding", false) then return end
-	ply:SetPlaybackRate(0.75)
+	ply:SetPlaybackRate(0.01)
 	return true
 end)
 
