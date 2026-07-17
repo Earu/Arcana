@@ -1,20 +1,26 @@
-if SERVER then
-	util.AddNetworkString("Arcana_SkyWalk_Start")
-	util.AddNetworkString("Arcana_SkyWalk_Stop")
-end
-
 -- Sky Walk
--- Sustained wind levitation: fly freely in any direction at 2x run speed with real
--- collision (not noclip) for a fixed window. While aloft, Wind Dash turns windborne —
--- no ground check, any direction, double launch force (handled in wind_dash.lua).
-local DURATION   = 45 -- Seconds of levitation
-local SPEED_MULT = 4  -- Flight speed = run speed * this
--- The windborne-dash yield window is owned by wind_dash.lua, which sets
--- ply.ArcanaSkyWalkDashUntil; SetupMove below simply honors that timestamp.
+-- Wear the wind for 45s. Like an elytra: leaving the ground (a jump or stepping off a ledge)
+-- opens the glide — steer by looking, dive to build speed, climb to trade it back (real collision,
+-- not noclip). Touch ground and it retracts — you land and it redeploys next time you're airborne,
+-- until the window runs out. While gliding, Wind Dash is windborne: a brief charge (fake cast),
+-- then a hard propel in any direction — your "firework rocket". (Dash logic lives in wind_dash.lua.)
+local DURATION = 45 -- Seconds the spell stays armed
 
--- Levitation state lives on the player (ply._ArcanaSkyWalk = { untilT, oldMoveType,
--- oldGravity }), matching the ArcanaWindDash* player-field convention. wind_dash.lua
--- reads the same field to know when to empower a dash — no shared globals involved.
+-- Elytra-style glide. You don't thrust with WASD; you steer by looking and trade altitude
+-- for speed: dive to accelerate, level out to glide, pull up to zoom-climb (bleeding speed).
+-- The windborne dash is your boost (like a firework rocket).
+local GLIDE_GRAVITY = 500  -- Constant downward pull (u/s^2); lower = floatier
+local GLIDE_TURN    = 3.0  -- How fast your heading swings toward where you look
+local GLIDE_PITCH   = 900  -- Dive acceleration / climb deceleration along the look axis
+local GLIDE_DRAG    = 0.2  -- Air resistance bleed
+local DEPLOY_SPEED  = 500  -- Minimum forward speed granted when you deploy the glide
+
+-- The windborne-dash windows are owned by wind_dash.lua, which sets ply.ArcanaSkyWalkChargeUntil
+-- (charge/hold) and ply.ArcanaSkyWalkDashUntil (propel); SetupMove below honors those timestamps.
+
+-- State lives on the player: ply._ArcanaSkyWalk = { untilT, oldMoveType, oldGravity,
+-- gliding, deployAt }. `gliding` is the elytra-deployed flag; wind_dash.lua reads it to
+-- know when a dash is windborne. Matches the ArcanaWindDash* player-field convention.
 local function isActive(ply)
 	if not IsValid(ply) then return false end
 	local st = ply._ArcanaSkyWalk
@@ -32,6 +38,7 @@ local function endSkyWalk(ply)
 	if st.oldGravity ~= nil then ply:SetGravity(st.oldGravity) end
 
 	ply._ArcanaSkyWalk = nil
+	ply.ArcanaSkyWalkChargeUntil = nil
 	ply.ArcanaSkyWalkDashUntil = nil
 	ply.ArcanaSkyWalkDashVel = nil
 	-- Drop any windborne-dash flags so fall-damage immunity can't leak past the levitation
@@ -40,19 +47,57 @@ local function endSkyWalk(ply)
 	ply.ArcanaWindDashDived  = false
 
 	if SERVER then
-		ply:SetNW2Bool("ArcanaSkyWalk", false)
+		ply:SetNW2Bool("ArcanaSkyWalkGliding", false)
+		ply:SetNW2Float("ArcanaSkyWalkChargeUntil", 0)
+		ply:SetNW2Float("ArcanaSkyWalkDashUntil", 0)
 		timer.Remove("Arcana_SkyWalk_Expire_" .. ply:EntIndex())
-		net.Start("Arcana_SkyWalk_Stop", true)
-		net.WriteEntity(ply)
-		net.Broadcast()
 	end
 end
 
--- Pose the levitating player as if swimming. Shared so remote players animate too.
--- Reads a networked flag (not the server-only state field) because animation is
--- resolved clientside. Registered unconditionally; hook.Add replaces by name.
+-- Retract the glide but keep Sky Walk armed: land the player and let them redeploy.
+local function retractGlide(ply, st)
+	st.gliding = false
+	if st.oldMoveType ~= nil then ply:SetMoveType(st.oldMoveType) end
+	if st.oldGravity ~= nil then ply:SetGravity(st.oldGravity) end
+
+	ply.ArcanaSkyWalkChargeUntil = nil
+	ply.ArcanaSkyWalkDashUntil = nil
+	ply.ArcanaSkyWalkDashVel = nil
+
+	if SERVER then
+		ply:SetNW2Bool("ArcanaSkyWalkGliding", false)
+		ply:SetNW2Float("ArcanaSkyWalkChargeUntil", 0)
+		ply:SetNW2Float("ArcanaSkyWalkDashUntil", 0)
+	end
+end
+
+-- Pose the levitating player. Normally swimming; during a windborne dash, tuck into a
+-- crouch angled along travel (SetAllowFullRotation lets the model pitch to the aim/dash
+-- direction), then return to swimming. Reads networked flags because animation is resolved
+-- clientside. Shared so remote players animate too; registered unconditionally.
 hook.Add("CalcMainActivity", "Arcana_SkyWalk_Anim", function(ply)
-	if not ply:GetNW2Bool("ArcanaSkyWalk", false) then return end
+	if not ply:GetNW2Bool("ArcanaSkyWalkGliding", false) then
+		-- Restore normal yaw-only rotation if we had toggled full rotation for this player.
+		if CLIENT and ply._arcanaSkyWalkFullRot then
+			ply:SetAllowFullRotation(false)
+			ply._arcanaSkyWalkFullRot = false
+		end
+		return
+	end
+
+	-- Crouch during the charge/windup (the fake cast), then swim once propelled.
+	local charging = CurTime() < ply:GetNW2Float("ArcanaSkyWalkChargeUntil", 0)
+
+	-- Full rotation only while charging, so the tucked body pitches toward the aim.
+	if CLIENT and ply._arcanaSkyWalkFullRot ~= charging then
+		ply:SetAllowFullRotation(charging)
+		ply._arcanaSkyWalkFullRot = charging
+	end
+
+	if charging then
+		return ACT_MP_CROUCH_IDLE, -1
+	end
+
 	return ACT_MP_SWIM, -1
 end)
 
@@ -60,7 +105,7 @@ end)
 -- velocity (up to 2x), so at flight/dash speeds the arms thrash. Force a gentle,
 -- steady rate and suppress the default calc (returning a value skips GM:UpdateAnimation).
 hook.Add("UpdateAnimation", "Arcana_SkyWalk_AnimRate", function(ply)
-	if not ply:GetNW2Bool("ArcanaSkyWalk", false) then return end
+	if not ply:GetNW2Bool("ArcanaSkyWalkGliding", false) then return end
 	ply:SetPlaybackRate(0.75)
 	return true
 end)
@@ -70,9 +115,34 @@ if SERVER then
 		local st = ply._ArcanaSkyWalk
 		if not istable(st) then return end
 
+		-- Expire the whole armed window.
 		if not st.untilT or CurTime() >= st.untilT then
 			endSkyWalk(ply)
 			return
+		end
+
+		-- Armed but not deployed: auto-deploy the glide the moment we're airborne (clear of the
+		-- ground). No key needed — while Sky Walk is armed you're "wearing wings", so a jump or
+		-- stepping off a ledge opens the glide. Checked EVERY tick, which is why it works where a
+		-- jump-press check didn't: the press was always grounded and the engine hides IN_JUMP mid-air.
+		if not st.gliding then
+			local grounded = util.TraceLine({
+				start  = ply:GetPos(),
+				endpos = ply:GetPos() - Vector(0, 0, 24),
+				filter = ply,
+				mask   = MASK_PLAYERSOLID,
+			}).Hit
+
+			if grounded then return end -- still on the ground; not gliding yet
+
+			st.gliding = true
+			st.deployAt = CurTime()
+			st.justDeployed = true
+			ply:SetMoveType(MOVETYPE_FLY)
+			ply:SetGravity(0)
+			ply:SetGroundEntity(NULL)
+			ply:SetNW2Bool("ArcanaSkyWalkGliding", true)
+			sound.Play("ambient/wind/wind_hit1.wav", ply:WorldSpaceCenter(), 72, 105)
 		end
 
 		if ply:GetMoveType() ~= MOVETYPE_FLY then
@@ -80,9 +150,29 @@ if SERVER then
 		end
 		ply:SetGroundEntity(NULL)
 
-		-- Windborne dash in progress: force the stored dash velocity and raise the speed
-		-- cap so MOVETYPE_FLY's per-tick clamp/friction can't crush the impulse. This keeps
-		-- the dash carrying at full speed for its window, then normal flight resumes.
+		-- We drive velocity directly; stop the engine adding its own WASD acceleration
+		-- (no thrust — steering is purely by looking, elytra-style).
+		mv:SetForwardSpeed(0)
+		mv:SetSideSpeed(0)
+		mv:SetUpSpeed(0)
+
+		local dt = engine.TickInterval()
+
+		-- First tick after deploy: launch along the look at a minimum speed.
+		if st.justDeployed then
+			st.justDeployed = nil
+			local aim = ply:GetAimVector()
+			mv:SetVelocity(aim * math.max(mv:GetVelocity():Length(), DEPLOY_SPEED))
+		end
+
+		-- Charging a windborne dash: hover in place while the "cast" builds, then propel.
+		if ply.ArcanaSkyWalkChargeUntil and CurTime() < ply.ArcanaSkyWalkChargeUntil then
+			mv:SetVelocity(mv:GetVelocity() * math.Clamp(1 - 12 * dt, 0, 1))
+			return
+		end
+
+		-- Propelling: force the stored dash velocity and raise the speed cap so MOVETYPE_FLY's
+		-- per-tick clamp/friction can't crush the impulse. Carries at full speed for its window.
 		if ply.ArcanaSkyWalkDashUntil and CurTime() < ply.ArcanaSkyWalkDashUntil then
 			local dv = ply.ArcanaSkyWalkDashVel
 			if dv then
@@ -94,29 +184,41 @@ if SERVER then
 			return
 		end
 
-		local speed = ply:GetRunSpeed() * SPEED_MULT
-		mv:SetMaxClientSpeed(speed)
-		mv:SetMaxSpeed(speed)
+		-- Base movement: elytra glide. Steer by looking; dive for speed, climb to trade it.
+		local vel = mv:GetVelocity()
+		local aim = ply:GetAimVector()
 
-		-- Wish direction from WASD (relative to view, including pitch) + Space/Ctrl vertical.
-		local ang  = mv.GetMoveAngles and mv:GetMoveAngles() or mv:GetAngles()
-		local wish = ang:Forward() * mv:GetForwardSpeed() + ang:Right() * mv:GetSideSpeed()
+		-- Swing heading toward where you look, preserving speed (converts dive <-> forward).
+		local spd = vel:Length()
+		if spd > 1 then
+			local dir = vel / spd
+			dir = (dir + (aim - dir) * math.Clamp(GLIDE_TURN * dt, 0, 1)):GetNormalized()
+			vel = dir * spd
+		end
 
-		local climb = 0
-		if cmd:KeyDown(IN_JUMP) then climb = climb + 1 end
-		if cmd:KeyDown(IN_DUCK) then climb = climb - 1 end
-		wish.z = wish.z + climb * speed
+		-- Look down (aim.z < 0) to accelerate along the look axis; look up to bleed speed.
+		vel = vel + aim * (-aim.z * GLIDE_PITCH * dt)
+		-- Gravity always pulls down, independent of heading — you sink unless you keep diving.
+		vel.z = vel.z - GLIDE_GRAVITY * dt
+		-- Air drag — this alone sets a natural terminal speed. No hard cap.
+		vel = vel * (1 - GLIDE_DRAG * dt)
 
-		local cur = mv:GetVelocity()
-		local dt  = engine.TickInterval()
+		-- Keep the engine's speed clamp far out of the way so MOVETYPE_FLY never limits velocity.
+		mv:SetMaxClientSpeed(100000)
+		mv:SetMaxSpeed(100000)
+		mv:SetVelocity(vel)
 
-		if wish:LengthSqr() > 0 then
-			wish:Normalize()
-			wish:Mul(speed)
-			mv:SetVelocity(cur + (wish - cur) * math.Clamp(10 * dt, 0, 1))
-		else
-			-- Gentle drift-to-stop when there's no input, so hovering feels controlled.
-			mv:SetVelocity(cur * (1 - math.Clamp(8 * dt, 0, 1)))
+		-- Landing: touching ground retracts the glide (Sky Walk stays armed to redeploy).
+		local foot = ply:GetPos()
+		local tr = util.TraceLine({
+			start  = foot + Vector(0, 0, 10),
+			endpos = foot - Vector(0, 0, 8),
+			filter = ply,
+			mask   = MASK_PLAYERSOLID,
+		})
+		if tr.Hit and (not st.deployAt or CurTime() > st.deployAt + 0.2) then
+			retractGlide(ply, st)
+			sound.Play("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", foot, 62, 105)
 		end
 	end)
 
@@ -136,7 +238,7 @@ end
 Arcana:RegisterSpell({
 	id = "wind_sky_walk",
 	name = "Sky Walk",
-	description = "Levitate and fly freely in any direction for 45s. While aloft, Wind Dash surges in any direction with no need for solid ground.",
+	description = "Take to the sky and glide for 45s — steer by looking, dive to build speed. While aloft, Wind Dash charges, then hurls you in any direction with no need for solid ground.",
 	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 35,
 	knowledge_cost = 3,
@@ -150,7 +252,6 @@ Arcana:RegisterSpell({
 	can_cast = function(caster)
 		if not IsValid(caster) then return false, "Invalid caster" end
 		if isActive(caster) then return false, "You are already sky walking" end
-		if caster:GetMoveType() ~= MOVETYPE_WALK then return false, "Must be on solid footing to take flight" end
 		return true
 	end,
 
@@ -158,32 +259,23 @@ Arcana:RegisterSpell({
 		if CLIENT then return true end
 		if not IsValid(caster) then return false end
 
+		-- Arm the elytra. The glide auto-deploys once airborne (handled in SetupMove).
 		caster._ArcanaSkyWalk = {
 			untilT      = CurTime() + DURATION,
 			oldMoveType = caster:GetMoveType(),
 			oldGravity  = caster:GetGravity(),
+			gliding     = false,
 		}
 
-		caster:SetMoveType(MOVETYPE_FLY)
-		caster:SetGravity(0)
-		caster:SetGroundEntity(NULL)
-		caster:SetNW2Bool("ArcanaSkyWalk", true) -- drives the swim pose clientside
-
-		-- Fallback in case SetupMove stops running (no inputs) before expiry.
+		-- Fallback to end the armed window even if SetupMove stops running.
 		local key = "Arcana_SkyWalk_Expire_" .. caster:EntIndex()
 		timer.Remove(key)
 		timer.Create(key, DURATION + 0.05, 1, function()
 			if IsValid(caster) then endSkyWalk(caster) end
 		end)
 
-		local pos = caster:WorldSpaceCenter()
-		sound.Play("ambient/wind/wind_hit1.wav", pos, 72, 90)
+		sound.Play("ambient/wind/wind_hit1.wav", caster:WorldSpaceCenter(), 72, 90)
 		caster:EmitSound("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", 75, 110)
-
-		net.Start("Arcana_SkyWalk_Start", true)
-		net.WriteEntity(caster)
-		net.WriteFloat(DURATION)
-		net.Broadcast()
 
 		return true
 	end,
@@ -196,43 +288,34 @@ Arcana:RegisterSpell({
 })
 
 if CLIENT then
-	local active = {}
+	-- Pale wind wisps trailing anyone currently gliding. Driven by the networked flag so
+	-- the trail appears on deploy and clears on land/expiry without extra messages.
+	local emitters = {}
+	local nextP    = {}
 
-	net.Receive("Arcana_SkyWalk_Start", function()
-		local ply  = net.ReadEntity()
-		local life = net.ReadFloat() or DURATION
-		if not IsValid(ply) then return end
-
-		active[ply] = {
-			untilT  = CurTime() + life,
-			emitter = ParticleEmitter(ply:WorldSpaceCenter()),
-			nextP   = 0,
-		}
-	end)
-
-	net.Receive("Arcana_SkyWalk_Stop", function()
-		local ply = net.ReadEntity()
-		local st  = active[ply]
-		if st and st.emitter then st.emitter:Finish() end
-		active[ply] = nil
-	end)
-
-	-- Pale wind wisps swirling up around the levitating player.
 	hook.Add("Think", "Arcana_SkyWalk_FX", function()
 		local now = CurTime()
 
-		for ply, st in pairs(active) do
-			if not IsValid(ply) or now >= st.untilT then
-				if st.emitter then st.emitter:Finish() end
-				active[ply] = nil
+		-- Drop emitters for players who left.
+		for ply, em in pairs(emitters) do
+			if not IsValid(ply) then
+				if em then em:Finish() end
+				emitters[ply] = nil
+			end
+		end
+
+		for _, ply in ipairs(player.GetAll()) do
+			if not ply:GetNW2Bool("ArcanaSkyWalkGliding", false) then
+				if emitters[ply] then emitters[ply]:Finish() emitters[ply] = nil end
 				continue
 			end
 
-			if now < st.nextP then continue end
-			st.nextP = now + 0.03
-
-			local em = st.emitter
+			emitters[ply] = emitters[ply] or ParticleEmitter(ply:WorldSpaceCenter())
+			local em = emitters[ply]
 			if not em then continue end
+
+			if (nextP[ply] or 0) > now then continue end
+			nextP[ply] = now + 0.03
 
 			local mins, maxs = ply:OBBMins(), ply:OBBMaxs()
 			local base = ply:GetPos()
@@ -252,7 +335,7 @@ if CLIENT then
 					p:SetRoll(math.Rand(0, 360))
 					p:SetRollDelta(math.Rand(-2, 2))
 					p:SetColor(200, 225, 255)
-					-- Swirl tangentially and drift upward to sell the levitation.
+					-- Swirl tangentially and drift with the glide.
 					local tangent = rvec:Cross(Vector(0, 0, 1)) * math.Rand(20, 45)
 					p:SetVelocity(tangent + Vector(0, 0, math.Rand(15, 40)))
 					p:SetAirResistance(90)
