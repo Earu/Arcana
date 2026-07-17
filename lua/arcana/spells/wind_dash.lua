@@ -2,6 +2,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_WindDash")
 	util.AddNetworkString("Arcana_WindDashLand")
 	util.AddNetworkString("Arcana_WindDash_SkyBurst")
+	util.AddNetworkString("Arcana_WindDash_SkyCharge")
 end
 
 -- Wind Dash
@@ -11,12 +12,13 @@ local LEAP_FORCE  = 1250 -- Launch force for the upward leap
 local DIVE_FORCE  = 2000 -- Launch force for the downward crash
 local EMPOWERED_FORCE = LEAP_FORCE * 6 -- Windborne dash launch force while Sky Walk is active
 local EMPOWERED_YIELD = 1.0 -- How long Sky Walk's flight control yields to let this dash carry
+local EMPOWERED_CHARGE = 0.4 -- Windup (fake cast) before the windborne dash propels you
 
 -- Sky Walk (wind_sky_walk.lua) stores its state on the player as _ArcanaSkyWalk.
--- Reading the field directly keeps the coupling on the player-field convention.
+-- The dash is only windborne while actually gliding (elytra deployed), not merely armed.
 local function skyWalkActive(ply)
 	local st = ply._ArcanaSkyWalk
-	return istable(st) and st.untilT ~= nil and CurTime() < st.untilT
+	return istable(st) and st.gliding == true and st.untilT ~= nil and CurTime() < st.untilT
 end
 local LEAP_PITCH  = -10  -- Eye pitch threshold: below this = looking "up enough" to leap
 local DIVE_PITCH  =  5   -- Eye pitch threshold: above this = looking "down enough" to dive
@@ -71,37 +73,63 @@ Arcana:RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		-- Windborne dash: Sky Walk empowers Wind Dash into an any-direction, double-force
-		-- surge with no ground/pitch gate. Levitation owns movement, so we don't set the
-		-- ArcanaWindDash* land flags here (the land hook never fires under MOVETYPE_FLY).
+		-- Windborne dash: Sky Walk empowers Wind Dash. It's a "fake cast" — a brief charge
+		-- where you hover in a crouch and the magic circle + particles gather, then a hard
+		-- propel in any direction with no ground/pitch gate. Levitation owns movement, so we
+		-- don't set the ArcanaWindDash* land flags (the land hook never fires under FLY).
 		if skyWalkActive(caster) then
-			local aim = caster:GetAimVector()
-			local dashVel = aim * EMPOWERED_FORCE
-			caster:SetVelocity(dashVel)
-			-- Sky Walk's SetupMove reads these to sustain the dash at full speed for the
-			-- window (MOVETYPE_FLY would otherwise clamp/friction the impulse away).
-			caster.ArcanaSkyWalkDashVel = dashVel
-			caster.ArcanaSkyWalkDashUntil = CurTime() + EMPOWERED_YIELD
+			local chargeEnd = CurTime() + EMPOWERED_CHARGE
+
+			-- Charge phase: SetupMove hovers the player here while the cast builds.
+			caster.ArcanaSkyWalkChargeUntil = chargeEnd
+			caster.ArcanaSkyWalkDashVel = nil
+			caster.ArcanaSkyWalkDashUntil = nil
+			caster:SetNW2Float("ArcanaSkyWalkChargeUntil", chargeEnd)
+			caster:SetNW2Float("ArcanaSkyWalkDashUntil", 0)
 
 			local pos = caster:WorldSpaceCenter()
-			sound.Play("ambient/wind/wind_roar1.wav", pos, 90, 150)
-			sound.Play("weapons/physcannon/physcannon_charge.wav", pos, 78, 160)
-			-- The "bang": a low concussive boom everyone hears at the launch point.
-			sound.Play("ambient/explosions/explode_4.wav", pos, 92, math.random(125, 140))
-			sound.Play("ambient/wind/wind_hit1.wav", pos, 85, 70)
+			sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", pos, 72, 55)
+			sound.Play("weapons/physcannon/physcannon_charge.wav", pos, 78, 105)
 
-			net.Start("Arcana_WindDash", true)
-			net.WriteEntity(caster)
-			net.WriteVector(aim)
-			net.WriteBool(false)
-			net.Broadcast()
-
-			-- Wind explosion + physgun-colored impact disc at the launch point.
-			net.Start("Arcana_WindDash_SkyBurst", true)
+			-- Magic circle + gathering particles during the charge.
+			net.Start("Arcana_WindDash_SkyCharge", true)
 			net.WriteVector(pos)
 			net.WriteEntity(caster)
-			net.WriteVector(aim)
+			net.WriteVector(caster:GetAimVector())
+			net.WriteFloat(EMPOWERED_CHARGE)
 			net.Broadcast()
+
+			-- Release: propel along wherever they're aiming at the end of the charge.
+			timer.Simple(EMPOWERED_CHARGE, function()
+				if not IsValid(caster) or not skyWalkActive(caster) then return end
+
+				local aim = caster:GetAimVector()
+				local dashVel = aim * EMPOWERED_FORCE
+				caster:SetVelocity(dashVel)
+				caster.ArcanaSkyWalkChargeUntil = nil
+				caster.ArcanaSkyWalkDashVel = dashVel
+				caster.ArcanaSkyWalkDashUntil = CurTime() + EMPOWERED_YIELD
+				caster:SetNW2Float("ArcanaSkyWalkChargeUntil", 0)
+				caster:SetNW2Float("ArcanaSkyWalkDashUntil", CurTime() + EMPOWERED_YIELD)
+
+				local rpos = caster:WorldSpaceCenter()
+				-- The "bang": a low concussive boom at the release.
+				sound.Play("ambient/wind/wind_roar1.wav", rpos, 90, 150)
+				sound.Play("ambient/wind/wind_hit1.wav", rpos, 85, 70)
+
+				net.Start("Arcana_WindDash", true)
+				net.WriteEntity(caster)
+				net.WriteVector(aim)
+				net.WriteBool(false)
+				net.Broadcast()
+
+				-- Wind explosion + physgun-colored impact disc at the release point.
+				net.Start("Arcana_WindDash_SkyBurst", true)
+				net.WriteVector(rpos)
+				net.WriteEntity(caster)
+				net.WriteVector(aim)
+				net.Broadcast()
+			end)
 
 			return true
 		end
@@ -187,6 +215,32 @@ if SERVER then
 end
 
 if CLIENT then
+	-- While gliding, a windborne dash's charge circle stands in for the cast circle — so hide
+	-- the default cast circle in that context (returning true suppresses it).
+	hook.Add("Arcana_BeginCastingVisuals", "Arcana_WindDash_HideCast", function(caster, spellId)
+		if spellId == "wind_dash" and IsValid(caster) and caster:GetNW2Bool("ArcanaSkyWalkGliding", false) then
+			return true
+		end
+	end)
+
+	-- Launch pose during the windborne-dash charge: pivot the whole body at the feet so its
+	-- up-axis points along the aim (head leads, feet planted on the charge circle). Reads as
+	-- the player coiled to propel forward off the circle. Render-only; doesn't touch aiming.
+	-- No manual reset needed — render angles auto-reset to the player's angles each frame right
+	-- after GM:UpdateAnimation, so simply not setting it (when not charging) leaves it normal.
+	hook.Add("PrePlayerDraw", "Arcana_WindDash_ChargePose", function(ply)
+		if not ply:GetNW2Bool("ArcanaSkyWalkGliding", false) then return end
+		if CurTime() >= ply:GetNW2Float("ArcanaSkyWalkChargeUntil", 0) then return end
+
+		-- Lay the body's feet->head axis along the aim (head-first, belly down), so it reads as
+		-- pushing off the charge circle. AngleEx uses `belly` as forward and `aim` as the up
+		-- reference, so the model's UP (feet->head) ends up along aim at any pitch.
+		local aim = ply:GetAimVector()
+		local belly = aim:Cross(ply:EyeAngles():Right()) -- ⟂ aim, points "down/belly"
+		if belly:LengthSqr() < 1e-6 then belly = ply:EyeAngles():Forward() end
+		ply:SetRenderAngles(belly:AngleEx(aim))
+	end)
+
 	-- Expanding, fading impact discs from windborne dashes: each faces along the dash
 	-- direction and is tinted with the caster's physgun color, so it reads as a surface
 	-- the player bounced off of.
@@ -232,7 +286,79 @@ if CLIENT then
 		end
 	end)
 
-	-- Wind explosion at the launch point of a Sky Walk (windborne) dash.
+	-- Charge-up of a Sky Walk (windborne) dash: the magic circle forms and wind gathers
+	-- inward while the "cast" builds, before the release propels the player.
+	net.Receive("Arcana_WindDash_SkyCharge", function()
+		local pos    = net.ReadVector()
+		local caster = net.ReadEntity()
+		local aim    = net.ReadVector()
+		local dur    = net.ReadFloat()
+		if dur <= 0 then dur = 0.4 end
+
+		local pcol = physgunColor(caster)
+
+		-- Magic circle at the player's feet, standing perpendicular to the dash (face normal =
+		-- aim) — the launch pad. With the launch pose below, the body lies along the aim with
+		-- feet planted on this circle, so it reads as pushing off it. Follows live feet + aim.
+		if Arcana.Circle and Arcana.Circle.MagicCircle then
+			local function circleAng()
+				local a = (IsValid(caster) and caster:GetAimVector()) or aim
+				local an = a:Angle()
+				an:RotateAroundAxis(an:Right(), 90) -- an:Up() == aim (the circle's face normal)
+				return an
+			end
+
+			local startPos = IsValid(caster) and caster:GetPos() or pos
+			local circle = Arcana.Circle.MagicCircle.CreateMagicCircle(startPos, circleAng(), pcol, 3, 90, dur + 0.15, 2)
+
+			local endT = CurTime() + dur + 0.15
+			local fname = "Arcana_WindDash_ChargeCircle_" .. (IsValid(caster) and caster:EntIndex() or 0) .. "_" .. CurTime()
+			hook.Add("Think", fname, function()
+				if not IsValid(caster) or not circle or (circle.IsActive and not circle:IsActive()) or CurTime() > endT then
+					hook.Remove("Think", fname)
+					return
+				end
+				circle.position = caster:GetPos()
+				circle.angles = circleAng()
+			end)
+		end
+
+		-- Gathering wind: wisps spiral inward toward the caster as energy builds.
+		local endT = CurTime() + dur
+		local hookName = "Arcana_WindDash_Gather_" .. (IsValid(caster) and caster:EntIndex() or 0) .. "_" .. CurTime()
+		hook.Add("Think", hookName, function()
+			if not IsValid(caster) or CurTime() >= endT then
+				hook.Remove("Think", hookName)
+				return
+			end
+
+			local center = caster:WorldSpaceCenter()
+			local em = ParticleEmitter(center, false)
+			if not em then return end
+
+			for i = 1, 3 do
+				local dir   = VectorRand():GetNormalized()
+				local spawn = center + dir * math.Rand(60, 120)
+				local p = em:Add("effects/splash2", spawn)
+				if p then
+					p:SetDieTime(0.35)
+					p:SetStartAlpha(math.Rand(160, 210))
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(6, 11))
+					p:SetEndSize(1)
+					p:SetRoll(math.Rand(0, 360))
+					p:SetRollDelta(math.Rand(-6, 6))
+					p:SetColor(pcol.r, pcol.g, pcol.b)
+					p:SetVelocity(-dir * math.Rand(280, 460)) -- inward = converging/charging
+					p:SetAirResistance(60)
+					p:SetLighting(false)
+				end
+			end
+			em:Finish()
+		end)
+	end)
+
+	-- Wind explosion at the release point of a Sky Walk (windborne) dash.
 	net.Receive("Arcana_WindDash_SkyBurst", function()
 		local pos    = net.ReadVector()
 		local caster = net.ReadEntity()
@@ -249,13 +375,6 @@ if CLIENT then
 			dur    = 0.5,
 			size   = 130,
 		}
-
-		-- Arcana magic circle standing in the same plane, facing along the dash.
-		if Arcana.Circle and Arcana.Circle.MagicCircle then
-			local ang = aim:Angle()
-			ang:RotateAroundAxis(ang:Right(), 90)
-			Arcana.Circle.MagicCircle.CreateMagicCircle(pos, ang, pcol, 3, 140, 1.2, 2)
-		end
 
 		local emitter = ParticleEmitter(pos)
 		if not emitter then return end
