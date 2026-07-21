@@ -115,8 +115,16 @@ if CLIENT then
 		-- Ground circles (player, not forward-like) face upward; forward/spellcaster circles are neutral
 		local direction = (not isSpellCaster and not forwardLike) and -1 or nil
 
+		-- Grimoire NPCs have no weapon colour to borrow, so they wind up in the colour of
+		-- the element they specialise in: the speciality is legible before the spell lands.
+		local school = Arcana.NPC and caster:GetNWString(Arcana.NPC.SCHOOL_NW, "") or ""
+		local essence = school ~= "" and Arcana.Spellcraft and Arcana.Spellcraft.Essences[school] or nil
+
 		local color
-		if isSpellCaster then
+		if essence then
+			-- Copied: the circle owns the colour it is handed, and the catalog's is shared.
+			color = Color(essence.color.r, essence.color.g, essence.color.b)
+		elseif isSpellCaster then
 			local owner = (caster.CPPIGetOwner and caster:CPPIGetOwner()) or (caster:GetNWEntity("FallbackOwner"))
 			color = IsValid(owner) and owner.GetWeaponColor and owner:GetWeaponColor():ToColor() or Color(150, 100, 255, 255)
 		else
