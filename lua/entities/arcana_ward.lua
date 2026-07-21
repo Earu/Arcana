@@ -71,7 +71,9 @@ if SERVER then
 		self:_RegisterHooks()
 	end
 
-	function ENT:_OnShotFired(data)
+	function ENT:_OnShotFired(shooter, data)
+		if self:IsAllowed(shooter) then return end
+
 		local center = self:GetPos()
 		local radius = self:GetRadius()
 		local src    = data.Src
@@ -91,7 +93,7 @@ if SERVER then
 	function ENT:_RegisterHooks()
 		-- Player shots, including hitscan weapons that fire no real bullets
 		hook.Add("Arcana_ShotFired", self, function(_, shooter, wep, data)
-			self:_OnShotFired(data)
+			self:_OnShotFired(shooter, data)
 		end)
 
 		-- Non-player bullets (NPCs, turrets, ...); player shots are covered above
@@ -99,14 +101,14 @@ if SERVER then
 			if IsValid(shooter) and shooter:IsPlayer() then return end
 			if IsValid(shooter) and shooter:IsWeapon() and IsValid(shooter:GetOwner()) and shooter:GetOwner():IsPlayer() then return end
 
-			self:_OnShotFired(data)
+			self:_OnShotFired(shooter, data)
 		end)
 
 		hook.Add("EntityTakeDamage", self, function(_, target, dmginfo)
 			if not IsValid(target) then return end
 
 			-- Only protect entities that were inside at activation or owned by allowed players
-			if not self._allowed[target:EntIndex()] and not self:_IsOwnerAllowed(target) then return end
+			if not self:IsAllowed(target) then return end
 
 			local center = self:GetPos()
 			local radius = self:GetRadius()
@@ -117,6 +119,9 @@ if SERVER then
 			-- Check whether both attacker and inflictor are outside
 			local attacker  = dmginfo:GetAttacker()
 			local inflictor = dmginfo:GetInflictor()
+
+			-- Exempt attackers hit through the ward unimpeded
+			if self:IsAllowed(attacker) then return end
 
 			local attackerOutside = true
 			if IsValid(attacker) and attacker ~= target then
@@ -148,7 +153,7 @@ if SERVER then
 
 		for _, ply in pairs(player.GetAll()) do
 			if not IsValid(ply) then continue end
-			if self._allowed[ply:EntIndex()] then continue end
+			if self:IsAllowed(ply) then continue end
 
 			local pdata = Arcana:GetPlayerData(ply)
 			if not pdata or not pdata.casting_spell then continue end
@@ -186,6 +191,34 @@ if SERVER then
 		return IsValid(owner) and self._allowed[owner:EntIndex()] == true
 	end
 
+	-- Single source of truth for "does this entity get a pass from the ward?".
+	-- Every enforcement site (Touch, damage, shots, casting) routes through here.
+	-- Addons should answer the Arcana_WardShouldAllow hook rather than overriding
+	-- ward methods: return true to always exempt, false to force-block, nil to defer.
+	function ENT:IsAllowed(ent)
+		if not IsValid(ent) then return false end
+		if self._allowed[ent:EntIndex()] then return true end
+		if self:_IsOwnerAllowed(ent) then return true end
+
+		local override = Arcana.RunHook("WardShouldAllow", self, ent)
+		if override ~= nil then return override end
+
+		return false
+	end
+
+	-- Imperative allow-list controls for addons that want to grant/revoke a pass
+	-- directly. Note the Arcana_WardShouldAllow hook is re-evaluated live, so it is
+	-- usually the better choice for "this entity is always exempt".
+	function ENT:Allow(ent)
+		if not IsValid(ent) then return end
+		self._allowed[ent:EntIndex()] = true
+	end
+
+	function ENT:Disallow(ent)
+		if not IsValid(ent) then return end
+		self._allowed[ent:EntIndex()] = nil
+	end
+
 	function ENT:_Disintegrate(ent)
 		local diss = ents.Create("env_entity_dissolver")
 		if not IsValid(diss) then
@@ -210,11 +243,9 @@ if SERVER then
 		if ent:IsWorld() then return end
 		if ent:GetClass() == "arcana_ward" then return end
 
-		-- Ignore entities that were present when the ward activated
-		if self._allowed and self._allowed[ent:EntIndex()] then return end
-
-		-- Props/entities owned by an allowed player get a pass
-		if self:_IsOwnerAllowed(ent) then return end
+		-- Entities present at activation, owned by an allowed player, or exempted
+		-- by an addon get a pass
+		if self:IsAllowed(ent) then return end
 
 		local isPlayer  = ent:IsPlayer()
 		local isNPC     = ent:IsNPC()
