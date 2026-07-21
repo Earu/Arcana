@@ -14,7 +14,7 @@ Arcana:RegisterRitualSpell({
 	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 23,
 	knowledge_cost = 4,
-    cooldown = 60 * 60,
+	cooldown = 60 * 60,
 	cost_type = Arcana.COST_TYPES.COINS,
 	cost_amount = 10000,
 	cast_time = 10.0,
@@ -30,6 +30,11 @@ Arcana:RegisterRitualSpell({
 			return false, "Another environment is already active."
 		end
 
+		local lockLeft = Arcana.Environments:GetLockRemaining("magical_forest")
+		if lockLeft > 0 then
+			return false, "The forest can't be summoned again for another " .. string.NiceTime(lockLeft) .. "."
+		end
+
 		local tr = caster:GetEyeTrace()
 		if not tr.Hit or not ACCEPTABLE_SURFACE_TYPES[tr.MatType] then return false, "This ritual may only be cast on grass, dirt, sand, or snow terrain." end
 
@@ -40,17 +45,23 @@ Arcana:RegisterRitualSpell({
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
 
-        local Envs = Arcana.Environments
+		local Envs = Arcana.Environments
 		if Envs:IsActive() then
-			Arcana:SendErrorNotification(activatingPly, "Another environment is already active.")
+			Arcana:SendErrorNotification(activatingPly, "Ritual failed: Another environment is already active.")
 			return
 		end
 
-        local ok, reason = Envs:Start("magical_forest", selfEnt:GetPos(), activatingPly)
-        if not ok then
-            Arcana:SendErrorNotification(activatingPly, "Ritual failed: " .. tostring(reason))
-            return
-        end
+		local lockLeft = Arcana.Environments:GetLockRemaining("magical_forest")
+		if lockLeft > 0 then
+			Arcana:SendErrorNotification(activatingPly, "Ritual failed: The forest can't be summoned again for another " .. string.NiceTime(lockLeft) .. ".")
+			return
+		end
+
+		local ok, reason = Envs:Start("magical_forest", selfEnt:GetPos(), activatingPly)
+		if not ok then
+			Arcana:SendErrorNotification(activatingPly, "Ritual failed: " .. tostring(reason))
+			return
+		end
 
 		selfEnt:CallOnRemove("StopForestEnv", function()
 			local active = Envs:GetActive()
@@ -59,7 +70,7 @@ Arcana:RegisterRitualSpell({
 			end
 		end)
 
-        selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 70, 110)
+		selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 70, 110)
 	end,
 	on_replenish = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
