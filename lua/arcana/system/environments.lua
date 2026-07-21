@@ -93,6 +93,17 @@ function Envs:GetActive()
 	return self.Active
 end
 
+-- Seconds left on an environment's post-activation lock; 0 when it may be started again.
+-- The lock table only exists serverside, so clients always read 0 and defer to the server.
+function Envs:GetLockRemaining(id)
+	local lockUntil = tonumber(self.LockUntilById[tostring(id or "")] or 0) or 0
+	return math.max(0, lockUntil - CurTime())
+end
+
+function Envs:IsLocked(id)
+	return self:GetLockRemaining(id) > 0
+end
+
 -- Extend the lifetime of the currently active environment.
 -- id (optional): if provided, only extends if the active environment matches.
 -- duration (optional): seconds to add; defaults to the environment's registered lifetime.
@@ -235,10 +246,9 @@ function Envs:_StartServer(id, origin, owner)
 	local def = self.Registered[id]
 	if not def then return false, "Unknown environment" end
 
-	local lockUntil = tonumber(self.LockUntilById[id] or 0) or 0
-	if CurTime() < lockUntil then
-		local remaining = math.max(0, math.floor(lockUntil - CurTime()))
-		return false, (def.name or id) .. " is on cooldown for " .. tostring(remaining) .. "s"
+	local remaining = self:GetLockRemaining(id)
+	if remaining > 0 then
+		return false, (def.name or id) .. " is on cooldown for " .. tostring(math.floor(remaining)) .. "s"
 	end
 
 	origin = origin or Vector(0, 0, 0)
