@@ -89,6 +89,12 @@ function SWEP:Holster()
 	return true
 end
 
+function SWEP:OnDrop()
+	if not SERVER then return end
+
+	SafeRemoveEntity(self)
+end
+
 function SWEP:PrimaryAttack()
 	if not Arcana then return end
 	local owner = self:GetOwner()
