@@ -13,13 +13,27 @@ if SERVER then
 	-- fireball specifically: otherwise forgetting fireball at the altar would be undone
 	-- by the next weapon swap. A player who forgets their way down to an empty book
 	-- still gets the starter back, which is the case this hook actually exists for.
+	-- NPCs equip grimoires too (see Arcana.NPC), and they have no player data at all,
+	-- so the starter grant has to stay on the player branch.
 	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function(wep, ply)
-		if wep:GetClass() == "grimoire" and IsValid(ply) then
+		if wep:GetClass() == "grimoire" and IsValid(ply) and ply:IsPlayer() then
 			local data = Arcana:GetPlayerData(ply)
 
 			if data and table.IsEmpty(data.unlocked_spells) then
 				Arcana:UnlockSpell(ply, "fireball", true)
 			end
+		end
+	end)
+
+	-- NPCs spawned straight from the menu get their weapon through the engine's
+	-- "additionalequipment" keyvalue, so SWEP:Equip is not the only way in. Register
+	-- from the gamemode hook as well; Arcana.NPC.Register is idempotent.
+	hook.Add("WeaponEquip", "Arcana_GrimoireNPCMage", function(wep, ent)
+		if not IsValid(wep) or wep:GetClass() ~= "grimoire" then return end
+		if not IsValid(ent) or ent:IsPlayer() then return end
+
+		if wep.SetupNPCOwner then
+			wep:SetupNPCOwner(ent)
 		end
 	end)
 end
@@ -58,6 +72,15 @@ SWEP.RadialOpen = false
 SWEP.RadialHoverSlot = nil
 SWEP.RadialOpenTime = 0
 
+-- Offer the grimoire in the NPC weapon dropdown and the NPC menubar. Sandbox validates
+-- the chosen equipment against this list before it will hand it to a spawned NPC, so
+-- without the entry there is no way to spawn a mage from the menu.
+list.Set("NPCUsableWeapons", "grimoire", {
+	class = "grimoire",
+	title = "Grimoire",
+	category = "Arcana",
+})
+
 function SWEP:Initialize()
 	self:SetHoldType(self.HoldType)
 	-- Store active magic circle reference
@@ -93,6 +116,85 @@ function SWEP:OnDrop()
 	if not SERVER then return end
 
 	SafeRemoveEntity(self)
+end
+
+-- ── NPC support ──────────────────────────────────────────────────────────────
+-- An NPC given a grimoire becomes an Arcana mage: Arcana.NPC rolls its elemental
+-- speciality, generates its spellbook out of the spellcraft catalog, and drives the
+-- casting from its own think loop. The engine-facing plumbing here only shapes the
+-- NPC's posture — advertising a ranged attack so the AI keeps its distance and faces
+-- its enemy instead of closing in to club it.
+
+local function isNPCOwner(ent)
+	return IsValid(ent) and (ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+end
+
+function SWEP:SetupNPCOwner(npc)
+	if not SERVER or not isNPCOwner(npc) then return end
+
+	-- The player-facing "slam" hold type has no NPC range-attack activity; "smg" does,
+	-- so the NPC aims and plays an attack animation with the book in hand.
+	self:SetHoldType("smg")
+	self._ArcanaNPCOwner = npc
+
+	if Arcana and Arcana.NPC then
+		Arcana.NPC.Register(npc, self)
+	end
+end
+
+function SWEP:Equip(newOwner)
+	self:SetupNPCOwner(newOwner)
+end
+
+function SWEP:OwnerChanged()
+	if not SERVER then return end
+
+	local previous = self._ArcanaNPCOwner
+	local current = self:GetOwner()
+	if previous == current then return end
+
+	if IsValid(previous) and Arcana and Arcana.NPC then
+		Arcana.NPC.Unregister(previous)
+	end
+
+	self._ArcanaNPCOwner = isNPCOwner(current) and current or nil
+end
+
+function SWEP:OnRemove()
+	if not SERVER then return end
+
+	if IsValid(self._ArcanaNPCOwner) and Arcana and Arcana.NPC then
+		Arcana.NPC.Unregister(self._ArcanaNPCOwner)
+	end
+end
+
+function SWEP:GetCapabilities()
+	return bit.bor(CAP_WEAPON_RANGE_ATTACK1, CAP_INNATE_RANGE_ATTACK1)
+end
+
+function SWEP:GetNPCBulletSpread()
+	return 5
+end
+
+-- One "shot" per attack, paced slowly: the cast wind-up and per-spell cooldowns in
+-- Arcana.NPC are the real rhythm, this just stops the AI asking for more.
+function SWEP:GetNPCBurstSettings()
+	return 1, 1, 1.5
+end
+
+function SWEP:GetNPCRestTimes()
+	return 1.5, 3.0
+end
+
+-- The engine's fire callback funnels into the same entry point the mage think loop
+-- uses, so an engine-elected shot and a loop-elected cast cannot double-cast.
+function SWEP:NPCShoot_Primary()
+	local owner = self:GetOwner()
+	if not isNPCOwner(owner) then return end
+
+	if Arcana and Arcana.NPC then
+		Arcana.NPC.TryCast(owner)
+	end
 end
 
 function SWEP:PrimaryAttack()

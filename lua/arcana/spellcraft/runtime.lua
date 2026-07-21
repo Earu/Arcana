@@ -105,6 +105,24 @@ if SERVER then
 		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
 	end
 
+	-- Alive() is a player method; NPC mages and other entity casters answer on health.
+	local function isAlive(ent)
+		if not IsValid(ent) then return false end
+		if ent:IsPlayer() then return ent:Alive() end
+
+		return ent:Health() > 0
+	end
+
+	-- Key for per-caster records (self auras). Players keep their SteamID64 so a record
+	-- survives their entity churn; anything else — NPC mages, spell casters — is keyed
+	-- by entity index.
+	local function casterKey(ent)
+		if not IsValid(ent) then return nil end
+		if ent:IsPlayer() then return ent:SteamID64() end
+
+		return "ent_" .. ent:EntIndex()
+	end
+
 	-- Apply ONLY the essence rider to a single actor. Base damage is dealt
 	-- separately by the area/direct damage pass so the cap stays honest.
 	function P.ApplyEssenceHit(caster, target, hitPos, compiled)
@@ -244,7 +262,7 @@ if SERVER then
 		end
 
 		-- Siphon: heal for part of the damage dealt, hard-capped per cast.
-		if compiled.siphon and hits > 0 and IsValid(caster) and caster:Alive() then
+		if compiled.siphon and hits > 0 and isAlive(caster) then
 			local heal = math.min(hits * compiled.damage * damageMult * 0.15, 40)
 			caster:SetHealth(math.min(caster:GetMaxHealth(), caster:Health() + math.floor(heal)))
 		end
@@ -485,7 +503,8 @@ if SERVER then
 	end
 
 	function P.CastSelf(caster, srcEnt, compiled, ctx)
-		local sid = caster:SteamID64() or tostring(caster:EntIndex())
+		local sid = casterKey(caster)
+		if not sid then return end
 		local duration = compiled.duration > 0 and compiled.duration or 8
 
 		P.SelfAuras[sid] = {
@@ -507,7 +526,7 @@ if SERVER then
 		local interval = math.max(0.5, compiled.tickInterval or 1.0)
 		timer.Create(tag, interval, 0, function()
 			local aura = P.SelfAuras[sid]
-			if not IsValid(caster) or not caster:Alive() or not aura or CurTime() >= aura.endTime then
+			if not isAlive(caster) or not aura or CurTime() >= aura.endTime then
 				timer.Remove(tag)
 				if IsValid(caster) then
 					P.AuraFX(caster, compiled.essence, 0, 0)
@@ -523,8 +542,11 @@ if SERVER then
 	-- Thorns: while an aura with thorns is up, attackers get struck by the
 	-- aura's element (per-attacker cooldown so DoTs can't loop it).
 	hook.Add("EntityTakeDamage", "Arcana_Spellcraft_Thorns", function(target, dmginfo)
-		if not target:IsPlayer() then return end
-		local sid = target:SteamID64()
+		-- Cheap out before keying: this runs on every damage event on the map.
+		if next(P.SelfAuras) == nil then return end
+		if not isActor(target) then return end
+
+		local sid = casterKey(target)
 		if not sid then return end
 
 		local aura = P.SelfAuras[sid]
