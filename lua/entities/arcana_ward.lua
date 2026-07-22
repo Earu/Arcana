@@ -340,7 +340,7 @@ if SERVER then
 		net.WriteVector(hitPos)
 		net.WriteAngle(ang)
 		net.WriteFloat(PLATE_LIFETIME)
-		net.Broadcast()
+		net.SendPVS(hitPos)
 
 		SafeRemoveEntityDelayed(plate, PLATE_LIFETIME)
 		self._plates[#self._plates + 1] = plate
@@ -402,6 +402,7 @@ if CLIENT then
 				if r <= 0 then r = WARD_RADIUS end
 				local color = Color(BAND_COLOR.r, BAND_COLOR.g, BAND_COLOR.b, 0)
 				self._bands = BandCircle.Create(self:GetPos(), self:GetAngles(), color, r, 0)
+			self._bands:SetReferenceEntity(self)
 				self._bands:AddBand(r * 0.95, 120, { p = 0,   y = 12,  r = 3  }, 6)
 				self._bands:AddBand(r * 0.95, 120, { p = -6,  y = -9,  r = 2  }, 6)
 				self._bands:AddBand(r * 0.95, 120, { p = 6,   y = -11, r = -2 }, 6)

@@ -513,6 +513,7 @@ if CLIENT then
 				local ritualId = self:GetRitualId()
 				local seed = (isstring(ritualId) and #ritualId > 0) and tonumber(util.CRC(ritualId)) or nil
 				self._circle = MagicCircle.new(pos, ang, color, 100, 100, 2, seed)
+				self._circle:SetReferenceEntity(self)
 				MagicCircleManager:Add(self._circle)
 			end
 
@@ -559,6 +560,7 @@ if CLIENT then
 			self._bands = BandCircle.Create(pos, ang, baseColor, 80, 0)
 
 			if self._bands then
+				self._bands:SetReferenceEntity(self)
 				self._bands.position = pos
 				self._bands.angles = ang
 

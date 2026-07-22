@@ -407,6 +407,7 @@ if CLIENT then
 		local ang = self:GetAngles()
 		self._band = BandCircle.Create(top, ang, BAND_CIRCLE_COLOR, math.max(40, self:GetAuraSize() * 0.35))
 		if not self._band then return end
+		self._band:SetReferenceEntity(self)
 
 		-- Three fast rotating bands on different axes
 		local baseR = math.max(24, self:GetAuraSize() * 0.18)

@@ -841,6 +841,7 @@ if CLIENT then
 		-- Ground magic circle (ritual area), anchored to the ground beneath the base.
 		if not self._groundCircle then
 			self._groundCircle = MagicCircle.new(self:GetPos() + VECTOR_SLIGHTLY_ABOVE, Angle(0, 180, 180), color, 60, 110, 2)
+			self._groundCircle:SetReferenceEntity(self)
 			MagicCircleManager:Add(self._groundCircle)
 		end
 
@@ -871,6 +872,7 @@ if CLIENT then
 		else
 			if not self._cannonCircle then
 				self._cannonCircle = MagicCircle.new(muzzle, aimToCircleAngle(dir), color, 40, 52, 2)
+				self._cannonCircle:SetReferenceEntity(self)
 				MagicCircleManager:Add(self._cannonCircle)
 			end
 			self._cannonCircle.position = muzzle
@@ -884,6 +886,7 @@ if CLIENT then
 		if not self._bands and BandCircle then
 			self._bands = BandCircle.Create(center, Angle(0, 0, 0), color, self.BubbleRadius, 0)
 			if self._bands then
+				self._bands:SetReferenceEntity(self)
 				self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = 0, y = 70, r = 35 }, 4)
                 self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = -70, y = -35, r = 0 }, 4)
                 self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = 70, y = 0, r = 70 }, 4)

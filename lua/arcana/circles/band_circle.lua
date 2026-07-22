@@ -125,6 +125,12 @@ function BandCircle:IsDrawnManually()
 	return self._drawnManually == true
 end
 
+-- Tie this circle's visibility to an entity: the manager skips drawing it
+-- while the entity is dormant (out of the local player's PVS)
+function BandCircle:SetReferenceEntity(ent)
+	self.refEntity = ent
+end
+
 function BandCircle:IsActive()
 	return self.isActive
 end
