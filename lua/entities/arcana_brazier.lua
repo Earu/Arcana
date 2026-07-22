@@ -216,6 +216,7 @@ if CLIENT then
 
 		self._circle = MagicCircle.new(pos, ang, circleColor, intensity, size, 2.5)
 		if self._circle then
+			self._circle:SetReferenceEntity(self)
 			MagicCircleManager:Add(self._circle)
 		end
 	end

@@ -607,6 +607,7 @@ if CLIENT then
 		local color = Color(222, 198, 120, 255)
 		local bc = BandCircle.Create(pos, ang, color, 80)
 		if not bc then return end
+		bc:SetReferenceEntity(self)
 
 		local mins, maxs = wep:OBBMins(), wep:OBBMaxs()
 		local size = (maxs - mins):Length()

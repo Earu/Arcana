@@ -252,6 +252,12 @@ function MagicCircle:IsDrawnManually()
 	return self._drawnManually == true
 end
 
+-- Tie this circle's visibility to an entity: the manager skips drawing it
+-- while the entity is dormant (out of the local player's PVS)
+function MagicCircle:SetReferenceEntity(ent)
+	self.refEntity = ent
+end
+
 function MagicCircle:SetAnimated(duration)
 	self.isAnimated = true
 	self.duration = duration or 5
@@ -397,13 +403,21 @@ function MagicCircleManager:Update()
 	end
 end
 
+-- A circle is skipped by the manager when it is drawn manually elsewhere,
+-- or when its reference entity exists but is dormant (out of PVS)
+function MagicCircleManager:IsCircleHidden(circle)
+	if circle.IsDrawnManually and circle:IsDrawnManually() then return true end
+
+	local refEnt = circle.refEntity
+	if refEnt and IsValid(refEnt) and refEnt:IsDormant() then return true end
+
+	return false
+end
+
 function MagicCircleManager:Draw()
 	for _, circle in ipairs(self.circles) do
-		if circle.Draw then
-			local manual = (circle.IsDrawnManually and circle:IsDrawnManually()) or false
-			if not manual then
-				circle:Draw()
-			end
+		if circle.Draw and not self:IsCircleHidden(circle) then
+			circle:Draw()
 		end
 	end
 end
@@ -433,9 +447,7 @@ hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(b
 
 	local anyBloom = false
 	for i = 1, n do
-		local c = circles[i]
-		local manual = (c.IsDrawnManually and c:IsDrawnManually()) or false
-		if not manual then
+		if not MagicCircleManager:IsCircleHidden(circles[i]) then
 			anyBloom = true
 			break
 		end
