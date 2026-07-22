@@ -44,8 +44,11 @@ function ENT:SetupDataTables()
 	end
 end
 
+-- PVS membership is computed from the collision bounds (the full ward sphere),
+-- so this transmits whenever any part of the ward volume overlaps a client's PVS
+-- and lets the client entity go dormant (hiding the bands) when none of it does
 function ENT:UpdateTransmitState()
-	return TRANSMIT_ALWAYS
+	return TRANSMIT_PVS
 end
 
 if SERVER then
