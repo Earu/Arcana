@@ -24,7 +24,11 @@
 local Arcana = _G.Arcana or {}
 _G.Arcana = Arcana
 
-pcall(require, "metalog")
+-- pcalling require still calls the error handler
+if file.Exists("includes/modules/metalog.lua", "LUA") then
+	require("metalog")
+end
+
 function Arcana:Print(...)
 	if _G.metalog then
 		_G.metalog.info("Arcana", nil, ...)
