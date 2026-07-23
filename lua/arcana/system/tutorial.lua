@@ -404,11 +404,17 @@ function Tutorial:StartSequence(sequence)
 		self:Think()
 	end)
 
-	-- Disable player movement simulation
+	-- Block non-movement binds during the tutorial
 	hook.Add("PlayerBindPress", "Arcana_TutorialInput", function(ply, bind, pressed)
 		if self.active and self.phase == "tutorial" then
 			return self:HandleInput(bind, pressed)
 		end
+	end)
+
+	-- Read movement intent from the usercmd, then freeze the real player
+	self.inputForward, self.inputSide = 0, 0
+	hook.Add("CreateMove", "Arcana_TutorialCreateMove", function(cmd)
+		self:HandleCreateMove(cmd)
 	end)
 
 	-- Suppress default footstep sounds during tutorial
@@ -434,8 +440,34 @@ function Tutorial:HandleInput(bind, pressed)
 		return false
 	end
 
-	-- Block all other inputs (movement handled separately)
+	-- Let movement binds through so CreateMove can read their intent;
+	-- HandleCreateMove zeroes them out before they reach the server
+	if string.find(bind, "+forward") or string.find(bind, "+back") or
+	   string.find(bind, "+moveleft") or string.find(bind, "+moveright") then
+		return false
+	end
+
+	-- Block all other inputs
 	return true
+end
+
+-- Capture movement intent from the usercmd, then zero it out so the real
+-- player stays put; respects rebinds, multiple binds and analog input
+function Tutorial:HandleCreateMove(cmd)
+	if not self.active or self.phase ~= "tutorial" then
+		self.inputForward, self.inputSide = 0, 0
+		return
+	end
+
+	self.inputForward = cmd:GetForwardMove()
+	self.inputSide = cmd:GetSideMove()
+
+	cmd:SetForwardMove(0)
+	cmd:SetSideMove(0)
+	cmd:SetUpMove(0)
+
+	local blockedButtons = bit.bor(IN_FORWARD, IN_BACK, IN_MOVELEFT, IN_MOVERIGHT, IN_JUMP, IN_DUCK, IN_SPEED, IN_WALK)
+	cmd:SetButtons(bit.band(cmd:GetButtons(), bit.bnot(blockedButtons)))
 end
 
 -- Update movement based on key states (called in Think)
@@ -455,30 +487,12 @@ function Tutorial:UpdateMovement()
 	right.z = 0
 	right:Normalize()
 
-	local moveDir = Vector(0, 0, 0)
+	-- Movement intent captured from the usercmd in HandleCreateMove
+	local moveDir = forward * (self.inputForward or 0) + right * (self.inputSide or 0)
 
-	self.keyForward = self.keyForward or input.LookupBinding("+forward")
-	self.keyBackward = self.keyBackward or input.LookupBinding("+back")
-	self.keyLeft = self.keyLeft or input.LookupBinding("+moveleft")
-	self.keyRight = self.keyRight or input.LookupBinding("+moveright")
-
-	-- Check continuous key states
-	if self.keyForward and input.IsKeyDown(input.GetKeyCode(self.keyForward)) then
-		moveDir = moveDir + forward
-	end
-	if self.keyBackward and input.IsKeyDown(input.GetKeyCode(self.keyBackward)) then
-		moveDir = moveDir - forward
-	end
-	if self.keyLeft and input.IsKeyDown(input.GetKeyCode(self.keyLeft)) then
-		moveDir = moveDir - right
-	end
-	if self.keyRight and input.IsKeyDown(input.GetKeyCode(self.keyRight)) then
-		moveDir = moveDir + right
-	end
-
-	-- Track if we're moving for footsteps
+	-- Track if we're moving for footsteps (small deadzone for analog input)
 	local wasMoving = self.isMoving or false
-	self.isMoving = moveDir:Length() > 0
+	self.isMoving = moveDir:Length() > 1
 
 	-- Normalize and apply speed
 	if self.isMoving then
@@ -822,6 +836,7 @@ function Tutorial:EndSequence()
 	hook.Remove("RenderScreenspaceEffects", "Arcana_TutorialScreenspace")
 	hook.Remove("Think", "Arcana_TutorialThink")
 	hook.Remove("PlayerBindPress", "Arcana_TutorialInput")
+	hook.Remove("CreateMove", "Arcana_TutorialCreateMove")
 	hook.Remove("PlayerFootstep", "Arcana_TutorialFootstep")
 
 	self.currentSequence = nil
