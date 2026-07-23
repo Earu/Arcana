@@ -24,7 +24,13 @@
 local Arcana = _G.Arcana or {}
 _G.Arcana = Arcana
 
+pcall(require, "metalog")
 function Arcana:Print(...)
+	if _G.metalog then
+		_G.metalog.info("Arcana", nil, ...)
+		return
+	end
+	
 	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), table.concat({...}, " "), "\n")
 end
 
