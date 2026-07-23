@@ -30,7 +30,7 @@ function Arcana:Print(...)
 		_G.metalog.info("Arcana", nil, ...)
 		return
 	end
-	
+
 	MsgC(Color(147, 112, 219), "[Arcana] ", Color(255, 255, 255), table.concat({...}, " "), "\n")
 end
 
