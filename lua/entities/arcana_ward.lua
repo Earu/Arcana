@@ -164,6 +164,7 @@ if SERVER then
 			local spellId = pdata.casting_spell
 			local spell = Arcana.RegisteredSpells and Arcana.RegisteredSpells[spellId]
 			if not spell then continue end
+			if spellId == "ritual_drain" then continue end
 
 			local eyePos = ply:EyePos()
 			if eyePos:Distance(center) <= radius then continue end
