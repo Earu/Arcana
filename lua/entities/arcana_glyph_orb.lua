@@ -100,7 +100,7 @@ if SERVER then
 		local ed4 = EffectData()
 		ed4:SetOrigin(pos)
 		util.Effect("Explosion", ed4, true, true)
-		util.ScreenShake(pos, 8, 150, 0.4, 700)
+		Arcana.Common.ScreenShake(pos, 8, 150, 0.4, 700)
 
 		self:Remove()
 	end

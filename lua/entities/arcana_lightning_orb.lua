@@ -184,7 +184,7 @@ if SERVER then
 		ed:SetOrigin(pos)
 		util.Effect("cball_explode", ed, true, true)
 		util.Effect("ElectricSpark", ed, true, true)
-		util.ScreenShake(pos, 10, 120, 0.5, 800)
+		Arcana.Common.ScreenShake(pos, 10, 120, 0.5, 800)
 
 		-- Impactful explosion sounds
 		sound.Play("ambient/explosions/explode_" .. math.random(1, 3) .. ".wav", pos, 95, 110)

@@ -99,7 +99,7 @@ if SERVER then
 		local ed = EffectData()
 		ed:SetOrigin(pos)
 		util.Effect("Explosion", ed, true, true)
-		util.ScreenShake(pos, 5, 5, 0.35, 512)
+		Arcana.Common.ScreenShake(pos, 5, 5, 0.35, 512)
 		util.Decal("Scorch", pos + Vector(0, 0, 8), pos - Vector(0, 0, 16))
 
 		sound.Play("ambient/explosions/explode_4.wav", pos, 90, 100)

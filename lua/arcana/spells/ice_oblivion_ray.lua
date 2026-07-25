@@ -75,7 +75,7 @@ local function startBeamPhase(caster)
 	net.WriteFloat(BEAM_DURATION)
 	net.Broadcast()
 
-	util.ScreenShake(caster:GetPos(), 20, 120, 2.0, 3000)
+	Arcana.Common.ScreenShake(caster:GetPos(), 20, 120, 2.0, 3000)
 	sound.Play("ambient/energy/whiteflash.wav", caster:GetPos(), 115, 75)
 	sound.Play("ambient/atmosphere/thunder1.wav", caster:GetPos(), 105, 50)
 
@@ -130,7 +130,7 @@ local function startBeamPhase(caster)
 
 			-- Periodic screen shake scaled with progress
 			if tick % 5 == 0 then
-				util.ScreenShake(beamOrigin, 8 * (0.3 + progress * 0.7), 100, 0.5, 2000)
+				Arcana.Common.ScreenShake(beamOrigin, 8 * (0.3 + progress * 0.7), 100, 0.5, 2000)
 			end
 
 			if tick % 10 == 0 then
@@ -168,7 +168,7 @@ local function startBeamPhase(caster)
 					end
 				end
 
-				util.ScreenShake(impactPos, 6, 70, 0.3, 800)
+				Arcana.Common.ScreenShake(impactPos, 6, 70, 0.3, 800)
 				net.Start("Arcana_IceOblivionRay_ImpactNova")
 				net.WriteVector(impactPos)
 				net.WriteFloat(novaRadius)
@@ -240,8 +240,8 @@ local function startBeamPhase(caster)
 			end)
 		end
 
-		util.ScreenShake(impactPos,       35, 200, 5.0, 7000)
-		util.ScreenShake(caster:GetPos(), 25, 150, 3.0, 4000)
+		Arcana.Common.ScreenShake(impactPos,       35, 200, 5.0, 7000)
+		Arcana.Common.ScreenShake(caster:GetPos(), 25, 150, 3.0, 4000)
 		sound.Play("ambient/explosions/explode_9.wav",          impactPos, 135, 30)
 		sound.Play("ambient/energy/whiteflash.wav",             impactPos, 125, 55)
 		sound.Play("ambient/atmosphere/thunder1.wav",           impactPos, 118, 32)
@@ -430,7 +430,7 @@ if CLIENT then
 			end
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", eyePos, 90, 82)
 			sound.Play("ambient/energy/weld" .. math.random(1, 2) .. ".wav", eyePos, 85, 85)
-			util.ScreenShake(eyePos, 3, 80, 0.3, 400)
+			Arcana.Common.ScreenShake(eyePos, 3, 80, 0.3, 400)
 		end)
 
 		-- t=3.5 ── Third barrel ring + first orbital BandCircle
@@ -453,7 +453,7 @@ if CLIENT then
 			end
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", eyePos, 92, 78)
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", eyePos, 88, 80)
-			util.ScreenShake(eyePos, 4, 90, 0.4, 500)
+			Arcana.Common.ScreenShake(eyePos, 4, 90, 0.4, 500)
 		end)
 
 		-- t=5 ── Fourth barrel ring
@@ -468,7 +468,7 @@ if CLIENT then
 				barrelCircles[#barrelCircles + 1] = { circle = c, dist = 445 }
 			end
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", eyePos, 93, 75)
-			util.ScreenShake(eyePos, 5, 100, 0.5, 550)
+			Arcana.Common.ScreenShake(eyePos, 5, 100, 0.5, 550)
 		end)
 
 		-- t=5.5 ── First two muzzle satellites (opposite sides)
@@ -499,7 +499,7 @@ if CLIENT then
 
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", eyePos, 90, 80)
 			sound.Play("ambient/energy/newspark0" .. math.random(4, 8) .. ".wav", eyePos, 85, 85)
-			util.ScreenShake(eyePos, 5, 110, 0.6, 600)
+			Arcana.Common.ScreenShake(eyePos, 5, 110, 0.6, 600)
 		end)
 
 		-- t=7 ── Two more muzzle satellites + second BandCircle + lightning arcs begin
@@ -541,7 +541,7 @@ if CLIENT then
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", eyePos, 95, 70)
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", eyePos, 92, 72)
 			sound.Play("ambient/energy/newspark0" .. math.random(4, 8) .. ".wav", eyePos, 88, 88)
-			util.ScreenShake(eyePos, 7, 120, 0.8, 700)
+			Arcana.Common.ScreenShake(eyePos, 7, 120, 0.8, 700)
 		end)
 
 		-- t=8.5 ── Intensity escalates
@@ -549,7 +549,7 @@ if CLIENT then
 			if not IsValid(caster) or not castingData[caster] then return end
 			sound.Play("ambient/energy/whiteflash.wav", caster:EyePos(), 90, 90)
 			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", caster:EyePos(), 92, 50)
-			util.ScreenShake(caster:EyePos(), 9, 130, 1.2, 800)
+			Arcana.Common.ScreenShake(caster:EyePos(), 9, 130, 1.2, 800)
 		end)
 
 		-- t=9.5 ── Final surge before firing
@@ -558,7 +558,7 @@ if CLIENT then
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:EyePos(), 98, 65)
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", caster:EyePos(), 95, 68)
 			sound.Play("ambient/atmosphere/thunder1.wav", caster:EyePos(), 100, 42)
-			util.ScreenShake(caster:EyePos(), 12, 150, 2.0, 1000)
+			Arcana.Common.ScreenShake(caster:EyePos(), 12, 150, 2.0, 1000)
 		end)
 
 		-- ── Per-frame Think: keep all circles aligned to live aim direction ──────
@@ -717,13 +717,13 @@ if CLIENT then
 		timer.Simple(castTime * 0.5, function()
 			if not IsValid(caster) then return end
 			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", caster:EyePos(), 88, 55)
-			util.ScreenShake(caster:EyePos(), 5, 100, 1.0, 600)
+			Arcana.Common.ScreenShake(caster:EyePos(), 5, 100, 1.0, 600)
 		end)
 
 		timer.Simple(castTime * 0.75, function()
 			if not IsValid(caster) then return end
 			sound.Play("ambient/energy/whiteflash.wav", caster:EyePos(), 88, 88)
-			util.ScreenShake(caster:EyePos(), 7, 115, 1.5, 750)
+			Arcana.Common.ScreenShake(caster:EyePos(), 7, 115, 1.5, 750)
 		end)
 
 		-- Safety cleanup for cast failure / timeout (skip if beam phase is active —

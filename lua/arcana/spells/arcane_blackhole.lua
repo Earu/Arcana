@@ -155,21 +155,21 @@ Arcana:RegisterSpell({
 
 		-- Climax moment: Multi-stage collapse with building screen shakes
 		-- Stage 1: Initial compression
-		util.ScreenShake(targetPos, 15, 150, 0.8, 2500)
+		Arcana.Common.ScreenShake(targetPos, 15, 150, 0.8, 2500)
 
 		-- Stage 2: Intensifying (0.3s)
 		timer.Simple(0.3, function()
-			util.ScreenShake(targetPos, 25, 200, 0.6, 2500)
+			Arcana.Common.ScreenShake(targetPos, 25, 200, 0.6, 2500)
 		end)
 
 		-- Stage 3: Violent final implosion (0.9s)
 		timer.Simple(0.9, function()
-			util.ScreenShake(targetPos, 50, 255, 0.4, 3000)
+			Arcana.Common.ScreenShake(targetPos, 50, 255, 0.4, 3000)
 		end)
 
 		-- Final collapse impact (1.1s)
 		timer.Simple(1.1, function()
-			util.ScreenShake(targetPos, 45, 240, 0.3, 2500)
+			Arcana.Common.ScreenShake(targetPos, 45, 240, 0.3, 2500)
 		end)
 
 		-- Climax sounds - multi-stage collapse with intense layering
@@ -1226,7 +1226,7 @@ if CLIENT then
 
 			-- Initial void opening sound
 			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", caster:GetPos(), 90, 60)
-			util.ScreenShake(caster:GetPos(), 4, 90, 0.5, 400)
+			Arcana.Common.ScreenShake(caster:GetPos(), 4, 90, 0.5, 400)
 		end
 
 		-- Stacked vertical circles appear progressively
@@ -1257,7 +1257,7 @@ if CLIENT then
 					local volume = 92 + (i * 1)
 					sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", caster:GetPos(), volume, pitch)
 					sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), volume - 5, pitch - 5)
-					util.ScreenShake(caster:GetPos(), 4 + i, 100 + (i * 8), 0.5, 450 + (i * 50))
+					Arcana.Common.ScreenShake(caster:GetPos(), 4 + i, 100 + (i * 8), 0.5, 450 + (i * 50))
 				end
 			end)
 		end
@@ -1274,7 +1274,7 @@ if CLIENT then
 			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", caster:GetPos(), 98, 50)
 			sound.Play("ambient/atmosphere/cave_hit" .. math.random(1, 6) .. ".wav", caster:GetPos(), 95, 45)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 93, 50)
-			util.ScreenShake(caster:GetPos(), 7, 130, 0.8, 600)
+			Arcana.Common.ScreenShake(caster:GetPos(), 7, 130, 0.8, 600)
 
 			for i = 1, numSatellites do
 				local baseAngle = (i / numSatellites) * math.pi * 2
@@ -1523,14 +1523,14 @@ if CLIENT then
 			if not IsValid(caster) then return end
 			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", caster:GetPos(), 95, 45)
 			sound.Play("ambient/atmosphere/cave_hit" .. math.random(1, 6) .. ".wav", caster:GetPos(), 93, 50)
-			util.ScreenShake(caster:GetPos(), 6, 110, 1.2, 500)
+			Arcana.Common.ScreenShake(caster:GetPos(), 6, 110, 1.2, 500)
 		end)
 
 		timer.Simple(castTime * 0.6, function()
 			if not IsValid(caster) then return end
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 98, 40)
 			sound.Play("ambient/atmosphere/thunder1.wav", caster:GetPos(), 96, 95)
-			util.ScreenShake(caster:GetPos(), 9, 130, 1.5, 600)
+			Arcana.Common.ScreenShake(caster:GetPos(), 9, 130, 1.5, 600)
 		end)
 
 		timer.Simple(castTime * 0.8, function()
@@ -1538,7 +1538,7 @@ if CLIENT then
 			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", caster:GetPos(), 102, 35)
 			sound.Play("ambient/energy/whiteflash.wav", caster:GetPos(), 100, 80)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 98, 45)
-			util.ScreenShake(caster:GetPos(), 12, 150, 2.0, 700)
+			Arcana.Common.ScreenShake(caster:GetPos(), 12, 150, 2.0, 700)
 		end)
 
 		-- Final buildup at 92%
@@ -1546,7 +1546,7 @@ if CLIENT then
 			if not IsValid(caster) then return end
 			sound.Play("ambient/atmosphere/cave_hit" .. math.random(1, 6) .. ".wav", caster:GetPos(), 105, 30)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 103, 40)
-			util.ScreenShake(caster:GetPos(), 15, 170, 2.5, 800)
+			Arcana.Common.ScreenShake(caster:GetPos(), 15, 170, 2.5, 800)
 		end)
 
 		-- Cleanup when cast completes or fails

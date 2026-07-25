@@ -429,7 +429,7 @@ if CLIENT then
 
 	net.Receive("Arcana_CrawlSkullImpact", function()
 		local pos = net.ReadVector()
-		util.ScreenShake(pos, 7, 90, 0.45, 650)
+		Arcana.Common.ScreenShake(pos, 7, 90, 0.45, 650)
 
 		local emitter = ParticleEmitter(pos)
 		if emitter then

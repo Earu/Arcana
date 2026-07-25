@@ -137,7 +137,7 @@ if SERVER then
 		util.Effect("cball_explode", ed, true, true)
 		util.Effect("ManhackSparks", ed, true, true)
 		util.Decal("Scorch", pos + normal * 8, pos - normal * 8)
-		util.ScreenShake(
+		Arcana.Common.ScreenShake(
 			pos,
 			(opts.shakePower or 6) * power,
 			opts.shakeHz or 90,

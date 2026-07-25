@@ -113,7 +113,7 @@ if SERVER then
 		local ed = EffectData()
 		ed:SetOrigin(pos)
 		util.Effect("GlassImpact", ed, true, true)
-		util.ScreenShake(pos, 3, 50, 0.2, 256)
+		Arcana.Common.ScreenShake(pos, 3, 50, 0.2, 256)
 		sound.Play("physics/glass/glass_impact_bullet1.wav", pos, 70, 150)
 		sound.Play("ambient/levels/canals/windchime2.wav", pos, 65, 180)
 		util.Decal("FadingScorch", pos + Vector(0, 0, 8), pos - Vector(0, 0, 16))

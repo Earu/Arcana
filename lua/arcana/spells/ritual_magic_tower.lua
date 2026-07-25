@@ -49,6 +49,6 @@ Arcana:RegisterRitualSpell({
 
 		selfEnt:EmitSound("ambient/energy/whiteflash.wav", 85, 100)
 		selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 75, 105)
-		util.ScreenShake(pos, 8, 60, 1.0, 1200)
+		Arcana.Common.ScreenShake(pos, 8, 60, 1.0, 1200)
 	end,
 })

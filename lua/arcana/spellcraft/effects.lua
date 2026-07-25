@@ -34,7 +34,7 @@ if SERVER then
 				local ed = EffectData()
 				ed:SetOrigin(pos)
 				util.Effect("Explosion", ed, true, true)
-				util.ScreenShake(pos, 5, 5, 0.35, 512)
+				Arcana.Common.ScreenShake(pos, 5, 5, 0.35, 512)
 				sound.Play("ambient/explosions/explode_4.wav", pos, 90, 100)
 			else
 				sound.Play("ambient/fire/ignite.wav", pos, 65, math.random(95, 110))
@@ -47,7 +47,7 @@ if SERVER then
 			util.Effect("GlassImpact", ed, true, true)
 			if intensity >= 0.9 then
 				sound.Play("physics/glass/glass_impact_bullet1.wav", pos, 75, 120)
-				util.ScreenShake(pos, 3, 60, 0.25, radius * 1.5)
+				Arcana.Common.ScreenShake(pos, 3, 60, 0.25, radius * 1.5)
 			end
 			sound.Play("ambient/levels/canals/windchime2.wav", pos, 65, math.random(130, 150))
 		end,
@@ -68,7 +68,7 @@ if SERVER then
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", pos, intensity >= 0.9 and 90 or 70, 110)
 			if intensity >= 0.9 then
 				util.Decal("Scorch", pos + UP * 8, pos + DOWN)
-				util.ScreenShake(pos, 6, 90, 0.3, 600)
+				Arcana.Common.ScreenShake(pos, 6, 90, 0.3, 600)
 			end
 		end,
 		earth = function(pos, radius, intensity)
@@ -79,7 +79,7 @@ if SERVER then
 			if intensity >= 0.9 then
 				sound.Play("physics/concrete/concrete_break2.wav", pos, 80, 95)
 				sound.Play("ambient/materials/rock_impact_hard2.wav", pos, 80, 100)
-				util.ScreenShake(pos, 7, 40, 0.4, radius * 2)
+				Arcana.Common.ScreenShake(pos, 7, 40, 0.4, radius * 2)
 				util.Decal("Scorch", pos + UP * 8, pos + DOWN)
 			else
 				sound.Play("physics/concrete/rock_impact_soft" .. math.random(1, 3) .. ".wav", pos, 65, 100)
