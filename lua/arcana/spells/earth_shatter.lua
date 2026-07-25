@@ -31,7 +31,7 @@ Arcana:RegisterSpell({
 		ed:SetOrigin(pos)
 		util.Effect("ThumperDust", ed, true, true)
 		util.Effect("cball_explode", ed, true, true)
-		util.ScreenShake(pos, 8, 80, 0.5, 800)
+		Arcana.Common.ScreenShake(pos, 8, 80, 0.5, 800)
 		srcEnt:EmitSound("physics/concrete/concrete_break2.wav", 80, 95)
 		sound.Play("ambient/materials/rock_impact_hard2.wav", pos, 80, 100)
 		-- Tell clients to render expanding earthy rings + dust/debris

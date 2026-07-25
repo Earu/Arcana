@@ -95,7 +95,7 @@ if CLIENT then
 			util.Effect("cball_explode", ed, true, true)
 			sound.Play("ambient/fire/ignite.wav", caster:GetPos(), 75, 110)
 			caster:EmitSound("ambient/fire/gascan_ignite1.wav", 75, 100)
-			util.ScreenShake(caster:GetPos(), 2, 2, 0.4, 256)
+			Arcana.Common.ScreenShake(caster:GetPos(), 2, 2, 0.4, 256)
 
 			for i = 1, 5 do
 				local t = i / 5

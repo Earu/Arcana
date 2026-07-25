@@ -101,7 +101,7 @@ local function startBeamPhase(caster, targetPos)
 	net.WriteFloat(BEAM_DURATION)
 	net.Broadcast()
 	-- Initial MASSIVE screen shake
-	util.ScreenShake(targetPos, 30, 150, 3.0, MAX_BEAM_RADIUS * 2)
+	Arcana.Common.ScreenShake(targetPos, 30, 150, 3.0, MAX_BEAM_RADIUS * 2)
 	local startTime = CurTime()
 	local endTime = startTime + BEAM_DURATION
 	-- Damage tick rate
@@ -157,7 +157,7 @@ local function startBeamPhase(caster, targetPos)
 
 			-- Periodic screen shake - more intense as beam grows
 			if tick % 3 == 0 then
-				util.ScreenShake(targetPos, 15 * progress, 120, 0.6, currentRadius * 1.5)
+				Arcana.Common.ScreenShake(targetPos, 15 * progress, 120, 0.6, currentRadius * 1.5)
 			end
 
 			-- Periodic powerful rumble sounds
@@ -200,7 +200,7 @@ local function startBeamPhase(caster, targetPos)
 			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 120, 50)
 		end)
 
-		util.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
+		Arcana.Common.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
 		-- Final damage wave
 		Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS, 200, { damageType = bit.bor(DMG_BLAST, DMG_DISSOLVE), ignoreAttacker = true })
 		-- Broadcast final impact wave
@@ -269,7 +269,7 @@ local function startBeamPhase(caster, targetPos)
 
 					-- Screen shake
 					if tick % 5 == 0 then
-						util.ScreenShake(targetPos, 15 + (suctionProgress * 10), 150, 0.4, MAX_BEAM_RADIUS * 2)
+						Arcana.Common.ScreenShake(targetPos, 15 + (suctionProgress * 10), 150, 0.4, MAX_BEAM_RADIUS * 2)
 					end
 				end)
 			end
@@ -294,7 +294,7 @@ local function startBeamPhase(caster, targetPos)
 
 				-- Final pull damage
 				Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, { damageType = bit.bor(DMG_CRUSH, DMG_BLAST), ignoreAttacker = true })
-				util.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
+				Arcana.Common.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
 				-- Broadcast collapse visuals
 				net.Start("Arcana_FallenDown_VacuumCollapse", true)
 				net.WriteVector(targetPos)
@@ -1539,7 +1539,7 @@ if CLIENT then
 					local amplitude = Lerp(shakeProgress, 1, 15) -- From 1 to 15
 					local frequency = Lerp(shakeProgress, 1, 8) -- From 1 to 8
 					local duration = Lerp(shakeProgress, 0.3, 1.0) -- From 0.3s to 1.0s
-					util.ScreenShake(caster:GetPos(), amplitude, frequency, duration, 3000)
+					Arcana.Common.ScreenShake(caster:GetPos(), amplitude, frequency, duration, 3000)
 					lastShakeTime = now
 				end
 			end

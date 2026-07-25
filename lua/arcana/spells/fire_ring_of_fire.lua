@@ -42,7 +42,7 @@ Arcana:RegisterSpell({
 		-- Audio/impact
 		srcEnt:EmitSound("ambient/fire/gascan_ignite1.wav", 75, 100)
 		sound.Play("ambient/fire/mtov_flame2.wav", origin, 70, 100)
-		util.ScreenShake(origin, 4, 40, 0.4, 512)
+		Arcana.Common.ScreenShake(origin, 4, 40, 0.4, 512)
 
 		for i = 1, steps do
 			local t = (i / steps) * duration

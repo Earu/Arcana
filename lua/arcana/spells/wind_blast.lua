@@ -45,8 +45,8 @@ Arcana:RegisterSpell({
 		timer.Simple(0.15, function()
 			sound.Play("weapons/physcannon/energy_disintegrate4.wav", origin, 80, 70)
 		end)
-		
-		util.ScreenShake(origin, 10, 120, 0.5, radius * 1.2)
+
+		Arcana.Common.ScreenShake(origin, 10, 120, 0.5, radius * 1.2)
 
 		for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
 			if not IsValid(ent) then continue end
@@ -92,17 +92,17 @@ if CLIENT then
 	net.Receive("Arcana_WindBlast", function()
 		local origin = net.ReadVector()
 		local radius = net.ReadFloat()
-		
+
 		local emitter = ParticleEmitter(origin)
 		if not emitter then return end
-		
+
 		-- Omnidirectional wind burst particles (spherical expansion)
 		for i = 1, 120 do
 			-- Random direction in all directions
 			local dir = VectorRand():GetNormalized()
 			local dist = math.Rand(100, radius)
 			local pos = origin + dir * dist
-			
+
 			local p = emitter:Add("effects/splash2", pos)
 			if p then
 				p:SetDieTime(math.Rand(1.0, 1.6))
@@ -118,13 +118,13 @@ if CLIENT then
 				p:SetGravity(Vector(0, 0, -80))
 			end
 		end
-		
+
 		-- Dense dust cloud expanding outward
 		for i = 1, 80 do
 			local dir = VectorRand():GetNormalized()
 			local dist = math.Rand(50, radius * 0.7)
 			local pos = origin + dir * dist
-			
+
 			local p = emitter:Add("particle/particle_smokegrenade", pos)
 			if p then
 				p:SetDieTime(math.Rand(1.5, 2.5))
@@ -140,13 +140,13 @@ if CLIENT then
 				p:SetGravity(Vector(0, 0, math.Rand(-30, 10)))
 			end
 		end
-		
+
 		-- Sharp wind pressure waves
 		for i = 1, 60 do
 			local dir = VectorRand():GetNormalized()
 			local dist = math.Rand(120, radius * 1.1)
 			local pos = origin + dir * dist
-			
+
 			local p = emitter:Add("effects/blueflare1", pos)
 			if p then
 				p:SetDieTime(math.Rand(0.5, 1.0))
@@ -160,16 +160,16 @@ if CLIENT then
 				p:SetGravity(Vector(0, 0, 0))
 			end
 		end
-		
+
 		emitter:Finish()
-		
+
 		-- Central explosion effects
 		local ed = EffectData()
 		ed:SetOrigin(origin)
 		ed:SetScale(radius * 0.5)
 		util.Effect("cball_explode", ed, true, true)
 		util.Effect("HelicopterMegaBomb", ed, true, true)
-		
+
 		-- Multiple expanding shockwave rings
 		for i = 1, 3 do
 			local ed2 = EffectData()
@@ -180,5 +180,3 @@ if CLIENT then
 		end
 	end)
 end
-
-

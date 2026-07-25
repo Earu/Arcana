@@ -109,7 +109,7 @@ function ENT:OnRemove()
 		sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", self:GetPos(), 95, 110)
 
 		-- Screen shake
-		util.ScreenShake(self:GetPos(), 15, 150, 1.0, 2000)
+		Arcana.Common.ScreenShake(self:GetPos(), 15, 150, 1.0, 2000)
 
 		local grps = table.Copy(self.PreviousCollisionGroups)
 		timer.Simple(1, function() -- give time to entities to be pulled apart

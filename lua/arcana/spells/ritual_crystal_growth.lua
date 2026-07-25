@@ -58,7 +58,7 @@ Arcana:RegisterRitualSpell({
 		timer.Simple(0.5, function()
 			if not IsValid(crystal) then return end
 			crystal:DropToFloor()
-			util.ScreenShake(crystal:GetPos(), 5, 5, 1, 512)
+			Arcana.Common.ScreenShake(crystal:GetPos(), 5, 5, 1, 512)
 		end)
 	end,
 })

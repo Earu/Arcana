@@ -175,7 +175,7 @@ if SERVER then
 			ignoreAttacker = true,
 		})
 
-		util.ScreenShake(pos, 9, 80, 0.6, 1400)
+		Arcana.Common.ScreenShake(pos, 9, 80, 0.6, 1400)
 		sound.Play("ambient/energy/whiteflash.wav", pos, 90, 90)
 		sound.Play("ambient/explosions/explode_" .. math.random(1, 4) .. ".wav", pos, 95, 105)
 
@@ -225,7 +225,7 @@ if SERVER then
 
 		self:ArcaneExplosion(tr.HitPos, tr.HitNormal)
 
-		util.ScreenShake(muzzle, 5, 60, 0.5, 1600)
+		Arcana.Common.ScreenShake(muzzle, 5, 60, 0.5, 1600)
 		self:EmitSound("weapons/physcannon/energy_disintegrate4.wav", 85, 90)
 	end
 

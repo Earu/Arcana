@@ -89,7 +89,7 @@ Arcana:RegisterSpell({
 		local ed = EffectData()
 		ed:SetOrigin(pos)
 		util.Effect("GlassImpact", ed, true, true)
-		util.ScreenShake(pos, 4, 60, 0.25, 512)
+		Arcana.Common.ScreenShake(pos, 4, 60, 0.25, 512)
 
 		srcEnt:EmitSound("physics/glass/glass_impact_bullet1.wav", 75, 120)
 		srcEnt:EmitSound("ambient/levels/canals/windchime2.wav", 70, 140)

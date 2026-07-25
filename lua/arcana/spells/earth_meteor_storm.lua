@@ -35,7 +35,7 @@ Arcana:RegisterSpell({
 		local meteorCount = 35 -- Number of smaller meteors
 		local meteorInterval = 0.7 -- Time between meteor impacts
 		-- CLIMAX MOMENT: Cast complete, dramatic transition
-		util.ScreenShake(center, 20, 200, 1.5, baseRadius * 2.5)
+		Arcana.Common.ScreenShake(center, 20, 200, 1.5, baseRadius * 2.5)
 		-- Dramatic climax sounds
 		sound.Play("ambient/explosions/explode_9.wav", center, 135, 50)
 		sound.Play("weapons/physcannon/energy_sing_explosion2.wav", center, 130, 60)
@@ -57,7 +57,7 @@ Arcana:RegisterSpell({
 		timer.Simple(0.5, function()
 			if not IsValid(caster) then return end
 			-- PHASE 1: Initial darkening and rumble
-			util.ScreenShake(center, 12, 100, 2.0, baseRadius * 2)
+			Arcana.Common.ScreenShake(center, 12, 100, 2.0, baseRadius * 2)
 			sound.Play("ambient/atmosphere/thunder1.wav", center, 100, 60)
 			sound.Play("ambient/atmosphere/terrain_rumble1.wav", center, 95, 90)
 			-- Broadcast initial VFX
@@ -183,7 +183,7 @@ Arcana:RegisterSpell({
 					local shakeAmp = isFinal and 40 or 15
 					local shakeFreq = isFinal and 220 or 120
 					local shakeDur = isFinal and 3.5 or 0.8
-					util.ScreenShake(groundPos, shakeAmp, shakeFreq, shakeDur, radius * (isFinal and 3.5 or 2.5))
+					Arcana.Common.ScreenShake(groundPos, shakeAmp, shakeFreq, shakeDur, radius * (isFinal and 3.5 or 2.5))
 					-- Create crater decal
 					util.Decal("Scorch", groundPos + tr.HitNormal * 2, groundPos - tr.HitNormal * 8)
 
@@ -398,14 +398,14 @@ Arcana:RegisterSpell({
 				if not IsValid(caster) then return end
 				-- First warning - distant rumble
 				sound.Play("ambient/atmosphere/thunder1.wav", center, 110, 35)
-				util.ScreenShake(center, 5, 80, 1.5, baseRadius * 2)
+				Arcana.Common.ScreenShake(center, 5, 80, 1.5, baseRadius * 2)
 
 				-- Second warning after pause
 				timer.Simple(1.5, function()
 					if not IsValid(caster) then return end
 					sound.Play("ambient/wind/wind_rooftop1.wav", center, 105, 50)
 					sound.Play("ambient/atmosphere/terrain_rumble1.wav", center, 100, 70)
-					util.ScreenShake(center, 8, 100, 2.0, baseRadius * 2)
+					Arcana.Common.ScreenShake(center, 8, 100, 2.0, baseRadius * 2)
 				end)
 
 				-- Broadcast final impact warning (visual cue in sky)
@@ -1060,7 +1060,7 @@ if CLIENT then
 			-- Initial thump
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 88, 80)
 			sound.Play("ambient/energy/newspark0" .. math.random(4, 8) .. ".wav", caster:GetPos(), 85, 75)
-			util.ScreenShake(caster:GetPos(), 3, 80, 0.3, 300)
+			Arcana.Common.ScreenShake(caster:GetPos(), 3, 80, 0.3, 300)
 		end
 
 		-- PHASE 2: Stacked vertical circles appear progressively (0-4s)
@@ -1081,7 +1081,7 @@ if CLIENT then
 					local volume = 88 + (i * 2) -- Louder for higher circles
 					sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), volume - 10, pitch - 10)
 					sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", caster:GetPos(), volume - 5, pitch)
-					util.ScreenShake(caster:GetPos(), 3 + i, 90 + (i * 10), 0.4, 350 + (i * 50))
+					Arcana.Common.ScreenShake(caster:GetPos(), 3 + i, 90 + (i * 10), 0.4, 350 + (i * 50))
 				end
 			end)
 		end
@@ -1096,7 +1096,7 @@ if CLIENT then
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 95, 70)
 			sound.Play("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", caster:GetPos(), 93, 65)
 			sound.Play("ambient/energy/newspark0" .. math.random(4, 8) .. ".wav", caster:GetPos(), 90, 80)
-			util.ScreenShake(caster:GetPos(), 6, 120, 0.6, 500)
+			Arcana.Common.ScreenShake(caster:GetPos(), 6, 120, 0.6, 500)
 
 			for i = 1, numSatellites do
 				local baseAngle = (i / numSatellites) * math.pi * 2
@@ -1231,14 +1231,14 @@ if CLIENT then
 		timer.Simple(castTime * 0.5, function()
 			if not IsValid(caster) then return end
 			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", caster:GetPos(), 95, 50)
-			util.ScreenShake(caster:GetPos(), 5, 100, 1.0, 400)
+			Arcana.Common.ScreenShake(caster:GetPos(), 5, 100, 1.0, 400)
 		end)
 
 		timer.Simple(castTime * 0.75, function()
 			if not IsValid(caster) then return end
 			sound.Play("ambient/energy/whiteflash.wav", caster:GetPos(), 90, 90)
 			sound.Play("ambient/atmosphere/thunder1.wav", caster:GetPos(), 95, 45)
-			util.ScreenShake(caster:GetPos(), 8, 120, 1.5, 500)
+			Arcana.Common.ScreenShake(caster:GetPos(), 8, 120, 1.5, 500)
 		end)
 
 		-- Final buildup at 90% charge
@@ -1246,7 +1246,7 @@ if CLIENT then
 			if not IsValid(caster) then return end
 			sound.Play("ambient/atmosphere/thunder1.wav", caster:GetPos(), 100, 38)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", caster:GetPos(), 95, 70)
-			util.ScreenShake(caster:GetPos(), 10, 140, 2.0, 600)
+			Arcana.Common.ScreenShake(caster:GetPos(), 10, 140, 2.0, 600)
 		end)
 
 		-- Cleanup when cast completes or fails

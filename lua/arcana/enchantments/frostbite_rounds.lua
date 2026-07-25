@@ -41,7 +41,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	local ed = EffectData()
 	ed:SetOrigin(impact)
 	util.Effect("GlassImpact", ed, true, true)
-	util.ScreenShake(impact, 2, 40, 0.15, 256)
+	Arcana.Common.ScreenShake(impact, 2, 40, 0.15, 256)
 	sound.Play("physics/glass/glass_impact_bullet1.wav", impact, 70, 130)
 end
 
