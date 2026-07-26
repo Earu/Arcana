@@ -3,9 +3,12 @@ ENT.Type = "anim"
 ENT.Base = "base_anim"
 ENT.PrintName = "Brazier"
 ENT.Category = "Arcana"
-ENT.Spawnable = false
+ENT.Spawnable = true
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.Author = "Earu"
+
+-- Ground traces stop on world/props but pass through players and NPCs
+local GROUND_COLLISION_GROUP = COLLISION_GROUP_WEAPON
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "FloatHeight")
@@ -52,21 +55,6 @@ if SERVER then
 		end
 	end
 
-	function ENT:SpawnFunction(ply, tr, className)
-		if not tr or not tr.Hit then return end
-
-		local pos = tr.HitPos + tr.HitNormal * 100
-		local ent = ents.Create(classname or "arcana_brazier")
-		if not IsValid(ent) then return end
-
-		ent:SetPos(pos + Vector(0, 0, 100))
-		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
-		ent:Spawn()
-		ent:Activate()
-
-		return ent
-	end
-
 	local TRACE_OFFSET = Vector(0, 0, 1000)
 	local VECTOR_UP = Vector(0, 0, 1)
 
@@ -82,6 +70,7 @@ if SERVER then
 			endpos = currentPos - TRACE_OFFSET,
 			mask = MASK_SOLID,
 			filter = self,
+			collisiongroup = GROUND_COLLISION_GROUP,
 		})
 
 		-- Calculate target position from ground with gentle bobbing
@@ -198,6 +187,7 @@ if CLIENT then
 			endpos = center - Vector(0, 0, 2000),
 			mask = MASK_SOLID,
 			filter = self,
+			collisiongroup = GROUND_COLLISION_GROUP,
 		})
 
 		if not tr.Hit then return end
@@ -249,6 +239,7 @@ if CLIENT then
 				endpos = center - Vector(0, 0, 2000),
 				mask = MASK_SOLID,
 				filter = self,
+				collisiongroup = GROUND_COLLISION_GROUP,
 			})
 
 			if tr.Hit then
@@ -396,6 +387,7 @@ if CLIENT then
 			endpos = center - Vector(0, 0, 2000),
 			mask = MASK_SOLID,
 			filter = self,
+			collisiongroup = GROUND_COLLISION_GROUP,
 		})
 
 		if tr.Hit then
