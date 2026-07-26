@@ -1285,9 +1285,13 @@ if CLIENT then
 				local coins, shards, isFree = 0, 0, false
 				local nextPoll = 0
 
+				-- The price is read from the price functions, not from the gate: a disabled
+				-- button still has to quote what the spell costs, and CanForgetSpell refuses
+				-- (broke, casting, a third-party hook) before it can vouch for anything.
 				local function refreshPrice()
-					local ok, _, c, s, free = Arcana:CanForgetSpell(ply, item.id)
-					coins, shards, isFree = c or 0, s or 0, free or false
+					local ok = Arcana:CanForgetSpell(ply, item.id)
+					isFree = Arcana:IsForgetFree(ply, item.id)
+					coins, shards = Arcana:GetForgetCost(item.id)
 					btn:SetEnabled(ok == true)
 				end
 
