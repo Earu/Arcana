@@ -48,6 +48,7 @@ if SERVER then
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:Wake()
+			phys:EnableGravity(false)
 		end
 	end
 
