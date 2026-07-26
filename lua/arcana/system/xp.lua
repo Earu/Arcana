@@ -203,19 +203,23 @@ function Arcana:CanForgetSpell(ply, spellId)
 	-- it would return on the next level anyway. Crafted spells are the Emissary's.
 	if spell.is_divine_pact then return false, "This spell was granted, not learned" end
 	if spell.is_crafted then return false, "This spell cannot be forgotten here" end
-	if data.casting_until and data.casting_until > CurTime() then return false, "You are casting" end
 
+	-- The price is known from here on, so every remaining return carries it: a refusal
+	-- means "you cannot pay this", not "this costs nothing", and the altar prints what
+	-- it is handed.
 	local isFree = self:IsForgetFree(ply, spellId)
 	local coins, shards = self:GetForgetCost(spellId)
 
+	if data.casting_until and data.casting_until > CurTime() then return false, "You are casting", coins, shards, isFree end
+
 	-- Third-party economy overrides can return nil rather than 0, so coerce before comparing.
 	if not isFree then
-		if (self:GetCoins(ply) or 0) < coins then return false, "Not enough coins" end
-		if shards > 0 and (self:GetItemCount(ply, self.FORGET_ITEM) or 0) < shards then return false, "Not enough mana crystal shards" end
+		if (self:GetCoins(ply) or 0) < coins then return false, "Not enough coins", coins, shards, isFree end
+		if shards > 0 and (self:GetItemCount(ply, self.FORGET_ITEM) or 0) < shards then return false, "Not enough mana crystal shards", coins, shards, isFree end
 	end
 
 	local ok, reason = Arcana.RunHook("CanForgetSpell", ply, spellId)
-	if ok == false then return false, reason or "Cannot forget spell" end
+	if ok == false then return false, reason or "Cannot forget spell", coins, shards, isFree end
 
 	return true, nil, coins, shards, isFree
 end
