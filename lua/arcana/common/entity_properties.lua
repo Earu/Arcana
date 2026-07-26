@@ -228,3 +228,8 @@ function Arcana.Common.AddScalarProperty(name, cfg)
 		end,
 	})
 end
+
+-- Entity files declare their properties at file scope and the load order between
+-- arcana/common and lua/entities is not guaranteed -- a reload can run either side
+-- on its own. Entities that loaded first are listening for this.
+Arcana.RunHook("EntityPropertiesReady")

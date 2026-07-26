@@ -481,8 +481,10 @@ if CLIENT then
 	end
 end
 
--- Context-menu properties (see arcana/common/entity_properties.lua)
-if Arcana.Common.AddColorProperty then
+-- Context-menu properties (see arcana/common/entity_properties.lua). That file and
+-- this one can load in either order, so register now if it is already there and
+-- otherwise wait for it to announce itself.
+local function registerProperties()
 	Arcana.Common.AddColorProperty("arcana_brazier_flame_color", {
 		class = "arcana_brazier",
 		label = "Flame Color",
@@ -542,4 +544,10 @@ if Arcana.Common.AddColorProperty then
 		get = function(ent) return ent:GetLightScale() end,
 		set = function(ent, value) ent:SetLightScale(value) end,
 	})
+end
+
+if Arcana.Common.AddColorProperty then
+	registerProperties()
+else
+	hook.Add("Arcana_EntityPropertiesReady", "arcana_brazier_properties", registerProperties)
 end
