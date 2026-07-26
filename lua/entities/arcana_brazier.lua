@@ -16,26 +16,14 @@ ENT.MinFloatHeight = 0
 ENT.MaxFloatHeight = 600
 ENT.MaxLightScale = 3
 
-local function packColor(col)
-	local r = math.Clamp(math.Round(col.r), 0, 255)
-	local g = math.Clamp(math.Round(col.g), 0, 255)
-	local b = math.Clamp(math.Round(col.b), 0, 255)
-
-	return bit.bor(bit.lshift(r, 16), bit.lshift(g, 8), b)
-end
-
-local function unpackColor(packed)
-	return Color(bit.band(bit.rshift(packed, 16), 255), bit.band(bit.rshift(packed, 8), 255), bit.band(packed, 255))
-end
-
 -- The flame color travels as a packed 24bit int: networked vectors lose too much
 -- precision on 0-1 components to round-trip a color cleanly.
 function ENT:SetFlameColor(col)
-	self:SetFlameColorPacked(packColor(col))
+	self:SetFlameColorPacked(Arcana.Common.PackColor(col))
 end
 
 function ENT:GetFlameColor()
-	return unpackColor(self:GetFlameColorPacked())
+	return Arcana.Common.UnpackColor(self:GetFlameColorPacked())
 end
 
 function ENT:SetupDataTables()
@@ -493,278 +481,65 @@ if CLIENT then
 	end
 end
 
--- Context-menu properties. Registered shared: the client builds the menus,
--- the server validates and applies. Guarded because non-sandbox gamemodes
--- have no properties module.
-if properties and properties.Add then
-	local FLAME_PRESETS = {
-		{name = "Ember", color = Color(255, 160, 50)},
-		{name = "Crimson", color = Color(255, 70, 45)},
-		{name = "Gold", color = Color(255, 210, 95)},
-		{name = "Witchfire", color = Color(140, 255, 90)},
-		{name = "Emerald", color = Color(90, 255, 150)},
-		{name = "Azure", color = Color(80, 170, 255)},
-		{name = "Frost", color = Color(160, 230, 255)},
-		{name = "Violet", color = Color(180, 110, 255)},
-		{name = "Bone", color = Color(235, 230, 205)},
-	}
-
-	local HEIGHT_PRESETS = {
-		{name = "Resting", height = 20},
-		{name = "Low", height = 80},
-		{name = "Standard", height = 150},
-		{name = "High", height = 280},
-		{name = "Soaring", height = 450},
-	}
-
-	local LIGHT_PRESETS = {
-		{name = "Off", scale = 0},
-		{name = "Dim", scale = 0.4},
-		{name = "Normal", scale = 1},
-		{name = "Bright", scale = 1.8},
-		{name = "Blinding", scale = 3},
-	}
-
-	local sendThrottled, openFlameColorPicker
-
-	if CLIENT then
-		-- Sliders and the color mixer fire continuously while dragged: cap the rate
-		-- but never drop the value the player actually settled on.
-		local pending = {}
-
-		sendThrottled = function(key, value, sendFn)
-			local now = SysTime()
-			local entry = pending[key]
-
-			if not entry then
-				entry = {last = 0}
-				pending[key] = entry
-			end
-
-			entry.value = value
-			entry.send = sendFn
-
-			if now - entry.last >= 0.1 then
-				entry.last = now
-				sendFn(value)
-
-				return
-			end
-
-			if entry.scheduled then return end
-			entry.scheduled = true
-
-			timer.Simple(0.1 - (now - entry.last), function()
-				entry.scheduled = false
-				entry.last = SysTime()
-				entry.send(entry.value)
-			end)
-		end
-
-		openFlameColorPicker = function(prop, ent)
-			local frame = vgui.Create("DFrame")
-			frame:SetSize(280, 330)
-			frame:Center()
-			frame:SetTitle("")
-			frame:MakePopup()
-
-			frame.Paint = function(_, w, h)
-				ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoBg, 12)
-				ArtDeco.DrawDecoFrame(4, 4, w - 8, h - 8, ArtDeco.Colors.gold, 10)
-				ArtDeco.DrawTitle("Arcana_Ancient", "FLAME COLOR", 8, 36, ArtDeco.Colors.paleGold)
-			end
-
-			ArtDeco.StyleCloseButton(frame)
-
-			local mixer = vgui.Create("DColorMixer", frame)
-			mixer:Dock(FILL)
-			mixer:DockMargin(14, 40, 14, 14)
-			mixer:SetPalette(true)
-			mixer:SetAlphaBar(false)
-			mixer:SetWangs(true)
-			mixer:SetColor(ent:GetFlameColor())
-
-			mixer.ValueChanged = function(_, col)
-				if not IsValid(ent) then
-					frame:Remove()
-
-					return
-				end
-
-				sendThrottled("flame_" .. ent:EntIndex(), col, function(value) prop:Apply(ent, value) end)
-			end
-
-			return frame
-		end
-	end
-
-	local function makeFilter(name)
-		return function(_, ent, ply)
-			if not IsValid(ent) or ent:GetClass() ~= "arcana_brazier" then return false end
-			if not IsValid(ply) or not ply:IsPlayer() then return false end
-			if not gamemode.Call("CanProperty", ply, name, ent) then return false end
-			if ply:IsAdmin() then return true end
-
-			-- Defer to prop protection when installed; plain sandbox lets anyone tweak
-			local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
-			if IsValid(owner) then return owner == ply end
-
-			return true
-		end
-	end
-
-	-- Reads the entity a property message targets, or nil if the sender may not touch it
-	local function readTarget(prop, ply)
-		local ent = net.ReadEntity()
-		if not IsValid(ent) then return end
-		if not properties.CanBeTargeted(ent, ply) then return end
-		if not prop:Filter(ent, ply) then return end
-
-		return ent
-	end
-
-	properties.Add("arcana_brazier_flame_color", {
-		MenuLabel = "Flame Color",
-		Order = 900,
-		MenuIcon = "icon16/paintcan.png",
-		Filter = makeFilter("arcana_brazier_flame_color"),
-
-		Apply = function(self, ent, col)
-			self:MsgStart()
-			net.WriteEntity(ent)
-			net.WriteUInt(packColor(col), 24)
-			self:MsgEnd()
-		end,
-
-		MenuOpen = function(self, option, ent)
-			local submenu = option:AddSubMenu()
-			submenu:SetMinimumWidth(170)
-
-			for _, preset in ipairs(FLAME_PRESETS) do
-				local swatch = preset.color
-				local opt = submenu:AddOption(preset.name, function() self:Apply(ent, swatch) end)
-
-				opt.PaintOver = function(_, w, h)
-					local y = h * 0.5 - 6
-					surface.SetDrawColor(swatch)
-					surface.DrawRect(w - 26, y, 16, 12)
-					surface.SetDrawColor(0, 0, 0, 180)
-					surface.DrawOutlinedRect(w - 26, y, 16, 12)
-				end
-			end
-
-			submenu:AddSpacer()
-			submenu:AddOption("Custom...", function() openFlameColorPicker(self, ent) end):SetIcon("icon16/color_wheel.png")
-		end,
-
-		Action = function() end,
-
-		Receive = function(self, _, ply)
-			local ent = readTarget(self, ply)
-			local packed = net.ReadUInt(24)
-			if not IsValid(ent) then return end
-
-			ent:SetFlameColorPacked(packed)
-		end,
+-- Context-menu properties (see arcana/common/entity_properties.lua)
+if Arcana.Common.AddColorProperty then
+	Arcana.Common.AddColorProperty("arcana_brazier_flame_color", {
+		class = "arcana_brazier",
+		label = "Flame Color",
+		title = "Flame Color",
+		order = 900,
+		icon = "icon16/paintcan.png",
+		presets = {
+			{name = "Ember", color = Color(255, 160, 50)},
+			{name = "Crimson", color = Color(255, 70, 45)},
+			{name = "Gold", color = Color(255, 210, 95)},
+			{name = "Witchfire", color = Color(140, 255, 90)},
+			{name = "Emerald", color = Color(90, 255, 150)},
+			{name = "Azure", color = Color(80, 170, 255)},
+			{name = "Frost", color = Color(160, 230, 255)},
+			{name = "Violet", color = Color(180, 110, 255)},
+			{name = "Bone", color = Color(235, 230, 205)},
+		},
+		get = function(ent) return ent:GetFlameColor() end,
+		set = function(ent, col) ent:SetFlameColor(col) end,
 	})
 
-	properties.Add("arcana_brazier_float_height", {
-		MenuLabel = "Float Height",
-		Order = 901,
-		MenuIcon = "icon16/arrow_up.png",
-		Filter = makeFilter("arcana_brazier_float_height"),
-
-		Apply = function(self, ent, height)
-			self:MsgStart()
-			net.WriteEntity(ent)
-			net.WriteFloat(height)
-			self:MsgEnd()
-		end,
-
-		MenuOpen = function(self, option, ent)
-			local submenu = option:AddSubMenu()
-			submenu:SetMinimumWidth(250)
-
-			local slider = vgui.Create("DNumSlider", submenu)
-			slider:SetSize(240, 44)
-			slider:SetText("Units")
-			slider:SetMin(ent.MinFloatHeight)
-			slider:SetMax(ent.MaxFloatHeight)
-			slider:SetDecimals(0)
-			slider:SetValue(ent:GetFloatHeight())
-
-			slider.OnValueChanged = function(_, value)
-				if not IsValid(ent) then return end
-
-				sendThrottled("height_" .. ent:EntIndex(), value, function(v) self:Apply(ent, v) end)
-			end
-
-			submenu:AddPanel(slider)
-			submenu:AddSpacer()
-
-			for _, preset in ipairs(HEIGHT_PRESETS) do
-				submenu:AddOption(preset.name, function() self:Apply(ent, preset.height) end)
-			end
-		end,
-
-		Action = function() end,
-
-		Receive = function(self, _, ply)
-			local ent = readTarget(self, ply)
-			local height = net.ReadFloat()
-			if not IsValid(ent) then return end
-
-			ent:SetFloatHeight(math.Clamp(height, ent.MinFloatHeight, ent.MaxFloatHeight))
-		end,
+	Arcana.Common.AddScalarProperty("arcana_brazier_float_height", {
+		class = "arcana_brazier",
+		label = "Float Height",
+		sliderLabel = "Units",
+		order = 901,
+		icon = "icon16/arrow_up.png",
+		min = ENT.MinFloatHeight,
+		max = ENT.MaxFloatHeight,
+		decimals = 0,
+		presets = {
+			{name = "Resting", value = 20},
+			{name = "Low", value = 80},
+			{name = "Standard", value = 150},
+			{name = "High", value = 280},
+			{name = "Soaring", value = 450},
+		},
+		get = function(ent) return ent:GetFloatHeight() end,
+		set = function(ent, value) ent:SetFloatHeight(value) end,
 	})
 
-	properties.Add("arcana_brazier_light", {
-		MenuLabel = "Light Output",
-		Order = 902,
-		MenuIcon = "icon16/lightbulb.png",
-		Filter = makeFilter("arcana_brazier_light"),
-
-		Apply = function(self, ent, scale)
-			self:MsgStart()
-			net.WriteEntity(ent)
-			net.WriteFloat(scale)
-			self:MsgEnd()
-		end,
-
-		MenuOpen = function(self, option, ent)
-			local submenu = option:AddSubMenu()
-			submenu:SetMinimumWidth(250)
-
-			local slider = vgui.Create("DNumSlider", submenu)
-			slider:SetSize(240, 44)
-			slider:SetText("Intensity")
-			slider:SetMin(0)
-			slider:SetMax(ent.MaxLightScale)
-			slider:SetDecimals(1)
-			slider:SetValue(ent:GetLightScale())
-
-			slider.OnValueChanged = function(_, value)
-				if not IsValid(ent) then return end
-
-				sendThrottled("light_" .. ent:EntIndex(), value, function(v) self:Apply(ent, v) end)
-			end
-
-			submenu:AddPanel(slider)
-			submenu:AddSpacer()
-
-			for _, preset in ipairs(LIGHT_PRESETS) do
-				submenu:AddOption(preset.name, function() self:Apply(ent, preset.scale) end)
-			end
-		end,
-
-		Action = function() end,
-
-		Receive = function(self, _, ply)
-			local ent = readTarget(self, ply)
-			local scale = net.ReadFloat()
-			if not IsValid(ent) then return end
-
-			ent:SetLightScale(math.Clamp(scale, 0, ent.MaxLightScale))
-		end,
+	Arcana.Common.AddScalarProperty("arcana_brazier_light", {
+		class = "arcana_brazier",
+		label = "Light Output",
+		sliderLabel = "Intensity",
+		order = 902,
+		icon = "icon16/lightbulb.png",
+		min = 0,
+		max = ENT.MaxLightScale,
+		decimals = 1,
+		presets = {
+			{name = "Off", value = 0},
+			{name = "Dim", value = 0.4},
+			{name = "Normal", value = 1},
+			{name = "Bright", value = 1.8},
+		},
+		get = function(ent) return ent:GetLightScale() end,
+		set = function(ent, value) ent:SetLightScale(value) end,
 	})
 end

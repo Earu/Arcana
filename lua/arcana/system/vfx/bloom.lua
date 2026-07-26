@@ -109,9 +109,13 @@ local function initBloom()
 	end
 
 	-- Full pipeline: blur passes then additive composite with chromatic aberration.
-	function renderBloom()
+	-- caScale scales the red/blue split of both composite passes: 1 (default) keeps
+	-- the tuned amount, 0 composites clean for callers that do not want the fringe.
+	function renderBloom(caScale)
 		if not BLOOM_ENABLED:GetBool() then return end
 		if eyeOutOfWorld() then return end
+
+		caScale = caScale or 1
 
 		-- ── Tight bloom — 3 successive H+V passes at half-res ────────────────
 		blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
@@ -133,8 +137,8 @@ local function initBloom()
 		-- but shrinks the contribution where the framebuffer is already bright,
 		-- preventing the circles' own colors from being washed out / over-exposed.
 		render.OverrideBlend(true, BLEND_ONE_MINUS_DST_COLOR, BLEND_ONE, BLENDFUNC_ADD, BLEND_ZERO, BLEND_ONE, BLENDFUNC_ADD)
-		additiveComposite(BLOOM_RT_B, 0.025) -- tight bloom with CA
-		additiveComposite(GLOW_RT_B, 0.012) -- wide glow fog with subtle CA
+		additiveComposite(BLOOM_RT_B, 0.025 * caScale) -- tight bloom with CA
+		additiveComposite(GLOW_RT_B, 0.012 * caScale) -- wide glow fog with subtle CA
 		render.OverrideBlend(false)
 	end
 
