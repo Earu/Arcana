@@ -9,6 +9,9 @@ ENT.RenderGroup = RENDERGROUP_BOTH
 local VECTOR_ABOVE_ORB = Vector(0, 0, 0)
 local VECTOR_DOWN = Vector(0, 0, 256)
 
+-- Ground traces stop on world/props but pass through players and NPCs
+local GROUND_COLLISION_GROUP = COLLISION_GROUP_WEAPON
+
 -- Server-only runtime
 if SERVER then
 	util.AddNetworkString("Arcana_Ritual_Update")
@@ -290,6 +293,7 @@ if SERVER then
 			endpos = start - VECTOR_DOWN,
 			mask = MASK_SOLID,
 			filter = self,
+			collisiongroup = GROUND_COLLISION_GROUP,
 		})
 
 		local floatPos = tr.HitPos + Vector(0, 0, 50 + 5 * math.sin(CurTime()))
@@ -523,6 +527,7 @@ if CLIENT then
 					endpos = self:GetPos() - VECTOR_DOWN,
 					mask = MASK_SOLID,
 					filter = self,
+					collisiongroup = GROUND_COLLISION_GROUP,
 				})
 
 				self._circle.position = tr.HitPos + VECTOR_SLIGHTLY_ABOVE
