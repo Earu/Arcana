@@ -16,6 +16,20 @@ ENT.MinFloatHeight = 0
 ENT.MaxFloatHeight = 600
 ENT.MaxLightScale = 3
 
+-- Offered in the context menu, and one is picked at random when a player spawns
+-- one so a row of braziers is not a row of identical fires.
+ENT.ColorPresets = {
+	{name = "Ember", color = Color(255, 160, 50)},
+	{name = "Crimson", color = Color(255, 70, 45)},
+	{name = "Gold", color = Color(255, 210, 95)},
+	{name = "Witchfire", color = Color(140, 255, 90)},
+	{name = "Emerald", color = Color(90, 255, 150)},
+	{name = "Azure", color = Color(80, 170, 255)},
+	{name = "Frost", color = Color(160, 230, 255)},
+	{name = "Violet", color = Color(180, 110, 255)},
+	{name = "Bone", color = Color(235, 230, 205)},
+}
+
 -- The flame color travels as a packed 24bit int: networked vectors lose too much
 -- precision on 0-1 components to round-trip a color cleanly.
 function ENT:SetFlameColor(col)
@@ -128,6 +142,11 @@ if SERVER then
 		ent:SetAngles(Angle(180, ply:EyeAngles().y, 0))
 		ent:Spawn()
 		ent:Activate()
+
+		-- Player-spawned braziers come in a random preset color; ones created in
+		-- code keep the default
+		local preset = ent.ColorPresets[math.random(#ent.ColorPresets)]
+		ent:SetFlameColor(preset.color)
 
 		return ent
 	end
@@ -486,6 +505,14 @@ end
 -- Context-menu properties (see arcana/common/entity_properties.lua). That file and
 -- this one can load in either order, so register now if it is already there and
 -- otherwise wait for it to announce itself.
+-- Read off ENT here rather than inside the function: registration can be deferred
+-- to the hook, by which point the ENT global belongs to whatever entity file the
+-- loader reached next.
+local COLOR_PRESETS = ENT.ColorPresets
+local MIN_FLOAT_HEIGHT = ENT.MinFloatHeight
+local MAX_FLOAT_HEIGHT = ENT.MaxFloatHeight
+local MAX_LIGHT_SCALE = ENT.MaxLightScale
+
 local function registerProperties()
 	Arcana.Common.AddColorProperty("arcana_brazier_flame_color", {
 		class = "arcana_brazier",
@@ -493,17 +520,7 @@ local function registerProperties()
 		title = "Flame Color",
 		order = 900,
 		icon = "icon16/paintcan.png",
-		presets = {
-			{name = "Ember", color = Color(255, 160, 50)},
-			{name = "Crimson", color = Color(255, 70, 45)},
-			{name = "Gold", color = Color(255, 210, 95)},
-			{name = "Witchfire", color = Color(140, 255, 90)},
-			{name = "Emerald", color = Color(90, 255, 150)},
-			{name = "Azure", color = Color(80, 170, 255)},
-			{name = "Frost", color = Color(160, 230, 255)},
-			{name = "Violet", color = Color(180, 110, 255)},
-			{name = "Bone", color = Color(235, 230, 205)},
-		},
+		presets = COLOR_PRESETS,
 		get = function(ent) return ent:GetFlameColor() end,
 		set = function(ent, col) ent:SetFlameColor(col) end,
 	})
@@ -514,8 +531,8 @@ local function registerProperties()
 		sliderLabel = "Units",
 		order = 901,
 		icon = "icon16/arrow_up.png",
-		min = ENT.MinFloatHeight,
-		max = ENT.MaxFloatHeight,
+		min = MIN_FLOAT_HEIGHT,
+		max = MAX_FLOAT_HEIGHT,
 		decimals = 0,
 		presets = {
 			{name = "Resting", value = 20},
@@ -535,7 +552,7 @@ local function registerProperties()
 		order = 902,
 		icon = "icon16/lightbulb.png",
 		min = 0,
-		max = ENT.MaxLightScale,
+		max = MAX_LIGHT_SCALE,
 		decimals = 1,
 		presets = {
 			{name = "Off", value = 0},

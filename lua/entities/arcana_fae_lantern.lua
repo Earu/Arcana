@@ -20,6 +20,20 @@ ENT.GlassSubMaterial = "models/cs_italy/light_orange"
 ENT.DefaultLightColor = Color(255, 190, 110)
 ENT.MaxBrightness = 3
 
+-- Offered in the context menu, and one is picked at random when a player spawns
+-- one so a row of lanterns is not a row of identical candles.
+ENT.ColorPresets = {
+	{name = "Candle", color = Color(255, 190, 110)},
+	{name = "Ember", color = Color(255, 150, 60)},
+	{name = "Crimson", color = Color(255, 70, 45)},
+	{name = "Gold", color = Color(255, 215, 105)},
+	{name = "Witchfire", color = Color(140, 255, 90)},
+	{name = "Emerald", color = Color(90, 255, 150)},
+	{name = "Azure", color = Color(80, 170, 255)},
+	{name = "Frost", color = Color(160, 230, 255)},
+	{name = "Violet", color = Color(180, 110, 255)},
+}
+
 -- Collision speed that cracks the glass and lets the fairy out. Roughly: a
 -- gravgun punt, a jeep running it over or a hard throw at a wall clear this; being
 -- carried, set down or nudged does not.
@@ -155,6 +169,11 @@ if SERVER then
 		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
 		ent:Spawn()
 		ent:Activate()
+
+		-- Player-spawned lanterns come in a random preset color; ones created in
+		-- code keep the default
+		local preset = ent.ColorPresets[math.random(#ent.ColorPresets)]
+		ent:SetLightColor(preset.color)
 
 		return ent
 	end
@@ -511,6 +530,12 @@ end
 -- Context-menu properties (see arcana/common/entity_properties.lua). That file and
 -- this one can load in either order, so register now if it is already there and
 -- otherwise wait for it to announce itself.
+-- Read off ENT here rather than inside the function: registration can be deferred
+-- to the hook, by which point the ENT global belongs to whatever entity file the
+-- loader reached next.
+local COLOR_PRESETS = ENT.ColorPresets
+local MAX_BRIGHTNESS = ENT.MaxBrightness
+
 local function registerProperties()
 	Arcana.Common.AddColorProperty("arcana_fae_lantern_color", {
 		class = "arcana_fae_lantern",
@@ -518,17 +543,7 @@ local function registerProperties()
 		title = "Lantern Color",
 		order = 900,
 		icon = "icon16/paintcan.png",
-		presets = {
-			{name = "Candle", color = Color(255, 190, 110)},
-			{name = "Ember", color = Color(255, 150, 60)},
-			{name = "Crimson", color = Color(255, 70, 45)},
-			{name = "Gold", color = Color(255, 215, 105)},
-			{name = "Witchfire", color = Color(140, 255, 90)},
-			{name = "Emerald", color = Color(90, 255, 150)},
-			{name = "Azure", color = Color(80, 170, 255)},
-			{name = "Frost", color = Color(160, 230, 255)},
-			{name = "Violet", color = Color(180, 110, 255)},
-		},
+		presets = COLOR_PRESETS,
 		get = function(ent) return ent:GetLightColor() end,
 		set = function(ent, col) ent:SetLightColor(col) end,
 	})
@@ -540,7 +555,7 @@ local function registerProperties()
 		order = 901,
 		icon = "icon16/lightbulb.png",
 		min = 0,
-		max = ENT.MaxBrightness,
+		max = MAX_BRIGHTNESS,
 		decimals = 1,
 		presets = {
 			{name = "Out", value = 0},
