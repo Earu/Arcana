@@ -195,7 +195,19 @@ if CLIENT then
 		self:DrawTranslucent()
 	end
 
+	-- Fairies normally pick their hue from their entity index, but one released
+	-- from a fae lantern inherits the lantern's color. Polled rather than read once
+	-- in Initialize because the networked value arrives after the entity does.
+	function ENT:CalcNetworkedColor()
+		local packed = self:GetNWInt("Arcana_FairyColor", -1)
+		if packed < 0 or packed == self._colorPacked then return end
+
+		self._colorPacked = packed
+		self:SetFairyColor(Arcana.Common.UnpackColor(packed))
+	end
+
 	function ENT:Think()
+		self:CalcNetworkedColor()
 		self:CalcSounds()
 		self:CalcLight()
 		self:CalcPulse()

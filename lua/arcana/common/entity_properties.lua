@@ -173,6 +173,40 @@ function Arcana.Common.AddColorProperty(name, cfg)
 	})
 end
 
+--- Context-menu action property: one menu entry that runs something on the server.
+-- cfg: class, label, order, icon, run(ent, ply), and optionally
+--      available(ent, ply) to hide the entry when the action does not apply.
+function Arcana.Common.AddActionProperty(name, cfg)
+	local ownershipFilter = makeFilter(name, cfg)
+
+	properties.Add(name, {
+		MenuLabel = cfg.label,
+		Order = cfg.order or 900,
+		MenuIcon = cfg.icon or "icon16/wrench.png",
+		InternalName = name,
+
+		Filter = function(self, ent, ply)
+			if not ownershipFilter(self, ent, ply) then return false end
+			if cfg.available and not cfg.available(ent, ply) then return false end
+
+			return true
+		end,
+
+		Action = function(self, ent)
+			self:MsgStart()
+			net.WriteEntity(ent)
+			self:MsgEnd()
+		end,
+
+		Receive = function(self, _, ply)
+			local ent = readTarget(self, ply)
+			if not IsValid(ent) then return end
+
+			cfg.run(ent, ply)
+		end,
+	})
+end
+
 --- Context-menu numeric property: a live slider plus named presets.
 -- cfg: class, label, order, icon, sliderLabel, min, max, decimals,
 --      presets = {{name, value}}, get(ent), set(ent, number)
