@@ -84,10 +84,20 @@ if SERVER then
 	-- Hard knocks crack the glass. Gentle handling does not: PhysicsCollide reports
 	-- the speed of the impact, so setting it down or bumping it stays well under.
 	function ENT:PhysicsCollide(data)
-		if self:GetBroken() then return end
+		if self._breaking or self:GetBroken() then return end
 		if data.Speed < self.BreakSpeed then return end
 
-		self:Break()
+		-- Deferred a tick: this runs inside a physics callback, and spawning the
+		-- fairy there is not allowed (its Initialize calls StartMotionController,
+		-- which the engine refuses mid-simulation). The flag is separate from the
+		-- networked Broken so Break itself can still run.
+		self._breaking = true
+
+		timer.Simple(0, function()
+			if not IsValid(self) then return end
+
+			self:Break()
+		end)
 	end
 
 	function ENT:Break()
