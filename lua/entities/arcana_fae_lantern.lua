@@ -20,6 +20,11 @@ ENT.GlassSubMaterial = "models/cs_italy/light_orange"
 ENT.DefaultLightColor = Color(255, 190, 110)
 ENT.MaxBrightness = 3
 
+-- Collision speed that cracks the glass and lets the fairy out. Roughly: a
+-- gravgun punt, a jeep running it over or a hard throw at a wall clear this; being
+-- carried, set down or nudged does not.
+ENT.BreakSpeed = 250
+
 function ENT:SetLightColor(col)
 	self:SetLightColorPacked(Arcana.Common.PackColor(col))
 end
@@ -31,10 +36,20 @@ end
 function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "Brightness")
 	self:NetworkVar("Int", 0, "LightColorPacked")
+	self:NetworkVar("Bool", 0, "Broken")
 
 	if SERVER then
 		self:SetBrightness(1)
 		self:SetLightColor(self.DefaultLightColor)
+		self:SetBroken(false)
+	end
+
+	if CLIENT then
+		self:NetworkVarNotify("Broken", function(ent, _, _, new)
+			if not new then return end
+
+			ent:Shatter()
+		end)
 	end
 end
 
@@ -52,6 +67,82 @@ if SERVER then
 		end
 	end
 
+	-- Hard knocks crack the glass. Gentle handling does not: PhysicsCollide reports
+	-- the speed of the impact, so setting it down or bumping it stays well under.
+	function ENT:PhysicsCollide(data)
+		if self:GetBroken() then return end
+		if data.Speed < self.BreakSpeed then return end
+
+		self:Break()
+	end
+
+	function ENT:Break()
+		if self:GetBroken() then return end
+		self:SetBroken(true)
+
+		local pos = self:LocalToWorld(self:OBBCenter())
+		self:EmitSound("physics/glass/glass_sheet_break" .. math.random(1, 3) .. ".wav", 80, math.random(95, 108))
+
+		local ed = EffectData()
+		ed:SetOrigin(pos)
+		ed:SetMagnitude(2)
+		ed:SetScale(1)
+		util.Effect("GlassImpact", ed)
+
+		-- Out comes the occupant, wearing the lantern's color
+		local fairy = ents.Create("arcana_fairy")
+		if IsValid(fairy) then
+			fairy:SetPos(pos)
+			fairy:Spawn()
+			fairy:SetNWInt("Arcana_FairyColor", self:GetLightColorPacked())
+
+			-- Inherit the lantern's owner: prop protection covers the fairy, it
+			-- counts against that player's entity limit and the cleanup menu can
+			-- reach it, instead of it being an orphan nobody owns.
+			local owner = self.CPPIGetOwner and self:CPPIGetOwner()
+			if not IsValid(owner) then
+				owner = self:GetCreator()
+			end
+
+			if IsValid(owner) and owner:IsPlayer() then
+				fairy:SetCreator(owner)
+
+				if fairy.CPPISetOwner then
+					fairy:CPPISetOwner(owner)
+				end
+
+				owner:AddCount("sents", fairy)
+				-- Prop protection that tracks by hook rather than CPPI only learns
+				-- about the fairy through this
+				gamemode.Call("PlayerSpawnedSENT", owner, fairy)
+			end
+
+			-- The fairy stands in for the lantern in the undo and cleanup lists, so
+			-- undoing the lantern removes what it turned into rather than leaving a
+			-- dead entry behind. A lantern that was never in those lists (spawned by
+			-- code rather than from the menu) has nothing to replace, so the fairy
+			-- is registered from scratch instead.
+			undo.ReplaceEntity(self, fairy)
+
+			if not cleanup.ReplaceEntity(self, fairy) and IsValid(owner) and owner:IsPlayer() then
+				owner:AddCleanup("sents", fairy)
+			end
+
+			local fairyPhys = fairy:GetPhysicsObject()
+			if IsValid(fairyPhys) then
+				fairyPhys:SetVelocity(VectorRand() * 60 + Vector(0, 0, 90))
+			end
+		end
+
+		-- Held briefly so the Broken notify reaches clients and they can play the
+		-- shatter while the lantern is still there to play it from
+		timer.Simple(0.1, function()
+			if IsValid(self) then
+				self:Remove()
+			end
+		end)
+	end
+
 	function ENT:SpawnFunction(ply, tr, classname)
 		if not tr or not tr.Hit then return end
 
@@ -59,6 +150,7 @@ if SERVER then
 		if not IsValid(ent) then return end
 
 		-- Lift it clear of the surface so the physics box does not spawn stuck
+		ent:SetCreator(ply)
 		ent:SetPos(tr.HitPos + tr.HitNormal * 14)
 		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
 		ent:Spawn()
@@ -308,6 +400,38 @@ if CLIENT then
 		return true
 	end
 
+	-- Fired by the Broken notify, just before the server removes the lantern. The
+	-- emitter outlives Finish() until its last particle dies, so the burst still
+	-- plays out after the entity is gone.
+	function ENT:Shatter()
+		if not self._emitter then return end
+
+		local pal = self:GetPalette()
+		local pos = self:LocalToWorld(self:OBBCenter())
+
+		for _ = 1, 24 do
+			local dir = VectorRand()
+			dir:Normalize()
+
+			local p = self._emitter:Add("sprites/light_glow02_add", pos + dir * math.Rand(2, 6))
+			if p then
+				p:SetStartAlpha(230)
+				p:SetEndAlpha(0)
+				p:SetStartSize(math.Rand(2, 5))
+				p:SetEndSize(0)
+				p:SetDieTime(math.Rand(0.5, 1.1))
+				p:SetVelocity(dir * math.Rand(60, 160))
+				p:SetAirResistance(60)
+				p:SetGravity(Vector(0, 0, -120))
+				p:SetRoll(math.Rand(-180, 180))
+				p:SetRollDelta(math.Rand(-3, 3))
+
+				local col = math.random(1, 3) == 1 and pal.core or pal.base
+				p:SetColor(col.r, col.g, col.b)
+			end
+		end
+	end
+
 	function ENT:SpawnMote(pal, brightness)
 		if not self._emitter then return end
 
@@ -426,6 +550,15 @@ local function registerProperties()
 		},
 		get = function(ent) return ent:GetBrightness() end,
 		set = function(ent, value) ent:SetBrightness(value) end,
+	})
+
+	Arcana.Common.AddActionProperty("arcana_fae_lantern_break", {
+		class = "arcana_fae_lantern",
+		label = "Break",
+		order = 902,
+		icon = "icon16/bomb.png",
+		available = function(ent) return not ent:GetBroken() end,
+		run = function(ent) ent:Break() end,
 	})
 end
 
