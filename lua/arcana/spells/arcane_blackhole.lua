@@ -283,6 +283,13 @@ if CLIENT then
 	local darkStarData = {}
 	local blackholeLightningArcs = {}
 
+	-- Shatters every charging circle for this caster (interrupt, disconnect or climax)
+	local function teardownCastCircles(caster, duration)
+		local data = blackholeCastingData[caster]
+		if not data then return end
+		Arcana:BreakdownCastCircles(duration, data.circles, data.satellites)
+	end
+
 	-- Function to spawn lightning arc from dark star to ground
 	local function spawnDarkStarLightning(caster)
 		if not IsValid(caster) or not darkStarData[caster] then return end
@@ -1114,63 +1121,9 @@ if CLIENT then
 			end)
 		end
 
-
-		-- Pulse and destroy all circles
+		-- Blow the charging circles apart as the void collapses
 		if IsValid(caster) and blackholeCastingData[caster] then
-			local data = blackholeCastingData[caster]
-
-			-- Pulse all vertical circles inward and fade
-			for _, circle in ipairs(data.circles) do
-				if circle and circle.IsActive and circle:IsActive() then
-					timer.Create("Arcana_Blackhole_CirclePulse_" .. tostring(circle), 0, 0, function()
-						if not circle or not circle.IsActive or not circle:IsActive() then
-							timer.Remove("Arcana_Blackhole_CirclePulse_" .. tostring(circle))
-							return
-						end
-
-						local elapsed = CurTime() - (circle.climaxStart or CurTime())
-						if not circle.climaxStart then
-							circle.climaxStart = CurTime()
-							circle.originalRadius = circle.radius or 80
-						end
-
-						if elapsed < 0.8 then
-							local progress = elapsed / 0.8
-							circle.radius = circle.originalRadius * (1 - progress * 0.6)
-							circle.alpha = 255 * (1 - progress)
-						else
-							timer.Remove("Arcana_Blackhole_CirclePulse_" .. tostring(circle))
-						end
-					end)
-				end
-			end
-
-			-- Pulse satellites
-			for _, satData in ipairs(data.satellites) do
-				if satData.circle and satData.circle.IsActive and satData.circle:IsActive() then
-					local circle = satData.circle
-					timer.Create("Arcana_Blackhole_CirclePulse_" .. tostring(circle), 0, 0, function()
-						if not circle or not circle.IsActive or not circle:IsActive() then
-							timer.Remove("Arcana_Blackhole_CirclePulse_" .. tostring(circle))
-							return
-						end
-
-						local elapsed = CurTime() - (circle.climaxStart or CurTime())
-						if not circle.climaxStart then
-							circle.climaxStart = CurTime()
-							circle.originalRadius = circle.radius or 50
-						end
-
-						if elapsed < 0.8 then
-							local progress = elapsed / 0.8
-							circle.radius = circle.originalRadius * (1 - progress * 0.6)
-							circle.alpha = 255 * (1 - progress)
-						else
-							timer.Remove("Arcana_Blackhole_CirclePulse_" .. tostring(circle))
-						end
-					end)
-				end
-			end
+			teardownCastCircles(caster, 0.8)
 
 			-- Cleanup
 			timer.Simple(1.0, function()
@@ -1408,6 +1361,13 @@ if CLIENT then
 
 		hook.Add("Think", updateHook, function()
 			if not IsValid(caster) or not blackholeCastingData[caster] then
+				if not IsValid(caster) then
+					-- Caster gone (disconnect): the Arcana_SpellFailed receiver bails on an
+					-- invalid entity, so this is the only place left to shatter the circles
+					teardownCastCircles(caster, 0.1)
+					blackholeCastingData[caster] = nil
+				end
+
 				hook.Remove("Think", updateHook)
 				return
 			end
@@ -1598,6 +1558,8 @@ if CLIENT then
 	hook.Add("Arcana_CastSpellFailure", "Arcana_Blackhole_CastCleanup", function(caster, spellId)
 		if spellId ~= "blackhole" then return end
 		if not blackholeCastingData[caster] then return end
+
+		teardownCastCircles(caster, 0.1)
 
 		-- Stop any lingering sounds
 		if IsValid(caster) then

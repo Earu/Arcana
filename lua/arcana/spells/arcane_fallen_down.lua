@@ -552,8 +552,27 @@ if CLIENT then
 
 	-- Override the default casting visuals for Fallen Down
 	-- Client-side cleanup function for interruption
-	local function cleanupClientVisuals(caster)
-		if not IsValid(caster) then return end
+	-- shatter: break the circles apart (cast cut short) instead of fading them out (cast completed)
+	local function teardownCircles(caster, shatter)
+		local data = fallenDownCircleData[caster]
+		if not data then return end
+
+		-- Every list holds { circle = ... } or { bc = ... } entries, which the helper unwraps
+		local teardown = shatter and Arcana.BreakdownCastCircles or Arcana.FadeCastCircles
+		teardown(Arcana, shatter and 0.1 or 0.3, data.circles, data.satelliteCircles, data.midSatelliteCircles, data.bandCircles, data.bandOrbs)
+
+		fallenDownCircleData[caster] = nil
+	end
+
+	local function cleanupClientVisuals(caster, shatter)
+		if not IsValid(caster) then
+			-- Caster gone (disconnect): the hook names below are derived from the caster,
+			-- so all that is left to do is tear the circles down
+			teardownCircles(caster, shatter)
+
+			return
+		end
+
 		-- Remove all hooks for this caster
 		local chargeSoundHook = "Arcana_FallenDown_ChargeSounds_" .. tostring(caster)
 		local particleHook = "Arcana_FallenDown_ChargeParticles_" .. tostring(caster)
@@ -572,60 +591,7 @@ if CLIENT then
 		table.Empty(fallenDownLightningArcs)
 
 		-- Remove all magic circles
-		if fallenDownCircleData[caster] then
-			local data = fallenDownCircleData[caster]
-
-			-- Remove main vertical stacked circles
-			if data.circles then
-				for _, circleData in ipairs(data.circles) do
-					if circleData.circle and circleData.circle.Remove then
-						circleData.circle:Remove()
-					end
-				end
-			end
-
-			-- Remove satellite circles
-			if data.satelliteCircles then
-				for _, circle in ipairs(data.satelliteCircles) do
-					if circle and circle.Remove then
-						circle:Remove()
-					end
-				end
-			end
-
-			-- Remove mid satellite circles
-			if data.midSatelliteCircles then
-				for _, circle in ipairs(data.midSatelliteCircles) do
-					if circle and circle.Remove then
-						circle:Remove()
-					end
-				end
-			end
-
-			-- Remove band circles
-			if data.bandCircles then
-				for _, bc in ipairs(data.bandCircles) do
-					if bc and bc.Remove then
-						bc:Remove()
-					end
-				end
-			end
-
-			-- Remove band orbs (which may have circles attached)
-			if data.bandOrbs then
-				for _, orb in ipairs(data.bandOrbs) do
-					if orb.circles then
-						for _, circle in ipairs(orb.circles) do
-							if circle and circle.Remove then
-								circle:Remove()
-							end
-						end
-					end
-				end
-			end
-
-			fallenDownCircleData[caster] = nil
-		end
+		teardownCircles(caster, shatter)
 
 		-- Reset HUD state if this is the local player
 		if caster == LocalPlayer() then
@@ -1011,6 +977,9 @@ if CLIENT then
 
 		hook.Add("Think", hookName, function()
 			if not IsValid(caster) then
+				-- Caster gone (disconnect): the Arcana_SpellFailed receiver bails on an
+				-- invalid entity, so this is the only place left to shatter the circles
+				teardownCircles(caster, true)
 				hook.Remove("Think", hookName)
 
 				return
@@ -2846,7 +2815,7 @@ if CLIENT then
 	hook.Add("Arcana_CastSpellFailure", "Arcana_FallenDown_CleanupHUD", function(caster, spellId)
 		if spellId ~= "fallen_down" then return end
 		-- Clean up all client visuals, sounds, and HUD
-		cleanupClientVisuals(caster)
+		cleanupClientVisuals(caster, true)
 
 		-- Stop sustained beam sounds if interrupted (beam was already started)
 		if IsValid(caster) then

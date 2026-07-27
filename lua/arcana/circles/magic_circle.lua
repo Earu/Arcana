@@ -203,16 +203,24 @@ function MagicCircle:Update(deltaTime)
 
 			ring.height = ring.height + (target - ring.height) * math.min(1, deltaTime * 6)
 		end
+	end
 
-		-- Handle fade-out completion
-		if self.isFading then
-			local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
+	-- Handle fade-out completion (kept out of the evolving branch: a circle that never
+	-- evolved, or whose isEvolving was cleared by StartBreakdown, must still deactivate)
+	if self.isFading then
+		local t = (CurTime() - self.fadeStart) / math_max(0.01, self.fadeDuration)
 
-			if t >= 1 then
-				self:FinalizeDeactivate()
-				self.isActive = false
-			end
+		if t >= 1 then
+			self:FinalizeDeactivate()
+			self.isActive = false
 		end
+	end
+
+	-- Breakdown completion: rings are culled as they fly past breakRemoveDistance, but a
+	-- ring that can't break (band rings) would keep the circle alive forever — hence the deadline
+	if self.isBreaking and (#self.rings <= 0 or CurTime() > (self.breakEnd or 0)) then
+		self:FinalizeDeactivate()
+		self.isActive = false
 	end
 end
 
@@ -271,6 +279,9 @@ function MagicCircle:StartBreakdown(duration)
 	self.isAnimated = false
 	self.isEvolving = false
 	local d = math_max(0.1, tonumber(duration) or 0.6)
+	-- Rings are removed by distance, not by time: give the breakdown a hard deadline so the
+	-- circle always leaves the manager even if a ring never reaches breakRemoveDistance
+	self.breakEnd = CurTime() + d + 2
 	local num = #self.rings
 	local idx = 0
 
@@ -294,17 +305,6 @@ function MagicCircle:StartBreakdown(duration)
 			-- sound cue will play when ejection actually starts in Update
 		end
 	end
-
-	-- Optional: schedule final cleanup if all rings gone
-	timer.Simple(d + 0.2, function()
-		if not self.isActive then return end
-
-		if #self.rings <= 0 then
-			-- No fade here; breakdown fully removes rings already
-			self.isActive = false
-			self:FinalizeDeactivate()
-		end
-	end)
 end
 
 -- Start evolving the circle over the given duration.

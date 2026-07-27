@@ -302,6 +302,53 @@ if CLIENT then
 		end
 	end)
 
+	-- Spells store their casting circles in different shapes, so each list entry may be a
+	-- circle itself or a holder table ({ circle = ... } / { bc = ... })
+	local function forEachCastCircle(fn, ...)
+		for i = 1, select("#", ...) do
+			local list = select(i, ...)
+
+			if istable(list) then
+				for _, entry in ipairs(list) do
+					local circle = entry
+
+					if istable(entry) and not entry.StartFadeOut then
+						circle = entry.circle or entry.bc
+					end
+
+					if circle then
+						fn(circle)
+					end
+				end
+			end
+		end
+	end
+
+	-- Tear down casting circles by shattering them: MagicCircles fling their rings outward,
+	-- BandCircles fade (they have no rings to eject). Use when a cast is cut short.
+	function Arcana:BreakdownCastCircles(duration, ...)
+		local d = math.max(0.1, tonumber(duration) or 0.1)
+
+		forEachCastCircle(function(circle)
+			if circle.StartBreakdown then
+				circle:StartBreakdown(d)
+			elseif circle.StartFadeOut then
+				circle:StartFadeOut(d)
+			end
+		end, ...)
+	end
+
+	-- Tear down casting circles by fading them out. Use when a cast completed normally.
+	function Arcana:FadeCastCircles(duration, ...)
+		local d = math.max(0.05, tonumber(duration) or 0.3)
+
+		forEachCastCircle(function(circle)
+			if circle.StartFadeOut then
+				circle:StartFadeOut(d)
+			end
+		end, ...)
+	end
+
 	-- Create a ground-following magic circle during spell casting.
 	-- Used by spells that want custom casting circle visuals tracking the caster's aim.
 	-- options.positionResolver: function(caster) -> Vector|nil — defaults to Arcana:ResolveGroundTarget
