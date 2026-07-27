@@ -283,11 +283,13 @@ if CLIENT then
 	local darkStarData = {}
 	local blackholeLightningArcs = {}
 
-	-- Shatters every charging circle for this caster (interrupt, disconnect or climax)
-	local function teardownCastCircles(caster, duration)
+	-- Tears down every charging circle for this caster. shatter: the cast was cut short
+	-- (interrupt/disconnect); otherwise the circles fade, as they do when the void collapses.
+	local function teardownCastCircles(caster, duration, shatter)
 		local data = blackholeCastingData[caster]
 		if not data then return end
-		Arcana:BreakdownCastCircles(duration, data.circles, data.satellites)
+		local teardown = shatter and Arcana.BreakdownCastCircles or Arcana.FadeCastCircles
+		teardown(Arcana, duration, data.circles, data.satellites)
 	end
 
 	-- Function to spawn lightning arc from dark star to ground
@@ -1121,7 +1123,7 @@ if CLIENT then
 			end)
 		end
 
-		-- Blow the charging circles apart as the void collapses
+		-- Fade the charging circles out as the void collapses
 		if IsValid(caster) and blackholeCastingData[caster] then
 			teardownCastCircles(caster, 0.8)
 
@@ -1364,7 +1366,7 @@ if CLIENT then
 				if not IsValid(caster) then
 					-- Caster gone (disconnect): the Arcana_SpellFailed receiver bails on an
 					-- invalid entity, so this is the only place left to shatter the circles
-					teardownCastCircles(caster, 0.1)
+					teardownCastCircles(caster, 0.1, true)
 					blackholeCastingData[caster] = nil
 				end
 
@@ -1559,7 +1561,7 @@ if CLIENT then
 		if spellId ~= "blackhole" then return end
 		if not blackholeCastingData[caster] then return end
 
-		teardownCastCircles(caster, 0.1)
+		teardownCastCircles(caster, 0.1, true)
 
 		-- Stop any lingering sounds
 		if IsValid(caster) then

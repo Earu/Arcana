@@ -458,11 +458,13 @@ if CLIENT then
 	local darkeningData = {} -- Sky darkening effect per spell instance
 	local meteorStormCastingData = {} -- Casting phase circle/particle data
 
-	-- Shatters every charging circle for this caster (interrupt, disconnect or climax)
-	local function teardownCastCircles(caster, duration)
+	-- Tears down every charging circle for this caster. shatter: the cast was cut short
+	-- (interrupt/disconnect); otherwise the circles fade, as they do when the storm lands.
+	local function teardownCastCircles(caster, duration, shatter)
 		local data = meteorStormCastingData[caster]
 		if not data then return end
-		Arcana:BreakdownCastCircles(duration, data.circles, data.satellites)
+		local teardown = shatter and Arcana.BreakdownCastCircles or Arcana.FadeCastCircles
+		teardown(Arcana, duration, data.circles, data.satellites)
 	end
 
 	-- Climax VFX: Dramatic cast completion moment
@@ -533,9 +535,9 @@ if CLIENT then
 			emitter:Finish()
 		end
 
-		-- Blow the charging circles apart as the storm begins
+		-- Fade the charging circles out as the storm begins
 		if IsValid(caster) and meteorStormCastingData[caster] then
-			teardownCastCircles(caster, 0.35)
+			teardownCastCircles(caster, 0.5)
 
 			-- Clean up the charging data after climax completes
 			timer.Simple(0.6, function()
@@ -1078,7 +1080,7 @@ if CLIENT then
 				if not IsValid(caster) then
 					-- Caster gone (disconnect): the Arcana_SpellFailed receiver bails on an
 					-- invalid entity, so this is the only place left to shatter the circles
-					teardownCastCircles(caster, 0.1)
+					teardownCastCircles(caster, 0.1, true)
 					meteorStormCastingData[caster] = nil
 				end
 
@@ -1214,7 +1216,7 @@ if CLIENT then
 	hook.Add("Arcana_CastSpellFailure", "Arcana_MeteorStorm_CastCleanup", function(caster, spellId)
 		if spellId ~= "meteor_storm" then return end
 		if not meteorStormCastingData[caster] then return end
-		teardownCastCircles(caster, 0.1)
+		teardownCastCircles(caster, 0.1, true)
 		local updateHook = "Arcana_MeteorStorm_CastUpdate_" .. tostring(caster)
 		hook.Remove("Think", updateHook)
 		meteorStormCastingData[caster] = nil
