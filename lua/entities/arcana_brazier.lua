@@ -450,15 +450,18 @@ if CLIENT then
 
 		local sizeScale = 0.6 + 0.4 * lightScale
 
-		-- Dynamic light (intense fire from above)
+		-- Both lights are steady: no decay (they are re-created every frame, so any
+		-- decay ramps down and snaps back as a fast flicker) and no sine pulse on
+		-- brightness. The glow sprites above still breathe, so the fire keeps its
+		-- life without the light it casts wobbling.
 		local dl = DynamicLight(self:EntIndex())
 		if dl then
 			dl.pos = center
 			dl.r = pal.gold.r
 			dl.g = pal.gold.g
 			dl.b = pal.gold.b
-			dl.brightness = (6 + pulse * 3) * lightScale
-			dl.Decay = 400
+			dl.brightness = 7.5 * lightScale
+			dl.Decay = 0
 			dl.Size = 400 * sizeScale -- Much larger light
 			dl.DieTime = t + 0.1
 		end
@@ -467,13 +470,12 @@ if CLIENT then
 		if tr.Hit then
 			local dl2 = DynamicLight(self:EntIndex() + 1)
 			if dl2 then
-				local magicPulse = 0.6 + 0.4 * math.sin(t * 2.2)
 				dl2.pos = tr.HitPos + tr.HitNormal * 5
 				dl2.r = pal.base.r
 				dl2.g = pal.base.g
 				dl2.b = pal.base.b
-				dl2.brightness = (3 + magicPulse * 2) * lightScale
-				dl2.Decay = 300
+				dl2.brightness = 4 * lightScale
+				dl2.Decay = 0
 				dl2.Size = 280 * sizeScale
 				dl2.DieTime = t + 0.1
 			end

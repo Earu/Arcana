@@ -295,7 +295,9 @@ if CLIENT then
 				dl.g = pal.base.g
 				dl.b = pal.base.b
 				dl.brightness = 2 * lit
-				dl.Decay = 500
+				-- No decay: the light is re-created every think, so any decay makes
+				-- it ramp down and snap back, which reads as a fast flicker.
+				dl.Decay = 0
 				dl.Size = math.min(200 * (0.6 + 0.4 * lit), 560)
 				dl.DieTime = now + 0.15
 			end
