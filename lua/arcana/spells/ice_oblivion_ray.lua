@@ -342,10 +342,17 @@ if CLIENT then
 	end
 
 	-- Fades all circles/bands stored in castingData for a caster (cast phase + beam phase).
-	local function fadeAllCastingCircles(caster, fadeDur)
+	-- With shatter set, the circles break apart instead — used when the cast is cut short.
+	local function fadeAllCastingCircles(caster, fadeDur, shatter)
 		local d = castingData[caster]
 		if not d then return end
 		fadeDur = fadeDur or 0.5
+
+		if shatter then
+			Arcana:BreakdownCastCircles(fadeDur, d.barrelCircles, d.muzzleSatellites, d.bandCircles, d.beamBandCircles)
+			return
+		end
+
 		for _, cd in ipairs(d.barrelCircles or {}) do
 			if cd.circle and cd.circle.StartFadeOut then cd.circle:StartFadeOut(fadeDur) end
 		end
@@ -565,6 +572,13 @@ if CLIENT then
 		local updateHook = "Arcana_IceOblivionRay_CastUpdate_" .. tostring(caster)
 		hook.Add("Think", updateHook, function()
 			if not IsValid(caster) or not castingData[caster] then
+				if not IsValid(caster) then
+					-- Caster gone (disconnect): the Arcana_SpellFailed receiver bails on an
+					-- invalid entity, so this is the only place left to shatter the circles
+					fadeAllCastingCircles(caster, 0.1, true)
+					castingData[caster] = nil
+				end
+
 				hook.Remove("Think", updateHook)
 				return
 			end
@@ -743,7 +757,7 @@ if CLIENT then
 	hook.Add("Arcana_CastSpellFailure", "Arcana_IceOblivionRay_CastCleanup", function(caster, spellId)
 		if spellId ~= "ice_oblivion_ray" then return end
 		if not castingData[caster] then return end
-		fadeAllCastingCircles(caster, 0.5)
+		fadeAllCastingCircles(caster, 0.1, true)
 		hook.Remove("Think", "Arcana_IceOblivionRay_CastUpdate_" .. tostring(caster))
 		castingData[caster] = nil
 	end)

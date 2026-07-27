@@ -140,6 +140,18 @@ function BandCircle:Remove()
 end
 BandCircle.Destroy = BandCircle.Remove
 
+-- Grow the bands in from nothing, mirroring MagicCircle:StartEvolving's reveal
+function BandCircle:StartEvolving(duration)
+	self:SetScale(0, 0)
+	self:SetScale(1, math_max(0.05, tonumber(duration) or 0.35))
+end
+
+-- Bands have no ring ejection to play, so a breakdown is just a quick fade.
+-- Exists so callers can tear down either circle class the same way.
+function BandCircle:StartBreakdown(duration)
+	self:StartFadeOut(duration)
+end
+
 function BandCircle:StartFadeOut(duration)
 	if self.isFading then return end
 	self.isFading = true
