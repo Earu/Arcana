@@ -205,6 +205,14 @@ if CLIENT then
 	local UNLIT_GLASS = 0.12
 
 	function ENT:Draw()
+		-- Claimed here as well as in Initialize. Leaving and re-entering the PVS
+		-- tears the entity down and rebuilds it clientside, and a teardown that
+		-- lands after the rebuild clears the entry Initialize just set -- the
+		-- lantern then renders but never blooms again. Draw only runs for lanterns
+		-- that are actually being rendered, which is exactly the set the bloom
+		-- pass cares about.
+		ACTIVE[self] = true
+
 		local pal = self:GetPalette()
 		glassTint:SetUnpacked(pal.normalized.x * UNLIT_GLASS, pal.normalized.y * UNLIT_GLASS, pal.normalized.z * UNLIT_GLASS)
 		self._paneMaterial:SetVector("$color2", glassTint)
