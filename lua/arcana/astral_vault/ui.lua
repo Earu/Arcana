@@ -253,15 +253,19 @@ local function openVault(items)
 		function model:PostDrawModel(ent)
 			if Arcana and Arcana.RenderEnchantBandsForEntity then
 				Arcana:RenderEnchantBandsForEntity(ent, self._EnchantCount or 3,
-					(LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or COLOR_GOLD, "axis")
+					(LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or COLOR_GOLD,
+					self._BandStyle or "axis", {isMelee = self._BandIsMelee})
 			end
 		end
 		if it then
 			local cls = it.class or ""
 			local swep = weapons.GetStored(cls) or list.Get("Weapon")[cls]
+			-- The world model is what the rings are resolved against in the world,
+			-- and geometry is cached per model, so the preview reuses that exact box
 			model:SetModel((swep and (swep.WorldModel or swep.ViewModel)) or HL2_MODELS[cls] or "models/weapons/w_pistol.mdl")
 			ArtDeco.FitModelPanel(model, MODEL_FOV, MODEL_DIR)
 			model._EnchantCount = math.max(1, #(it.enchant_ids or {}))
+			model._BandStyle, model._BandIsMelee = Arcana:GetEnchantBandPreviewInfo(cls)
 		else
 			model:SetVisible(false)
 		end
