@@ -312,82 +312,103 @@ function SWEP:GetViewModelPosition(pos, ang)
 end
 
 -- World model attachment to player's right hand
--- Tweak these offsets if the book does not sit perfectly in the hand
+-- Tweak these offsets if the book does not sit perfectly in the hand. They are relative to
+-- the hand attachment frame rebuilt below, not to the raw hand bone.
 SWEP.WorldModelOffset = {
-	pos = Vector(-1, -2, 0),
-	ang = Angle(-90, 180, 180), -- pitch, yaw, roll adjustments relative to the hand bone
+	-- Solved rather than eyeballed. The hand attachment point is where the engine expects the
+	-- grip of a held item to sit, so pos is whatever lands it on the middle of the book's spine
+	-- face (mesh Y min, X and Z centred), backed off a unit so the closed fist closes around the
+	-- spine instead of sinking into the cover. The old value put the grip 4.5 units inside the
+	-- front cover, which is what left the hand clipping through the book. Derived from the mesh
+	-- bounds against ang and size below, so re-solve it if either of those changes.
+	pos = Vector(-0.5, -6.434, 1.031),
+	ang = Angle(-90, 160, 180), -- pitch, yaw, roll adjustments relative to the hand attachment
 	size = 0.8 -- size of the world model
 
 }
 
-function SWEP:DrawWorldModel()
-	local owner = self:GetOwner()
+-- "anim_attachment_RH" is nothing but a fixed transform of the right hand bone: measured
+-- identical to five decimals on every ValveBiped playermodel that ships it (kleiner, male_07,
+-- alyx, combine_soldier). Plenty of custom playermodels omit the attachment entirely though,
+-- so reading it directly meant those models anchored on the raw bone instead — a frame rolled
+-- a half turn away from the one WorldModelOffset is tuned against, which is what made the book
+-- sit at the wrong angle on them. Rebuilding the attachment from the bone gives every
+-- playermodel the same convention whether or not the attachment exists.
+local HAND_ATTACHMENT_POS = Vector(2.676, -1.712, 0)
+local HAND_ATTACHMENT_ROLL = 180
 
-	if IsValid(owner) then
-		-- Prefer a hand attachment if available, fall back to the hand bone
-		local attId = owner:LookupAttachment("anim_attachment_RH") or owner:LookupAttachment("Anim_Attachment_RH")
+-- ValveBiped first; the rest cover rigs ported without it.
+local HAND_BONE_NAMES = {
+	"ValveBiped.Bip01_R_Hand",
+	"Bip01 R Hand",
+	"bip_hand_R",
+	"hand_R",
+	"RightHand",
+	"mixamorig:RightHand",
+}
 
-		if attId and attId > 0 then
-			local att = owner:GetAttachment(attId)
+-- Bone ids are per model, so the cache is keyed by model path.
+local handBoneCache = {}
 
-			if att then
-				local pos = att.Pos
-				local ang = att.Ang
-				-- Apply positional offset in the bone's local space
-				pos = pos + ang:Forward() * (self.WorldModelOffset.pos.x or 0) + ang:Right() * (self.WorldModelOffset.pos.y or 0) + ang:Up() * (self.WorldModelOffset.pos.z or 0)
-				-- Apply angular offsets
-				local a = self.WorldModelOffset.ang or angle_zero
+local function getHandBone(owner)
+	local model = owner:GetModel()
+	local cached = handBoneCache[model]
+	if cached ~= nil then return cached or nil end
 
-				if a then
-					ang:RotateAroundAxis(ang:Up(), a.y or 0)
-					ang:RotateAroundAxis(ang:Right(), a.p or 0)
-					ang:RotateAroundAxis(ang:Forward(), a.r or 0)
-				end
-
-				self:SetRenderOrigin(pos)
-				self:SetRenderAngles(ang)
-				self:SetModelScale(self.WorldModelOffset.size or 1.0)
-				self:DrawModel()
-				self:SetRenderOrigin()
-				self:SetRenderAngles()
-
-				return
-			end
-		end
-
-		local boneId = owner:LookupBone("ValveBiped.Bip01_R_Hand")
+	for _, name in ipairs(HAND_BONE_NAMES) do
+		local boneId = owner:LookupBone(name)
 
 		if boneId then
-			local matrix = owner:GetBoneMatrix(boneId)
+			handBoneCache[model] = boneId
 
-			if matrix then
-				local pos = matrix:GetTranslation()
-				local ang = matrix:GetAngles()
-				-- Apply positional offset in the bone's local space
-				pos = pos + ang:Forward() * (self.WorldModelOffset.pos.x or 0) + ang:Right() * (self.WorldModelOffset.pos.y or 0) + ang:Up() * (self.WorldModelOffset.pos.z or 0)
-				-- Apply angular offsets
-				local a = self.WorldModelOffset.ang or angle_zero
-
-				if a then
-					ang:RotateAroundAxis(ang:Up(), a.y or 0)
-					ang:RotateAroundAxis(ang:Right(), a.p or 0)
-					ang:RotateAroundAxis(ang:Forward(), a.r or 0)
-				end
-
-				self:SetRenderOrigin(pos)
-				self:SetRenderAngles(ang)
-				self:SetModelScale(self.WorldModelOffset.size or 1.0)
-				self:DrawModel()
-				self:SetRenderOrigin()
-				self:SetRenderAngles()
-
-				return
-			end
+			return boneId
 		end
 	end
 
+	-- false, not nil, so a rig with no recognised hand bone is not searched every frame
+	handBoneCache[model] = false
+
+	return nil
+end
+
+function SWEP:DrawWorldModel()
+	local owner = self:GetOwner()
+	local boneId = IsValid(owner) and getHandBone(owner) or nil
+
+	if boneId then
+		-- Bone matrices can be stale on a player the client has not animated this frame;
+		-- the engine no-ops this when they are already fresh.
+		owner:SetupBones()
+	end
+
+	local matrix = boneId and owner:GetBoneMatrix(boneId) or nil
+
 	-- Fallback if owner/bone is unavailable
+	if not matrix then
+		self:DrawModel()
+
+		return
+	end
+
+	local pos = matrix:GetTranslation()
+	local ang = matrix:GetAngles()
+	-- Rebuild the hand attachment frame from the bone
+	pos = pos + ang:Forward() * HAND_ATTACHMENT_POS.x + ang:Right() * HAND_ATTACHMENT_POS.y + ang:Up() * HAND_ATTACHMENT_POS.z
+	ang:RotateAroundAxis(ang:Forward(), HAND_ATTACHMENT_ROLL)
+	-- Apply positional offset in the attachment's local space
+	local off = self.WorldModelOffset
+	pos = pos + ang:Forward() * off.pos.x + ang:Right() * off.pos.y + ang:Up() * off.pos.z
+	-- Apply angular offsets
+	ang:RotateAroundAxis(ang:Up(), off.ang.y)
+	ang:RotateAroundAxis(ang:Right(), off.ang.p)
+	ang:RotateAroundAxis(ang:Forward(), off.ang.r)
+
+	self:SetRenderOrigin(pos)
+	self:SetRenderAngles(ang)
+	self:SetModelScale(off.size or 1.0)
 	self:DrawModel()
+	self:SetRenderOrigin()
+	self:SetRenderAngles()
 end
 
 -- Get available spells for the player
