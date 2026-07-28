@@ -39,6 +39,10 @@ ENT.ColorPresets = {
 -- carried, set down or nudged does not.
 ENT.BreakSpeed = 250
 
+-- Damage it can soak before the glass gives: a couple of pistol rounds or one
+-- solid melee swing, while a stray graze does not pop it instantly.
+ENT.LanternHealth = 20
+
 function ENT:SetLightColor(col)
 	self:SetLightColorPacked(Arcana.Common.PackColor(col))
 end
@@ -79,6 +83,28 @@ if SERVER then
 			phys:Wake()
 			phys:EnableGravity(false)
 		end
+
+		self:SetMaxHealth(self.LanternHealth)
+		self:SetHealth(self.LanternHealth)
+	end
+
+	function ENT:OnTakeDamage(dmg)
+		if self._breaking or self:GetBroken() then return end
+
+		-- Bullets and blasts still shove the lantern around like any prop
+		self:TakePhysicsDamage(dmg)
+		self:SetHealth(self:Health() - dmg:GetDamage())
+		if self:Health() > 0 then return end
+
+		-- Deferred for the same reason as PhysicsCollide: crush damage arrives from
+		-- inside the physics simulation, where spawning the fairy is not allowed.
+		self._breaking = true
+
+		timer.Simple(0, function()
+			if not IsValid(self) then return end
+
+			self:Break()
+		end)
 	end
 
 	-- Hard knocks crack the glass. Gentle handling does not: PhysicsCollide reports
