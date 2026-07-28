@@ -9,16 +9,16 @@
 --   ring_pattern_lines.png
 --   ring_rune_star.png
 --   ring_star_ring.png
---   ring_band.png                 (4096×256 horizontal strip)
+--   ring_band.png                 (2048×128 horizontal strip)
 --   glyphs/glyph_<charcode>.png   (8 files, A–H)
 
 if SERVER then return end
 
 -- ── Configuration ─────────────────────────────────────────────────────────────
 
-local RING_SIZE      = 4096   -- ring PNG canvas size (square)
+local RING_SIZE      = 2048   -- ring PNG canvas size (square)
 local GLYPH_SIZE     = 1024   -- standalone glyph PNG canvas size
-local LINE_THICK     = 16     -- line / circle stroke thickness in pixels at RING_SIZE
+local LINE_THICK     = 8      -- line / circle stroke thickness in pixels at RING_SIZE
 local OUTPUT         = "arcana/ring_exports"
 
 -- Phrases baked into the three PATTERN_LINES ring variants
@@ -47,10 +47,10 @@ local function run()
 	file.CreateDir(OUTPUT)
 	file.CreateDir(OUTPUT .. "/glyphs")
 
-	-- Dedicated fonts sized for the 4 K canvas.
-	-- TEXT_FONT: fills the ~5 % text band on PATTERN_LINES  (R * 0.05 ≈ 96 px at R ≈ 1925)
+	-- Dedicated fonts sized for the 2 K canvas.
+	-- TEXT_FONT: fills the ~5 % text band on PATTERN_LINES  (R * 0.05 ≈ 48 px at R ≈ 962)
 	-- GLYPH_FONT: fills ~70 % of the standalone 1024 × 1024 glyph canvas
-	surface.CreateFont("ArcanaEx_Text",  { font = RUNIC_FONT, size = 96,  weight = 500, antialias = true })
+	surface.CreateFont("ArcanaEx_Text",  { font = RUNIC_FONT, size = 48,  weight = 500, antialias = true })
 	surface.CreateFont("ArcanaEx_Glyph", { font = RUNIC_FONT, size = 700, weight = 800, antialias = true })
 
 	-- Geometry constants for the ring canvas
@@ -89,7 +89,7 @@ local function run()
 
 	-- ── Per-character glyph materials (for circular text rotation) ───────────
 	-- Each unique font+char gets its own tiny RT rendered once here.
-	-- At 4 K with TEXT_FONT size 96, each glyph RT is roughly 60–90 px wide.
+	-- At 2 K with TEXT_FONT size 48, each glyph RT is roughly 30–45 px wide.
 
 	local glyphMats = {}
 
@@ -266,12 +266,12 @@ local function run()
 		end
 	end)
 
-	-- 5. BAND_RING — three 4096×256 horizontal strips: line / text / line
+	-- 5. BAND_RING — three 2048×128 horizontal strips: line / text / line
 	-- The strip wraps around the cylindrical band mesh via UV repeat; all glyphs are
 	-- pre-warmed above so getGlyphMat is a cache-only lookup here (no nested RT push).
 	do
-		local BW     = 4096
-		local BH     = 256
+		local BW     = 2048
+		local BH     = 128
 		local bandRT = GetRenderTarget("arcana_export_band_rt", BW, BH, false)
 
 		-- Measure once; scale / layout is the same for all three variants.
