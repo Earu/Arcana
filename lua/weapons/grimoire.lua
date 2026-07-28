@@ -904,8 +904,6 @@ if CLIENT then
 			surface.DrawRect(0, 0, w, h)
 		end
 
-		local unlocked = {}
-
 		-- Separate spells into categories: regular, divine pacts, and rituals
 		local regularSpells = {}
 		local divinePacts = {}

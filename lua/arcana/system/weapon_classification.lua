@@ -111,7 +111,28 @@ local HL2_WEAPON_CLASSIFICATIONS = {
 	["passive"]           = "UNKNOWN",
 
 	-- The grimoire shouldnt be enchanted or categorised as HITSCAN
-	["grimoire"]          = "UNKNOWN", 
+	["grimoire"]          = "UNKNOWN",
+}
+
+-- Hold types for the default HL2/GMod weapons: they are engine weapons, so
+-- weapons.GetStored has nothing for them and GetHoldTypeForClass has no other
+-- source when nobody has equipped one yet this session.
+local HL2_WEAPON_HOLDTYPES = {
+	["weapon_crowbar"]    = "melee",
+	["weapon_stunstick"]  = "melee",
+	["weapon_pistol"]     = "pistol",
+	["weapon_alyxgun"]    = "pistol",
+	["weapon_357"]        = "revolver",
+	["weapon_smg1"]       = "smg",
+	["weapon_ar2"]        = "ar2",
+	["weapon_shotgun"]    = "shotgun",
+	["weapon_annabelle"]  = "shotgun",
+	["weapon_crossbow"]   = "crossbow",
+	["weapon_rpg"]        = "rpg",
+	["weapon_physcannon"] = "physgun",
+	["weapon_frag"]       = "grenade",
+	["weapon_slam"]       = "slam",
+	["weapon_bugbait"]    = "normal",
 }
 
 -- Known projectile entity classes for native HL2 projectile weapons.
@@ -141,22 +162,63 @@ local HL2_PROJECTILE_CLASSES = {
 	["prop_physics"] = true,
 }
 
+--- Returns true when the hold type name is a melee one.
+function Arcana.WeaponClassification.IsMeleeHoldTypeName(ht)
+	return MELEE_HOLDTYPES[ht] or false
+end
+
+--- Returns true when the hold type name is a pistol one.
+function Arcana.WeaponClassification.IsPistolHoldTypeName(ht)
+	return ht == "pistol" or ht == "revolver"
+end
+
+--- Returns true when the hold type name is a rifle / long-arm one.
+function Arcana.WeaponClassification.IsRifleHoldTypeName(ht)
+	return ht == "ar2" or ht == "shotgun" or ht == "rpg" or ht == "crossbow" or ht == "smg" or ht == "physgun"
+end
+
 --- Returns true when the weapon uses a melee hold type.
 function Arcana.WeaponClassification.IsMeleeHoldType(wep)
-	local ht = getHoldType(wep)
-	return MELEE_HOLDTYPES[ht] or false
+	return Arcana.WeaponClassification.IsMeleeHoldTypeName(getHoldType(wep))
 end
 
 --- Returns true when the weapon uses a pistol hold type.
 function Arcana.WeaponClassification.IsPistolHoldType(wep)
-	local ht = getHoldType(wep)
-	return ht == "pistol" or ht == "revolver"
+	return Arcana.WeaponClassification.IsPistolHoldTypeName(getHoldType(wep))
 end
 
 --- Returns true when the weapon uses a rifle / long-arm hold type.
 function Arcana.WeaponClassification.IsRifleHoldType(wep)
-	local ht = getHoldType(wep)
-	return ht == "ar2" or ht == "shotgun" or ht == "rpg" or ht == "crossbow" or ht == "smg" or ht == "physgun"
+	return Arcana.WeaponClassification.IsRifleHoldTypeName(getHoldType(wep))
+end
+
+--- Hold type of a weapon class with no live entity to inspect (UI previews).
+-- Reads the SWEP table first, then the classification cache (only populated for
+-- weapons someone has equipped), then the static table for the engine weapons,
+-- which are not SWEPs and expose nothing to read. "" when unknown.
+function Arcana.WeaponClassification.GetHoldTypeForClass(className)
+	if not isstring(className) or className == "" then return "" end
+
+	-- weapons.Get merges base-class fields, which GetStored does not: SWEPs that
+	-- inherit their hold type from a base only resolve through Get
+	local function fromSwep(swep)
+		if not istable(swep) then return nil end
+		for k, v in pairs(swep) do
+			if isstring(k) and string.lower(k) == "holdtype" and isstring(v) and v ~= "" then
+				return string.lower(v)
+			end
+		end
+	end
+
+	local ht = fromSwep(weapons.Get(className)) or fromSwep(weapons.GetStored(className))
+	if ht then return ht end
+
+	local data = Arcana.WeaponClassification.GetData(className)
+	if data and isstring(data.holdType) and data.holdType ~= "" then
+		return string.lower(data.holdType)
+	end
+
+	return HL2_WEAPON_HOLDTYPES[className] or ""
 end
 
 --- Returns true when the weapon uses primary ammo or has a finite clip.

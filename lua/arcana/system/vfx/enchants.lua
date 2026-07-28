@@ -19,6 +19,9 @@ local function vfxDebugPrint(fmt, ...)
 end
 
 local ActiveVFXByEnt = ActiveVFXByEnt or {}
+-- Bands drawn on UI model panels, keyed by the panel's model entity (see the
+-- preview section at the bottom of this file)
+local PreviewVFXByEnt = PreviewVFXByEnt or {}
 local RESCAN_INTERVAL = 0.50
 local lastRescan = 0
 
@@ -910,7 +913,9 @@ end
 -- Per-frame evaluation of resolved held geometry on the live bone matrix.
 -- Returns worldCenter, worldBladeDir (signed towards muzzle/tip), bonePos, boneAng;
 -- nil when the bone matrix is unavailable or garbage this frame.
-local function evalHeldGeometry(wep, st, owner)
+-- isMelee is passed in rather than derived: UI previews hand us a plain
+-- ClientsideModel, which carries none of the SWEP fields the hold-type helpers read.
+local function evalWeaponGeometry(wep, st, owner, isMelee)
 	-- SWEPs with a custom DrawWorldModel may paint the visible mesh as a
 	-- ClientsideModel at the hand while the entity's own bones sit stale near
 	-- the player origin (TF2 c_models: their weapon_bone has no ValveBiped
@@ -935,7 +940,6 @@ local function evalHeldGeometry(wep, st, owner)
 				local drawnPos, drawnAng = LocalToWorld(st.dwmLocalPos, st.dwmLocalAng, handPos, handAng)
 				local info = getModelBladeInfo(wep.WorldModel)
 				if info then
-					local isMelee = isMeleeHoldType(wep)
 					-- Guns follow the mesh's principal axis when the AABB axis is
 					-- unreliable (diagonal meshes); melee stays on the AABB axis,
 					-- whose centroid sign encodes the blade side
@@ -969,7 +973,7 @@ local function evalHeldGeometry(wep, st, owner)
 	local bladeDir = tipEnd - center
 	bladeDir:Normalize()
 
-	if isMeleeHoldType(wep) then
+	if isMelee then
 		-- The centroid sign marks the heavy (blade) side, but verify against the
 		-- grip once: the tip end must sit farther from the gripping hand than the
 		-- butt end. Resolved here (not at build time) because bones are only live
@@ -1275,7 +1279,10 @@ local function buildBandRings(bc, ringCount, style, p)
 	end
 end
 
-local function createBandsForWeapon(wep, count, style)
+-- held/isMelee/color are explicit so UI previews can build the very same bands
+-- around a plain model entity, which has no SWEP fields, no owner and therefore
+-- no physgun color to read.
+local function buildBandsForEntity(wep, count, style, held, isMelee, col)
 	if not BandCircle then return nil end
 	if count <= 0 then return nil end
 	local axis, _, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
@@ -1291,13 +1298,11 @@ local function createBandsForWeapon(wep, count, style)
 	if style == "axis" then
 		local geo = resolveHeldWeaponGeometry(wep)
 		if geo then
-			local held = isHeldActive(wep)
-			local col = getPhysgunColorFor(wep)
 			local bc = BandCircle.Create(wep:WorldSpaceCenter(), Angle(0, 0, 0), col, 80, 0)
 			if bc then
 				local ringCount = math.min(3, count)
 				local params
-				if isMeleeHoldType(wep) then
+				if isMelee then
 					local baseR = math.Clamp(geo.crossR * 1.2, 1.5, 8)
 					-- Stations: fractions of the box length measured from the grip
 					-- end (axis is signed towards the blade). Ring 1 sits on the
@@ -1362,7 +1367,6 @@ local function createBandsForWeapon(wep, count, style)
 		ang = buildOrientedAnglesForAxis(upAxis, nil, refFwd)
 	end
 	local pos = wep:WorldSpaceCenter()
-	local col = getPhysgunColorFor(wep)
 	local bc = BandCircle.Create(pos, ang, col, 80, 0)
 	if not bc then return nil end
 
@@ -1371,7 +1375,6 @@ local function createBandsForWeapon(wep, count, style)
 	local baseR = effectiveSmallest * 0.55
 	local bandH = math.max(2.5, baseR * 0.18)
 
-	local held = isHeldActive(wep)
 	if held then
 		baseR = (baseR * 0.9) / 2
 		bandH = bandH * 0.85
@@ -1407,6 +1410,10 @@ local function createBandsForWeapon(wep, count, style)
 		color = col,
 		style = style,
 	}
+end
+
+local function createBandsForWeapon(wep, count, style)
+	return buildBandsForEntity(wep, count, style, isHeldActive(wep), isMeleeHoldType(wep), getPhysgunColorFor(wep))
 end
 
 -- Shared cleanup for both ActiveVFXByEnt and ActiveVMVFX states
@@ -1497,6 +1504,129 @@ local function rescanWeapons()
 	end
 end
 
+-- Positions and orients a state's rings for this frame. owner is the weapon's
+-- carrier, or NULL for a weapon lying in the world — and for UI previews, which
+-- take exactly the dropped-weapon path this way. isMelee/colorOverride are
+-- explicit for the same reason buildBandsForEntity takes them.
+local function updateBandPlacement(wep, st, owner, isMelee, colorOverride)
+	local pos = wep:WorldSpaceCenter()
+	local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
+
+	local angOverride
+	local usedGeo = false
+	local heldNow = IsValid(owner) and isHeldActive(wep)
+	if st.geo and st.style ~= "dual" and (heldNow or not IsValid(owner)) then
+		-- Geometry-driven placement (held and world/dropped): box center +
+		-- blade axis evaluated on the weapon's live bone matrix. Falls
+		-- through to the legacy heuristics below on frames where the bone
+		-- matrix is unavailable.
+		local gCenter, gDir, gBonePos, gBoneAng = evalWeaponGeometry(wep, st, owner, isMelee)
+		if gCenter then
+			usedGeo = true
+			pos = gCenter
+			-- Roll reference must not be parallel to the ring normal (gDir):
+			-- held uses the eye RIGHT (same trick as dual); world weapons use
+			-- the axis' own canonical right, stable for a resting prop.
+			local refRight = heldNow and owner:EyeAngles():Right() or gDir:Angle():Right()
+			angOverride = anglesFromUpRight(gDir, refRight)
+			if VFX_DEBUG:GetInt() >= 2 then
+				render.SetColorMaterial()
+				render.DrawWireframeBox(gBonePos, gBoneAng, st.geo.mins, st.geo.maxs, Color(255, 220, 80), true)
+				render.DrawLine(gCenter, gCenter + gDir * (st.geo.len * 0.5), Color(0, 255, 0), true)
+			end
+		end
+	end
+
+	if usedGeo then
+		-- placement fully resolved above
+	elseif IsValid(owner) and isHeldActive(wep) and st.style == "dual" and st.bcL then
+		-- Akimbo: one ring per hand, both slid towards the muzzles along the
+		-- aim direction (the guns track where the player looks)
+		local rp, lp = getPlayerHandPositions(owner)
+		local aim = owner:GetAimVector()
+		dir = aim
+		local fwdOff = math.max(4, (tonumber(longest) or 14) * 0.3)
+		if rp then pos = rp + aim * fwdOff end
+		if lp then st.bcL.position = lp + aim * fwdOff end
+		-- The generic builder rolls against the eye FORWARD, which is parallel
+		-- to this ring's normal (the aim) and therefore degenerate — the rings
+		-- spin wildly on look. Roll against the eye right instead.
+		angOverride = anglesFromUpRight(aim, owner:EyeAngles():Right())
+	elseif IsValid(owner) and isHeldActive(wep) and isRifleHoldType(wep) then
+		local rp, lp = getPlayerHandPositions(owner)
+		local muzzle = getMuzzleAttachmentPos(wep)
+		local leftPoint = muzzle or lp
+		if rp and leftPoint then
+			local v = (leftPoint - rp)
+			if v:LengthSqr() > 1e-4 then
+				dir = v:GetNormalized()
+				pos = rp + v * 0.5
+			end
+		end
+	elseif IsValid(owner) and isHeldActive(wep) and isPistolHoldType(wep) then
+		local rpos, rang = getRightHandPose(owner)
+		if rpos then
+			local muzzle = getMuzzleAttachmentPos(wep)
+			if muzzle then
+				local v = muzzle - rpos
+				if v:LengthSqr() > 1e-4 then
+					dir = v:GetNormalized()
+					pos = rpos + v * 0.5
+				end
+			else
+				local fwd = (rang and rang:Forward()) or owner:EyeAngles():Forward()
+				if fwd:LengthSqr() < 1e-4 then fwd = Vector(1, 0, 0) end
+				dir = fwd:GetNormalized()
+				pos = rpos + dir * ((tonumber(longest) or 20) * 0.35)
+			end
+		end
+	elseif IsValid(owner) and isHeldActive(wep) and isMelee then
+		local rpos, rang = getRightHandPose(owner)
+		if rpos and rang then
+			local up = rang:Up()
+			if up:LengthSqr() < 1e-4 then up = rang:Forward() end
+			dir = -up:GetNormalized()
+			local size = tonumber(longest) or 20
+			pos = rpos + dir * (size * 0.25)
+		end
+	elseif IsValid(owner) and isHeldActive(wep) then
+		-- For the rest, anchor the orbital circle at the right hand when held
+		local rpos = select(1, getRightHandPose(owner))
+		if rpos then
+			pos = rpos
+		end
+	end
+
+	-- Decide style per-frame: default to axis when not held; use orbital only for held throwable types
+	local held = IsValid(owner) and isHeldActive(wep)
+	local desiredStyle
+	if held and st.style ~= "dual" and not (isRifleHoldType(wep) or isPistolHoldType(wep) or isMelee) then
+		desiredStyle = "orbital"
+	else
+		desiredStyle = "axis"
+	end
+
+	local upAxis = (desiredStyle == "orbital") and Vector(0, 0, 1) or dir
+	local refFwd
+	if desiredStyle == "axis" then
+		refFwd = getSecondLongestAxisVector(wep, axis, lenX, lenY, lenZ)
+	else
+		refFwd = wep:GetForward()
+	end
+
+	local ang = angOverride or buildOrientedAnglesForAxis(upAxis, owner, refFwd)
+	st.bc.position = pos
+	st.bc.angles = ang
+
+	-- Refresh color (physgun color may change)
+	local col = colorOverride or getPhysgunColorFor(wep)
+	st.bc.color = col
+	if st.bcL then
+		st.bcL.angles = ang
+		st.bcL.color = col
+	end
+end
+
 hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDrawingDepth)
 	-- Skip the depth pass: translucent VFX must not write into the depth buffer
 	if bDrawingDepth then return end
@@ -1504,9 +1634,6 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 	for wep, st in pairs(ActiveVFXByEnt) do
 		if not (st and st.bc) then continue end
 		if not IsValid(wep) then continue end
-
-		local pos = wep:WorldSpaceCenter()
-		local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
 
 		local owner = wep:GetOwner()
 
@@ -1518,119 +1645,7 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 			continue
 		end
 
-		local angOverride
-		local usedGeo = false
-		local heldNow = IsValid(owner) and isHeldActive(wep)
-		if st.geo and st.style ~= "dual" and (heldNow or not IsValid(owner)) then
-			-- Geometry-driven placement (held and world/dropped): box center +
-			-- blade axis evaluated on the weapon's live bone matrix. Falls
-			-- through to the legacy heuristics below on frames where the bone
-			-- matrix is unavailable.
-			local gCenter, gDir, gBonePos, gBoneAng = evalHeldGeometry(wep, st, owner)
-			if gCenter then
-				usedGeo = true
-				pos = gCenter
-				-- Roll reference must not be parallel to the ring normal (gDir):
-				-- held uses the eye RIGHT (same trick as dual); world weapons use
-				-- the axis' own canonical right, stable for a resting prop.
-				local refRight = heldNow and owner:EyeAngles():Right() or gDir:Angle():Right()
-				angOverride = anglesFromUpRight(gDir, refRight)
-				if VFX_DEBUG:GetInt() >= 2 then
-					render.SetColorMaterial()
-					render.DrawWireframeBox(gBonePos, gBoneAng, st.geo.mins, st.geo.maxs, Color(255, 220, 80), true)
-					render.DrawLine(gCenter, gCenter + gDir * (st.geo.len * 0.5), Color(0, 255, 0), true)
-				end
-			end
-		end
-
-		if usedGeo then
-			-- placement fully resolved above
-		elseif IsValid(owner) and isHeldActive(wep) and st.style == "dual" and st.bcL then
-			-- Akimbo: one ring per hand, both slid towards the muzzles along the
-			-- aim direction (the guns track where the player looks)
-			local rp, lp = getPlayerHandPositions(owner)
-			local aim = owner:GetAimVector()
-			dir = aim
-			local fwdOff = math.max(4, (tonumber(longest) or 14) * 0.3)
-			if rp then pos = rp + aim * fwdOff end
-			if lp then st.bcL.position = lp + aim * fwdOff end
-			-- The generic builder rolls against the eye FORWARD, which is parallel
-			-- to this ring's normal (the aim) and therefore degenerate — the rings
-			-- spin wildly on look. Roll against the eye right instead.
-			angOverride = anglesFromUpRight(aim, owner:EyeAngles():Right())
-		elseif IsValid(owner) and isHeldActive(wep) and isRifleHoldType(wep) then
-			local rp, lp = getPlayerHandPositions(owner)
-			local muzzle = getMuzzleAttachmentPos(wep)
-			local leftPoint = muzzle or lp
-			if rp and leftPoint then
-				local v = (leftPoint - rp)
-				if v:LengthSqr() > 1e-4 then
-					dir = v:GetNormalized()
-					pos = rp + v * 0.5
-				end
-			end
-		elseif IsValid(owner) and isHeldActive(wep) and isPistolHoldType(wep) then
-			local rpos, rang = getRightHandPose(owner)
-			if rpos then
-				local muzzle = getMuzzleAttachmentPos(wep)
-				if muzzle then
-					local v = muzzle - rpos
-					if v:LengthSqr() > 1e-4 then
-						dir = v:GetNormalized()
-						pos = rpos + v * 0.5
-					end
-				else
-					local fwd = (rang and rang:Forward()) or owner:EyeAngles():Forward()
-					if fwd:LengthSqr() < 1e-4 then fwd = Vector(1, 0, 0) end
-					dir = fwd:GetNormalized()
-					pos = rpos + dir * ((tonumber(longest) or 20) * 0.35)
-				end
-			end
-		elseif IsValid(owner) and isHeldActive(wep) and isMeleeHoldType(wep) then
-			local rpos, rang = getRightHandPose(owner)
-			if rpos and rang then
-				local up = rang:Up()
-				if up:LengthSqr() < 1e-4 then up = rang:Forward() end
-				dir = -up:GetNormalized()
-				local size = tonumber(longest) or 20
-				pos = rpos + dir * (size * 0.25)
-			end
-		elseif IsValid(owner) and isHeldActive(wep) then
-			-- For the rest, anchor the orbital circle at the right hand when held
-			local rpos = select(1, getRightHandPose(owner))
-			if rpos then
-				pos = rpos
-			end
-		end
-
-		-- Decide style per-frame: default to axis when not held; use orbital only for held throwable types
-		local held = IsValid(owner) and isHeldActive(wep)
-		local desiredStyle
-		if held and st.style ~= "dual" and not (isRifleHoldType(wep) or isPistolHoldType(wep) or isMeleeHoldType(wep)) then
-			desiredStyle = "orbital"
-		else
-			desiredStyle = "axis"
-		end
-
-		local upAxis = (desiredStyle == "orbital") and Vector(0, 0, 1) or dir
-		local refFwd
-		if desiredStyle == "axis" then
-			refFwd = getSecondLongestAxisVector(wep, axis, lenX, lenY, lenZ)
-		else
-			refFwd = wep:GetForward()
-		end
-
-		local ang = angOverride or buildOrientedAnglesForAxis(upAxis, owner, refFwd)
-		st.bc.position = pos
-		st.bc.angles = ang
-
-		-- Refresh color (physgun color may change)
-		local col = getPhysgunColorFor(wep)
-		st.bc.color = col
-		if st.bcL then
-			st.bcL.angles = ang
-			st.bcL.color = col
-		end
+		updateBandPlacement(wep, st, owner, isMeleeHoldType(wep))
 	end
 end)
 
@@ -1919,6 +1934,14 @@ hook.Add("Think", "Arcana_EnchantVFX_Scan", function()
 	-- Always prune VM VFX quickly to avoid lingering
 	pruneViewModelVFX()
 
+	-- A panel's model entity dies with the panel; drop the bands it owned
+	for ent, st in pairs(PreviewVFXByEnt) do
+		if not IsValid(ent) then
+			destroyBandState(st)
+			PreviewVFXByEnt[ent] = nil
+		end
+	end
+
 	-- Interval-based world rescan
 	local now = CurTime()
 	if now - lastRescan >= RESCAN_INTERVAL then
@@ -1927,34 +1950,72 @@ hook.Add("Think", "Arcana_EnchantVFX_Scan", function()
 	end
 end)
 
--- Reusable: render rings for an entity in an active 3D context (e.g., PostDrawModel)
-function Arcana:RenderEnchantBandsForEntity(ent, count, color, style)
+--
+-- UI model-panel previews
+--
+-- Model panels show the weapon as it lies in the world, so previews run the very
+-- same build and placement code the world path does, with no owner. State is kept
+-- per entity: BandCircle.Create registers with MagicCircleManager and Remove()
+-- only starts a fade, so a create-draw-destroy per frame would both rebuild the
+-- band meshes every frame and leak fading circles into the world.
+--
+local PREVIEW_COLOR = Color(198, 160, 74, 255)
+
+--- Ring style a weapon of this class shows in the world, plus whether it is melee.
+-- For UIs that only have a class name and therefore no weapon entity for the
+-- hold-type helpers to read. Mirrors ensureVFXFor's mapping for a weapon that is
+-- not held (the state a model panel depicts).
+-- @return style string ("axis" or "orbital"), isMelee boolean
+function Arcana:GetEnchantBandPreviewInfo(class)
+	local wc = Arcana.WeaponClassification
+	local ht = wc.GetHoldTypeForClass(class)
+	local isMelee = wc.IsMeleeHoldTypeName(ht)
+	local style = (isMelee or wc.IsPistolHoldTypeName(ht) or wc.IsRifleHoldTypeName(ht)) and "axis" or "orbital"
+
+	return style, isMelee
+end
+
+-- Reusable: render rings for an entity in an active 3D context (e.g., PostDrawModel).
+-- opts.isMelee tells us what the hold-type helpers cannot read off a bare model.
+-- A count of 0 draws nothing and releases the entity's bands, so callers can keep
+-- calling unconditionally as a weapon's enchantments come and go.
+function Arcana:RenderEnchantBandsForEntity(ent, count, color, style, opts)
 	if not IsValid(ent) or not BandCircle then return end
-	count = math.max(1, math.floor(count or 1))
+	count = math.max(0, math.floor(count or 0))
 	style = style or "axis"
+	local isMelee = (opts and opts.isMelee) or false
+	local col = color or PREVIEW_COLOR
+	local model = ent:GetModel() or ""
 
-	local axis, _, longest, lenX, lenY, lenZ = longestAxisInfo(ent)
-	local upAxis = (style == "orbital") and Vector(0, 0, 1)
-		or ((axis == "x" and ent:GetForward()) or (axis == "y" and ent:GetRight()) or ent:GetUp())
-	local refFwd = (style == "axis") and getSecondLongestAxisVector(ent, axis, lenX, lenY, lenZ) or ent:GetForward()
-	local ang = buildOrientedAnglesForAxis(upAxis, nil, refFwd)
+	local st = PreviewVFXByEnt[ent]
+	if st and (count <= 0 or st.count ~= count or st.style ~= style or st.isMelee ~= isMelee or st.model ~= model) then
+		destroyBandState(st)
+		PreviewVFXByEnt[ent] = nil
+		st = nil
+	end
 
-	local pos = ent:WorldSpaceCenter()
-	local col = color or Color(198, 160, 74, 255)
-	local bc = BandCircle.Create(pos, ang, col, 80, 0)
-	if not bc then return end
+	if count <= 0 then return end
 
-	local smallest = math.max(4, math.min(lenX or 8, math.min(lenY or 8, lenZ or 8)))
-	local baseR = math.max(6, smallest * 0.55)
-	local bandH = math.max(2.5, baseR * 0.18)
-	local ringCount = math.min(3, count)
-	local orbBase = math.max(10, smallest * 0.9)
-	buildBandRings(bc, ringCount, style, {
-		base = orbBase, heightscale = math.max(3, orbBase * 0.18), zBiasStep = 0.5,
-		baseR = baseR, bandH = bandH, stepR = math.max(2.5, smallest * 0.16),
-		totalSpan = (longest or 24) * 0.40,
-	})
+	if not st then
+		st = buildBandsForEntity(ent, count, style, false, isMelee, col)
+		if not st then return end
+		st.isMelee = isMelee
+		st.model = model
+		-- Ours to draw: the manager would otherwise paint these panel-space rings
+		-- into the real world
+		st.bc:SetDrawnManually(true)
+		if st.bcL then st.bcL:SetDrawnManually(true) end
+		PreviewVFXByEnt[ent] = st
+	end
 
-	if bc.Draw then bc:Draw() end
-	if bc.Remove then bc:Remove() end
+	updateBandPlacement(ent, st, NULL, isMelee, col)
+
+	-- Same glow the world rings get. Bloom captures by diffing framebuffer
+	-- snapshots, so it works from inside the panel's 3D pass, and no-ops on its
+	-- own when the shaders are missing or arcana_bloom is off.
+	Arcana.Bloom.ProcessBloom(function()
+		st.bc:Draw()
+		if st.bcL then st.bcL:Draw() end
+	end)
+	Arcana.Bloom.RenderBloom()
 end

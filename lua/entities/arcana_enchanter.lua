@@ -980,6 +980,13 @@ if CLIENT then
 			return wepEnt:GetNWString("Arcana_EnchantIds", "") or ""
 		end
 
+		-- How many bands the preview shows. Only ever read when the applied set
+		-- changed, which is also the only way the count can change.
+		local function getAppliedCount()
+			local ok, arr = pcall(util.JSONToTable, getAppliedStr())
+			return (ok and istable(arr)) and #arr or 0
+		end
+
 		-- Forward declaration so Think can trigger a rebuild
 		local rebuild
 
@@ -1045,7 +1052,16 @@ if CLIENT then
 			-- Spin about the model's geometry, not its origin, or off-origin weapons
 			-- (the RPG, the .357) orbit out of frame instead of turning in place.
 			ArtDeco.SpinModelPanelEntity(ent, Angle(0, CurTime() * 15 % 360, 0))
-			ArtDeco.FitModelPanel(self, PREVIEW_FOV)
+			ArtDeco.FitModelPanel(self, PREVIEW_FOV, nil, self._fitPadding)
+		end
+
+		-- The weapon's applied enchantments, rendered as the very bands it carries
+		-- once it is out in the world (same builder, same geometry-driven placement)
+		function modelPanel:PostDrawModel(ent)
+			-- Count 0 (a plain weapon, or one whose enchantments were just stripped)
+			-- draws nothing and releases the bands, so this needs no guard
+			local col = (LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or _circleCol
+			Arcana:RenderEnchantBandsForEntity(ent, self._enchantCount or 0, col, self._bandStyle or "axis", {isMelee = self._bandIsMelee})
 		end
 
 		local nameLabel = vgui.Create("DLabel", left)
@@ -1205,14 +1221,22 @@ if CLIENT then
 			local nice = (swep and (swep.PrintName or swep.Printname)) or cls
 			modelPanel:SetModel(model)
 			nameLabel:SetText(nice)
-			ArtDeco.FitModelPanel(modelPanel, PREVIEW_FOV)
+			ArtDeco.FitModelPanel(modelPanel, PREVIEW_FOV, nil, modelPanel._fitPadding)
+			modelPanel._bandStyle, modelPanel._bandIsMelee = Arcana:GetEnchantBandPreviewInfo(cls)
 		end
 
 		-- Position the model and name inside left panel (centered in the circle)
 		left.PerformLayout = function(pnl, w, h)
 			local cx, cy = w * 0.5, h * 0.40
 			local radius = math.min(w, h) * 0.34
-			local s = math.floor(radius * 1.5)
+			-- The panel IS the 3D viewport, so enchant rings reaching past it get
+			-- sliced off in mid-air. Grow it to the largest square the container
+			-- holds around the circle's centre, and pull the camera back by the
+			-- same factor: the weapon keeps the size it had at radius * 1.5 while
+			-- the rings gain room, and the deco frame is what cuts.
+			local base = math.floor(radius * 1.5)
+			local s = math.max(base, math.floor(2 * math.min(cx, cy, w - cx, h - cy)) - 12)
+			modelPanel._fitPadding = 1.15 * (s / base)
 			modelPanel:SetSize(s, s)
 			modelPanel:SetPos(math.floor(cx - s * 0.5), math.floor(cy - s * 0.5))
 			nameLabel:SetSize(math.floor(w * 0.6), 24)
@@ -1221,6 +1245,7 @@ if CLIENT then
 
 		-- Initialize preview and keep it updated
 		setPreviewForClass(IsValid(machine) and machine:GetContainedClass() or "")
+		modelPanel._enchantCount = getAppliedCount()
 		computeTotals()
 		refreshButtons()
 
@@ -1244,6 +1269,7 @@ if CLIENT then
 			local curStr = getAppliedStr()
 			if curStr ~= (lastAppliedStr or "") then
 				lastAppliedStr = curStr
+				modelPanel._enchantCount = getAppliedCount()
 				if rebuild then rebuild() end
 				computeTotals()
 				refreshButtons()
