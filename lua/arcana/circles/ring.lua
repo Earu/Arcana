@@ -109,10 +109,10 @@ local function CreateCircleMaterial(name, textureName)
 end
 
 -- ── PNG material system ───────────────────────────────────────────────────────
--- Ring PNGs are 4096×4096; the ring circle sits at 47% from the canvas centre.
-local PNG_RING_SIZE      = 4096
+-- Ring PNGs are 2048×2048; the ring circle sits at 47% from the canvas centre.
+local PNG_RING_SIZE      = 2048
 local PNG_RING_HALF      = PNG_RING_SIZE * 0.5
-local PNG_RING_RADIUS_PX = math_floor(PNG_RING_SIZE * 0.47)   -- 1925 px, matches export script
+local PNG_RING_RADIUS_PX = math_floor(PNG_RING_SIZE * 0.47)   -- 962 px, matches export script
 
 -- The 8 glyph character codes exported by export_glyphs.py (A=65 … H=72)
 local EXPORTED_GLYPH_CODES = { 65, 66, 67, 68, 69, 70, 71, 72 }
@@ -325,7 +325,7 @@ function Ring:Draw(centerPos, angles, color, time)
 end
 
 -- Draw the ring as a 3D2D quad using the pre-baked PNG material.
--- pxToWorld = radius / PNG_RING_RADIUS_PX ensures the ring circle in the 4096 PNG
+-- pxToWorld = radius / PNG_RING_RADIUS_PX ensures the ring circle in the 2048 PNG
 -- lands exactly at self.radius world units from the centre.
 function Ring:DrawPNGQuad(centerPos, angles, color, rotationAngle)
 	if not PNG_RING_MATS then return false end

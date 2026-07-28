@@ -1257,7 +1257,7 @@ local function buildBandRings(bc, ringCount, style, p)
 			end
 		end
 	else
-		local baseR, bandH, stepR, totalSpan, zBiasStep = p.baseR, p.bandH, p.stepR, p.totalSpan, p.zBiasStep
+		local baseR, bandH, stepR, totalSpan, _ = p.baseR, p.bandH, p.stepR, p.totalSpan, p.zBiasStep
 		local step = (ringCount > 1) and ((totalSpan or 0) / (ringCount - 1)) or 0
 		local startOffset = -0.5 * (ringCount - 1) * step
 		for i = 1, ringCount do
@@ -1278,7 +1278,7 @@ end
 local function createBandsForWeapon(wep, count, style)
 	if not BandCircle then return nil end
 	if count <= 0 then return nil end
-	local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
+	local axis, _, longest, lenX, lenY, lenZ = longestAxisInfo(wep)
 	style = style or "axis"
 
 	-- Axis-style weapons with resolvable model geometry get geometry-driven
@@ -1635,74 +1635,6 @@ hook.Add("PostDrawOpaqueRenderables", "Arcana_EnchantVFX_Follow", function(bDraw
 end)
 
 --
--- Quantitative ring-fit scorer for held weapons (iteration without screenshots):
--- samples each ring's circumference and measures it against the resolved
--- bone-local weapon box. Usage: arcana_enchant_vfx_score [class-substring]
--- Columns: station = ring center's normalized position along the box (0=butt 1=tip),
--- tilt = angle between ring plane normal and the weapon's long axis (deg),
--- cover = % of samples within the box's axial span, gap = mean/max radial distance
--- of samples beyond the box's circumscribed cross-section (negative = inside),
--- off = ring center's distance from the box centerline.
-local function scoreHeldRingFit(wep, st)
-	local owner = wep:GetOwner()
-	local geo = st.geo or resolveHeldWeaponGeometry(wep)
-	if not geo then return nil, "no geometry" end
-	local center, bladeDir, bonePos, boneAng = evalHeldGeometry(wep, {geo = geo, geoSign = st.geoSign}, owner)
-	if not center then return nil, "bone matrix unavailable" end
-
-	local spanA, spanB = geo.mins:Dot(geo.axis), geo.maxs:Dot(geo.axis)
-	local spanMin, spanMax = math.min(spanA, spanB), math.max(spanA, spanB)
-	local centerCross = geo.center - geo.axis * geo.center:Dot(geo.axis)
-
-	local up, fwd, right = st.bc.angles:Up(), st.bc.angles:Forward(), st.bc.angles:Right()
-	local lines = {}
-	for i, ring in ipairs(st.bc.rings) do
-		local r = (ring.radius or 0) * (ring.currentScale or 1)
-		local ringCenter = st.bc.position + up * (ring.zBias or 0)
-		local tilt = math.deg(math.acos(math.Clamp(math.abs(up:Dot(bladeDir)), 0, 1)))
-
-		local lc = WorldToLocal(ringCenter, angle_zero, bonePos, boneAng)
-		local lcAxial = lc:Dot(geo.axis)
-		local station = (spanMax > spanMin) and ((lcAxial - spanMin) / (spanMax - spanMin)) or 0
-		local centerOff = (lc - geo.axis * lcAxial - centerCross):Length()
-
-		local inSpan, gapSum, gapMax, n = 0, 0, -math.huge, 16
-		for k = 0, n - 1 do
-			local t = (k / n) * math.pi * 2
-			local lp = WorldToLocal(ringCenter + (fwd * math.cos(t) + right * math.sin(t)) * r, angle_zero, bonePos, boneAng)
-			local axial = lp:Dot(geo.axis)
-			if axial >= spanMin - 1 and axial <= spanMax + 1 then inSpan = inSpan + 1 end
-			local gap = (lp - geo.axis * axial - centerCross):Length() - geo.crossR
-			gapSum = gapSum + gap
-			if gap > gapMax then gapMax = gap end
-		end
-		lines[#lines + 1] = string.format(
-			"  ring %d: r=%5.2f station=%5.2f tilt=%5.1f cover=%3d%% gap=%5.2f/%5.2f off=%5.2f",
-			i, r, station, tilt, math.floor(inSpan / n * 100 + 0.5), gapSum / n, gapMax, centerOff)
-	end
-	return lines, geo
-end
-
-concommand.Add("arcana_enchant_vfx_score", function(_, _, args)
-	local filter = args and args[1] and args[1]:lower() or nil
-	local scored = 0
-	for wep, st in pairs(ActiveVFXByEnt) do
-		if IsValid(wep) and st and st.bc and (not filter or wep:GetClass():lower():find(filter, 1, true)) then
-			scored = scored + 1
-			local lines, geoOrErr = scoreHeldRingFit(wep, st)
-			if not lines then
-				MsgC(Color(255, 120, 120), string.format("%s [style=%s]: %s\n", wep:GetClass(), st.style or "?", geoOrErr))
-			else
-				MsgC(Color(120, 255, 160), string.format("%s [style=%s src=%s bone=%s len=%.1f crossR=%.2f]\n",
-					wep:GetClass(), st.style or "?", geoOrErr.source, geoOrErr.boneName, geoOrErr.len, geoOrErr.crossR))
-				for _, l in ipairs(lines) do MsgC(color_white, l, "\n") end
-			end
-		end
-	end
-	if scored == 0 then MsgC(Color(255, 200, 80), "no active held enchant VFX" .. (filter and (" matching '" .. filter .. "'") or "") .. "\n") end
-end)
-
---
 -- First-person viewmodel rendering for local player's active enchanted weapon
 --
 local ActiveVMVFX = ActiveVMVFX or {}
@@ -2001,7 +1933,7 @@ function Arcana:RenderEnchantBandsForEntity(ent, count, color, style)
 	count = math.max(1, math.floor(count or 1))
 	style = style or "axis"
 
-	local axis, dir, longest, lenX, lenY, lenZ = longestAxisInfo(ent)
+	local axis, _, longest, lenX, lenY, lenZ = longestAxisInfo(ent)
 	local upAxis = (style == "orbital") and Vector(0, 0, 1)
 		or ((axis == "x" and ent:GetForward()) or (axis == "y" and ent:GetRight()) or ent:GetUp())
 	local refFwd = (style == "axis") and getSecondLongestAxisVector(ent, axis, lenX, lenY, lenZ) or ent:GetForward()
