@@ -462,13 +462,23 @@ if CLIENT then
 	-- Screen-space mask of "world geometry inside the sphere": its blurred
 	-- edge is exactly the sphere/world intersection curve, which the shader
 	-- uses to draw flames along terrain, cliffs and buildings.
-	local CORR_SNAP_RT = GetRenderTarget("arcana_corr_snap", ScrW(), ScrH())
-	local CORR_MASK_RT = GetRenderTarget("arcana_corr_mask", ScrW(), ScrH())
-	local CORR_MBLUR_A = GetRenderTarget("arcana_corr_mblur_a", ScrW() / 2, ScrH() / 2)
-	local CORR_MBLUR_B = GetRenderTarget("arcana_corr_mblur_b", ScrW() / 2, ScrH() / 2)
+	--
+	-- Built on the first corruption draw rather than at load. These four are
+	-- 35 MB at 1440p (2.25x that at 4K), and Source never frees a render target,
+	-- so allocating them up front charges every client for an effect most
+	-- sessions never spawn. Same lazy pattern arcana_mana_crystal uses for its
+	-- refraction RT. The materials bake the RT names in at creation time, so
+	-- they have to be built here too rather than when the shaders mount.
+	local CORR_SNAP_RT, CORR_MASK_RT, CORR_MBLUR_A, CORR_MBLUR_B
+	local shadersMounted = false
 
-	WaitForShaderMounted({"arcana_corruption_ps30", "arcana_blit_ps30", "arcana_bloom_ps30", "arcana_passthrough_vs30"}, function(available)
-		if not available then return end
+	local function ensureCorruptionResources()
+		if corruptionMat or not shadersMounted then return end
+
+		CORR_SNAP_RT = GetRenderTarget("arcana_corr_snap", ScrW(), ScrH())
+		CORR_MASK_RT = GetRenderTarget("arcana_corr_mask", ScrW(), ScrH())
+		CORR_MBLUR_A = GetRenderTarget("arcana_corr_mblur_a", ScrW() / 2, ScrH() / 2)
+		CORR_MBLUR_B = GetRenderTarget("arcana_corr_mblur_b", ScrW() / 2, ScrH() / 2)
 
 		corruptionMat = CreateShaderMaterial("arcana_corruption_fx", {
 			["$pixshader"] = "arcana_corruption_ps30",
@@ -504,6 +514,10 @@ if CLIENT then
 			["$c1_x"] = 1.0, ["$c1_y"] = 0.0, -- intensity, CA off
 			["$c2_x"] = 0.0, ["$c2_y"] = 0.0, ["$c2_z"] = 1.0, -- diff mode off
 		})
+	end
+
+	WaitForShaderMounted({"arcana_corruption_ps30", "arcana_blit_ps30", "arcana_bloom_ps30", "arcana_passthrough_vs30"}, function(available)
+		shadersMounted = available
 	end)
 
 	local function maskBlurPass(srcRT, dstRT, dirX, dirY, radius)
@@ -664,6 +678,9 @@ if CLIENT then
 		-- repaints the framebuffer, so the screen-space grading feeds back on
 		-- its own output and the intersection-mask rasterisation persists
 		if bit.band(util.PointContents(EyePos()), CONTENTS_SOLID) ~= 0 then return end
+
+		-- First corrupted area actually drawn on this client pays for the RTs
+		ensureCorruptionResources()
 
 		if corruptionMat then
 			-- Custom shader path: one pass does the grading, refraction and the
