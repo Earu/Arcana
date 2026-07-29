@@ -30,8 +30,22 @@ Arcana.Bloom = Arcana.Bloom or {
 	RenderBloom = function() end,
 }
 
+-- Longest edge the bloom chain is allowed to work at. Bloom is entirely
+-- screen-space and every stage after the capture is blurred, so the native
+-- resolution buys nothing visible here: the circles themselves are still drawn
+-- to the framebuffer at full res, and only their glow contribution is computed
+-- at this size. Without a cap the cost scales with the square of the display -
+-- 51 MB of render targets at 1440p, ~115 MB at 4K, none of which Source ever
+-- frees. CopyRenderTargetToTexture scales into a smaller target (verified
+-- in-game), so the framebuffer snapshots cap cleanly along with the rest.
+local BLOOM_MAX_EDGE = 1920
+
 local function initBloom()
 	local scrW, scrH = ScrW(), ScrH()
+	local fit = math.min(1, BLOOM_MAX_EDGE / math.max(scrW, scrH))
+	-- kept a multiple of 4 so the half- and quarter-res stages stay whole pixels
+	scrW = math.max(4, math.floor(scrW * fit / 4) * 4)
+	scrH = math.max(4, math.floor(scrH * fit / 4) * 4)
 
 	-- Full-res: holds the circles' visible screen contribution each frame.
 	local CIRCLE_RT = GetRenderTarget("arcana_circles_rt", scrW, scrH)

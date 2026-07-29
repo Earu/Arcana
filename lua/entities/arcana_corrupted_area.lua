@@ -475,10 +475,30 @@ if CLIENT then
 	local function ensureCorruptionResources()
 		if corruptionMat or not shadersMounted then return end
 
-		CORR_SNAP_RT = GetRenderTarget("arcana_corr_snap", ScrW(), ScrH())
-		CORR_MASK_RT = GetRenderTarget("arcana_corr_mask", ScrW(), ScrH())
-		CORR_MBLUR_A = GetRenderTarget("arcana_corr_mblur_a", ScrW() / 2, ScrH() / 2)
-		CORR_MBLUR_B = GetRenderTarget("arcana_corr_mblur_b", ScrW() / 2, ScrH() / 2)
+		local w, h = ScrW(), ScrH()
+		local halfW, halfH = math.floor(w / 2), math.floor(h / 2)
+
+		-- The snapshot restores the screen verbatim, so it keeps the full 8 bits
+		-- per channel - at 16 bit the restore would band visibly.
+		CORR_SNAP_RT = GetRenderTarget("arcana_corr_snap", w, h)
+
+		-- The mask chain only ever carries two channels: the shader reads
+		-- `tex2D(Tex1, i.uv).rg` and nothing else, red being "inside the true
+		-- sphere" and green "expanded sphere visible here". RGB565 halves those
+		-- three targets (2 bytes/px instead of 4) while keeping R and G
+		-- independent, which no 1-byte format can - I8 replicates its single
+		-- channel across rgb and would collapse the two flags into one.
+		-- Verified in-game: the engine honours RT formats (unlike VTFs), and
+		-- CopyRenderTargetToTexture writes into a 565 target correctly.
+		-- Precision cost is 32 levels of red / 64 of green on the blurred edge,
+		-- which the flame noise hides.
+		local RT_FLAGS = bit.bor(4, 8, 256, 512) -- CLAMPS | CLAMPT | NOMIP | NOLOD (no TEXTUREFLAGS_* globals in GLua)
+		CORR_MASK_RT = GetRenderTargetEx("arcana_corr_mask", w, h,
+			RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_NONE, RT_FLAGS, 0, IMAGE_FORMAT_RGB565)
+		CORR_MBLUR_A = GetRenderTargetEx("arcana_corr_mblur_a", halfW, halfH,
+			RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_NONE, RT_FLAGS, 0, IMAGE_FORMAT_RGB565)
+		CORR_MBLUR_B = GetRenderTargetEx("arcana_corr_mblur_b", halfW, halfH,
+			RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_NONE, RT_FLAGS, 0, IMAGE_FORMAT_RGB565)
 
 		corruptionMat = CreateShaderMaterial("arcana_corruption_fx", {
 			["$pixshader"] = "arcana_corruption_ps30",
