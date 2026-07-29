@@ -11,6 +11,16 @@
 --   ring_star_ring.png
 --   ring_band.png                 (2048×128 horizontal strip)
 --   glyphs/glyph_<charcode>.png   (8 files, A–H)
+--
+-- These PNGs are the authoring format only. They are NOT kept in the repo and
+-- nothing loads them at runtime - only the DXT5 VTFs built from them ship, since
+-- Material() on a PNG uploads mipless BGRA8888 and costs 3x the VRAM. Feed this
+-- folder to the converter to rebuild them:
+--
+--   python3 tools/png_to_vtf.py <gmod>/garrysmod/data/arcana/ring_exports \
+--       --out materials/arcana/rings
+--   python3 tools/png_to_vtf.py <gmod>/garrysmod/data/arcana/ring_exports/glyphs \
+--       --out materials/arcana/glyphs
 
 if SERVER then return end
 

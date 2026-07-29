@@ -81,16 +81,14 @@ float4 main(PS_IN i) : COLOR
 	// Calculate pixel size for neighbor sampling
 	float2 pixelSize = TexBaseSize;
 
-	// Multi-sample the texture for smoother edges (reduce pixelation)
-	// Sample center and 4 neighbors, then average for antialiasing
-	float4 center = tex2D(TexBase, i.uv);
-	float4 up = tex2D(TexBase, i.uv + float2(0, pixelSize.y * 0.5));
-	float4 down = tex2D(TexBase, i.uv - float2(0, pixelSize.y * 0.5));
-	float4 left = tex2D(TexBase, i.uv - float2(pixelSize.x * 0.5, 0));
-	float4 right = tex2D(TexBase, i.uv + float2(pixelSize.x * 0.5, 0));
-
-	// Average the samples for smooth edges
-	float4 texSample = (center * 2.0 + up + down + left + right) / 6.0;
+	// Single tap. The ring textures are A8 VTFs with a full mip chain now, so the
+	// hardware averages the correct footprint under minification - which is what
+	// rings drawn a few hundred pixels wide from a 2048x2048 source are doing
+	// nearly all the time. The old 5-tap cross at +-0.5 texels was a weak stand-in
+	// for that back when the PNG loader could only give us a single mip level; it
+	// averaged barely a 2x2 texel neighbourhood while minification needs far
+	// wider, and cost 4 extra samples per pixel to do it.
+	float4 texSample = tex2D(TexBase, i.uv);
 
 	// Sample neighboring pixels to fill gaps and smooth edges
 	float alpha = texSample.a;

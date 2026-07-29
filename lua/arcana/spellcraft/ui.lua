@@ -40,9 +40,19 @@ local GLYPH_MATS
 local function getGlyphMats()
 	if GLYPH_MATS then return GLYPH_MATS end
 	GLYPH_MATS = {}
+
+	-- DXT5 VTF rather than the PNG: a third of the VRAM, and it shares the upload
+	-- with the ring glyph materials instead of adding a second BGRA8888 copy of
+	-- all eight. Regenerate with tools/png_to_vtf.py.
 	for i = 65, 72 do
-		GLYPH_MATS[#GLYPH_MATS + 1] = Material("arcana/glyphs/glyph_" .. i .. ".png", "smooth")
+		GLYPH_MATS[#GLYPH_MATS + 1] = CreateMaterial("arcana_spellcraft_glyph_" .. i, "UnlitGeneric", {
+			["$basetexture"] = "arcana/glyphs/glyph_" .. i,
+			["$translucent"] = 1,
+			["$vertexalpha"] = 1,
+			["$vertexcolor"] = 1,
+		})
 	end
+
 	return GLYPH_MATS
 end
 
