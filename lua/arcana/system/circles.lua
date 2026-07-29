@@ -5,15 +5,17 @@
 require("shader_to_gma")
 
 if SERVER then
-	local files, dirs = file.Find("materials/arcana/rings/*.png", "GAME")
-	for _, fname in ipairs(files) do
-		resource.AddFile("materials/arcana/rings/" .. fname)
+	-- Only the VTFs: DXT5 carries RGB as well as alpha, so both the shader and the
+	-- shaderless path draw from them and the source PNGs never load at runtime.
+	local function addTextureDir(dir)
+		local files = file.Find(dir .. "*.vtf", "GAME")
+		for _, fname in ipairs(files) do
+			resource.AddFile(dir .. fname)
+		end
 	end
 
-	files, dirs = file.Find("materials/arcana/glyphs/*.png", "GAME")
-	for _, fname in ipairs(files) do
-		resource.AddFile("materials/arcana/glyphs/" .. fname)
-	end
+	addTextureDir("materials/arcana/rings/")
+	addTextureDir("materials/arcana/glyphs/")
 
 	resource.AddShader("arcana_circle_ps30")
 	resource.AddShader("arcana_passthrough_vs30")
