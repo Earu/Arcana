@@ -1,7 +1,7 @@
 "VertexlitGeneric"
 {
-	"$basetexture" "models/arcana/catalyst_apprentice"
-	"$bumpmap" "models/arcana/normal"
+	"$basetexture" "models/arcana/grimoire/catalyst_apprentice"
+	"$bumpmap" "models/arcana/grimoire/normal"
 	//"$translucent" "1"
 	"$model" "1"
 	"$nodecal" "1"
@@ -10,13 +10,13 @@
 	//"$allowalphatocoverage" 1
 	//"$halflambert" "1"
 
-	"$lightwarptexture" "models/arcana/lightwarptexture"
+	"$lightwarptexture" "models/arcana/grimoire/lightwarptexture"
 
 	"$phong" "1"
 	"$phongboost"	"1"
 	"$phongalbedotint" "1"
 	"$phongexponent" "15"
-	"$phongexponenttexture" "models/arcana/phong_exp"
+	"$phongexponenttexture" "models/arcana/grimoire/phong_exp"
 	"$phongfresnelranges"	"[0.005 0.005 1]"
 
 	"$rimlight"               "1"

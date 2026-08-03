@@ -24,10 +24,10 @@ if SERVER then
 
 	resource.AddFile("materials/entities/arcana_altar.png")
 	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
-	resource.AddFile("models/arcana_obelisk/arcana_obelisk_bottom.mdl")
-	resource.AddFile("models/arcana_obelisk/arcana_obelisk_top.mdl")
-	resource.AddFile("materials/models/arcana_obelisk/arcana_bronze.vmt")
-	resource.AddFile("materials/models/arcana_obelisk/arcana_bronze_nm.vtf")
+	resource.AddFile("models/arcana/obelisk/obelisk_bottom.mdl")
+	resource.AddFile("models/arcana/obelisk/obelisk_top.mdl")
+	resource.AddFile("materials/models/arcana/obelisk/stone.vmt")
+	resource.AddFile("materials/models/arcana/obelisk/stone_nm.vtf")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
@@ -195,7 +195,7 @@ if CLIENT then
 		end
 
 		-- Create bottom part
-		self._obeliskBottom = ClientsideModel("models/arcana_obelisk/arcana_obelisk_bottom.mdl")
+		self._obeliskBottom = ClientsideModel("models/arcana/obelisk/obelisk_bottom.mdl")
 		if IsValid(self._obeliskBottom) then
 			self._obeliskBottom:SetPos(self:GetPos())
 			self._obeliskBottom:SetAngles(self:GetAngles())
@@ -203,7 +203,7 @@ if CLIENT then
 		end
 
 		-- Create top part
-		self._obeliskTop = ClientsideModel("models/arcana_obelisk/arcana_obelisk_top.mdl")
+		self._obeliskTop = ClientsideModel("models/arcana/obelisk/obelisk_top.mdl")
 		if IsValid(self._obeliskTop) then
 			self._obeliskTop:SetPos(self:GetPos())
 			self._obeliskTop:SetAngles(self:GetAngles())
