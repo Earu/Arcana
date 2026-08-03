@@ -40,6 +40,7 @@ end
 
 SWEP.PrintName = "Grimoire"
 SWEP.Author = "Earu"
+SWEP.Category = "Arcana"
 SWEP.Purpose = "A mystical tome containing powerful spells and rituals"
 SWEP.Instructions = "LMB: Cast | RMB: Open Grimoire | R: Quick Radial"
 SWEP.Spawnable = true

@@ -158,9 +158,12 @@ local TARGETS = {
 		end,
 	},
 	{
-		class = "grimoire", swep = true, fov = 40, dir = Vector(1, -0.55, 0.30), pad = 1.30, settle = 1,
-		-- A dropped weapon lands on a random face; stand it up so the cover reads.
-		stage = function(ent) ent:SetAngles(Angle(0, 0, 0)) end,
+		-- Stood upright with the cover square to the lens — the emblem pose. Pitch +90, not -90:
+		-- the model's +x axis is the BOTTOM of the cover art, so -90 stands it on its head. With
+		-- the pitch flipped, +up is the side the sigil cover faces. camRoll does the 180 the
+		-- entity pose cannot (see computeView).
+		class = "grimoire", swep = true, fov = 40, dir = Vector(0, 0, 1), pad = 0.94, camRoll = 180, settle = 1,
+		stage = function(ent) ent:SetAngles(Angle(90, 0, 0)) end,
 	},
 }
 
@@ -306,26 +309,45 @@ if SERVER then
 	return
 end
 
--- ── Palette ───────────────────────────────────────────────────────────────────
--- Taken from ArtDeco.Colors so the icons sit in the same family as every station UI.
+-- ── Frame & backdrop art ──────────────────────────────────────────────────────
+-- The frame every icon wears: a double-rule octagon with 45 degree cut corners, a runic glyph in
+-- each open corner triangle, and a lozenge at each edge midpoint. Everything is a fraction of the
+-- square size s. This lives HERE, not in the runtime addon: nothing player-facing draws it, and
+-- the one thing that did (the animated grimoire icon) is gone.
 
 local COL_BG_TOP    = Color(30, 23, 16)
-local COL_BG_BOTTOM = Color(9, 7, 5)
+local COL_BG_DARK   = Color(9, 7, 5)
 local COL_GOLD      = Color(198, 160, 74)
 local COL_PALE_GOLD = Color(222, 198, 120)
 local COL_BRASS     = Color(160, 130, 60)
 
-local MAT_GLOW      = Material("particle/particle_glow_04_additive")
-local MAT_GRAD_UP   = Material("gui/gradient_up")
-local MAT_GRAD_DOWN = Material("gui/gradient_down")
-local MAT_GRAD      = Material("gui/gradient")
+local MAT_GLOW = Material("particle/particle_glow_04_additive")
 
--- ── Drawing primitives ────────────────────────────────────────────────────────
+-- Four different glyphs so the frame reads as an inscription, not a stamp.
+local CORNER_GLYPH_CODES = {65, 68, 70, 67}
+local CORNERS = {{0, 0}, {1, 0}, {1, 1}, {0, 1}}
 
--- Every line in this frame is axis-aligned, so a stroke is just a rect — no stack of offset
--- DrawLine calls, which is what was leaving ragged edges. Each rect overhangs its segment by half
--- the thickness at both ends, which is also what closes the notch where two runs meet at a step:
--- butted rects leave a t/2 square hole at every inside corner.
+local glyphMats
+local function getGlyphMats()
+	if glyphMats then return glyphMats end
+	glyphMats = {}
+
+	-- DXT5 VTF rather than the PNG, matching spellcraft/ui.lua: the upload is shared with the
+	-- ring glyphs instead of adding a BGRA8888 copy.
+	for _, code in ipairs(CORNER_GLYPH_CODES) do
+		glyphMats[code] = CreateMaterial("arcana_spawnicon_glyph_" .. code, "UnlitGeneric", {
+			["$basetexture"] = "arcana/glyphs/glyph_" .. code,
+			["$translucent"] = 1,
+			["$vertexalpha"] = 1,
+			["$vertexcolor"] = 1,
+		})
+	end
+
+	return glyphMats
+end
+
+-- Axis-aligned stroke as a rect, ends extended by half the thickness so perpendicular runs meet
+-- without notching.
 local function bar(x1, y1, x2, y2, t)
 	local h = t * 0.5
 
@@ -338,12 +360,33 @@ local function bar(x1, y1, x2, y2, t)
 	end
 end
 
-local CORNERS = {{0, 0}, {1, 0}, {1, 1}, {0, 1}}
+-- Diagonal stroke as a filled quad, same half-thickness end extension. Minus side first: with
+-- screen-space y pointing down this walks the quad clockwise, which is the winding DrawPoly
+-- renders — the mirror order gets culled.
+local function slantBar(x1, y1, x2, y2, t)
+	local dx, dy = x2 - x1, y2 - y1
+	local len = math.sqrt(dx * dx + dy * dy)
+	if len < 0.001 then return end
 
--- Closed outline of a square with 45 degree cut corners — the same octagon every station UI
--- draws through ArtDeco.DrawDecoFrame, so the icons speak the addon's dialect. Each corner is the
--- two-point cut mirrored into its quadrant; the two singly-mirrored ones are walked backwards so
--- the path stays continuous.
+	local h = t * 0.5
+	local ux, uy = dx / len, dy / len
+	local nx, ny = -uy * h, ux * h
+
+	x1, y1 = x1 - ux * h, y1 - uy * h
+	x2, y2 = x2 + ux * h, y2 + uy * h
+
+	draw.NoTexture()
+	surface.DrawPoly({
+		{x = x1 - nx, y = y1 - ny},
+		{x = x2 - nx, y = y2 - ny},
+		{x = x2 + nx, y = y2 + ny},
+		{x = x1 + nx, y = y1 + ny},
+	})
+end
+
+-- Closed outline of a square with 45 degree cut corners — the ArtDeco.DrawDecoFrame octagon, so
+-- the icons speak the addon's dialect. Each corner is the two-point cut mirrored into its
+-- quadrant; the two singly-mirrored ones are walked backwards so the path stays continuous.
 local function octagonPath(x, y, s, c)
 	local base = {{0, c}, {c, 0}}
 	local pts = {}
@@ -365,32 +408,6 @@ local function octagonPath(x, y, s, c)
 	return pts
 end
 
--- Diagonal stroke as a filled quad, ends extended by half the thickness like bar() so joints with
--- the axis-aligned runs close instead of notching. DrawPoly wants clockwise winding; extending
--- along the segment direction and offsetting by its normal keeps it so regardless of slant.
-local function slantBar(x1, y1, x2, y2, t)
-	local dx, dy = x2 - x1, y2 - y1
-	local len = math.sqrt(dx * dx + dy * dy)
-	if len < 0.001 then return end
-
-	local h = t * 0.5
-	local ux, uy = dx / len, dy / len
-	local nx, ny = -uy * h, ux * h
-
-	x1, y1 = x1 - ux * h, y1 - uy * h
-	x2, y2 = x2 + ux * h, y2 + uy * h
-
-	-- Minus side first: with screen-space y pointing down this walks the quad clockwise, which is
-	-- the winding DrawPoly renders — the mirror order gets culled silently.
-	draw.NoTexture()
-	surface.DrawPoly({
-		{x = x1 - nx, y = y1 - ny},
-		{x = x2 - nx, y = y2 - ny},
-		{x = x2 + nx, y = y2 + ny},
-		{x = x1 + nx, y = y1 + ny},
-	})
-end
-
 local function strokePath(pts, t, col)
 	surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
 
@@ -405,39 +422,104 @@ local function strokePath(pts, t, col)
 	end
 end
 
--- ── Backdrop ──────────────────────────────────────────────────────────────────
--- Composed around the screen centre so it lands correctly in the square crop, and identical for
--- every icon by design.
---
--- It is baked into a render target rather than drawn straight into the scene: the opaque pass runs
--- with alpha blending OFF, so a 2D draw there ignores its alpha entirely and every faint layer
--- comes out solid gold. Baking it where blending behaves and blitting the result opaquely is both
--- correct and cheaper — the backdrop never changes between icons.
+-- Each glyph sits in the dead triangle OUTSIDE the frame, between the cut and the square's own
+-- corner. The largest axis-aligned square under the cut line has side reach / 2 flush in the
+-- corner; 0.46 with a 0.02 nudge leaves a hair of air on every side.
+local function drawCornerGlyphs(x, y, s, a, c)
+	local mats = getGlyphMats()
+	local reach = a + c
+	local size = reach * 0.46
+	local d = size * 0.5 + reach * 0.02
+
+	for i, m in ipairs(CORNERS) do
+		local mat = mats[CORNER_GLYPH_CODES[i]]
+		if not mat then continue end
+
+		local sx = m[1] == 0 and 1 or -1
+		local sy = m[2] == 0 and 1 or -1
+		local cx = (m[1] == 0 and x or (x + s)) + sx * d
+		local cy = (m[2] == 0 and y or (y + s)) + sy * d
+
+		surface.SetMaterial(mat)
+		surface.SetDrawColor(COL_PALE_GOLD.r, COL_PALE_GOLD.g, COL_PALE_GOLD.b, 255)
+		surface.DrawTexturedRect(cx - size * 0.5, cy - size * 0.5, size, size)
+	end
+end
+
+-- A gold lozenge seated on the band at the middle of each edge, echoing the diamond that
+-- ArtDeco.DrawDecoFlourish puts at the centre of every station title rule.
+local function drawEdgeDiamonds(x, y, s, a, b)
+	local mid = (a + b) * 0.5
+	local r = math.max(3, (b - a) * 0.80)
+
+	local spots = {
+		{x + s * 0.5, y + mid},
+		{x + s * 0.5, y + s - mid},
+		{x + mid, y + s * 0.5},
+		{x + s - mid, y + s * 0.5},
+	}
+
+	draw.NoTexture()
+
+	for _, p in ipairs(spots) do
+		surface.SetDrawColor(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 255)
+		surface.DrawPoly({
+			{x = p[1], y = p[2] - r},
+			{x = p[1] + r, y = p[2]},
+			{x = p[1], y = p[2] + r},
+			{x = p[1] - r, y = p[2]},
+		})
+
+		local ri = r * 0.42
+		surface.SetDrawColor(COL_BG_DARK.r, COL_BG_DARK.g, COL_BG_DARK.b, 255)
+		surface.DrawPoly({
+			{x = p[1], y = p[2] - ri},
+			{x = p[1] + ri, y = p[2]},
+			{x = p[1], y = p[2] + ri},
+			{x = p[1] - ri, y = p[2]},
+		})
+	end
+end
+
+-- The full frame over a square region.
+local function drawFrame(x, y, s)
+	local tOuter = math.max(3, math.floor(s * 0.0105))
+	local tInner = math.max(1, math.floor(s * 0.0035))
+	local a = math.ceil(tOuter * 0.5)            -- outer rule, pulled in enough to sit inside
+	local b = a + math.floor(s * 0.030)          -- inner rule
+	local c = math.floor(s * 0.150)              -- corner cut reach
+
+	-- Both rules use the SAME cut reach, which keeps the two slants exactly parallel so the band
+	-- between them holds a constant width.
+	strokePath(octagonPath(x + a, y + a, s - a * 2, c), tOuter, COL_GOLD)
+	strokePath(octagonPath(x + b, y + b, s - b * 2, c), tInner, COL_BRASS)
+
+	drawCornerGlyphs(x, y, s, a, c)
+	drawEdgeDiamonds(x, y, s, a, b)
+end
 
 local GRADIENT_STEPS = 96
 
-local backdropRT, backdropMat, backdropW, backdropH
-
-local function paintBackdrop(scrW, scrH)
-	-- Vertical gradient base
-	local stepH = scrH / GRADIENT_STEPS
+-- The shared backdrop: vertical gradient, warm core bloom, the addon's own pattern rings and
+-- faint concentric hairlines. Fills w x h, composed around its centre at scale s.
+local function paintBackdrop(x, y, w, h, s)
+	local stepH = h / GRADIENT_STEPS
 
 	for i = 0, GRADIENT_STEPS - 1 do
 		local f = i / (GRADIENT_STEPS - 1)
 		surface.SetDrawColor(
-			Lerp(f, COL_BG_TOP.r, COL_BG_BOTTOM.r),
-			Lerp(f, COL_BG_TOP.g, COL_BG_BOTTOM.g),
-			Lerp(f, COL_BG_TOP.b, COL_BG_BOTTOM.b),
+			Lerp(f, COL_BG_TOP.r, COL_BG_DARK.r),
+			Lerp(f, COL_BG_TOP.g, COL_BG_DARK.g),
+			Lerp(f, COL_BG_TOP.b, COL_BG_DARK.b),
 			255
 		)
-		surface.DrawRect(0, math.floor(i * stepH), scrW, math.ceil(stepH) + 1)
+		surface.DrawRect(x, math.floor(y + i * stepH), w, math.ceil(stepH) + 1)
 	end
 
-	local cx, cy = scrW * 0.5, scrH * 0.5
-	local s = scrH
+	local cx, cy = x + w * 0.5, y + h * 0.5
 
-	-- Warm core bloom behind wherever the subject sits. This is the only thing lifting the middle
-	-- off black — the subject is the hero, the backdrop just has to seat it.
+	-- Warm core bloom behind wherever the subject sits — the only thing lifting the middle off
+	-- black; the subject is the hero, the backdrop just has to seat it.
 	surface.SetMaterial(MAT_GLOW)
 	surface.SetDrawColor(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 46)
 	surface.DrawTexturedRect(cx - s * 0.50, cy - s * 0.50, s, s)
@@ -450,14 +532,23 @@ local function paintBackdrop(scrW, scrH)
 		Arcana.Circle.Draw2DPatternRing(2, cx, cy, s * 0.255, 0, COL_GOLD, 16)
 	end
 
-	-- Concentric hairlines, evenly spaced, to give the void some structure without competing with
-	-- the subject the way a full sunburst did.
-	surface.SetDrawColor(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 20)
-
+	-- Concentric hairlines, evenly spaced, to give the void some structure
 	for i = 1, 4 do
 		surface.DrawCircle(cx, cy, s * (0.10 + i * 0.075), COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 20)
 	end
 end
+
+-- ── Backdrop ──────────────────────────────────────────────────────────────────
+-- It is baked into a render target rather than drawn straight into the scene: the opaque pass runs
+-- with alpha blending OFF, so a 2D draw there ignores its alpha entirely and every faint layer
+-- comes out solid gold. Baking it where blending behaves and blitting the result opaquely is both
+-- correct and cheaper — the backdrop never changes between icons.
+
+local MAT_GRAD_UP   = Material("gui/gradient_up")
+local MAT_GRAD_DOWN = Material("gui/gradient_down")
+local MAT_GRAD      = Material("gui/gradient")
+
+local backdropRT, backdropMat, backdropW, backdropH
 
 local function buildBackdrop()
 	local scrW, scrH = ScrW(), ScrH()
@@ -474,7 +565,7 @@ local function buildBackdrop()
 	render.PushRenderTarget(backdropRT, 0, 0, scrW, scrH)
 	render.Clear(0, 0, 0, 255, true, true)
 	cam.Start2D()
-	paintBackdrop(scrW, scrH)
+	paintBackdrop(0, 0, scrW, scrH, scrH)
 	cam.End2D()
 	render.PopRenderTarget()
 end
@@ -505,113 +596,6 @@ local function drawVignette(x, y, s)
 	surface.DrawTexturedRectRotated(x + s - band * 0.5, y + s * 0.5, band, s, 180)
 end
 
--- A runic glyph seated in each corner — the same eight Pulsian glyphs the magic circles draw from
--- (materials/arcana/glyphs, built by tools/export_ring_pngs.lua + png_to_vtf.py). Four different
--- ones so the frame reads as an inscription rather than a repeated stamp.
---
--- Placement is in terms of x + y measured from the corner, because the diagonal is a line of
--- constant x + y. The frame's staircase oscillates between x + y = c and c + q (each tread trades
--- q of x for q of y), so the glyph centre has to clear (c + q) / 2 per axis or it collides with
--- the corner it decorates.
-local CORNER_GLYPH_CODES = {65, 68, 70, 67}
-
-local GLYPH_MATS
-local function getGlyphMats()
-	if GLYPH_MATS then return GLYPH_MATS end
-	GLYPH_MATS = {}
-
-	-- DXT5 VTF rather than the PNG, matching how spellcraft/ui.lua loads these: the upload is
-	-- shared with the ring glyphs instead of adding a second BGRA8888 copy of all eight.
-	for _, code in ipairs(CORNER_GLYPH_CODES) do
-		GLYPH_MATS[code] = CreateMaterial("arcana_spawnicon_glyph_" .. code, "UnlitGeneric", {
-			["$basetexture"] = "arcana/glyphs/glyph_" .. code,
-			["$translucent"] = 1,
-			["$vertexalpha"] = 1,
-			["$vertexcolor"] = 1,
-		})
-	end
-
-	return GLYPH_MATS
-end
-
--- Each glyph sits in the dead triangle OUTSIDE the frame — between the 45 degree cut and the
--- square's own corner. The glyph centre rides the corner diagonal; the far corner of its quad has
--- to stay under the cut line x + y = a + c, which is what bounds the size.
-local function drawCornerGlyphs(x, y, s, a, c)
-	local mats = getGlyphMats()
-	-- The largest axis-aligned square under the cut line has side reach / 2 and sits flush in the
-	-- corner; 0.46 with a 0.02 nudge inward leaves a hair of air on every side.
-	local reach = a + c
-	local size = reach * 0.46
-	local d = size * 0.5 + reach * 0.02            -- centre distance in from the corner, per axis
-
-	for i, m in ipairs(CORNERS) do
-		local mat = mats[CORNER_GLYPH_CODES[i]]
-		if not mat then continue end
-
-		local sx = m[1] == 0 and 1 or -1
-		local sy = m[2] == 0 and 1 or -1
-		local cx = (m[1] == 0 and x or (x + s)) + sx * d
-		local cy = (m[2] == 0 and y or (y + s)) + sy * d
-
-		surface.SetMaterial(mat)
-		surface.SetDrawColor(COL_PALE_GOLD.r, COL_PALE_GOLD.g, COL_PALE_GOLD.b, 255)
-		surface.DrawTexturedRect(cx - size * 0.5, cy - size * 0.5, size, size)
-	end
-end
-
--- A gold lozenge seated on the band at the middle of each edge, matching the diamond that
--- ArtDeco.DrawDecoFlourish puts at the centre of every station UI's title rule.
-local function drawEdgeDiamonds(x, y, s, a, b)
-	local mid = (a + b) * 0.5
-	local r = math.max(3, (b - a) * 0.80)
-
-	local spots = {
-		{x + s * 0.5, y + mid},
-		{x + s * 0.5, y + s - mid},
-		{x + mid, y + s * 0.5},
-		{x + s - mid, y + s * 0.5},
-	}
-
-	draw.NoTexture()
-
-	for _, p in ipairs(spots) do
-		surface.SetDrawColor(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 255)
-		surface.DrawPoly({
-			{x = p[1], y = p[2] - r},
-			{x = p[1] + r, y = p[2]},
-			{x = p[1], y = p[2] + r},
-			{x = p[1] - r, y = p[2]},
-		})
-
-		local ri = r * 0.42
-		surface.SetDrawColor(COL_BG_BOTTOM.r, COL_BG_BOTTOM.g, COL_BG_BOTTOM.b, 255)
-		surface.DrawPoly({
-			{x = p[1], y = p[2] - ri},
-			{x = p[1] + ri, y = p[2]},
-			{x = p[1], y = p[2] + ri},
-			{x = p[1] - ri, y = p[2]},
-		})
-	end
-end
-
--- The frame runs edge to edge: the icon IS the card, so the setback corners land on the square's
--- own corners rather than floating inside a margin.
-local function drawFrame(x, y, s)
-	local tOuter = math.max(3, math.floor(s * 0.0105))
-	local tInner = math.max(1, math.floor(s * 0.0035))
-	local a = math.ceil(tOuter * 0.5)            -- outer rule, pulled in enough to sit inside
-	local b = a + math.floor(s * 0.030)          -- inner rule
-	local c = math.floor(s * 0.150)              -- corner cut reach
-
-	-- Both rules use the SAME cut reach, which keeps the two slants exactly parallel so the band
-	-- between them holds a constant width around the corner.
-	strokePath(octagonPath(x + a, y + a, s - a * 2, c), tOuter, COL_GOLD)
-	strokePath(octagonPath(x + b, y + b, s - b * 2, c), tInner, COL_BRASS)
-
-	drawCornerGlyphs(x, y, s, a, c)
-	drawEdgeDiamonds(x, y, s, a, b)
-end
 
 -- ── Capture rig ───────────────────────────────────────────────────────────────
 
@@ -665,9 +649,16 @@ local function computeView(ent, t)
 	local dir = (ang:Forward() * d.x + ang:Right() * d.y + ang:Up() * d.z):GetNormalized()
 	local origin = lookAt + dir * dist
 
+	-- camRoll rotates the photograph in the image plane. It exists because the entity route is a
+	-- dead end for this: with the camera riding the subject's own axes, flipping the subject
+	-- rotates the whole rig and produces the identical picture (measured, not guessed — pitch
+	-- -90 and +90 exports of the grimoire diff to framing noise).
+	local viewAng = (lookAt - origin):Angle()
+	viewAng.roll = t.camRoll or 0
+
 	return {
 		origin = origin,
-		angles = (lookAt - origin):Angle(),
+		angles = viewAng,
 		fov = fov,
 		znear = 1,
 		zfar = math.max(4096, dist * 4),
