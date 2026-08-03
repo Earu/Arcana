@@ -25,9 +25,9 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
-	resource.AddFile("models/props_swamp/shroom_ref_01.mdl")
-	resource.AddFile("materials/models/props_swamp/shroom_diffuse.vmt")
-	resource.AddFile("materials/models/props_swamp/shroom_diffuse.vtf")
+	resource.AddFile("models/arcana/mushroom/mushroom.mdl")
+	resource.AddFile("materials/models/arcana/mushroom/shroom_diffuse.vmt")
+	resource.AddFile("materials/models/arcana/mushroom/shroom_diffuse.vtf")
 
 	function ENT:Initialize()
 		-- Use a solid physics model and render the mushroom clientside
@@ -124,7 +124,7 @@ if SERVER then
 end
 
 if CLIENT then
-	local CLIENT_MUSHROOM_MODEL = "models/props_swamp/shroom_ref_01.mdl"
+	local CLIENT_MUSHROOM_MODEL = "models/arcana/mushroom/mushroom.mdl"
 
 	function ENT:Initialize()
 		self._emitter = ParticleEmitter(self:GetPos(), false)

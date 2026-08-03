@@ -91,17 +91,17 @@ if SERVER then
 	resource.AddShader("arcana_crystal_surface_vs30")
 	resource.AddShader("arcana_crystal_surface_ps30")
 
-	resource.AddFile("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_a.mdl")
-	resource.AddFile("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_b.mdl")
-	resource.AddFile("materials/models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge_multi.vmt")
-	resource.AddFile("materials/models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge.vmt")
+	resource.AddFile("models/arcana/crystals/crystal_cluster_a.mdl")
+	resource.AddFile("models/arcana/crystals/crystal_cluster_b.mdl")
+	resource.AddFile("materials/models/arcana/crystals/crystal_damaged_huge_multi.vmt")
+	resource.AddFile("materials/models/arcana/crystals/crystal_damaged_huge.vmt")
 
 	-- Cooldown to prevent excessive shard drops from multi-hit weapons (non-shatter only)
 	local DAMAGE_SHARD_COOLDOWN = 1
 
 	function ENT:Initialize()
-		self:SetModel("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_cluster_huge_damaged_" .. (math.random() > 0.5 and "a" or "b") .. ".mdl")
-		self:SetMaterial("models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge.vmt")
+		self:SetModel("models/arcana/crystals/crystal_cluster_" .. (math.random() > 0.5 and "a" or "b") .. ".mdl")
+		self:SetMaterial("models/arcana/crystals/crystal_damaged_huge.vmt")
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
@@ -252,7 +252,7 @@ if CLIENT then
 		SHADER_MAT = CreateShaderMaterial("crystal_dispersion", {
 			["$pixshader"] = "arcana_crystal_surface_ps30",
 			["$vertexshader"] = "arcana_crystal_surface_vs30",
-			--["$texture1"] = "models/props_abandoned/crystals_fixed/crystal_damaged/crystal_damaged_huge",
+			--["$texture1"] = "models/arcana/crystals/crystal_damaged_huge",
 			["$model"] = 1,
 			["$vertexnormal"] = 1,
 			["$softwareskin"] = 1,
