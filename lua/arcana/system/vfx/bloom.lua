@@ -125,11 +125,28 @@ local function initBloom()
 	-- Full pipeline: blur passes then additive composite with chromatic aberration.
 	-- caScale scales the red/blue split of both composite passes: 1 (default) keeps
 	-- the tuned amount, 0 composites clean for callers that do not want the fringe.
-	function renderBloom(caScale)
+	--
+	-- tight skips the quarter-res glow fog and shortens the blur chain. The full
+	-- profile is tuned for metre-wide magic circles; feed it a screen-space-small
+	-- glyph and the fog swallows the letterform in a blob several times its size.
+	-- Tight mode keeps a halo that hugs the shape instead.
+	function renderBloom(caScale, tight)
 		if not BLOOM_ENABLED:GetBool() then return end
 		if eyeOutOfWorld() then return end
 
 		caScale = caScale or 1
+
+		if tight then
+			-- ── Tight-only — a single H+V pass at half-res, no fog ───────────
+			blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
+			blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 0.4) -- bake bloom intensity
+
+			render.OverrideBlend(true, BLEND_ONE_MINUS_DST_COLOR, BLEND_ONE, BLENDFUNC_ADD, BLEND_ZERO, BLEND_ONE, BLENDFUNC_ADD)
+			additiveComposite(BLOOM_RT_B, 0.025 * caScale)
+			render.OverrideBlend(false)
+
+			return
+		end
 
 		-- ── Tight bloom — 3 successive H+V passes at half-res ────────────────
 		blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)

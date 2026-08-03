@@ -28,6 +28,7 @@ end
 if SERVER then
 	util.AddNetworkString("Arcana_CloseEmissaryMenu")
 
+	resource.AddFile("materials/entities/arcana_emissary.png")
 	resource.AddFile("models/arcana/bench/bench.mdl")
 	resource.AddFile("materials/models/arcana/bench/altarstone.vmt")
 	resource.AddFile("materials/models/arcana/bench/altarstone.vtf")
@@ -1077,64 +1078,89 @@ if CLIENT then
 				render.SetBlend(1)
 				render.SetColorModulation(1, 1, 1)
 				render.MaterialOverride()
-
-				-- One big rune before each shelf, upright, facing the
-				-- grimoire, fading with the shelf's depth in the abyss
-				surface.SetFont("MagicCircle_Large")
-
-				for i = 1, SHELF_COUNT do
-					local f = self._shelfFrac and self._shelfFrac[i] or 0
-
-					if f > 0 then
-						local below = SHELF_SINK_DEPTH * (1 - easeOutCubic(f))
-						local alpha = math.floor((1 - math.Clamp(below / SHELF_FADE_RANGE, 0, 1)) * BIGRUNE_ALPHA)
-
-						if alpha > 0 then
-							local groundPos, yaw = self:_ShelfGroundPos(i)
-							local pos = groundPos - Vector(0, 0, below)
-								- Angle(0, yaw, 0):Forward() * RUNE_INWARD_OFFSET
-								+ Vector(0, 0, SHELF_SCROLL_HEIGHT + math.sin(now * BIGRUNE_BOB_SPEED + i * 1.3) * BIGRUNE_BOB_AMP)
-							local ang = (self._grimWorldPos - pos):GetNormalized():Angle()
-							ang:RotateAroundAxis(ang:Right(), -90)
-							ang:RotateAroundAxis(ang:Up(), 90)
-							local ch = self._shelfRuneChars and self._shelfRuneChars[i] or "A"
-							local w, h = surface.GetTextSize(ch)
-							cam.Start3D2D(pos, ang, BIGRUNE_SCALE)
-							surface.SetTextColor(GOLD.r, GOLD.g, GOLD.b, alpha)
-							surface.SetTextPos(-w * 0.5, -h * 0.5)
-							surface.DrawText(ch)
-							cam.End3D2D()
-						end
-					end
-				end
-
-				-- Rune stream flowing to the grimoire, one shared billboard
-				-- angle, altar-style
-				if self._runes and #self._runes > 0 then
-					local streamAng = (EyePos() - self:GetPos()):GetNormalized():Angle()
-					streamAng:RotateAroundAxis(streamAng:Right(), -90)
-					streamAng:RotateAroundAxis(streamAng:Up(), 90)
-
-					surface.SetFont("MagicCircle_Medium")
-
-					for _, p in ipairs(self._runes) do
-						local fadeIn = math.Clamp((now - (p.born or now)) / RUNE_FADE_IN, 0, 1)
-						local fadeOut = math.Clamp(((p.dieAt or now) - now) / RUNE_FADE_OUT, 0, 1)
-						local alpha = math.floor((p.alpha or 180) * fadeIn * fadeOut)
-
-						if alpha > 0 then
-							local w, h = surface.GetTextSize(p.char or "")
-							cam.Start3D2D(p.pos, streamAng, 0.06)
-							surface.SetTextColor(GOLD.r, GOLD.g, GOLD.b, alpha)
-							surface.SetTextPos(-w * 0.5, -h * 0.5)
-							surface.DrawText(p.char or "")
-							cam.End3D2D()
-						end
-					end
-				end
 			end)
 
 			Arcana.Bloom.RenderBloom()
+
+			-- The floating glyphs get their own capture on the tight profile.
+			-- They shared the bench's full-fat bloom for a while, and the
+			-- quarter-res glow fog — sized for the bench's engraved planes —
+			-- swallowed each glyph in a blob several times its size.
+			local anyShelfRune = false
+
+			if self._shelfFrac then
+				for i = 1, SHELF_COUNT do
+					if (self._shelfFrac[i] or 0) > 0 then
+						anyShelfRune = true
+
+						break
+					end
+				end
+			end
+
+			if anyShelfRune or (self._runes and #self._runes > 0) then
+				Arcana.Bloom.ProcessBloom(function()
+					-- One big rune before each shelf, upright, facing the
+					-- grimoire, fading with the shelf's depth in the abyss
+					surface.SetFont("MagicCircle_Large")
+
+					for i = 1, SHELF_COUNT do
+						local f = self._shelfFrac and self._shelfFrac[i] or 0
+
+						if f > 0 then
+							local below = SHELF_SINK_DEPTH * (1 - easeOutCubic(f))
+							local alpha = math.floor((1 - math.Clamp(below / SHELF_FADE_RANGE, 0, 1)) * BIGRUNE_ALPHA)
+
+							if alpha > 0 then
+								local groundPos, yaw = self:_ShelfGroundPos(i)
+								local pos = groundPos - Vector(0, 0, below)
+									- Angle(0, yaw, 0):Forward() * RUNE_INWARD_OFFSET
+									+ Vector(0, 0, SHELF_SCROLL_HEIGHT + math.sin(now * BIGRUNE_BOB_SPEED + i * 1.3) * BIGRUNE_BOB_AMP)
+								local ang = (self._grimWorldPos - pos):GetNormalized():Angle()
+								ang:RotateAroundAxis(ang:Right(), -90)
+								ang:RotateAroundAxis(ang:Up(), 90)
+								local ch = self._shelfRuneChars and self._shelfRuneChars[i] or "A"
+								local w, h = surface.GetTextSize(ch)
+								cam.Start3D2D(pos, ang, BIGRUNE_SCALE)
+								surface.SetTextColor(GOLD.r, GOLD.g, GOLD.b, alpha)
+								surface.SetTextPos(-w * 0.5, -h * 0.5)
+								surface.DrawText(ch)
+								cam.End3D2D()
+							end
+						end
+					end
+
+					-- Rune stream flowing to the grimoire, one shared billboard
+					-- angle, altar-style
+					if self._runes and #self._runes > 0 then
+						local streamAng = (EyePos() - self:GetPos()):GetNormalized():Angle()
+						streamAng:RotateAroundAxis(streamAng:Right(), -90)
+						streamAng:RotateAroundAxis(streamAng:Up(), 90)
+
+						surface.SetFont("MagicCircle_Medium")
+
+						for _, p in ipairs(self._runes) do
+							local fadeIn = math.Clamp((now - (p.born or now)) / RUNE_FADE_IN, 0, 1)
+							local fadeOut = math.Clamp(((p.dieAt or now) - now) / RUNE_FADE_OUT, 0, 1)
+							local alpha = math.floor((p.alpha or 180) * fadeIn * fadeOut)
+
+							if alpha > 0 then
+								local w, h = surface.GetTextSize(p.char or "")
+								cam.Start3D2D(p.pos, streamAng, 0.06)
+								surface.SetTextColor(GOLD.r, GOLD.g, GOLD.b, alpha)
+								surface.SetTextPos(-w * 0.5, -h * 0.5)
+								surface.DrawText(p.char or "")
+								cam.End3D2D()
+							end
+						end
+					end
+				end)
+
+				-- A third of the tuned CA, matching the altar's floating glyphs: full fringe at
+				-- glyph size reads as misregistration, none reads flat. The bench pass above
+				-- keeps the full amount.
+				Arcana.Bloom.RenderBloom(0.35, true)
+			end
 		end
 
 		-- Candle flames on the platform, flickering on two mixed frequencies

@@ -56,6 +56,8 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
+	resource.AddFile("materials/entities/arcana_brazier.png")
+
 	function ENT:Initialize()
 		-- Use the shell model inverted
 		self:SetModel("models/hunter/misc/shell2x2a.mdl")
