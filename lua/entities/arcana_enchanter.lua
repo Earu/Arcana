@@ -880,6 +880,10 @@ if CLIENT then
 			surface.DrawTexturedRectRotated(rx, ry, size, size, rot)
 		end
 
+		-- Restore the global RNG: leaving it seeded makes every math.random
+		-- caller this frame (world VFX included) repeat the same sequence
+		math.randomseed(SysTime())
+
 		render.SetStencilEnable(false)
 	end
 

@@ -119,6 +119,10 @@ local function drawEmissaryBackground(w, h, seed)
 		surface.DrawTexturedRectRotated(rx, ry, size, size, rot)
 	end
 
+	-- Restore the global RNG: leaving it seeded makes every math.random
+	-- caller this frame (world VFX included) repeat the same sequence
+	math.randomseed(SysTime())
+
 	render.SetStencilEnable(false)
 end
 
@@ -386,6 +390,38 @@ local function OpenSpellcraftMenu(machine)
 	frame:SetTitle("")
 	frame:MakePopup()
 
+	-- Draggable by the whole header band (the stock strip is too thin).
+	-- The cursor signals the band on hover and the drag while it lasts.
+	frame:SetDraggable(false)
+	frame.OnMousePressed = function(pnl, code)
+		if code ~= MOUSE_LEFT then return end
+		local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+		if my <= 44 then
+			pnl._dragOffset = {mx, my}
+			pnl:MouseCapture(true)
+			pnl:SetCursor("sizeall")
+		end
+	end
+	frame.OnMouseReleased = function(pnl)
+		pnl._dragOffset = nil
+		pnl:MouseCapture(false)
+		local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+		pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
+	end
+	frame.OnCursorMoved = function(pnl)
+		if pnl._dragOffset then
+			local mx, my = gui.MousePos()
+			pnl:SetPos(
+				math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
+				math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
+
+			return
+		end
+
+		local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+		pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
+	end
+
 	local bgSeed = math.random(1, 10 ^ 9)
 
 	hook.Add("HUDPaint", frame, function()
@@ -396,6 +432,17 @@ local function OpenSpellcraftMenu(machine)
 	ArtDeco.StyleCloseButton(frame)
 	if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
 	if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
+
+	-- Tell the station its menu closed so it can wind down its ceremony
+	frame.OnClose = function()
+		if IsValid(machine) then
+			net.Start("Arcana_CloseEmissaryMenu")
+			net.WriteEntity(machine)
+			net.SendToServer()
+		end
+	end
+
+	frame.OnRemove = frame.OnClose
 
 	-- Declared here so the title can measure the band down to the panels' frames.
 	local content
