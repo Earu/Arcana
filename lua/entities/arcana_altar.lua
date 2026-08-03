@@ -26,8 +26,8 @@ if SERVER then
 	resource.AddFile("sound/arcana/altar_ambient_stereo.ogg")
 	resource.AddFile("models/arcana/obelisk/obelisk_bottom.mdl")
 	resource.AddFile("models/arcana/obelisk/obelisk_top.mdl")
-	resource.AddFile("materials/models/arcana/obelisk/arcana_bronze.vmt")
-	resource.AddFile("materials/models/arcana/obelisk/arcana_bronze_nm.vtf")
+	resource.AddFile("materials/models/arcana/obelisk/stone.vmt")
+	resource.AddFile("materials/models/arcana/obelisk/stone_nm.vtf")
 
 	function ENT:Initialize()
 		-- Use a base HL2 model that exists on all servers/clients
