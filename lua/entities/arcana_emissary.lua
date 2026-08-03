@@ -58,7 +58,8 @@ if SERVER then
 		local ent = ents.Create(classname or "arcana_emissary")
 		if not IsValid(ent) then return end
 		ent:SetPos(tr.HitPos + tr.HitNormal * 2)
-		ent:SetAngles(Angle(0, ply:EyeAngles().y, 0))
+		-- The bench's +x is the open desk side, so it faces back at the spawner
+		ent:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))
 		ent:Spawn()
 		ent:Activate()
 		return ent
