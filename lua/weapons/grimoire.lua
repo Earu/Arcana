@@ -1,11 +1,11 @@
 if SERVER then
 	AddCSLuaFile()
-	resource.AddFile("models/arcana/models/arcana/Grimoire.mdl")
-	resource.AddFile("materials/models/arcana/catalyst_apprentice.vmt")
-	resource.AddFile("materials/models/arcana/catalyst_apprentice.vtf")
-	resource.AddFile("materials/models/arcana/normal.vtf")
-	resource.AddFile("materials/models/arcana/lightwarptexture.vtf")
-	resource.AddFile("materials/models/arcana/phong_exp.vtf")
+	resource.AddFile("models/arcana/grimoire/grimoire.mdl")
+	resource.AddFile("materials/models/arcana/grimoire/catalyst_apprentice.vmt")
+	resource.AddFile("materials/models/arcana/grimoire/catalyst_apprentice.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/normal.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/lightwarptexture.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/phong_exp.vtf")
 	resource.AddFile("materials/entities/grimoire.png")
 
 	-- Starter spell for new players.
@@ -44,7 +44,7 @@ SWEP.Purpose = "A mystical tome containing powerful spells and rituals"
 SWEP.Instructions = "LMB: Cast | RMB: Open Grimoire | R: Quick Radial"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
-SWEP.WorldModel = "models/arcana/models/arcana/Grimoire.mdl"
+SWEP.WorldModel = "models/arcana/grimoire/grimoire.mdl"
 SWEP.Primary.ClipSize = -1
 SWEP.Primary.DefaultClip = -1
 SWEP.Primary.Automatic = false
@@ -61,7 +61,7 @@ SWEP.SlotPos = 1
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
 SWEP.HoldType = "slam"
-SWEP.ViewModel = "models/arcana/models/arcana/Grimoire.mdl"
+SWEP.ViewModel = "models/arcana/grimoire/grimoire.mdl"
 -- ViewModelFOV controls the FOV of the dedicated viewmodel camera pass.
 -- A value of 70 gives a natural book-in-hand appearance at typical screen FOVs.
 SWEP.ViewModelFOV = 70
