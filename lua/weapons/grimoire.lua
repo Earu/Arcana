@@ -1,11 +1,11 @@
 if SERVER then
 	AddCSLuaFile()
 	resource.AddFile("models/arcana/grimoire/grimoire.mdl")
-	resource.AddFile("materials/models/arcana/catalyst_apprentice.vmt")
-	resource.AddFile("materials/models/arcana/catalyst_apprentice.vtf")
-	resource.AddFile("materials/models/arcana/normal.vtf")
-	resource.AddFile("materials/models/arcana/lightwarptexture.vtf")
-	resource.AddFile("materials/models/arcana/phong_exp.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/catalyst_apprentice.vmt")
+	resource.AddFile("materials/models/arcana/grimoire/catalyst_apprentice.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/normal.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/lightwarptexture.vtf")
+	resource.AddFile("materials/models/arcana/grimoire/phong_exp.vtf")
 	resource.AddFile("materials/entities/grimoire.png")
 
 	-- Starter spell for new players.
