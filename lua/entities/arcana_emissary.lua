@@ -193,7 +193,8 @@ if CLIENT then
 	local ABYSS_ROCK_DEPTH = 430 -- how far the rock mass converges below the cap
 	local ABYSS_VOID_COLOR = Color(6, 3, 14)
 	local ABYSS_CAP_RADIUS = 130 -- flat stone top holding the bench above the void
-	local ABYSS_CAP_TEXTURE = "models/props_wasteland/rockcliff02c"
+	local ABYSS_CAP_TEXTURE = "models/props_foliage/coastrock02"
+	local ABYSS_CAP_BRIGHTNESS = 1 -- extra gain on the sampled light, tune to match the bench
 	local SHELF_FADE_RANGE = 300 -- shelves dissolve into the abyss past this depth
 
 	local sparkMat = Material("sprites/light_glow02_add")
@@ -880,10 +881,14 @@ if CLIENT then
 		if not pts or #pts < 3 then return end
 
 		local center = self:_GroundPos() + Vector(0, 0, -2)
+
+		-- ComputeLighting returns linear-space light, but lit props are
+		-- displayed after gamma correction: convert (^1/2.2) so the cap
+		-- reads as bright as the bench standing in the same light
 		local light = render.ComputeLighting(self:_GroundPos() + Vector(0, 0, 8), vector_up)
-		local r = math.Clamp(light.x * 255, 16, 255)
-		local g = math.Clamp(light.y * 255, 16, 255)
-		local b = math.Clamp(light.z * 255, 16, 255)
+		local r = math.Clamp(math.pow(math.max(light.x, 0), 0.4545) * ABYSS_CAP_BRIGHTNESS * 255, 16, 255)
+		local g = math.Clamp(math.pow(math.max(light.y, 0), 0.4545) * ABYSS_CAP_BRIGHTNESS * 255, 16, 255)
+		local b = math.Clamp(math.pow(math.max(light.z, 0), 0.4545) * ABYSS_CAP_BRIGHTNESS * 255, 16, 255)
 
 		local ang = Angle(0, self._tearYaw or 0, 0)
 		local fwd = ang:Forward()
@@ -997,27 +1002,6 @@ if CLIENT then
 			render.OverrideColorWriteEnable(true, false)
 			render.OverrideAlphaWriteEnable(true, false)
 			self:_DrawTearShape(center, tf)
-
-			-- Entities are not part of the tear: redraw nearby ones (no color
-			-- writes, normal depth test) clearing the mask where they are
-			-- visible, so the void never draws over players, NPCs, or props.
-			-- The world cannot punch out, so slopes stay covered.
-			render.SetStencilReferenceValue(0)
-			render.SetStencilCompareFunction(STENCIL_ALWAYS)
-			render.SetStencilPassOperation(STENCIL_REPLACE)
-			local lp = LocalPlayer()
-
-			for _, ent in ipairs(ents.FindInSphere(center, TEAR_RADIUS * TEAR_STRETCH + 150)) do
-				local mdl = IsValid(ent) and ent:GetModel() or nil
-
-				if mdl and not string.StartWith(mdl, "*") and ent ~= self
-					and not ent._arcanaCeremonyProp and not ent:IsDormant()
-					and (ent ~= lp or lp:ShouldDrawLocalPlayer()) then
-					ent:DrawModel()
-				end
-			end
-
-			render.SetStencilReferenceValue(1)
 			render.OverrideAlphaWriteEnable(false, false)
 			render.OverrideColorWriteEnable(false, false)
 
