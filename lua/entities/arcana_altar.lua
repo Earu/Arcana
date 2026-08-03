@@ -1399,6 +1399,9 @@ if CLIENT then
 
 	local COLOR_GLOW = Color(255, 230, 160, 230)
 	local TOP_OFFSET = Vector(0, 0, 10)
+	-- Tight-profile bloom carries far less energy than the full pipeline, so the halo copy can be
+	-- brighter without blobbing.
+	local GLYPH_BLOOM_ALPHA_SCALE = 0.45
 	function ENT:DrawTranslucent()
 		-- glowy core at the merge point (only when parts are separated)
 		if not self._glowMat then return end
@@ -1417,18 +1420,38 @@ if CLIENT then
 		self:DrawGlyphParticles()
 	end
 
-	-- Lightweight glyph particles rising like sparks around the pillar top
+	-- Lightweight glyph particles rising like sparks around the pillar top.
+	-- Routed through the bloom pass the same way the emissary's runes and the lantern's panes are:
+	-- ProcessBloom snapshots the framebuffer either side of the draw and blooms the difference, so
+	-- the glyphs have to be drawn inside its callback to contribute anything.
 	function ENT:DrawGlyphParticles()
 		if not self._glyphParticles then return end
 
-		local t = CurTime()
-		local ply = LocalPlayer()
-		local topAng = self:GetAngles()
+		local bloom = Arcana and Arcana.Bloom
 
-		if IsValid(ply) then
-			local toPlayer = (ply:GetPos() - self:GetPos()):GetNormalized()
-			topAng = toPlayer:Angle()
+		if bloom and bloom.ProcessBloom then
+			-- Two passes. The bloom only ever sees a faint copy, which becomes the halo; putting
+			-- the glyphs into it at full strength turns them into featureless white blobs, because
+			-- the composite adds its blur on top of an already bright glyph and swallows the
+			-- letterform. The readable pass is drawn afterwards, so the character sits crisp on top
+			-- of its own glow. Tight profile: the full one's quarter-res fog is sized for magic
+			-- circles and buries a glyph-sized shape.
+			bloom.ProcessBloom(function() self:_DrawGlyphParticleQuads(GLYPH_BLOOM_ALPHA_SCALE) end)
+			-- CA at a third of the tuned amount, kept in step with the emissary's floating glyphs.
+			bloom.RenderBloom(0.35, true)
 		end
+
+		self:_DrawGlyphParticleQuads(1)
+	end
+
+	function ENT:_DrawGlyphParticleQuads(alphaScale)
+		local t = CurTime()
+
+		-- Billboard to the eye position, not the player entity. The two only coincide in plain
+		-- first person: in thirdperson, or under any custom view, the glyphs turn to face a body
+		-- the camera is looking at rather than the camera, and go edge-on.
+		local toView = EyePos() - self:GetPos()
+		local topAng = toView:LengthSqr() > 0.001 and toView:GetNormalized():Angle() or self:GetAngles()
 
 		topAng:RotateAroundAxis(topAng:Right(), -90)
 		topAng:RotateAroundAxis(topAng:Up(), 90)
@@ -1450,7 +1473,7 @@ if CLIENT then
 			local travelFrac = math.Clamp((p.h or 0) / math.max(1, p.travel or 200), 0, 1)
 			local tailFadeStart = 0.9
 			local tailFade = travelFrac >= tailFadeStart and (1 - (travelFrac - tailFadeStart) / (1 - tailFadeStart)) or 1
-			local alpha = math.floor((p.alpha or 36) * lifeFrac * tailFade)
+			local alpha = math.floor((p.alpha or 36) * lifeFrac * tailFade * alphaScale)
 
 			if alpha > 0 then
 				local ox = (p.baseX or 0) + (p.driftX or 0) + (p.orbitR or 0) * math.cos((p.orbitW or 0) * t + (p.orbitP or 0))

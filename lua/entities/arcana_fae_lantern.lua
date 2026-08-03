@@ -72,6 +72,8 @@ function ENT:SetupDataTables()
 end
 
 if SERVER then
+	resource.AddFile("materials/entities/arcana_fae_lantern.png")
+
 	function ENT:Initialize()
 		self:SetModel(self.LanternModel)
 		self:PhysicsInit(SOLID_VPHYSICS)
