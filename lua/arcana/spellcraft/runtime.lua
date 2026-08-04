@@ -185,7 +185,7 @@ if SERVER then
 
 		if compiled.concussive then
 			local dir = (target:WorldSpaceCenter() - hitPos):GetNormalized()
-			local force = dir * 320 + Vector(0, 0, 120)
+			local force = dir * 650 + Vector(0, 0, 220)
 			if target:IsPlayer() then
 				target:SetVelocity(force)
 			else
@@ -199,7 +199,7 @@ if SERVER then
 			local dir = (hitPos - target:WorldSpaceCenter())
 			dir.z = 0
 			dir:Normalize()
-			local force = dir * 340 + Vector(0, 0, 80)
+			local force = dir * 650 + Vector(0, 0, 150)
 			if target:IsPlayer() then
 				target:SetVelocity(force)
 			else
@@ -210,14 +210,14 @@ if SERVER then
 
 		-- Hobble: light element-agnostic slow (frost element conflicts).
 		if compiled.hobble and Arcana.Status and Arcana.Status.Frost then
-			Arcana.Status.Frost.Apply(target, { slowMult = 0.7, duration = 2, vfxTag = "spellcraft_hobble", sendClientFX = target:IsPlayer() })
+			Arcana.Status.Frost.Apply(target, { slowMult = 0.5, duration = 4, vfxTag = "spellcraft_hobble", sendClientFX = target:IsPlayer() })
 		end
 
 		-- Curse: the victim takes extra damage from everything for a while
 		-- (amplification happens in the EntityTakeDamage hook below).
 		if compiled.curse then
-			target.ArcanaCurseUntil = CurTime() + 5
-			Arcana:SendAttachBandVFX(target, Color(120, 60, 160, 255), 24, 5, {
+			target.ArcanaCurseUntil = CurTime() + 8
+			Arcana:SendAttachBandVFX(target, Color(120, 60, 160, 255), 24, 8, {
 				{ radius = 18, height = 5, spin = { p = 0, y = -50, r = 0 }, lineWidth = 2 },
 			}, "spellcraft_curse")
 		end
@@ -226,7 +226,7 @@ if SERVER then
 	-- Cursed victims take amplified damage from all sources.
 	hook.Add("EntityTakeDamage", "Arcana_Spellcraft_Curse", function(target, dmginfo)
 		if (target.ArcanaCurseUntil or 0) >= CurTime() then
-			dmginfo:ScaleDamage(1.15)
+			dmginfo:ScaleDamage(1.3)
 		end
 	end)
 
@@ -263,7 +263,7 @@ if SERVER then
 
 		-- Siphon: heal for part of the damage dealt, hard-capped per cast.
 		if compiled.siphon and hits > 0 and isAlive(caster) then
-			local heal = math.min(hits * compiled.damage * damageMult * 0.15, 40)
+			local heal = math.min(hits * compiled.damage * damageMult * 0.3, 100)
 			caster:SetHealth(math.min(caster:GetMaxHealth(), caster:Health() + math.floor(heal)))
 		end
 
@@ -290,7 +290,7 @@ if SERVER then
 				if not IsValid(caster) then return end
 				P.AreaEssence(caster, pos, compiled, {
 					radius = radius,
-					damageMult = damageMult * 0.5,
+					damageMult = damageMult * 0.75,
 					fxIntensity = math.min(fxIntensity, 0.8),
 					isEcho = true,
 				})
@@ -302,10 +302,10 @@ if SERVER then
 	function P.SpawnLingering(caster, pos, compiled)
 		if not compiled.lingering then return end
 		local patchRadius = math.max(80, compiled.radius * 0.7)
-		local duration = 4
-		local ticks = 8 -- 4s at 0.5s
+		local duration = 6
+		local ticks = 12 -- 6s at 0.5s
 		local tag = "Arcana_SpellcraftLinger_" .. math.floor(pos.x) .. "_" .. math.floor(pos.y) .. "_" .. math.floor(CurTime() * 100)
-		local perTick = compiled.damage * 0.25
+		local perTick = compiled.damage * 0.4
 
 		-- Continuous dense element volume for the whole patch lifetime
 		-- (poison_cloud style), instead of sparse pulses.
@@ -382,8 +382,8 @@ if SERVER then
 		-- a reduced spell and never split, home, pierce, or echo again.
 		if compiled.split and not bolt._isChild then
 			local child = table.Copy(compiled)
-			child.damage = compiled.damage * 0.35
-			child.radius = compiled.radius * 0.6
+			child.damage = compiled.damage * 0.55
+			child.radius = compiled.radius * 0.75
 			child.split = false
 			child.homing = false
 			child.pierce = false
@@ -445,14 +445,14 @@ if SERVER then
 			-- Refract: the beam forks from the impact to up to two more foes.
 			if compiled.refract then
 				local forks = 0
-				for _, ent in ipairs(ents.FindInSphere(tr.HitPos, 300)) do
+				for _, ent in ipairs(ents.FindInSphere(tr.HitPos, 400)) do
 					if forks >= 2 then break end
 					if ent ~= caster and isActor(ent) and not (ent:IsPlayer() and not ent:Alive()) then
 						local tpos = ent:WorldSpaceCenter()
 						P.BeamFX(compiled.essence, tr.HitPos, tpos)
 
 						local dmg = DamageInfo()
-						dmg:SetDamage(compiled.damage * 0.5)
+						dmg:SetDamage(compiled.damage * 0.75)
 						dmg:SetDamageType(compiled.damageType)
 						dmg:SetAttacker(caster)
 						dmg:SetInflictor(caster)
@@ -498,8 +498,8 @@ if SERVER then
 	local function applyHaste(caster)
 		if caster.ArcanaSpellcraftHaste then return end -- never stack on recast
 		caster.ArcanaSpellcraftHaste = { walk = caster:GetWalkSpeed(), run = caster:GetRunSpeed() }
-		caster:SetWalkSpeed(caster:GetWalkSpeed() * 1.2)
-		caster:SetRunSpeed(caster:GetRunSpeed() * 1.2)
+		caster:SetWalkSpeed(caster:GetWalkSpeed() * 1.4)
+		caster:SetRunSpeed(caster:GetRunSpeed() * 1.4)
 	end
 
 	function P.CastSelf(caster, srcEnt, compiled, ctx)
@@ -560,6 +560,17 @@ if SERVER then
 		if (aura.thornsCD[attacker] or 0) > now then return end
 		aura.thornsCD[attacker] = now + 1
 
+		-- Reflect half the incoming damage, then strike with the element rider.
+		local reflected = dmginfo:GetDamage() * 0.5
+		if reflected > 0 then
+			local dmg = DamageInfo()
+			dmg:SetDamage(reflected)
+			dmg:SetDamageType(aura.compiled.damageType)
+			dmg:SetAttacker(target)
+			dmg:SetInflictor(target)
+			dmg:SetDamagePosition(attacker:WorldSpaceCenter())
+			Arcana:TakeDamageInfo(attacker, dmg)
+		end
 		P.ApplyEssenceHit(target, attacker, target:WorldSpaceCenter(), aura.compiled)
 	end)
 
