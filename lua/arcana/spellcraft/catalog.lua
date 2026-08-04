@@ -27,12 +27,12 @@ if SERVER then
 	CreateConVar("arcana_spellcraft_budget_per_level", "1", F, "Extra power budget per level above the minimum")
 	CreateConVar("arcana_spellcraft_cost_mult", "1.0", F, "Multiplier on per-cast coin cost")
 	CreateConVar("arcana_spellcraft_offering_mult", "1.0", F, "Multiplier on the one-time consecration offering")
-	CreateConVar("arcana_spellcraft_max_damage", "220", F, "Hard cap on total damage per cast")
-	CreateConVar("arcana_spellcraft_max_radius", "420", F, "Hard cap on effect radius")
+	CreateConVar("arcana_spellcraft_max_damage", "400", F, "Hard cap on total damage per cast")
+	CreateConVar("arcana_spellcraft_max_radius", "600", F, "Hard cap on effect radius")
 	CreateConVar("arcana_spellcraft_max_projectiles", "3", F, "Hard cap on projectiles per cast")
 	CreateConVar("arcana_spellcraft_min_cooldown", "2.0", F, "Floor on cooldown seconds")
 	CreateConVar("arcana_spellcraft_min_casttime", "0.4", F, "Floor on cast time seconds")
-	CreateConVar("arcana_spellcraft_max_range", "2500", F, "Hard cap on range / beam distance")
+	CreateConVar("arcana_spellcraft_max_range", "4000", F, "Hard cap on range / beam distance")
 end
 
 local function cvarNum(name, default)
@@ -50,12 +50,12 @@ function P.Config()
 		budgetPerLevel = cvarNum("arcana_spellcraft_budget_per_level", 1),
 		costMult       = cvarNum("arcana_spellcraft_cost_mult", 1.0),
 		offeringMult   = cvarNum("arcana_spellcraft_offering_mult", 1.0),
-		maxDamage      = cvarNum("arcana_spellcraft_max_damage", 220),
-		maxRadius      = cvarNum("arcana_spellcraft_max_radius", 420),
+		maxDamage      = cvarNum("arcana_spellcraft_max_damage", 400),
+		maxRadius      = cvarNum("arcana_spellcraft_max_radius", 600),
 		maxProjectiles = math.floor(cvarNum("arcana_spellcraft_max_projectiles", 3)),
 		minCooldown    = cvarNum("arcana_spellcraft_min_cooldown", 2.0),
 		minCastTime    = cvarNum("arcana_spellcraft_min_casttime", 0.4),
-		maxRange       = cvarNum("arcana_spellcraft_max_range", 2500),
+		maxRange       = cvarNum("arcana_spellcraft_max_range", 4000),
 	}
 end
 
@@ -134,47 +134,47 @@ P.Essences = {
 -- symmetrically in Compile).
 P.Clauses = {
 	reach      = { id = "reach",      label = "Reach",      order = 1,  points = 8,      maxRank = 1, levels = { 35 },       denyForm = { self = true },
-	              desc = "+50% range, projectile speed, and beam distance." },
+	              desc = "+100% range, projectile speed, and beam distance." },
 	concussive = { id = "concussive", label = "Concussive", order = 2,  points = 8,      maxRank = 1, levels = { 36 },       denyForm = { self = true }, denyEssence = { wind = true }, conflicts = { pull = true },
 	              desc = "Knock foes back on hit (redundant with Wind)." },
 	precision  = { id = "precision",  label = "Precision",  order = 3,  points = 6,      maxRank = 1, levels = { 37 },       onlyForm = { bolt = true, beam = true },
-	              desc = "+25% damage, but the blast radius is halved." },
+	              desc = "+50% damage, but the blast radius is halved." },
 	swift      = { id = "swift",      label = "Swift",      order = 4,  points = 12,     maxRank = 1, levels = { 38 },
-	              desc = "Cast 40% faster." },
+	              desc = "Cast 60% faster." },
 	hobble     = { id = "hobble",     label = "Hobble",     order = 5,  points = 12,     maxRank = 1, levels = { 39 },       denyEssence = { frost = true },
-	              desc = "Hits slow victims for 2s (redundant with Frost)." },
+	              desc = "Hits heavily slow victims for 4s (redundant with Frost)." },
 	widen      = { id = "widen",      label = "Widen",      order = 6,  points = 10,     maxRank = 2, levels = { 40, 44 },
-	              desc = "+30% effect radius per rank." },
+	              desc = "+50% effect radius per rank." },
 	ricochet   = { id = "ricochet",   label = "Ricochet",   order = 7,  points = 10,     maxRank = 2, levels = { 41, 47 },   onlyForm = { bolt = true },
-	              desc = "Bolts bounce off surfaces once per rank." },
+	              desc = "Bolts bounce off surfaces twice per rank." },
 	haste      = { id = "haste",      label = "Haste",      order = 8,  points = 12,     maxRank = 1, levels = { 42 },       onlyForm = { self = true },
-	              desc = "Move 20% faster while your aura lasts." },
+	              desc = "Move 40% faster while your aura lasts." },
 	endure     = { id = "endure",     label = "Endure",     order = 9,  points = 15,     maxRank = 2, levels = { 42, 46 },   onlyForm = { self = true },
-	              desc = "Self aura lasts +4s per rank." },
+	              desc = "Self aura lasts +8s per rank." },
 	pull       = { id = "pull",       label = "Pull",       order = 10, points = 10,     maxRank = 1, levels = { 43 },       conflicts = { concussive = true },
 	              desc = "Victims are dragged toward the impact." },
 	piercing   = { id = "piercing",   label = "Piercing",   order = 11, points = 14,     maxRank = 1, levels = { 44 },       onlyForm = { bolt = true }, conflicts = { split = true },
-	              desc = "Bolts pass through up to 3 victims, only breaking on walls." },
+	              desc = "Bolts pass through up to 4 victims, only breaking on walls." },
 	amplify    = { id = "amplify",    label = "Amplify",    order = 12, points = 10,     maxRank = 3, levels = { 45, 50, 55 },
-	              desc = "+20% damage per rank." },
+	              desc = "+35% damage per rank." },
 	thorns     = { id = "thorns",     label = "Thorns",     order = 13, points = 15,     maxRank = 1, levels = { 47 },       onlyForm = { self = true },
-	              desc = "Whoever hurts you gets struck by your element." },
+	              desc = "Attackers take half their damage back and get struck by your element." },
 	lingering  = { id = "lingering",  label = "Lingering",  order = 14, points = 15,     maxRank = 1, levels = { 48 },       denyForm = { self = true },
-	              desc = "Leaves a burning patch of essence for 4s." },
+	              desc = "Leaves a burning patch of essence for 6s." },
 	curse      = { id = "curse",      label = "Curse",      order = 15, points = 14,     maxRank = 1, levels = { 49 },
-	              desc = "Victims take +15% damage from everything for 5s." },
+	              desc = "Victims take +30% damage from everything for 8s." },
 	alacrity   = { id = "alacrity",   label = "Alacrity",   order = 16, points = 12,     maxRank = 2, levels = { 50, 56 },
-	              desc = "-25% cooldown per rank." },
+	              desc = "-40% cooldown per rank." },
 	refract    = { id = "refract",    label = "Refract",    order = 17, points = 14,     maxRank = 1, levels = { 52 },       onlyForm = { beam = true },
 	              desc = "The beam forks at impact to up to 2 nearby foes." },
 	multishot  = { id = "multishot",  label = "Multishot",  order = 18, points = 15,     maxRank = 2, levels = { 55, 60 },   onlyForm = { bolt = true },
 	              desc = "+1 projectile per rank, each dealing less." },
 	echo       = { id = "echo",       label = "Echo",       order = 19, points = 16,     maxRank = 1, levels = { 57 },       denyForm = { self = true },
-	              desc = "The impact repeats once after 1.5s at half damage." },
+	              desc = "The impact repeats once after 1.5s at 75% damage." },
 	split      = { id = "split",      label = "Split",      order = 20, points = 16,     maxRank = 1, levels = { 58 },       onlyForm = { bolt = true }, conflicts = { piercing = true },
 	              desc = "Detonations burst into 3 smaller bolts." },
 	siphon     = { id = "siphon",     label = "Siphon",     order = 21, points = 18,     maxRank = 1, levels = { 61 },
-	              desc = "Heal for part of the damage dealt (up to 40 HP per cast)." },
+	              desc = "Heal for part of the damage dealt (up to 100 HP per cast)." },
 	homing     = { id = "homing",     label = "Homing",     order = 22, points = 18,     maxRank = 1, levels = { 62 },       onlyForm = { bolt = true },
 	              desc = "Projectiles seek the nearest foe." },
 }
@@ -274,8 +274,8 @@ function P.Compile(def)
 	local endureRank = ranks.endure or 0
 	local multishotRank = ranks.multishot or 0
 
-	local dmgMult = (1 + 0.20 * amplifyRank) * (essence.damageMult or 1)
-	if ranks.precision then dmgMult = dmgMult * 1.25 end
+	local dmgMult = (1 + 0.35 * amplifyRank) * (essence.damageMult or 1)
+	if ranks.precision then dmgMult = dmgMult * 1.5 end
 
 	-- Projectiles (bolt only meaningfully; clamped)
 	local projectiles = 1
@@ -286,7 +286,7 @@ function P.Compile(def)
 	-- Base damage number per form
 	local baseDamage = form.baseDamage or form.tickDamage or 0
 	local perHit = baseDamage * dmgMult
-	if projectiles > 1 then perHit = perHit * 0.65 end
+	if projectiles > 1 then perHit = perHit * 0.8 end
 
 	-- Lightning chain draws from the same budget so it counts against the cap
 	local chainDamage = 0
@@ -299,10 +299,10 @@ function P.Compile(def)
 	-- counts: projectiles, chains, pierce-through hits, split children,
 	-- refract forks, and the echo repeat.
 	local total = perHit * projectiles + chainDamage * LIGHTNING_MAX_CHAINS
-	if ranks.piercing then total = total + perHit * 0.65 * 2 end
-	if ranks.split then total = total + perHit * 0.35 * 3 end
-	if ranks.refract then total = total + perHit * 0.5 * 2 end
-	if ranks.echo then total = total * 1.5 end
+	if ranks.piercing then total = total + perHit * 0.85 * 3 end
+	if ranks.split then total = total + perHit * 0.55 * 3 end
+	if ranks.refract then total = total + perHit * 0.75 * 2 end
+	if ranks.echo then total = total * 1.75 end
 	if total > cfg.maxDamage and total > 0 then
 		local scale = cfg.maxDamage / total
 		perHit = perHit * scale
@@ -310,7 +310,7 @@ function P.Compile(def)
 	end
 
 	-- Radius (splash for bolt/beam, blast for aoe, aura for self)
-	local radius = (form.baseRadius or 0) * (1 + 0.30 * widenRank)
+	local radius = (form.baseRadius or 0) * (1 + 0.50 * widenRank)
 	if ranks.precision then radius = radius * 0.5 end
 	radius = math.min(radius, cfg.maxRadius)
 
@@ -318,23 +318,23 @@ function P.Compile(def)
 	local range = form.baseRange or 0
 	local speed = form.baseSpeed or 0
 	if ranks.reach then
-		range = range * 1.5
-		speed = speed * 1.5
+		range = range * 2
+		speed = speed * 2
 	end
 	range = math.min(range, cfg.maxRange)
 
 	-- Cooldown (alacrity), floored
 	local cooldown = form.baseCooldown or cfg.minCooldown
-	if alacrityRank > 0 then cooldown = cooldown * (0.75 ^ alacrityRank) end
+	if alacrityRank > 0 then cooldown = cooldown * (0.6 ^ alacrityRank) end
 	cooldown = math.max(cfg.minCooldown, cooldown)
 
 	-- Cast time (swift), floored
 	local castTime = form.baseCastTime or 0.8
-	if ranks.swift then castTime = castTime * 0.6 end
+	if ranks.swift then castTime = castTime * 0.4 end
 	castTime = math.max(cfg.minCastTime, castTime)
 
 	-- Self aura duration (endure)
-	local duration = (form.baseDuration or 0) + 4 * endureRank
+	local duration = (form.baseDuration or 0) + 8 * endureRank
 
 	-- Prices (superlinear; clause tax past the second slot)
 	local clauseTax = 1.25 ^ math.max(0, numClauseSlots - 2)
@@ -379,7 +379,7 @@ function P.Compile(def)
 		lingering = ranks.lingering ~= nil,
 		concussive = ranks.concussive ~= nil,
 		pierce = ranks.piercing ~= nil,
-		ricochets = ranks.ricochet or 0,
+		ricochets = (ranks.ricochet or 0) * 2,
 		split = ranks.split ~= nil,
 		refract = ranks.refract ~= nil,
 		pull = ranks.pull ~= nil,

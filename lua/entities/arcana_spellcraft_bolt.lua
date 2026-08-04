@@ -94,7 +94,7 @@ if SERVER then
 				local speed = self:GetProjectileSpeed() > 0 and self:GetProjectileSpeed() or 1200
 				local desired = (self._homingTarget:WorldSpaceCenter() - self:WorldSpaceCenter()):GetNormalized()
 				local cur = phys:GetVelocity():GetNormalized()
-				local steered = LerpVector(0.1, cur, desired):GetNormalized()
+				local steered = LerpVector(0.2, cur, desired):GetNormalized()
 				phys:SetVelocity(steered * speed)
 			end
 		end
@@ -160,7 +160,7 @@ if SERVER then
 
 			local caster = self._spellcraftCaster
 			if IsValid(caster) and not (ent:IsPlayer() and not ent:Alive()) then
-				local mult = self._pierceCount == 1 and 1 or 0.65
+				local mult = self._pierceCount == 1 and 1 or 0.85
 				local dmg = DamageInfo()
 				dmg:SetDamage(sc.damage * mult)
 				dmg:SetDamageType(sc.damageType)
@@ -175,9 +175,9 @@ if SERVER then
 			-- Fly on: drop any homing lock so it doesn't orbit the victim.
 			self._homingTarget = nil
 
-			-- Spent after three victims: fizzle out (no full blast on top of
+			-- Spent after four victims: fizzle out (no full blast on top of
 			-- the pierced hits; the damage cap already accounts for them).
-			if self._pierceCount >= 3 then
+			if self._pierceCount >= 4 then
 				self._detonated = true
 				self:Remove()
 			end
