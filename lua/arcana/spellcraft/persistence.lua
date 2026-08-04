@@ -322,21 +322,34 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	end
 
 	local sid = ply:SteamID64()
-	if P.Active[sid] and P.Active[sid][slot] then
-		Arcana:SendErrorNotification(ply, "That slot is already in use")
-		return
-	end
 
-	-- No duplicate names among this player's own crafted spells.
+	-- Writing over an occupied slot edits that spell in place. The full offering
+	-- is charged again below, so reworking a spell costs what making it fresh
+	-- would, and the reworked form has to be consecrated on its own merits.
+	local previous = P.Active[sid] and P.Active[sid][slot]
+
+	-- No duplicate names among this player's own crafted spells. The slot being
+	-- edited is allowed to keep the name it already has.
 	for otherSlot in pairs(P.Active[sid] or {}) do
-		local otherSpell = Arcana.RegisteredSpells[P.SpellId(sid, otherSlot)]
-		if otherSpell and string.lower(otherSpell.name) == string.lower(name) then
-			Arcana:SendErrorNotification(ply, "You already have a spell with that name")
-			return
+		if otherSlot ~= slot then
+			local otherSpell = Arcana.RegisteredSpells[P.SpellId(sid, otherSlot)]
+			if otherSpell and string.lower(otherSpell.name) == string.lower(name) then
+				Arcana:SendErrorNotification(ply, "You already have a spell with that name")
+				return
+			end
 		end
 	end
 
 	local def = { form = form, essence = essence, clauses = clauses }
+
+	-- Never charge for a rework that changes nothing.
+	if previous and P.DefHash(previous) == P.DefHash(def) then
+		local prevSpell = Arcana.RegisteredSpells[P.SpellId(sid, slot)]
+		if prevSpell and prevSpell.name == name then
+			Arcana:SendErrorNotification(ply, "That spell is already exactly this")
+			return
+		end
+	end
 	local state = P.GetServerState(ply, def)
 	state.consecrated = true -- crafting consecrates here; test the rest
 	local req = P.Requirements(def, state)
@@ -358,8 +371,9 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 		return
 	end
 
-	Arcana:TakeCoins(ply, coins, "Crafted spell: " .. name)
-	Arcana:TakeItem(ply, "mana_crystal_shard", shards, "Crafted spell: " .. name)
+	local ledger = (previous and "Reworked spell: " or "Crafted spell: ") .. name
+	Arcana:TakeCoins(ply, coins, ledger)
+	Arcana:TakeItem(ply, "mana_crystal_shard", shards, ledger)
 
 	-- Consecrate + persist + register.
 	local hash = P.DefHash(def)
