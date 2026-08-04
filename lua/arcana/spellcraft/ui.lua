@@ -1,15 +1,15 @@
--- Spellcraft — the Emissary menu.
+-- Spellcraft: the Emissary menu.
 --
--- Composing is a 4-step wizard, one minimal view at a time:
---   1. FORM       how the spell is delivered
---   2. ESSENCE    the nature of the magic (buy locked ones here)
---   3. MODIFIERS  optional clauses, up to five ranks
---   4. RECAP      full summary, name it, pay the cost
--- BACK/NEXT navigate; the breadcrumb jumps to any completed step. Selecting an
--- occupied slot on the left shows that crafted spell's details/requirements instead.
+-- Composing happens on one screen: the star map (graph.lua), a chart of every
+-- form, element and modifier drawn against the Elysion nebula. Take stars by
+-- clicking them, name the spell in the bar underneath, and pay the one-time
+-- cost. Clicking the star at the centre opens the review card.
 --
--- Modifiers incompatible with the chosen form/essence are hidden outright, and
--- anything unavailable says WHY on the row — no unexplained denials.
+-- Selecting an occupied slot on the left shows that crafted spell's
+-- details/requirements instead of the map.
+--
+-- Nothing is hidden on the map: stars you cannot take stay visible, dimmed, and
+-- say WHY when hovered, no unexplained denials.
 --
 -- All numbers come from the shared Arcana.Spellcraft.Compile/.Requirements; the
 -- server revalidates everything on submit. ACTIVATE uses an inline second-click
@@ -24,17 +24,12 @@ local P = Arcana.Spellcraft
 -- so it must not be touched at include time.
 local C
 
-local STEPS = { "FORM", "ELEMENT", "MODIFIERS", "REVIEW" }
-
--- Semi-transparent warm panel fills so the themed background shows through.
-local PANEL_BG = Color(20, 15, 10, 200)
-
 local function playDeny() surface.PlaySound("buttons/button8.wav") end
 local function playClick() surface.PlaySound("buttons/button6.wav") end
 
 ----------------------------------------------------------------------
 -- Themed background: dark stone, a divine glow descending from above,
--- and faint runes drifting upward — prayers rising to the gods.
+-- and faint runes drifting upward, prayers rising to the gods.
 ----------------------------------------------------------------------
 local GLYPH_MATS
 local function getGlyphMats()
@@ -124,6 +119,55 @@ local function drawEmissaryBackground(w, h, seed)
 	math.randomseed(SysTime())
 
 	render.SetStencilEnable(false)
+end
+
+-- The deco frame's octagon, laid out as dots instead of a solid line. Walks the
+-- same eight edges as ArtDeco.DrawDecoFrame so the two read as the same shape.
+--
+-- Dots rather than short DrawLine dashes: at icon size a dash is two pixels
+-- long, and DrawLine renders those unevenly once the ends land off the pixel
+-- grid. Square dots snapped to whole pixels come out identical every time.
+--
+-- Each edge is spaced on its own and skips its end point, so the corners get
+-- exactly one dot. Equal-length edges then get equal counts, which is what
+-- keeps the ring symmetric. Spacing it around the perimeter as one continuous
+-- run divides more evenly but lands the dots in a pinwheel.
+--
+-- Positions are rounded, not truncated: truncating biases every dot up and to
+-- the left, which shows up as the two halves of the ring not matching.
+local DOTTED_PTS = {}
+for i = 1, 8 do DOTTED_PTS[i] = { 0, 0 } end
+
+local function drawDottedDecoFrame(x, y, w, h, col, corner, spacing, dot)
+	local c = math.max(4, corner or 12)
+	spacing = spacing or 4.4
+	dot = dot or 2
+
+	local p = DOTTED_PTS
+	p[1][1], p[1][2] = x + c, y
+	p[2][1], p[2][2] = x + w - c, y
+	p[3][1], p[3][2] = x + w, y + c
+	p[4][1], p[4][2] = x + w, y + h - c
+	p[5][1], p[5][2] = x + w - c, y + h
+	p[6][1], p[6][2] = x + c, y + h
+	p[7][1], p[7][2] = x, y + h - c
+	p[8][1], p[8][2] = x, y + c
+
+	surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
+
+	local half = dot * 0.5
+	for i = 1, 8 do
+		local a, b = p[i], p[i % 8 + 1]
+		local dx, dy = b[1] - a[1], b[2] - a[2]
+		local len = math.sqrt(dx * dx + dy * dy)
+		if len > 0.5 then
+			local n = math.max(2, math.Round(len / spacing))
+			for k = 0, n - 1 do
+				local t = k / n
+				surface.DrawRect(math.Round(a[1] + dx * t - half), math.Round(a[2] + dy * t - half), dot, dot)
+			end
+		end
+	end
 end
 
 -- Wrap text into lines that fit maxW (for descriptions).
@@ -238,63 +282,6 @@ local function drawMark(x, y, ok)
 	surface.DrawOutlinedRect(x, y + 4, 10, 10)
 end
 
--- A small hand-drawn ornament per element, centred at (cx, cy).
-local function drawElementOrnament(id, cx, cy, col)
-	surface.SetDrawColor(col)
-	if id == "fire" then
-		-- Flame: nested upward strokes
-		surface.DrawLine(cx - 5, cy + 5, cx, cy - 6)
-		surface.DrawLine(cx, cy - 6, cx + 5, cy + 5)
-		surface.DrawLine(cx + 5, cy + 5, cx - 5, cy + 5)
-		surface.DrawLine(cx - 2, cy + 3, cx, cy - 1)
-		surface.DrawLine(cx, cy - 1, cx + 2, cy + 3)
-	elseif id == "frost" then
-		-- Snowflake: six spokes
-		surface.DrawLine(cx, cy - 6, cx, cy + 6)
-		surface.DrawLine(cx - 5, cy - 3, cx + 5, cy + 3)
-		surface.DrawLine(cx - 5, cy + 3, cx + 5, cy - 3)
-	elseif id == "earth" then
-		-- Stone: a core within an outline
-		surface.DrawOutlinedRect(cx - 5, cy - 5, 10, 10)
-		surface.DrawRect(cx - 2, cy - 2, 4, 4)
-	elseif id == "wind" then
-		-- Gusts: three staggered strokes
-		surface.DrawLine(cx - 6, cy - 4, cx + 4, cy - 4)
-		surface.DrawLine(cx - 4, cy, cx + 6, cy)
-		surface.DrawLine(cx - 6, cy + 4, cx + 2, cy + 4)
-	elseif id == "poison" then
-		-- Droplet
-		surface.DrawLine(cx, cy - 6, cx - 4, cy + 2)
-		surface.DrawLine(cx, cy - 6, cx + 4, cy + 2)
-		surface.DrawLine(cx - 4, cy + 2, cx, cy + 6)
-		surface.DrawLine(cx + 4, cy + 2, cx, cy + 6)
-	elseif id == "lightning" then
-		-- Bolt zigzag
-		surface.DrawLine(cx + 3, cy - 6, cx - 3, cy + 1)
-		surface.DrawLine(cx - 3, cy + 1, cx + 1, cy + 1)
-		surface.DrawLine(cx + 1, cy + 1, cx - 3, cy + 6)
-	elseif id == "arcane" then
-		-- Sparkle: four-point star
-		surface.DrawLine(cx, cy - 6, cx, cy + 6)
-		surface.DrawLine(cx - 6, cy, cx + 6, cy)
-		surface.DrawLine(cx - 3, cy - 3, cx + 3, cy + 3)
-		surface.DrawLine(cx - 3, cy + 3, cx + 3, cy - 3)
-	elseif id == "aurum" then
-		-- Sun: disc and rays
-		surface.DrawCircle(cx, cy, 4, col.r, col.g, col.b, col.a or 255)
-		surface.DrawLine(cx, cy - 7, cx, cy - 5)
-		surface.DrawLine(cx, cy + 5, cx, cy + 7)
-		surface.DrawLine(cx - 7, cy, cx - 5, cy)
-		surface.DrawLine(cx + 5, cy, cx + 7, cy)
-	else
-		-- Fallback diamond
-		surface.DrawLine(cx, cy - 5, cx + 5, cy)
-		surface.DrawLine(cx + 5, cy, cx, cy + 5)
-		surface.DrawLine(cx, cy + 5, cx - 5, cy)
-		surface.DrawLine(cx - 5, cy, cx, cy - 5)
-	end
-end
-
 -- Red warning modal (adapted from the enchanter's classification warning):
 -- dim overlay, pulsing red frame, explicit DELETE / CANCEL buttons.
 local function showDeleteModal(parent, spellName, onConfirm)
@@ -367,6 +354,79 @@ local function showDeleteModal(parent, spellName, onConfirm)
 	end
 end
 
+-- Gold sibling of the delete modal: confirms buying an element off the map.
+local function showUnlockModal(parent, essence, onConfirm)
+	local overlay = vgui.Create("DPanel", parent)
+	overlay:SetPos(0, 0)
+	overlay:SetSize(parent:GetWide(), parent:GetTall())
+	overlay:SetZPos(9999)
+	overlay:MoveToFront()
+	overlay:SetMouseInputEnabled(true)
+	overlay.Paint = function(_, w, h)
+		surface.SetDrawColor(0, 0, 0, 170)
+		surface.DrawRect(0, 0, w, h)
+	end
+
+	local ec = essence.color
+	local inner = vgui.Create("DPanel", overlay)
+	inner:SetSize(480, 230)
+	inner:Center()
+	inner.Paint = function(_, w, h)
+		ArtDeco.FillDecoPanel(0, 0, w, h, Color(20, 15, 10, 245), 10)
+		ArtDeco.DrawDecoFrame(0, 0, w, h, C.gold, 10)
+
+		draw.SimpleText("BUY AN ELEMENT", "Arcana_AncientLarge", w * 0.5, 22, C.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		surface.SetDrawColor(C.gold.r, C.gold.g, C.gold.b, 160)
+		surface.DrawRect(20, 42, w - 40, 1)
+
+		local cx = w * 0.5 - 70
+		P.Graph.DrawElementOrnament(essence.id, cx, 68, Color(ec.r, ec.g, ec.b), 1.4)
+		draw.SimpleText(essence.label, "Arcana_Ancient", cx + 20, 68, Color(ec.r, ec.g, ec.b), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		draw.SimpleText(essence.desc or "", "Arcana_AncientSmall", w * 0.5, 96, C.textDim, TEXT_ALIGN_CENTER)
+		draw.SimpleText("You keep it for good, on every spell you make.", "Arcana_AncientSmall", w * 0.5, 116, C.textDim, TEXT_ALIGN_CENTER)
+
+		ArtDeco.DrawCostLine("Arcana_Ancient", w * 0.5, 140, {
+			{ text = string.Comma(essence.unlock.coins), icon = ArtDeco.Icons.coin, color = C.coinGold },
+			{ text = string.Comma(essence.unlock.shards), icon = ArtDeco.Icons.shard, color = C.shardBlue },
+		}, TEXT_ALIGN_CENTER)
+	end
+
+	local function modalButton(label, onClick)
+		local b = vgui.Create("DButton", inner)
+		b:SetText("")
+		b:SetSize(190, 36)
+		b.Paint = function(pnl, w, h)
+			local hovered = pnl:IsHovered()
+			ArtDeco.FillDecoPanel(0, 0, w, h, hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235), 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, C.gold, 8)
+			draw.SimpleText(label, "Arcana_Ancient", w * 0.5, h * 0.5, C.textBright, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+		b.DoClick = onClick
+		return b
+	end
+
+	local cancel = modalButton("CANCEL", function()
+		playClick()
+		overlay:Remove()
+	end)
+
+	local buy = modalButton("BUY", function()
+		playClick()
+		overlay:Remove()
+		onConfirm()
+	end)
+
+	inner.PerformLayout = function(_, w, h)
+		cancel:SetPos(math.floor(w * 0.5 - 190 - 8), h - 52)
+		buy:SetPos(math.floor(w * 0.5 + 8), h - 52)
+	end
+
+	parent.OnSizeChanged = function(_, w, h)
+		overlay:SetSize(w, h)
+		inner:Center()
+	end
+end
+
 ----------------------------------------------------------------------
 -- The menu
 ----------------------------------------------------------------------
@@ -375,17 +435,22 @@ local function OpenSpellcraftMenu(machine)
 	if not IsValid(ply) then return end
 	C = ArtDeco.Colors
 
+	-- rev is bumped by the star map whenever the composition changes, so the
+	-- map's derived node state and the compiled preview refresh without a
+	-- full VGUI rebuild. view is the map's camera, kept across refreshes.
 	local state = {
 		selSlot = 1,
-		step = 1,
 		form = nil,
 		essence = nil,
 		clauseRanks = {},
 		name = "",
+		rev = 0,
+		view = nil,
 	}
 
+	-- Capped at 720p, and smaller than that only if the screen is.
 	local frame = vgui.Create("DFrame")
-	frame:SetSize(math.min(1180, ScrW() - 60), math.min(720, ScrH() - 60))
+	frame:SetSize(math.min(1280, ScrW()), math.min(720, ScrH()))
 	frame:Center()
 	frame:SetTitle("")
 	frame:MakePopup()
@@ -451,11 +516,20 @@ local function OpenSpellcraftMenu(machine)
 		drawEmissaryBackground(w, h, bgSeed)
 		ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, C.gold, 14)
 
-		-- The title centers in the band between the frame's top line and the slot
-		-- list / right pane below, which frame themselves at the content's top edge.
+		-- The title centers in the band between the frame's top line and the map
+		-- below, which frames itself at the content's top edge. The controls ride
+		-- along the far end of the same band: one strip of chrome, not two.
 		local bandTop = 6 + 1
 		local bandBottom = IsValid(content) and content:GetY() or (bandTop + 38)
-		ArtDeco.DrawTitle("Arcana_AncientLarge", "THE EMISSARY", bandTop, bandBottom, C.paleGold)
+		local titleRight = ArtDeco.DrawTitle("Arcana_AncientLarge", "THE EMISSARY", bandTop, bandBottom, C.paleGold)
+
+		-- Dropped rather than crammed if the frame is too narrow to hold both.
+		local hint = "Drag to look around  ·  Scroll to zoom  ·  Left-click takes, right-click gives back"
+		surface.SetFont("Arcana_AncientSmall")
+		local hintW = surface.GetTextSize(hint)
+		if w - 46 - hintW > titleRight + 24 then
+			draw.SimpleText(hint, "Arcana_AncientSmall", w - 46, (bandTop + bandBottom) * 0.5, C.textDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+		end
 	end
 
 	content = vgui.Create("DPanel", frame)
@@ -466,182 +540,50 @@ local function OpenSpellcraftMenu(machine)
 	local refresh -- forward declaration; single rebuild entry point
 
 	----------------------------------------------------------------
-	-- Left: slot list
+	-- Slot bookkeeping. Selecting a slot loads whatever is in it onto the
+	-- map, so an existing spell opens up as an editable chart rather than a
+	-- read-only card. baseHash/baseName record what was saved, which is how
+	-- we know whether anything has actually been reworked.
 	----------------------------------------------------------------
-	local left = vgui.Create("DPanel", content)
-	left:Dock(LEFT)
-	left:SetWide(260)
-	left.Paint = function(_, w, h)
-		ArtDeco.FillDecoPanel(0, 0, w - 4, h, PANEL_BG, 10)
-		ArtDeco.DrawDecoFrame(0, 0, w - 4, h, C.gold, 10)
-		draw.SimpleText("YOUR SPELLS", "Arcana_Ancient", 12, 10, C.paleGold)
-	end
+	local function loadSlot(slot)
+		state.selSlot = slot
+		state.clauseRanks = {}
+		state.lastDefaultName = nil
 
-	local slotList = vgui.Create("DPanel", left)
-	slotList:Dock(FILL)
-	slotList:DockMargin(8, 36, 12, 8)
-	slotList.Paint = nil
-
-	local function buildSlotList()
-		clearChildren(slotList)
-		local maxSlots = P.GetClientState().maxSlots or 3
-
-		for i = 1, maxSlots do
-			local row = vgui.Create("DButton", slotList)
-			row:Dock(TOP)
-			row:SetTall(56)
-			row:DockMargin(0, 0, 0, 6)
-			row:SetText("")
-			row.Paint = function(_, w, h)
-				local def = activeDefForSlot(i)
-				local sel = state.selSlot == i
-				ArtDeco.FillDecoPanel(0, 0, w, h, sel and Color(58, 44, 32, 235) or C.cardIdle, 8)
-				ArtDeco.DrawDecoFrame(0, 0, w, h, sel and C.paleGold or C.gold, 8)
-
-				if def then
-					draw.SimpleText(activeNameForSlot(i), "Arcana_Ancient", 12, 8, C.textBright)
-					local st = P.GetClientState()
-					st.consecrated = isConsecrated(def)
-					local req = P.Requirements(def, st)
-					if req.castable then
-						draw.SimpleText("Ready", "Arcana_AncientSmall", 12, 31, Color(120, 220, 120))
-					else
-						draw.SimpleText(req.firstMissing or "Locked", "Arcana_AncientSmall", 12, 31, Color(220, 130, 90))
-					end
-				else
-					draw.SimpleText("Empty slot", "Arcana_Ancient", 12, h * 0.5, C.textDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-				end
+		local def = activeDefForSlot(slot)
+		if def then
+			state.form = def.form
+			state.essence = def.essence
+			for _, id in ipairs(def.clauses or {}) do
+				state.clauseRanks[id] = (state.clauseRanks[id] or 0) + 1
 			end
-			row.DoClick = function()
-				state.selSlot = i
-				playClick()
-				refresh()
-			end
-		end
-	end
-
-	----------------------------------------------------------------
-	-- Right pane
-	----------------------------------------------------------------
-	local right = vgui.Create("DPanel", content)
-	right:Dock(FILL)
-	right:DockMargin(8, 0, 0, 0)
-	right.Paint = function(_, w, h)
-		ArtDeco.FillDecoPanel(0, 0, w, h, PANEL_BG, 10)
-		ArtDeco.DrawDecoFrame(0, 0, w, h, C.gold, 10)
-	end
-
-	-- Wizard chrome: step title + breadcrumb, docked TOP of the right pane.
-	local function stepDone(k)
-		if k == 1 then return state.form ~= nil end
-		if k == 2 then return state.essence ~= nil end
-		if k == 3 then return true end -- modifiers are optional
-		return false
-	end
-
-	local function canEnterStep(k)
-		for j = 1, k - 1 do
-			if not stepDone(j) then return false end
-		end
-		return true
-	end
-
-	local function buildWizardHeader(title, subtitle)
-		local hd = vgui.Create("DPanel", right)
-		hd:Dock(TOP)
-		hd:SetTall(80)
-		hd:DockMargin(16, 8, 16, 0)
-		hd._crumbs = {}
-		hd.Paint = function(pnl, w, h)
-			draw.SimpleText(title, "Arcana_AncientLarge", 0, 0, C.paleGold)
-			draw.SimpleText(subtitle, "Arcana_AncientSmall", 0, 30, C.textDim)
-
-			-- Breadcrumb on its own row; every segment is measured so nothing overlaps.
-			local y = 58
-			local x = 0
-			pnl._crumbs = {}
-			surface.SetFont("Arcana_AncientSmall")
-
-			for k = 1, 4 do
-				local cur = state.step == k
-				local done = stepDone(k) and k < state.step
-				local dotCol = cur and C.paleGold or (done and Color(120, 220, 120) or Color(120, 106, 84))
-
-				local cxp, cyp, r = x + 6, y + 9, 5
-				surface.SetDrawColor(dotCol)
-				surface.DrawLine(cxp, cyp - r, cxp + r, cyp)
-				surface.DrawLine(cxp + r, cyp, cxp, cyp + r)
-				surface.DrawLine(cxp, cyp + r, cxp - r, cyp)
-				surface.DrawLine(cxp - r, cyp, cxp, cyp - r)
-
-				local label = STEPS[k]
-				local tw = surface.GetTextSize(label)
-				draw.SimpleText(label, "Arcana_AncientSmall", x + 16, y, cur and C.textBright or (done and Color(150, 220, 150) or C.textDim))
-				pnl._crumbs[k] = { x0 = x, x1 = x + 16 + tw }
-				x = x + 16 + tw
-
-				if k < 4 then
-					surface.SetDrawColor(110, 96, 74, 255)
-					surface.DrawRect(x + 10, y + 8, 14, 1)
-					x = x + 34
-				end
-			end
-		end
-		hd.OnMousePressed = function(pnl, code)
-			if code ~= MOUSE_LEFT then return end
-			local mx, my = pnl:ScreenToLocal(gui.MousePos())
-			if my < 52 then return end
-			for k, crumb in ipairs(pnl._crumbs or {}) do
-				if mx >= crumb.x0 and mx <= crumb.x1 and k ~= state.step and canEnterStep(k) then
-					state.step = k
-					playClick()
-					refresh()
-					return
-				end
-			end
-		end
-	end
-
-	-- Wizard nav: BACK (left) + NEXT (right), docked BOTTOM.
-	local function buildWizardNav(nextEnabled)
-		local nav = vgui.Create("DPanel", right)
-		nav:Dock(BOTTOM)
-		nav:SetTall(34)
-		nav:DockMargin(16, 6, 16, 12)
-		nav.Paint = nil
-
-		if state.step > 1 then
-			local back = decoButton(nav, {
-				label = "< BACK",
-				onClick = function()
-					state.step = state.step - 1
-					refresh()
-				end,
-			})
-			back:Dock(LEFT)
-			back:SetWide(100)
+			state.name = activeNameForSlot(slot)
+			state.baseHash = P.DefHash(def)
+			state.baseName = state.name
+		else
+			state.form = nil
+			state.essence = nil
+			state.name = ""
+			state.baseHash = nil
+			state.baseName = nil
 		end
 
-		if state.step < 4 then
-			local nxt = decoButton(nav, {
-				label = "NEXT >",
-				enabled = nextEnabled,
-				onClick = function()
-					state.step = state.step + 1
-					refresh()
-				end,
-			})
-			nxt:Dock(RIGHT)
-			nxt:SetWide(140)
-		end
-
-		return nav
+		state.rev = (state.rev or 0) + 1
 	end
 
-	----------------------------------------------------------------
-	-- Power gauge, shared by every composer step. Sums points directly so it
-	-- works mid-composition, before a full Compile is possible.
-	----------------------------------------------------------------
+	local function currentName()
+		if IsValid(state.nameEntry) then return string.Trim(state.nameEntry:GetValue() or "") end
+		return string.Trim(state.name or "")
+	end
+
+	-- True when the chart no longer matches the spell saved in this slot.
+	local function isModified()
+		if not state.baseHash then return true end -- an empty slot is always "new"
+		if currentName() ~= state.baseName then return true end
+		if not (state.form and state.essence) then return true end
+		return P.DefHash(buildDef(state)) ~= state.baseHash
+	end
+
 	local function currentPoints()
 		local pts = 0
 		local form = P.Forms[state.form]
@@ -655,534 +597,183 @@ local function OpenSpellcraftMenu(machine)
 		return pts
 	end
 
-	local function buildPowerBar(extraTextFn)
-		local power = vgui.Create("DPanel", right)
-		power:Dock(TOP)
-		power:SetTall(24)
-		power:DockMargin(16, 6, 16, 0)
-		power.Paint = function(_, w, h)
-			local budget = P.Budget(P.GetClientState().level)
-			local points = currentPoints()
-			local over = points > budget
-			local txt = points .. " / " .. budget
-			if extraTextFn then txt = txt .. "   ·   " .. extraTextFn() end
-
-			draw.SimpleText("POWER", "Arcana_AncientSmall", 0, 4, C.paleGold)
-			surface.SetFont("Arcana_AncientSmall")
-			local tw = surface.GetTextSize(txt)
-			local barX = 64
-			local barW = math.max(40, w - barX - tw - 14)
-			surface.SetDrawColor(46, 36, 26, 235)
-			surface.DrawRect(barX, 6, barW, 12)
-			surface.SetDrawColor(over and Color(200, 80, 60, 220) or C.xpFill)
-			surface.DrawRect(barX + 2, 8, math.floor((barW - 4) * math.Clamp(points / math.max(1, budget), 0, 1)), 8)
-			surface.SetDrawColor(C.gold)
-			surface.DrawOutlinedRect(barX, 6, barW, 12)
-			draw.SimpleText(txt, "Arcana_AncientSmall", w, 4, over and Color(220, 110, 90) or C.textBright, TEXT_ALIGN_RIGHT)
-		end
-		return power
+	local function slotCount()
+		local n = 0
+		for _, r in pairs(state.clauseRanks) do n = n + r end
+		return n
 	end
 
 	----------------------------------------------------------------
-	-- Shared spell overview (review + details): element-tinted magic
-	-- circle, title, description, modifier chips, and the stat rows.
-	-- Returns ix, infoW and the y to continue drawing at.
+	-- Slot strip: one octagon per slot, sitting over the top-left of the
+	-- map. Filled means a spell lives there, hollow means the slot is free.
 	----------------------------------------------------------------
-	-- extraH: expected height of whatever the caller draws below the overview,
-	-- so the whole block centers vertically alongside the circle.
-	local function drawSpellOverview(w, h, compiled, title, extraH)
-		local form = P.Forms[compiled.form]
-		local essence = P.Essences[compiled.essence]
-		local ec = essence.color
-		local t = CurTime()
+	local function buildSlotStrip(host)
+		local maxSlots = P.GetClientState().maxSlots or 3
+		-- Odd size on purpose: the icon spans pixels 0..34, so its centre is a
+		-- whole pixel and the number lands dead centre instead of on a half.
+		local size, gap = 35, 8
 
-		-- The full magic circle, identical for every form.
-		local ccx, ccy = 128, h * 0.5
-		local radius = math.min(112, math.max(84, h * 0.42))
-		local circleCol = Color(ec.r, ec.g, ec.b)
-		Arcana.Circle.Draw2DRuneStar(ccx, ccy, radius, t * 2, { 66, 68, 70, 72 }, circleCol, 255)
-		Arcana.Circle.Draw2DPatternRing(2, ccx, ccy, radius * 0.82, -t * 4, circleCol, 255)
-		Arcana.Circle.Draw2DRing(Arcana.Circle.RING_TYPES.SIMPLE_LINE, ccx, ccy, radius * 0.66, t * 2, circleCol, 230)
-		Arcana.Circle.Draw2DPatternRing(1, ccx, ccy, radius * 0.52, -t * 9, circleCol, 255)
-		Arcana.Circle.Draw2DRuneStar(ccx, ccy, radius * 0.4, -t * 3, { 65, 67, 69, 71 }, circleCol, 255)
+		local strip = vgui.Create("DPanel", host)
+		strip:SetZPos(400)
+		strip:SetSize(maxSlots * (size + gap) - gap, size)
+		strip:SetPos(10, 10)
+		strip.Paint = nil
 
-		local ix = 272
-		local infoW = w - ix - 8
+		for i = 1, maxSlots do
+			local btn = vgui.Create("DButton", strip)
+			btn:SetPos((i - 1) * (size + gap), 0)
+			btn:SetSize(size, size)
+			btn:SetText("")
+			btn:SetCursor("hand")
 
-		-- Measure the block so it centers vertically like the circle.
-		local descLines = wrapText("Arcana_AncientSmall", form.desc .. " " .. (essence.desc or ""), infoW)
-		local blockH = 32 + #descLines * 17 + 10 + 36 + 118 + (extraH or 0)
-		local y = math.max(2, math.floor((h - blockH) * 0.5))
+			local occupied = activeDefForSlot(i) ~= nil
+			local label = occupied and activeNameForSlot(i) or "Empty slot"
+			ArtDeco.AddTooltip(btn, label .. (occupied and "" or ".  Pick it to start a new spell."), 240)
 
-		-- Title in the element colour; the composition shows as a suffix
-		-- when a custom name replaces it.
-		local composition = essence.label .. " " .. form.label
-		title = (title and title ~= "") and title or composition
-		ArtDeco.DrawTruncatedText("Arcana_AncientLarge", title, ix, y, circleCol, infoW)
-		if title ~= composition then
-			surface.SetFont("Arcana_AncientLarge")
-			local titleW = surface.GetTextSize(title)
-			if titleW + 100 < infoW then
-				draw.SimpleText(composition, "Arcana_AncientSmall", ix + titleW + 12, y + 8, C.textDim)
+			-- Centred by measuring the number and placing it on whole pixels.
+			-- TEXT_ALIGN_CENTER lands on a half pixel whenever the glyph width is
+			-- odd, and the digit then renders a pixel off inside a 35px icon.
+			local numeral = tostring(i)
+			local function drawNumber(w, h, col)
+				surface.SetFont("Arcana_Ancient")
+				local tw, th = surface.GetTextSize(numeral)
+				draw.SimpleText(numeral, "Arcana_Ancient",
+					math.floor((w - tw) * 0.5), math.floor((h - th) * 0.5), col)
 			end
-		end
-		y = y + 32
 
-		for _, lineTxt in ipairs(descLines) do
-			draw.SimpleText(lineTxt, "Arcana_AncientSmall", ix, y, C.textDim)
-			y = y + 17
-		end
-		y = y + 10
+			btn.Paint = function(pnl, w, h)
+				local sel = state.selSlot == i
+				local hovered = pnl:IsHovered()
+				-- 0.2071 is the cut that turns a square into a regular octagon.
+				-- Anything larger reads as a rounded blob at this size.
+				local corner = math.Round(w * 0.2071)
 
-		-- Modifier chips
-		local chipX = ix
-		surface.SetFont("Arcana_AncientSmall")
-		local anyMod = false
-		for _, clause in ipairs(P.SortedClauses()) do
-			local rank = compiled.ranks[clause.id]
-			if rank then
-				anyMod = true
-				local label = clause.label .. (rank > 1 and (" " .. rank) or "")
-				local tw = surface.GetTextSize(label)
-				ArtDeco.FillDecoPanel(chipX, y, tw + 18, 22, C.cardIdle, 4)
-				ArtDeco.DrawDecoFrame(chipX, y, tw + 18, 22, C.gold, 4)
-				draw.SimpleText(label, "Arcana_AncientSmall", chipX + 9, y + 3, C.paleGold)
-				chipX = chipX + tw + 26
-			end
-		end
-		if not anyMod then
-			draw.SimpleText("No modifiers", "Arcana_AncientSmall", ix, y + 3, C.textDim)
-		end
-		y = y + 36
-
-		-- Stat strip: two rows of three, big values over small labels.
-		local statRow1
-		if compiled.isSelf then
-			statRow1 = {
-				{ v = tostring(math.Round(compiled.damage)) .. "/s", l = "DAMAGE" },
-				{ v = tostring(math.Round(compiled.radius)), l = "RADIUS" },
-				{ v = compiled.duration .. "s", l = "DURATION" },
-			}
-		else
-			local dmg = math.Round(compiled.damage * (compiled.projectiles or 1))
-			statRow1 = {
-				{ v = tostring(dmg) .. ((compiled.projectiles or 1) > 1 and (" x" .. compiled.projectiles) or ""), l = "DAMAGE" },
-				{ v = tostring(math.Round(compiled.radius)), l = "RADIUS" },
-				{ v = tostring(math.Round(compiled.range)), l = "RANGE" },
-			}
-		end
-		local statRow2 = {
-			{ v = ("%.1fs"):format(compiled.cooldown), l = "COOLDOWN" },
-			{ v = ("%.1fs"):format(compiled.castTime), l = "CAST" },
-			{ v = string.Comma(compiled.perCastCost), l = "PER CAST", gold = true, icon = ArtDeco.Icons.coin },
-		}
-
-		local colW = math.floor(infoW / 3)
-		local function drawStatRow(cols)
-			for i, s in ipairs(cols) do
-				local sx = ix + (i - 1) * colW
-				if s.icon then
-					ArtDeco.DrawCostLine("Arcana_AncientLarge", sx, y, {
-						{text = s.v, icon = s.icon, color = s.gold and C.paleGold or C.textBright},
-					})
+				-- Filled when the slot holds a spell, hollow when it is free.
+				if occupied then
+					local fill = sel and C.paleGold or (hovered and C.gold or Color(150, 120, 56))
+					ArtDeco.FillDecoPanel(0, 0, w, h, fill, corner)
+					ArtDeco.DrawDecoFrame(0, 0, w, h, sel and Color(255, 255, 255) or C.gold, corner)
+					drawNumber(w, h, Color(24, 18, 10))
 				else
-					draw.SimpleText(s.v, "Arcana_AncientLarge", sx, y, s.gold and C.paleGold or C.textBright)
+					-- Free slots wear a dotted outline: an open space, not a thing.
+					-- Inset by one so the dots, which straddle the path they sit on,
+					-- land inside the icon instead of hanging off its left and top.
+					ArtDeco.FillDecoPanel(0, 0, w, h, Color(20, 15, 10, 200), corner)
+					drawDottedDecoFrame(1, 1, w - 2, h - 2, sel and Color(255, 255, 255) or (hovered and C.paleGold or Color(130, 112, 74)), corner)
+					drawNumber(w, h, sel and C.paleGold or C.textDim)
 				end
-				draw.SimpleText(s.l, "Arcana_AncientSmall", sx, y + 28, C.textDim)
 			end
-			y = y + 56
-		end
-		drawStatRow(statRow1)
-		drawStatRow(statRow2)
-		y = y + 6
 
-		return ix, infoW, y
-	end
-
-	----------------------------------------------------------------
-	-- Step 1: FORM
-	----------------------------------------------------------------
-	local function buildStepForm()
-		buildWizardHeader("CHOOSE A FORM", "How your spell is delivered. Pick one.")
-		buildWizardNav(function() return state.form ~= nil end)
-		buildPowerBar()
-
-		local list = vgui.Create("DPanel", right)
-		list:Dock(FILL)
-		list:DockMargin(16, 8, 16, 4)
-		list.Paint = nil
-
-		for _, form in ipairs(P.SortedForms()) do
-			local row = vgui.Create("DButton", list)
-			row:Dock(TOP)
-			row:SetTall(58)
-			row:DockMargin(0, 0, 0, 6)
-			row:SetText("")
-			row.Paint = function(_, w, h)
-				local sel = state.form == form.id
-				ArtDeco.FillDecoPanel(0, 0, w, h, sel and Color(58, 44, 32, 235) or C.cardIdle, 8)
-				ArtDeco.DrawDecoFrame(0, 0, w, h, sel and Color(255, 255, 255, 255) or C.gold, 8)
-				draw.SimpleText(form.label, "Arcana_AncientLarge", 16, 4, sel and C.paleGold or C.textBright)
-				draw.SimpleText(form.desc, "Arcana_AncientSmall", 16, 34, C.textDim)
-
-				-- Structured mini stats, value over label, like the review strip.
-				local cols = {
-					{ v = form.id == "self" and (form.tickDamage .. "/s") or tostring(form.baseDamage), l = "DMG" },
-					{ v = ("%.0fs"):format(form.baseCooldown), l = "COOLDOWN" },
-				}
-				local colW = 104
-				local baseX = w - 340
-				for i, s in ipairs(cols) do
-					local sx = baseX + (i - 1) * colW
-					draw.SimpleText(s.v, "Arcana_Ancient", sx, 7, C.textBright)
-					draw.SimpleText(s.l, "Arcana_AncientSmall", sx, 32, C.textDim)
-				end
-
-				-- Points sit apart on the far right, in gold.
-				draw.SimpleText(tostring(form.points), "Arcana_Ancient", w - 64, 7, C.paleGold)
-				draw.SimpleText("PTS", "Arcana_AncientSmall", w - 64, 32, C.paleGold)
-			end
-			row.DoClick = function()
-				state.form = form.id
-				-- Drop modifiers that no longer fit the new form.
-				for id in pairs(state.clauseRanks) do
-					local cl = P.Clauses[id]
-					if (cl.onlyForm and not cl.onlyForm[form.id]) or (cl.denyForm and cl.denyForm[form.id]) then
-						state.clauseRanks[id] = nil
-					end
-				end
+			btn.DoClick = function()
+				if state.selSlot == i then return end
 				playClick()
+				loadSlot(i)
 				refresh()
 			end
 		end
+
+		return strip
 	end
 
 	----------------------------------------------------------------
-	-- Step 2: ESSENCE
+	-- Sidebar: everything about the spell you are looking at, floating over
+	-- the right of the map and rebuilt from the live selection every frame.
 	----------------------------------------------------------------
-	local function buildStepEssence()
-		buildWizardHeader("CHOOSE AN ELEMENT", "What your spell's damage does. Locked elements can be bought with a one-time payment.")
-		buildWizardNav(function() return state.essence ~= nil end)
-		buildPowerBar()
+	local SIDEBAR_W = 340
 
-		-- Price footer under the rows: shows the cost of the hovered locked
-		-- element, right-aligned with the UNLOCK buttons.
-		local hoveredLocked
-		local footer = vgui.Create("DPanel", right)
-		footer:Dock(BOTTOM)
-		footer:SetTall(22)
-		footer:DockMargin(16, 0, 16, 0)
-		footer.Paint = function(_, w, h)
-			local e = hoveredLocked
-			if not e then return end
-			ArtDeco.DrawCostLine("Arcana_AncientSmall", w - 9, 4, {
-				{text = "Unlock " .. e.label .. ":", color = C.paleGold},
-				{text = string.Comma(e.unlock.coins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-				{text = string.Comma(e.unlock.shards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
-			}, TEXT_ALIGN_RIGHT)
-		end
+	local function buildSidebar(host)
+		local pad = 14
+		local innerW = SIDEBAR_W - pad * 2
 
-		local list = vgui.Create("DScrollPanel", right)
-		list:Dock(FILL)
-		list:DockMargin(16, 8, 12, 4)
-		local vbar = list:GetVBar()
-		vbar:SetWide(6)
-		vbar.Paint = nil
-		vbar.btnGrip.Paint = function(_, w, h)
-			surface.SetDrawColor(C.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		local bar = vgui.Create("DPanel", host)
+		bar:SetZPos(400)
 
-		local gradMat = Material("vgui/gradient-l")
-		local st = P.GetClientState()
-		for _, essence in ipairs(P.SortedEssences()) do
-			local hidden = essence.bargain and not st.bargain
-			local unlocked = (essence.bargain and st.bargain) or st.essences[essence.id] == true
-			local ec = essence.color
+		-- Compiled only when the composition actually changes. The column paints
+		-- every frame, so nothing here may recompile on a whim.
+		local compiled, liveDef, req, compiledRev
+		local function currentCompiled()
+			if compiledRev ~= state.rev then
+				compiledRev = state.rev
+				liveDef = buildDef(state)
+				compiled = (state.form and state.essence) and P.Compile(liveDef) or nil
 
-			local row = vgui.Create("DPanel", list)
-			row:Dock(TOP)
-			row:SetTall(46)
-			row:DockMargin(0, 0, 0, 5)
-			row.Paint = function(_, w, h)
-				local sel = state.essence == essence.id
-
-				if hidden then
-					ArtDeco.FillDecoPanel(0, 0, w, h, C.cardIdle, 6)
-					ArtDeco.DrawDecoFrame(0, 0, w, h, Color(120, 105, 80), 6)
-					draw.SimpleText("???", "Arcana_Ancient", 34, 4, Color(160, 150, 135))
-					draw.SimpleText("A hidden element.", "Arcana_AncientSmall", 34, 26, C.textDim)
-					return
-				end
-
-				-- Card washed with the element color from the left.
-				ArtDeco.FillDecoPanel(0, 0, w, h, sel and Color(58, 44, 32, 235) or C.cardIdle, 6)
-				surface.SetDrawColor(ec.r, ec.g, ec.b, sel and 48 or (unlocked and 30 or 12))
-				surface.SetMaterial(gradMat)
-				surface.DrawTexturedRect(2, 2, math.floor(w * 0.55), h - 4)
-
-				-- Frame: a white outline marks the selection; otherwise the frame
-				-- is tinted by the element (dim when locked).
-				if sel then
-					ArtDeco.DrawDecoFrame(0, 0, w, h, Color(255, 255, 255, 255), 6)
+				if compiled then
+					local cs = P.GetClientState()
+					cs.consecrated = isConsecrated(liveDef)
+					req = P.Requirements(liveDef, cs)
 				else
-					local mul = unlocked and 0.65 or 0.35
-					ArtDeco.DrawDecoFrame(0, 0, w, h, Color(ec.r * mul, ec.g * mul, ec.b * mul), 6)
+					req = nil
 				end
 
-				-- Per-element ornament on the left rail.
-				local ornMul = (sel or unlocked) and 1 or 0.45
-				drawElementOrnament(essence.id, 16, h * 0.5, Color(ec.r * ornMul, ec.g * ornMul, ec.b * ornMul))
-
-				draw.SimpleText(essence.label, "Arcana_Ancient", 34, 4, sel and Color(ec.r, ec.g, ec.b) or (unlocked and C.textBright or Color(170, 158, 140)))
-				draw.SimpleText(essence.desc or "", "Arcana_AncientSmall", 34, 26, C.textDim)
-			end
-
-			if not hidden then
-				if unlocked then
-					local pick = vgui.Create("DButton", row)
-					pick:Dock(FILL)
-					pick:SetText("")
-					pick.Paint = nil
-					pick.DoClick = function()
-						state.essence = essence.id
-						-- Drop modifiers that clash with the new essence.
-						for id in pairs(state.clauseRanks) do
-							local cl = P.Clauses[id]
-							if cl.denyEssence and cl.denyEssence[essence.id] then
-								state.clauseRanks[id] = nil
-							end
-						end
-						playClick()
-						refresh()
-					end
-				else
-					local unlock = decoButton(row, {
-						label = "UNLOCK",
-						onClick = function()
-							net.Start("Arcana_Spellcraft_UnlockEssence")
-							net.WriteString(essence.id)
-							net.SendToServer()
-							playClick()
-						end,
-					})
-					unlock:Dock(RIGHT)
-					unlock:SetWide(110)
-					unlock:DockMargin(4, 9, 9, 9)
-					unlock.OnCursorEntered = function() hoveredLocked = essence end
-
-					row.OnCursorEntered = function() hoveredLocked = essence end
-					row.OnCursorExited = function(pnl)
-						if hoveredLocked == essence and not pnl:IsChildHovered() then
-							hoveredLocked = nil
+				-- Default name follows the composition until the player types
+				-- their own, and never overwrites a saved spell's name.
+				local defaultName = compiled and (P.Essences[compiled.essence].label .. " " .. P.Forms[compiled.form].label) or ""
+				if defaultName ~= "" and not state.baseHash then
+					if state.name == "" or state.name == state.lastDefaultName then
+						state.name = defaultName
+						if IsValid(state.nameEntry) and not state.nameEntry:HasFocus() then
+							state.nameEntry:SetValue(defaultName)
 						end
 					end
+					state.lastDefaultName = defaultName
 				end
 			end
-		end
-	end
-
-	----------------------------------------------------------------
-	-- Step 3: MODIFIERS
-	----------------------------------------------------------------
-	local function buildStepModifiers()
-		local function slotCount()
-			local n = 0
-			for _, r in pairs(state.clauseRanks) do n = n + r end
-			return n
-		end
-
-		buildWizardHeader("ADD MODIFIERS", "Optional. Each rank costs power and raises the price. Skip ahead if you want none.")
-		buildWizardNav(function() return true end)
-		buildPowerBar(function() return slotCount() .. "/" .. P.MAX_CLAUSE_SLOTS .. " modifiers" end)
-
-		local scroll = vgui.Create("DScrollPanel", right)
-		scroll:Dock(FILL)
-		scroll:DockMargin(16, 6, 12, 4)
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(6)
-		vbar.Paint = nil
-		vbar.btnGrip.Paint = function(_, w, h)
-			surface.SetDrawColor(C.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
-
-		local level = P.GetClientState().level or 0
-
-		for _, clause in ipairs(P.SortedClauses()) do
-			-- Incompatible modifiers are hidden outright: less noise, no dead rows.
-			local formOk = (not clause.onlyForm or clause.onlyForm[state.form]) and (not clause.denyForm or not clause.denyForm[state.form])
-			local essenceOk = not (clause.denyEssence and state.essence and clause.denyEssence[state.essence])
-
-			if formOk and essenceOk then
-				-- The reason the next rank cannot be added right now, or nil if it can.
-				local function blockReason()
-					local rank = state.clauseRanks[clause.id] or 0
-					local nextRank = rank + 1
-					if nextRank > clause.maxRank then return nil end -- maxed; +' is just inert
-					if level < clause.levels[nextRank] then return "Unlocks at level " .. clause.levels[nextRank] end
-					if slotCount() >= P.MAX_CLAUSE_SLOTS then return "Modifier limit reached (" .. P.MAX_CLAUSE_SLOTS .. ")" end
-					if clause.id == "homing" and (state.clauseRanks.widen or 0) >= 2 then return "Conflicts with Widen II" end
-					if clause.id == "widen" and nextRank >= 2 and state.clauseRanks.homing then return "Rank II conflicts with Homing" end
-
-					-- Generic pairwise conflicts (mirrors Compile), both directions.
-					for other in pairs(clause.conflicts or {}) do
-						if state.clauseRanks[other] then
-							return "Conflicts with " .. (P.Clauses[other] and P.Clauses[other].label or other)
-						end
-					end
-					for otherId, rank2 in pairs(state.clauseRanks) do
-						if rank2 > 0 then
-							local other = P.Clauses[otherId]
-							if other and other.conflicts and other.conflicts[clause.id] then
-								return "Conflicts with " .. other.label
-							end
-						end
-					end
-
-					return nil
-				end
-
-				local row = vgui.Create("DPanel", scroll)
-				row:Dock(TOP)
-				row:SetTall(52)
-				row:DockMargin(0, 0, 0, 5)
-				row.Paint = function(_, w, h)
-					local rank = state.clauseRanks[clause.id] or 0
-					ArtDeco.FillDecoPanel(0, 0, w, h, rank > 0 and Color(58, 44, 32, 235) or C.cardIdle, 6)
-					ArtDeco.DrawDecoFrame(0, 0, w, h, rank > 0 and C.paleGold or C.gold, 6)
-
-					draw.SimpleText(clause.label, "Arcana_Ancient", 12, 5, rank > 0 and C.paleGold or C.textBright)
-
-					-- Rank pips
-					if clause.maxRank > 1 then
-						surface.SetFont("Arcana_Ancient")
-						local nameW = surface.GetTextSize(clause.label)
-						for r = 1, clause.maxRank do
-							local px = 12 + nameW + 10 + (r - 1) * 14
-							if r <= rank then
-								surface.SetDrawColor(C.paleGold)
-								surface.DrawRect(px, 11, 9, 9)
-							else
-								surface.SetDrawColor(110, 96, 74, 255)
-								surface.DrawOutlinedRect(px, 11, 9, 9)
-							end
-						end
-					end
-
-					draw.SimpleText(clause.desc, "Arcana_AncientSmall", 12, 30, C.textDim)
-
-					-- Points sit apart, left of the -/+ buttons, in gold.
-					draw.SimpleText(tostring(clause.points), "Arcana_Ancient", w - 92, 7, C.paleGold, TEXT_ALIGN_RIGHT)
-					draw.SimpleText("PTS" .. (clause.maxRank > 1 and "/RANK" or ""), "Arcana_AncientSmall", w - 92, 29, C.paleGold, TEXT_ALIGN_RIGHT)
-
-					local reason = blockReason()
-					if reason then
-						surface.SetFont("Arcana_AncientSmall")
-						local rw = surface.GetTextSize(reason)
-						draw.SimpleText(reason, "Arcana_AncientSmall", w - 175 - rw, 30, Color(220, 170, 110))
-					end
-				end
-
-				local plus = vgui.Create("DButton", row)
-				plus:Dock(RIGHT)
-				plus:SetWide(34)
-				plus:DockMargin(2, 9, 9, 9)
-				plus:SetText("")
-				plus.Paint = function(_, w, h)
-					local rank = state.clauseRanks[clause.id] or 0
-					local usable = rank < clause.maxRank and blockReason() == nil
-					ArtDeco.FillDecoPanel(0, 0, w, h, C.cardIdle, 4)
-					ArtDeco.DrawDecoFrame(0, 0, w, h, usable and C.gold or Color(110, 96, 74), 4)
-					draw.SimpleText("+", "Arcana_Ancient", w * 0.5, h * 0.5, usable and C.textBright or Color(140, 128, 108), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				end
-				plus.DoClick = function()
-					local rank = state.clauseRanks[clause.id] or 0
-					if rank >= clause.maxRank or blockReason() ~= nil then playDeny() return end
-					state.clauseRanks[clause.id] = rank + 1
-					playClick()
-					refresh()
-				end
-
-				local minus = vgui.Create("DButton", row)
-				minus:Dock(RIGHT)
-				minus:SetWide(34)
-				minus:DockMargin(2, 9, 2, 9)
-				minus:SetText("")
-				minus.Paint = function(_, w, h)
-					local rank = state.clauseRanks[clause.id] or 0
-					ArtDeco.FillDecoPanel(0, 0, w, h, C.cardIdle, 4)
-					ArtDeco.DrawDecoFrame(0, 0, w, h, rank > 0 and C.gold or Color(110, 96, 74), 4)
-					draw.SimpleText("-", "Arcana_Ancient", w * 0.5, h * 0.5, rank > 0 and C.textBright or Color(140, 128, 108), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				end
-				minus.DoClick = function()
-					local rank = state.clauseRanks[clause.id] or 0
-					if rank <= 0 then playDeny() return end
-					state.clauseRanks[clause.id] = rank > 1 and (rank - 1) or nil
-					playClick()
-					refresh()
-				end
-			end
-		end
-	end
-
-	----------------------------------------------------------------
-	-- Step 4: RECAP
-	----------------------------------------------------------------
-	local function buildStepRecap()
-		buildWizardHeader("REVIEW YOUR SPELL", "Check the numbers, name it, and pay the one-time cost.")
-
-		local compiled = state.essence and P.Compile(buildDef(state)) or nil
-		local budget = P.Budget(P.GetClientState().level)
-
-		-- Nav with BACK + submit. The name check reads the entry live: a DTextEntry
-		-- only fires OnValueChange on enter/focus-loss, so we poll GetValue instead.
-		local nameEntry
-
-		local nav = vgui.Create("DPanel", right)
-		nav:Dock(BOTTOM)
-		nav:SetTall(44)
-		nav:DockMargin(16, 6, 16, 12)
-		nav.Paint = nil
-
-		local back = decoButton(nav, {
-			label = "< BACK",
-			onClick = function()
-				state.step = 3
-				refresh()
-			end,
-		})
-		back:Dock(LEFT)
-		back:SetWide(100)
-
-		local function currentName()
-			if IsValid(nameEntry) then return string.Trim(nameEntry:GetValue() or "") end
-			return string.Trim(state.name or "")
+			return compiled
 		end
 
 		local function canSubmit()
-			if not compiled then return false end
-			if compiled.points > budget then return false end
-			return #currentName() >= 3
+			local c = currentCompiled()
+			if not c then return false end
+			if c.points > P.Budget(P.GetClientState().level) then return false end
+			if #currentName() < 3 then return false end
+			return isModified()
 		end
 
-		-- Two-line submit: the one-time creation cost lives under the label,
-		-- vault-imprint style.
-		local submit = vgui.Create("DButton", nav)
-		submit:Dock(RIGHT)
-		submit:SetWide(340)
+		----------------------------------------------------------------
+		-- Name entry lives at the top of the column
+		----------------------------------------------------------------
+		local nameEntry = vgui.Create("DTextEntry", bar)
+		state.nameEntry = nameEntry
+		nameEntry:SetFont("Arcana_Ancient")
+		nameEntry:SetMaximumCharCount(24)
+		nameEntry:SetValue(state.name)
+		nameEntry:SetTextColor(C.textBright)
+		nameEntry:SetCursorColor(C.paleGold)
+		nameEntry:SetHighlightColor(Color(198, 160, 74, 120))
+		nameEntry:SetPaintBackground(false)
+		nameEntry:SetTextInset(10, 0)
+		nameEntry.OnChange = function(pnl) state.name = pnl:GetValue() or "" end
+		nameEntry.Paint = function(pnl, w, h)
+			ArtDeco.FillDecoPanel(0, 0, w, h, Color(32, 24, 17, 235), 6)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, pnl:HasFocus() and C.paleGold or C.gold, 6)
+			pnl:DrawTextEntryText(C.textBright, C.paleGold, C.textBright)
+		end
+
+		----------------------------------------------------------------
+		-- Buttons, stacked up from the bottom
+		----------------------------------------------------------------
+		local wasOccupied = activeDefForSlot(state.selSlot) ~= nil
+
+		local submit = vgui.Create("DButton", bar)
 		submit:SetText("")
 		submit.Paint = function(pnl, w, h)
+			local c = currentCompiled()
 			local enabled = canSubmit()
 			local hovered = enabled and pnl:IsHovered()
 			ArtDeco.FillDecoPanel(0, 0, w, h, hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235), 6)
 			ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and C.gold or Color(120, 105, 80), 6)
+
 			local txtCol = enabled and C.textBright or Color(160, 150, 135)
-			draw.SimpleText("CREATE SPELL", "Arcana_Ancient", w * 0.5, h * 0.5 - 8, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			if compiled then
-				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 1, {
-					{text = string.Comma(compiled.consecrationCoins), icon = ArtDeco.Icons.coin, color = enabled and ArtDeco.Colors.coinGold or C.textDim},
-					{text = string.Comma(compiled.consecrationShards), icon = ArtDeco.Icons.shard, color = enabled and ArtDeco.Colors.shardBlue or C.textDim},
+			draw.SimpleText(wasOccupied and "SAVE CHANGES" or "CREATE SPELL", "Arcana_Ancient", w * 0.5, h * 0.5 - 9, txtCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+			if not c then
+				draw.SimpleText("Pick a form and an element", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			elseif wasOccupied and not isModified() then
+				draw.SimpleText("No changes yet", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			else
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 2, {
+					{text = string.Comma(c.consecrationCoins), icon = ArtDeco.Icons.coin, color = enabled and C.coinGold or C.textDim},
+					{text = string.Comma(c.consecrationShards), icon = ArtDeco.Icons.shard, color = enabled and C.shardBlue or C.textDim},
 				}, TEXT_ALIGN_CENTER)
 			end
 		end
@@ -1201,234 +792,363 @@ local function OpenSpellcraftMenu(machine)
 			playClick()
 		end
 
-		-- Name entry above the nav.
-		local nameRow = vgui.Create("DPanel", right)
-		nameRow:Dock(BOTTOM)
-		nameRow:SetTall(40)
-		nameRow:DockMargin(16, 0, 16, 0)
-		nameRow.Paint = function(_, _, h)
-			draw.SimpleText("NAME", "Arcana_Ancient", 0, h * 0.5, C.paleGold, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-		end
-
-		-- Default name: the composition ("Poison Area"). Replaced when the
-		-- composition changes, unless the player typed their own.
-		local defaultName = compiled and (P.Essences[compiled.essence].label .. " " .. P.Forms[compiled.form].label) or ""
-		if state.name == "" or state.name == state.lastDefaultName then
-			state.name = defaultName
-		end
-		state.lastDefaultName = defaultName
-
-		nameEntry = vgui.Create("DTextEntry", nameRow)
-		nameEntry:Dock(FILL)
-		nameEntry:DockMargin(70, 3, 0, 3)
-		nameEntry:SetFont("Arcana_Ancient")
-		nameEntry:SetMaximumCharCount(24)
-		nameEntry:SetValue(state.name)
-		nameEntry:SetTextColor(C.textBright)
-		nameEntry:SetCursorColor(C.paleGold)
-		nameEntry:SetHighlightColor(Color(198, 160, 74, 120))
-		nameEntry:SetPaintBackground(false)
-		nameEntry:SetTextInset(10, 0)
-		nameEntry.OnChange = function(pnl) state.name = pnl:GetValue() or "" end
-		nameEntry.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, Color(32, 24, 17, 235), 6)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, pnl:HasFocus() and C.paleGold or C.gold, 6)
-			pnl:DrawTextEntryText(C.textBright, C.paleGold, C.textBright)
-		end
-
-		-- Recap body: animated essence circle on the left, info column on the right.
-		local body = vgui.Create("DPanel", right)
-		body:Dock(FILL)
-		body:DockMargin(16, 8, 16, 8)
-		body.Paint = function(_, w, h)
-			if not compiled then
-				draw.SimpleText("Incomplete spell. Go back and choose a form and an element.", "Arcana_Ancient", 0, 8, Color(220, 130, 90))
-				return
-			end
-
-			local over = compiled.points > budget
-			local name = string.Trim(state.name or "")
-			local ix, infoW, y = drawSpellOverview(w, h, compiled, #name >= 1 and name or nil, over and 46 or 26)
-			draw.SimpleText("POWER", "Arcana_AncientSmall", ix, y + 1, C.paleGold)
-			local barX, barW = ix + 64, infoW - 64 - 110
-			surface.SetDrawColor(46, 36, 26, 235)
-			surface.DrawRect(barX, y + 2, barW, 12)
-			surface.SetDrawColor(over and Color(200, 80, 60, 220) or C.xpFill)
-			surface.DrawRect(barX + 2, y + 4, math.floor((barW - 4) * math.Clamp(compiled.points / math.max(1, budget), 0, 1)), 8)
-			surface.SetDrawColor(C.gold)
-			surface.DrawOutlinedRect(barX, y + 2, barW, 12)
-			draw.SimpleText(compiled.points .. " / " .. budget, "Arcana_AncientSmall", barX + barW + 10, y + 1, over and Color(220, 110, 90) or C.textBright)
-			if over then
-				y = y + 20
-				draw.SimpleText("Over your power limit. Remove modifiers.", "Arcana_AncientSmall", ix, y, Color(220, 110, 90))
-			end
-		end
-	end
-
-	----------------------------------------------------------------
-	-- Details view (occupied slot)
-	----------------------------------------------------------------
-	local function buildDetails(slot)
-		local def = activeDefForSlot(slot)
-		if not def then return end
-		local compiled = P.Compile(def)
-
-		local actions = vgui.Create("DPanel", right)
-		actions:Dock(BOTTOM)
-		actions:SetTall(34)
-		actions:DockMargin(16, 4, 16, 12)
-		actions.Paint = nil
-
-		if not isConsecrated(def) then
-			local activate = confirmButton(actions, "ACTIVATE", "CONFIRM PAYMENT?", function()
+		local activate, deleteBtn
+		if wasOccupied then
+			activate = confirmButton(bar, "ACTIVATE", "CONFIRM PAYMENT?", function()
 				net.Start("Arcana_Spellcraft_Consecrate")
-				net.WriteUInt(slot, 8)
+				net.WriteUInt(state.selSlot, 8)
 				net.SendToServer()
 			end)
-			activate:Dock(LEFT)
-			activate:SetWide(220)
+
+			deleteBtn = decoButton(bar, {
+				label = "DELETE",
+				font = "Arcana_AncientSmall",
+				frameColor = function() return Color(170, 80, 60) end,
+				onClick = function()
+					playClick()
+					local slot = state.selSlot
+					showDeleteModal(frame, activeNameForSlot(slot), function()
+						net.Start("Arcana_Spellcraft_Dissolve")
+						net.WriteUInt(slot, 8)
+						net.SendToServer()
+					end)
+				end,
+			})
 		end
 
-		local deleteBtn = decoButton(actions, {
-			label = "DELETE",
-			frameColor = function() return Color(170, 80, 60) end,
-			onClick = function()
-				playClick()
-				showDeleteModal(frame, activeNameForSlot(slot), function()
-					net.Start("Arcana_Spellcraft_Dissolve")
-					net.WriteUInt(slot, 8)
-					net.SendToServer()
-				end)
-			end,
-		})
-		deleteBtn:Dock(RIGHT)
-		deleteBtn:SetWide(160)
+		-- ACTIVATE only makes sense while the chart matches what is saved:
+		-- once you rework it, saving is what pays for the new form.
+		local function activateVisible()
+			if not wasOccupied then return false end
+			if isModified() then return false end
+			local def = activeDefForSlot(state.selSlot)
+			return def ~= nil and not isConsecrated(def)
+		end
 
-		-- Same overview as the review step, then a live status underneath: a
-		-- single "ready" line, or the requirements checklist when locked.
-		local body = vgui.Create("DPanel", right)
-		body:Dock(FILL)
-		body:DockMargin(16, 12, 16, 4)
-		body.Paint = function(_, w, h)
-			if not compiled then
-				draw.SimpleText("Invalid spell", "Arcana_Ancient", 0, 8, Color(220, 110, 90))
+		local function layoutButtons()
+			local w, h = bar:GetSize()
+			local y = h - pad
+
+			local function place(btn, tall)
+				if not IsValid(btn) or not btn:IsVisible() then return end
+				y = y - tall
+				btn:SetPos(pad, y)
+				btn:SetSize(w - pad * 2, tall)
+				y = y - 8
+			end
+
+			place(deleteBtn, 30)
+			place(activate, 34)
+			place(submit, 48)
+
+			bar._buttonsTop = y
+		end
+
+		bar.PerformLayout = function(pnl, w)
+			nameEntry:SetPos(pad, 34)
+			nameEntry:SetSize(w - pad * 2, 32)
+			layoutButtons()
+		end
+
+		-- ACTIVATE comes and goes as the chart is reworked, so re-stack when it
+		-- does. This runs through _extraThink because anchor() owns Think.
+		bar._extraThink = function()
+			if not activate then return end
+			local want = activateVisible()
+			if activate:IsVisible() ~= want then
+				activate:SetVisible(want)
+				layoutButtons()
+			end
+		end
+		if activate then activate:SetVisible(activateVisible()) end
+
+		----------------------------------------------------------------
+		-- The column itself
+		----------------------------------------------------------------
+		bar.Paint = function(pnl, w, h)
+			ArtDeco.FillDecoPanel(0, 0, w, h, Color(16, 12, 8, 232), 10)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, C.gold, 10)
+
+			local c = currentCompiled()
+			local essence = c and P.Essences[c.essence]
+			local tint = essence and Color(essence.color.r, essence.color.g, essence.color.b) or C.paleGold
+
+			draw.SimpleText("NAME", "Arcana_AncientSmall", pad, 14, C.paleGold)
+
+			local y = 78
+
+			if not c then
+				-- The button below already says what to go and pick, so this only
+				-- explains what the column is for.
+				draw.SimpleText("Nothing composed yet.", "Arcana_Ancient", pad, y, C.textDim)
+				y = y + 26
+				for _, lineTxt in ipairs(wrapText("Arcana_AncientSmall", "This column fills in as you take nodes off the map.", innerW)) do
+					draw.SimpleText(lineTxt, "Arcana_AncientSmall", pad, y, C.textDim)
+					y = y + 17
+				end
 				return
 			end
 
-			local st = P.GetClientState()
-			st.consecrated = isConsecrated(def)
-			local req = P.Requirements(def, st)
+			-- Composition line
+			local form = P.Forms[c.form]
+			draw.SimpleText(essence.label .. " " .. form.label, "Arcana_Ancient", pad, y, tint)
+			y = y + 26
 
-			local extraH = req.castable and 32 or (34 + (4 + table.Count(compiled.ranks)) * 26)
-			local ix, _, y = drawSpellOverview(w, h, compiled, activeNameForSlot(slot), extraH)
-			y = y + 6
+			for _, lineTxt in ipairs(wrapText("Arcana_AncientSmall", form.desc .. " " .. (essence.desc or ""), innerW)) do
+				draw.SimpleText(lineTxt, "Arcana_AncientSmall", pad, y, C.textDim)
+				y = y + 16
+			end
+			y = y + 10
+
+			-- Modifier chips
+			draw.SimpleText("MODIFIERS", "Arcana_AncientSmall", pad, y, C.paleGold)
+			draw.SimpleText(slotCount() .. "/" .. P.MAX_CLAUSE_SLOTS, "Arcana_AncientSmall", w - pad, y, C.textDim, TEXT_ALIGN_RIGHT)
+			y = y + 20
+
+			local chipX, anyMod = pad, false
+			surface.SetFont("Arcana_AncientSmall")
+			for _, clause in ipairs(P.SortedClauses()) do
+				local rank = c.ranks[clause.id]
+				if rank then
+					anyMod = true
+					local label = clause.label .. (rank > 1 and (" " .. rank) or "")
+					local tw = surface.GetTextSize(label)
+					if chipX + tw + 18 > w - pad then
+						chipX = pad
+						y = y + 26
+					end
+					ArtDeco.FillDecoPanel(chipX, y, tw + 18, 22, C.cardIdle, 4)
+					ArtDeco.DrawDecoFrame(chipX, y, tw + 18, 22, C.gold, 4)
+					draw.SimpleText(label, "Arcana_AncientSmall", chipX + 9, y + 3, C.paleGold)
+					chipX = chipX + tw + 24
+				end
+			end
+			if not anyMod then
+				draw.SimpleText("None", "Arcana_AncientSmall", pad, y + 3, C.textDim)
+			end
+			y = y + 34
+
+			-- Stats, one per row: label left, value right.
+			local function stat(label, value, gold, icon)
+				draw.SimpleText(label, "Arcana_AncientSmall", pad, y, C.textDim)
+				if icon then
+					ArtDeco.DrawCostLine("Arcana_AncientSmall", w - pad, y, {
+						{text = value, icon = icon, color = gold and C.coinGold or C.textBright},
+					}, TEXT_ALIGN_RIGHT)
+				else
+					draw.SimpleText(value, "Arcana_AncientSmall", w - pad, y, gold and C.paleGold or C.textBright, TEXT_ALIGN_RIGHT)
+				end
+				y = y + 19
+			end
+
+			if c.isSelf then
+				stat("DAMAGE", math.Round(c.damage) .. "/s")
+				stat("RADIUS", tostring(math.Round(c.radius)))
+				stat("DURATION", c.duration .. "s")
+			else
+				local dmg = math.Round(c.damage * (c.projectiles or 1))
+				stat("DAMAGE", dmg .. ((c.projectiles or 1) > 1 and (" x" .. c.projectiles) or ""))
+				stat("RADIUS", tostring(math.Round(c.radius)))
+				stat("RANGE", tostring(math.Round(c.range)))
+			end
+			stat("COOLDOWN", ("%.1fs"):format(c.cooldown))
+			stat("CAST", ("%.1fs"):format(c.castTime))
+			stat("PER CAST", string.Comma(c.perCastCost), true, ArtDeco.Icons.coin)
+			y = y + 10
+
+			-- Power gauge
+			local budget = P.Budget(P.GetClientState().level)
+			local points = currentPoints()
+			local over = points > budget
+			draw.SimpleText("POWER", "Arcana_AncientSmall", pad, y, C.paleGold)
+			draw.SimpleText(points .. " / " .. budget, "Arcana_AncientSmall", w - pad, y, over and Color(220, 110, 90) or C.textBright, TEXT_ALIGN_RIGHT)
+			y = y + 19
+			surface.SetDrawColor(46, 36, 26, 235)
+			surface.DrawRect(pad, y, innerW, 12)
+			surface.SetDrawColor(over and Color(200, 80, 60, 220) or C.xpFill)
+			surface.DrawRect(pad + 2, y + 2, math.floor((innerW - 4) * math.Clamp(points / math.max(1, budget), 0, 1)), 8)
+			surface.SetDrawColor(C.gold)
+			surface.DrawOutlinedRect(pad, y, innerW, 12)
+			y = y + 22
+
+			if over then
+				draw.SimpleText("Over your power limit.", "Arcana_AncientSmall", pad, y, Color(220, 110, 90))
+				y = y + 19
+			end
+
+			----------------------------------------------------------------
+			-- What still stands between this spell and casting it
+			----------------------------------------------------------------
+			-- Stop before the buttons rather than drawing underneath them.
+			local limit = (pnl._buttonsTop or h) - 8
+
+			if not req then return end
 
 			if req.castable then
-				drawMark(ix, y, true)
-				draw.SimpleText("Ready to cast. Assign it to a quickslot in your grimoire.", "Arcana_Ancient", ix + 22, y, Color(150, 220, 150))
+				if y < limit then
+					drawMark(pad, y, true)
+					draw.SimpleText("Ready to cast.", "Arcana_AncientSmall", pad + 20, y + 1, Color(150, 220, 150))
+				end
 				return
 			end
 
-			draw.SimpleText("REQUIREMENTS ON THIS SERVER", "Arcana_Ancient", ix, y, C.paleGold)
-			y = y + 28
+			y = y + 4
+			draw.SimpleText("STILL NEEDED", "Arcana_AncientSmall", pad, y, C.paleGold)
+			y = y + 20
 
 			local function line(ok, text)
-				drawMark(ix, y, ok)
-				draw.SimpleText(text, "Arcana_Ancient", ix + 22, y, ok and C.textBright or C.textDim)
-				y = y + 26
-			end
-
-			-- Like line(), but with coin/shard amounts and their icons after the text
-			local function lineCost(ok, text, coins, shards)
-				drawMark(ix, y, ok)
-				local textW = draw.SimpleText(text, "Arcana_Ancient", ix + 22, y, ok and C.textBright or C.textDim)
-				ArtDeco.DrawCostLine("Arcana_Ancient", ix + 22 + textW + 10, y, {
-					{text = string.Comma(coins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-					{text = string.Comma(shards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
-				})
-				y = y + 26
+				if ok or y >= limit then return end
+				drawMark(pad, y, false)
+				ArtDeco.DrawTruncatedText("Arcana_AncientSmall", text, pad + 20, y + 1, C.textDim, innerW - 20)
+				y = y + 20
 			end
 
 			line(req.checks.level.ok, "Level " .. req.checks.level.need)
+
 			local ess = req.checks.essence
-			local essText = ess.label .. " element"
-			if ess.ok then
-				line(true, essText)
-			elseif ess.bargain then
-				line(false, essText .. "  (the Golden Sun's bargain)")
-			else
-				lineCost(false, essText .. "  — buy in the ELEMENT step:", ess.unlock.coins, ess.unlock.shards)
+			if not ess.ok then
+				line(false, ess.label .. (ess.bargain and " (the Golden Sun's bargain)" or " (buy it on the map)"))
 			end
+
 			for _, cl in ipairs(req.checks.clauses) do
-				line(cl.ok, cl.label .. (cl.rank > 1 and (" " .. cl.rank) or "") .. (cl.ok and "" or ("  (level " .. cl.need .. ")")))
+				line(cl.ok, cl.label .. (cl.rank > 1 and (" " .. cl.rank) or "") .. " (level " .. cl.need .. ")")
 			end
+
 			line(req.checks.budget.ok, "Power " .. req.checks.budget.need .. " / " .. req.checks.budget.have)
-			local con = req.checks.consecrated
-			if con.ok then
-				line(true, "Activated")
-			else
-				lineCost(false, "Activation cost:", con.coins, con.shards)
+
+			if not req.checks.consecrated.ok and y < limit then
+				drawMark(pad, y, false)
+				local textW = draw.SimpleText("Activation:", "Arcana_AncientSmall", pad + 20, y + 1, C.textDim)
+				ArtDeco.DrawCostLine("Arcana_AncientSmall", pad + 20 + textW + 8, y + 1, {
+					{text = string.Comma(req.checks.consecrated.coins), icon = ArtDeco.Icons.coin, color = C.coinGold},
+					{text = string.Comma(req.checks.consecrated.shards), icon = ArtDeco.Icons.shard, color = C.shardBlue},
+				})
 			end
 		end
+
+		return bar
 	end
 
 	----------------------------------------------------------------
-	-- refresh: single rebuild entry point
+	-- Keeps a floating panel pinned to its parent as the parent resizes.
 	----------------------------------------------------------------
-	refresh = function()
-		if not IsValid(right) then return end
-		clearChildren(right)
-		buildSlotList()
+	local function anchor(pnl, place)
+		local function sync(p)
+			local pw, ph = p:GetParent():GetSize()
+			if p._lw ~= pw or p._lh ~= ph then
+				p._lw, p._lh = pw, ph
+				place(p, pw, ph)
+			end
+			if p._extraThink then p._extraThink(p) end
+		end
+
+		pnl.Think = sync
+		sync(pnl) -- place it now if the parent is already laid out
+	end
+
+	----------------------------------------------------------------
+	-- Composer: the star map, with the slot strip over its top-left and
+	-- the spell column over its right.
+	----------------------------------------------------------------
+	local function buildComposer()
+		-- No header strip: the frame is already titled, and the controls sit in
+		-- that same band. Dropping it hands 50px of height back to the map.
+		local host = vgui.Create("DPanel", content)
+		host:Dock(FILL)
+		host.Paint = nil
 
 		-- Level gate up front: no point composing a spell you cannot create.
-		-- Carried spells still show their status in the slot list and details.
-		local st = P.GetClientState()
+		-- Slots you already carry still open, so their details stay reachable.
+		local cs = P.GetClientState()
 		local minLevel = P.Config().minLevel
-		if (st.level or 0) < minLevel and not activeDefForSlot(state.selSlot) then
-			local locked = vgui.Create("DPanel", right)
-			locked:Dock(FILL)
-			locked.Paint = function(_, w, h)
+		if (cs.level or 0) < minLevel and not activeDefForSlot(state.selSlot) then
+			host.Paint = function(_, w, h)
 				local cx, cy = w * 0.5, h * 0.5
 				local t = CurTime()
 				local dim = Color(150, 132, 100)
 				Arcana.Circle.Draw2DPatternRing(2, cx, cy - 40, 70, t * 3, dim, 120)
 				Arcana.Circle.Draw2DRing(Arcana.Circle.RING_TYPES.SIMPLE_LINE, cx, cy - 40, 52, -t * 2, dim, 100)
 				draw.SimpleText("SPELL CRAFTING LOCKED", "Arcana_AncientLarge", cx, cy + 60, C.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				draw.SimpleText("Requires level " .. minLevel .. ". You are level " .. (st.level or 0) .. ".", "Arcana_Ancient", cx, cy + 92, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("Requires level " .. minLevel .. ". You are level " .. (cs.level or 0) .. ".", "Arcana_Ancient", cx, cy + 92, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
+			buildSlotStrip(host)
 			return
 		end
 
-		if activeDefForSlot(state.selSlot) then
-			buildDetails(state.selSlot)
-		else
-			if state.step == 1 then
-				buildStepForm()
-			elseif state.step == 2 then
-				buildStepEssence()
-			elseif state.step == 3 then
-				buildStepModifiers()
-			else
-				buildStepRecap()
-			end
-		end
+		local canvas = P.Graph.CreateCanvas(host, {
+			state = state,
+			seed = bgSeed,
+			playClick = playClick,
+			playDeny = playDeny,
+			bumpRev = function() state.rev = (state.rev or 0) + 1 end,
+			rightInset = function() return SIDEBAR_W + 16 end,
+			requestUnlock = function(essence)
+				showUnlockModal(frame, essence, function()
+					net.Start("Arcana_Spellcraft_UnlockEssence")
+					net.WriteString(essence.id)
+					net.SendToServer()
+				end)
+			end,
+		})
+		canvas:Dock(FILL)
+
+		buildSlotStrip(host)
+
+		local sidebar = buildSidebar(host)
+		anchor(sidebar, function(pnl, pw, ph)
+			pnl:SetSize(SIDEBAR_W, ph - 16)
+			pnl:SetPos(pw - SIDEBAR_W - 8, 8)
+		end)
 	end
 
+	----------------------------------------------------------------
+	-- refresh: single rebuild entry point
+	----------------------------------------------------------------
+	refresh = function()
+		if not IsValid(content) then return end
+		state.nameEntry = nil
+		clearChildren(content)
+		buildComposer()
+	end
+
+	loadSlot(state.selSlot)
 	refresh()
 
-	-- Server pushed new state (essence bought, consecrated, register/unregister).
+	-- A cheap fingerprint of everything about this player that the menu draws.
+	local function clientSignature()
+		local cs = P.GetClientState()
+		local essences, consecrated = 0, 0
+		for _ in pairs(cs.essences) do essences = essences + 1 end
+		for _ in pairs(cs.consecrated) do consecrated = consecrated + 1 end
+		return table.concat({ cs.level or 0, essences, consecrated, cs.bargain and 1 or 0, cs.maxSlots or 0 }, "|")
+	end
+
+	local lastSignature = clientSignature()
+
+	-- Arcana_Spellcraft_Register is broadcast to everyone, so this hook also
+	-- fires when a stranger across the map finishes a spell. Rebuilding on that
+	-- would throw away work in progress and steal focus from the name box, so
+	-- nothing happens unless this player's own slot or standing actually moved.
 	hook.Add("Arcana_Spellcraft_StateChanged", frame, function()
-		if IsValid(frame) then
-			-- A successful craft turns the selected slot occupied: reset the wizard.
-			if activeDefForSlot(state.selSlot) and state.step == 4 then
-				state.step = 1
-				state.form = nil
-				state.essence = nil
-				state.clauseRanks = {}
-				state.name = ""
-			end
-			refresh()
+		if not IsValid(frame) then return end
+
+		local def = activeDefForSlot(state.selSlot)
+		local hash = def and P.DefHash(def) or nil
+		local storedName = def and activeNameForSlot(state.selSlot) or nil
+		local slotChanged = hash ~= state.baseHash or storedName ~= state.baseName
+
+		local signature = clientSignature()
+		if not slotChanged and signature == lastSignature then return end
+		lastSignature = signature
+
+		if slotChanged then
+			-- This slot was saved, reworked or dissolved: show what is stored now.
+			loadSlot(state.selSlot)
+		else
+			state.rev = (state.rev or 0) + 1
 		end
+
+		refresh()
 	end)
 
 	frame.Think = function()
