@@ -127,7 +127,7 @@ if CLIENT then
 	-- Shelves rising in a ring
 	local SHELF_COUNT = 8
 	local SHELF_RADIUS = 160
-	local SHELF_SINK_DEPTH = 420 -- deep in the abyss when hidden, they fade out long before
+	local SHELF_SINK_DEPTH = 420 -- deep in the abyss when hidden
 	local SHELF_RISE_DUR = 1.2
 	local SHELF_STAGGER = 0.12
 	local SHELF_YAW_OFFSET = 180 -- model-forward correction so shelves face inward
@@ -151,6 +151,7 @@ if CLIENT then
 	local BIGRUNE_ALPHA = 230
 	local BIGRUNE_BOB_AMP = 3
 	local BIGRUNE_BOB_SPEED = 1.2
+	local BIGRUNE_KINDLE_DUR = 0.4 -- lights up only once its shelf has locked into place
 
 	-- Rune stream flowing from the shelves to the grimoire, through bloom
 	local RUNE_RATE = 3 -- spawns/sec per emitting shelf
@@ -197,7 +198,6 @@ if CLIENT then
 	local ABYSS_CAP_RADIUS = 130 -- flat stone top holding the bench above the void
 	local ABYSS_CAP_TEXTURE = "models/props_foliage/coastrock02"
 	local ABYSS_CAP_BRIGHTNESS = 1 -- extra gain on the sampled light, tune to match the bench
-	local SHELF_FADE_RANGE = 300 -- shelves dissolve into the abyss past this depth
 
 	local sparkMat = Material("sprites/light_glow02_add")
 
@@ -274,15 +274,17 @@ if CLIENT then
 		render.SetLightingMode(0)
 	end
 
-	-- Stencil mask material: $ignorez so the tear punches through slopes and
-	-- any world geometry above its plane
+	-- Stencil mask material. Depth-tested on purpose: by translucent time
+	-- everything opaque has written its depth, so players, props and the bench
+	-- z-fail the mask and keep their pixels; only bare ground gets claimed.
+	-- The trade-off is that world geometry rising above the tear plane
+	-- occludes the tear instead of being punched through
 	local tearMaskMat
 	local function getTearMaskMat()
 		if tearMaskMat then return tearMaskMat end
 
 		tearMaskMat = CreateMaterial("arcana_emissary_tear_mask", "UnlitGeneric", {
 			["$basetexture"] = "vgui/white",
-			["$ignorez"] = 1,
 			["$nocull"] = 1,
 			["$vertexcolor"] = 1,
 		})
@@ -319,9 +321,11 @@ if CLIENT then
 		self._openStartTime = 0
 		self._lastThink = CurTime()
 		self._shelfFrac = {}
+		self._shelfRuneFrac = {}
 
 		for i = 1, SHELF_COUNT do
 			self._shelfFrac[i] = 0
+			self._shelfRuneFrac[i] = 0
 		end
 
 		self._grimFrac = 0
@@ -602,6 +606,7 @@ if CLIENT then
 
 				for i = 1, SHELF_COUNT do
 					self._shelfFrac[i] = 1
+					self._shelfRuneFrac[i] = 1
 				end
 
 				self._grimFrac = 1
@@ -694,17 +699,18 @@ if CLIENT then
 		-- in DrawTranslucent so their buried halves show through the tear
 		for i = 1, SHELF_COUNT do
 			local shelf = self._shelves[i]
+			local f = self._shelfFrac[i]
 
-			if IsValid(shelf) then
-				local f = self._shelfFrac[i]
-
-				if f > 0 then
-					local groundPos, yaw = self:_ShelfGroundPos(i)
-					local e = easeOutCubic(f)
-					shelf:SetPos(groundPos - Vector(0, 0, SHELF_SINK_DEPTH * (1 - e)))
-					shelf:SetAngles(Angle(0, yaw + SHELF_YAW_OFFSET, 0))
-				end
+			if IsValid(shelf) and f > 0 then
+				local groundPos, yaw = self:_ShelfGroundPos(i)
+				local e = easeOutCubic(f)
+				shelf:SetPos(groundPos - Vector(0, 0, SHELF_SINK_DEPTH * (1 - e)))
+				shelf:SetAngles(Angle(0, yaw + SHELF_YAW_OFFSET, 0))
 			end
+
+			-- The rune belongs to a shelf that has arrived, so it waits out the
+			-- rise and snuffs out the moment the shelf starts sinking again
+			self._shelfRuneFrac[i] = moveFrac(self._shelfRuneFrac[i] or 0, f >= 1 and 1 or 0, dt, BIGRUNE_KINDLE_DUR)
 		end
 
 		-- Grimoire: rests on the bench at 0, floats and slowly spins at 1
@@ -770,15 +776,7 @@ if CLIENT then
 			local f = self._shelfFrac[i] or 0
 
 			if IsValid(shelf) and f > 0 then
-				-- Deep shelves dissolve into the abyss instead of popping in
-				local below = SHELF_SINK_DEPTH * (1 - easeOutCubic(f))
-				local alpha = 1 - math.Clamp(below / SHELF_FADE_RANGE, 0, 1)
-
-				if alpha > 0 then
-					render.SetBlend(alpha)
-					shelf:DrawModel()
-					render.SetBlend(1)
-				end
+				shelf:DrawModel()
 			end
 		end
 	end
@@ -998,9 +996,9 @@ if CLIENT then
 			render.SetStencilFailOperation(STENCIL_KEEP)
 			render.SetStencilZFailOperation(STENCIL_KEEP)
 
-			-- Mask pass: no color writes and no depth test (the mask material
-			-- is $ignorez), so the tear stencils its full projection even
-			-- where sloped ground rises above its plane
+			-- Mask pass: no color writes, depth test on. The mask claims only
+			-- the pixels where the tear plane is the nearest visible surface,
+			-- so anything already drawn in front of it is left alone
 			render.OverrideColorWriteEnable(true, false)
 			render.OverrideAlphaWriteEnable(true, false)
 			self:_DrawTearShape(center, tf)
@@ -1032,16 +1030,11 @@ if CLIENT then
 			-- The pedestal's flat stone top, drawn over the rock mass
 			self:_DrawAbyssCap()
 
-			-- The void clear erased everything standing inside the tear's
-			-- projection, so the station itself is redrawn in the stencil
-			self:DrawModel()
-
-			if IsValid(self._grimoire) then
-				self._grimoire:DrawModel()
-			end
-
-			-- Shelves inside the stencil: their buried halves exist only
-			-- through the tear, never bleeding past its silhouette
+			-- The bench and grimoire wrote their depth in the opaque pass, so
+			-- the mask never claimed their pixels and they need no redraw. The
+			-- shelves are NoDraw and drawn by hand: inside the stencil their
+			-- buried halves exist only through the tear, never bleeding past
+			-- its silhouette
 			self:_DrawShelves()
 
 			render.SetStencilEnable(false)
@@ -1088,9 +1081,9 @@ if CLIENT then
 			-- swallowed each glyph in a blob several times its size.
 			local anyShelfRune = false
 
-			if self._shelfFrac then
+			if self._shelfRuneFrac then
 				for i = 1, SHELF_COUNT do
-					if (self._shelfFrac[i] or 0) > 0 then
+					if (self._shelfRuneFrac[i] or 0) > 0 then
 						anyShelfRune = true
 
 						break
@@ -1101,15 +1094,15 @@ if CLIENT then
 			if anyShelfRune or (self._runes and #self._runes > 0) then
 				Arcana.Bloom.ProcessBloom(function()
 					-- One big rune before each shelf, upright, facing the
-					-- grimoire, fading with the shelf's depth in the abyss
+					-- grimoire. It only kindles once its shelf has surfaced
 					surface.SetFont("MagicCircle_Large")
 
 					for i = 1, SHELF_COUNT do
-						local f = self._shelfFrac and self._shelfFrac[i] or 0
+						local rf = self._shelfRuneFrac and self._shelfRuneFrac[i] or 0
 
-						if f > 0 then
-							local below = SHELF_SINK_DEPTH * (1 - easeOutCubic(f))
-							local alpha = math.floor((1 - math.Clamp(below / SHELF_FADE_RANGE, 0, 1)) * BIGRUNE_ALPHA)
+						if rf > 0 then
+							local below = SHELF_SINK_DEPTH * (1 - easeOutCubic(self._shelfFrac[i] or 0))
+							local alpha = math.floor(rf * BIGRUNE_ALPHA)
 
 							if alpha > 0 then
 								local groundPos, yaw = self:_ShelfGroundPos(i)
