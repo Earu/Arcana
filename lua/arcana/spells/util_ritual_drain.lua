@@ -2,7 +2,7 @@
 -- Siphon time off any ritual you aim at, cutting its remaining duration.
 -- Repeated casts collapse the ritual entirely, so rituals must be defended.
 local DRAIN_FRACTION = 0.50 -- fraction of the ritual's TOTAL lifetime removed per cast
-local RANGE = 1500
+local RANGE = 3000
 
 if SERVER then
 	hook.Add("Arcana_BeginCasting", "RitualDrain_TargetScan", function(caster, spellId, casterEntity)
