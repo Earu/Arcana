@@ -105,12 +105,14 @@ if SERVER then
 		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
 	end
 
-	-- Alive() is a player method; NPC mages and other entity casters answer on health.
+	-- Alive() is a player method; NPC mages answer on health. Prop casters (spell
+	-- casters) carry no health at all, so for them existing is being alive.
 	local function isAlive(ent)
 		if not IsValid(ent) then return false end
 		if ent:IsPlayer() then return ent:Alive() end
+		if ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then return ent:Health() > 0 end
 
-		return ent:Health() > 0
+		return true
 	end
 
 	-- Key for per-caster records (self auras). Players keep their SteamID64 so a record
@@ -326,19 +328,29 @@ if SERVER then
 		end)
 	end
 
-	-- Resolve the aim origin/direction for a caster.
+	-- Resolve the aim origin/direction for a cast.
+	--
+	-- Aim belongs to whatever is actually casting, never to the owner standing
+	-- somewhere else: players and NPC mages sight down their eyes, while a spell
+	-- caster entity fires along its own forward axis (the direction its physgun
+	-- line advertises). Every entity answers EyePos/GetAimVector, so the split
+	-- has to be on what the caster IS, not on which methods it has.
 	local function resolveAim(caster, srcEnt, ctx)
+		local aimer = IsValid(srcEnt) and srcEnt or caster
 		local origin, aim
-		if caster.EyePos then
-			origin = caster:EyePos()
-			aim = caster:GetAimVector()
+
+		if aimer:IsPlayer() or aimer:IsNPC() or (aimer.IsNextBot and aimer:IsNextBot()) then
+			origin = aimer:EyePos()
+			aim = aimer:GetAimVector()
 		else
-			origin = srcEnt:WorldSpaceCenter()
-			aim = srcEnt:GetForward()
+			origin = aimer:WorldSpaceCenter()
+			aim = aimer:GetForward()
 		end
+
 		if isvector(ctx.circlePos) and not ctx.circlePos:IsZero() then
 			origin = ctx.circlePos
 		end
+
 		return origin, aim:GetNormalized()
 	end
 
@@ -357,6 +369,9 @@ if SERVER then
 				bolt:SetColor(compiled.essenceColor)
 				bolt._spellcraft = compiled
 				bolt._spellcraftCaster = caster
+				-- The machine that fired it is not a target: without this a bolt
+				-- leaving a spell caster can detonate on its own emitter.
+				bolt._spellcraftSource = srcEnt ~= caster and srcEnt or nil
 				bolt:SetElement(compiled.essence)
 				bolt:SetProjectileSpeed(compiled.speed > 0 and compiled.speed or 1200)
 				bolt:Spawn()
@@ -400,6 +415,7 @@ if SERVER then
 					mini:SetColor(compiled.essenceColor)
 					mini._spellcraft = child
 					mini._spellcraftCaster = caster
+					mini._spellcraftSource = bolt._spellcraftSource
 					mini._isChild = true
 					mini:SetElement(compiled.essence)
 					mini:SetProjectileSpeed(600)
@@ -481,8 +497,10 @@ if SERVER then
 		P.SpawnLingering(caster, pos, compiled)
 	end
 
-	-- Self aura: one maintenance timer per caster; re-casting refreshes it.
-	-- Records: [sid] = { endTime, compiled, caster, thornsCD }
+	-- Self aura: one maintenance timer per holder; re-casting refreshes it.
+	-- The holder is whatever cast it (a player wears it, a spell caster emits it
+	-- from its own body); the caster stays the owner so kills credit them.
+	-- Records: [sid] = { endTime, compiled, caster, holder, thornsCD }
 	P.SelfAuras = P.SelfAuras or {}
 
 	local function removeHaste(caster)
@@ -503,7 +521,10 @@ if SERVER then
 	end
 
 	function P.CastSelf(caster, srcEnt, compiled, ctx)
-		local sid = casterKey(caster)
+		-- Bound to the body that cast it: a machine's aura burns around the
+		-- machine, not around an owner standing on the other side of the map.
+		local holder = IsValid(srcEnt) and srcEnt or caster
+		local sid = casterKey(holder)
 		if not sid then return end
 		local duration = compiled.duration > 0 and compiled.duration or 8
 
@@ -511,31 +532,34 @@ if SERVER then
 			endTime = CurTime() + duration,
 			compiled = compiled,
 			caster = caster,
+			holder = holder,
 			thornsCD = {},
 		}
 
-		-- Continuous element aura around the caster (effects.lua): flames, arcs,
+		-- Continuous element aura around the holder (effects.lua): flames, arcs,
 		-- mist... the element itself is the visual, no magic circles.
-		P.AuraFX(caster, compiled.essence, compiled.radius, duration)
+		P.AuraFX(holder, compiled.essence, compiled.radius, duration)
 
-		if compiled.haste and caster:IsPlayer() then
-			applyHaste(caster)
+		-- Haste moves a body that walks; a machine has nothing to speed up.
+		if compiled.haste and holder:IsPlayer() then
+			applyHaste(holder)
 		end
 
 		local tag = "Arcana_SpellcraftSelf_" .. sid
 		local interval = math.max(0.5, compiled.tickInterval or 1.0)
 		timer.Create(tag, interval, 0, function()
 			local aura = P.SelfAuras[sid]
-			if not isAlive(caster) or not aura or CurTime() >= aura.endTime then
+			if not isAlive(holder) or not aura or CurTime() >= aura.endTime then
 				timer.Remove(tag)
-				if IsValid(caster) then
-					P.AuraFX(caster, compiled.essence, 0, 0)
-					removeHaste(caster)
+				if IsValid(holder) then
+					P.AuraFX(holder, compiled.essence, 0, 0)
+					removeHaste(holder)
 				end
 				P.SelfAuras[sid] = nil
 				return
 			end
-			P.AreaEssence(caster, caster:WorldSpaceCenter(), compiled, { inflictor = caster, fxIntensity = 0 })
+			-- inflictor = holder so the emitter is never caught in its own pulse.
+			P.AreaEssence(caster, holder:WorldSpaceCenter(), compiled, { inflictor = holder, fxIntensity = 0 })
 		end)
 	end
 
@@ -544,8 +568,9 @@ if SERVER then
 	hook.Add("EntityTakeDamage", "Arcana_Spellcraft_Thorns", function(target, dmginfo)
 		-- Cheap out before keying: this runs on every damage event on the map.
 		if next(P.SelfAuras) == nil then return end
-		if not isActor(target) then return end
 
+		-- Any aura holder retaliates, including a spell caster being shot at, so
+		-- this cannot be gated on the target being an actor.
 		local sid = casterKey(target)
 		if not sid then return end
 
@@ -561,17 +586,20 @@ if SERVER then
 		aura.thornsCD[attacker] = now + 1
 
 		-- Reflect half the incoming damage, then strike with the element rider.
+		-- Credit goes to the caster (the machine's owner, or the player wearing
+		-- the aura), with the struck body as the inflictor.
+		local credit = IsValid(aura.caster) and aura.caster or target
 		local reflected = dmginfo:GetDamage() * 0.5
 		if reflected > 0 then
 			local dmg = DamageInfo()
 			dmg:SetDamage(reflected)
 			dmg:SetDamageType(aura.compiled.damageType)
-			dmg:SetAttacker(target)
+			dmg:SetAttacker(credit)
 			dmg:SetInflictor(target)
 			dmg:SetDamagePosition(attacker:WorldSpaceCenter())
 			Arcana:TakeDamageInfo(attacker, dmg)
 		end
-		P.ApplyEssenceHit(target, attacker, target:WorldSpaceCenter(), aura.compiled)
+		P.ApplyEssenceHit(credit, attacker, target:WorldSpaceCenter(), aura.compiled)
 	end)
 
 	function P.Execute(caster, compiled, ctx)
