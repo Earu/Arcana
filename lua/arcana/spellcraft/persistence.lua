@@ -481,12 +481,26 @@ end)
 ----------------------------------------------------------------------
 -- Receiver: dissolve a crafted spell (frees the slot; no refund)
 ----------------------------------------------------------------------
+-- Machines pointed at a dissolved spell would only ever error on the next
+-- pulse, so clear them. Only this deliberate removal does it: re-syncs and
+-- reconnects unregister and re-register the very same ids, and wiping
+-- selections there would empty every spell caster each time the owner rejoins.
+local function clearCasterSelections(id)
+	for _, ent in ipairs(ents.FindByClass("arcana_spell_caster")) do
+		if IsValid(ent) and ent:GetSelectedSpell() == id then
+			ent:SetSelectedSpell("")
+			ent:SetCurrentSpell("")
+		end
+	end
+end
+
 net.Receive("Arcana_Spellcraft_Dissolve", function(_, ply)
 	if not IsValid(ply) then return end
 	if not rateOk(ply) then return end
 	local slot = net.ReadUInt(8)
 	local sid = ply:SteamID64()
 	if not (P.Active[sid] and P.Active[sid][slot]) then return end
+	clearCasterSelections(P.SpellId(sid, slot))
 	unregisterAndBroadcast(sid, slot)
 	-- The consecration row persists by defhash, so re-importing the same build
 	-- later stays consecrated ("the gods remember the pact").

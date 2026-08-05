@@ -110,6 +110,16 @@ if SERVER then
 		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
 	end
 
+	-- The caster and the machine that fired the bolt are both off limits: a
+	-- spell caster sits right behind its own muzzle, and a ricochet coming back
+	-- must not blow up on the emitter.
+	function ENT:IsOwnSource(ent)
+		if not IsValid(ent) then return false end
+		if ent == self:GetSpellOwner() then return true end
+
+		return IsValid(self._spellcraftSource) and ent == self._spellcraftSource
+	end
+
 	function ENT:PhysicsCollide(data, phys)
 		if self._detonated then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
@@ -118,8 +128,9 @@ if SERVER then
 
 		-- Piercing bolts fly through actors; the Touch handler strikes them.
 		if isActorEnt(hit) and sc and sc.pierce then return end
+		if self:IsOwnSource(hit) then return end
 
-		if (IsValid(hit) and hit ~= self:GetSpellOwner() and isSolidNonTrigger(hit)) or hit:IsWorld() then
+		if (IsValid(hit) and isSolidNonTrigger(hit)) or hit:IsWorld() then
 			-- Ricochet: reflect off surfaces (never actors) while bounces remain.
 			if not isActorEnt(hit) and (self._bounces or 0) > 0 then
 				self._bounces = self._bounces - 1
@@ -146,7 +157,7 @@ if SERVER then
 
 	function ENT:Touch(ent)
 		if self._detonated then return end
-		if ent == self:GetSpellOwner() then return end
+		if self:IsOwnSource(ent) then return end
 		if (CurTime() - (self.Created or 0)) < 0.03 then return end
 
 		local sc = self._spellcraft

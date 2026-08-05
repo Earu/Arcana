@@ -16,6 +16,9 @@ function ENT:SetupDataTables()
 	self:NetworkVar("String", 0, "CurrentSpell")
 	self:NetworkVar("Float", 0, "CastProgress")
 	self:NetworkVar("String", 1, "SelectedSpell") -- Menu-selected spell (Wiremod overrides this)
+	-- Cooldowns here are the entity's own, not the owner's, so the menu has to
+	-- read them from the entity rather than from player data.
+	self:NetworkVar("Float", 1, "CooldownEnd")
 end
 
 if SERVER then
@@ -43,6 +46,7 @@ if SERVER then
 		self.CastingUntil = 0
 		self.QueuedSpell = nil
 		self:SetSelectedSpell("") -- Default: no spell selected from menu
+		self:SetCooldownEnd(0)
 
 		-- Wiremod setup
 		if WireLib then
@@ -75,6 +79,29 @@ if SERVER then
 		ent:Activate()
 
 		return ent
+	end
+
+	-- Resolve the player this machine answers to.
+	function ENT:GetCasterOwner()
+		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
+		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
+		if not IsValid(owner) then return nil end
+
+		return owner
+	end
+
+	-- A wire pulse can fire many times a second, so the same complaint is only
+	-- said once every few seconds instead of flooding the owner's screen.
+	local NOTICE_COOLDOWN = 5
+	function ENT:NotifyOwner(owner, message)
+		if not IsValid(owner) or not owner:IsPlayer() then return end
+
+		local now = CurTime()
+		if self._lastNotice == message and now < (self._lastNoticeAt or 0) + NOTICE_COOLDOWN then return end
+
+		self._lastNotice = message
+		self._lastNoticeAt = now
+		Arcana:SendErrorNotification(owner, "Spell Caster: " .. message)
 	end
 
 	function ENT:GetEntityCooldown(spellId)
@@ -122,7 +149,7 @@ if SERVER then
 		if spell.cost_type == Arcana.COST_TYPES.COINS then
 			local canPayWithCoins = Arcana:GetCoins(owner) >= spell.cost_amount
 			if not canPayWithCoins and owner:Health() < spell.cost_amount then
-				return false, "Owner cannot afford spell cost"
+				return false, "Owner cannot afford " .. string.Comma(spell.cost_amount) .. " coins"
 			end
 		elseif spell.cost_type == Arcana.COST_TYPES.HEALTH then
 			if owner:Health() < spell.cost_amount then
@@ -144,15 +171,12 @@ if SERVER then
 	end
 
 	function ENT:StartCastingSpell(spellId)
-		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
-		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
+		local owner = self:GetCasterOwner()
 		if not IsValid(owner) then return false end
 
 		local canCast, reason = self:CanCastSpellForOwner(owner, spellId)
 		if not canCast then
-			if IsValid(owner) and owner:IsPlayer() then
-				Arcana:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
-			end
+			self:NotifyOwner(owner, reason or "Cannot cast")
 
 			return false
 		end
@@ -181,8 +205,10 @@ if SERVER then
 		-- Broadcast casting visuals
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
 
-		-- Use entity's position and orientation for casting circle
-		local pos = self:GetPos() + self:GetForward() * 30
+		-- Use entity's position and orientation for casting circle. This must
+		-- match computeCastCircleTransform in vfx/casting.lua so the spell leaves
+		-- the circle the player is actually looking at.
+		local pos = self:WorldSpaceCenter() + self:GetForward() * 30
 		local ang = self:GetForward():Angle()
 		ang:RotateAroundAxis(ang:Right(), 90)
 		local size = 30
@@ -206,12 +232,12 @@ if SERVER then
 				WireLib.TriggerOutput(self, "Casting", 0)
 			end
 
-			-- Re-validate before casting
-			local canExecute, reason = self:CanCastSpellForOwner(owner, spellId)
+			-- Re-validate before casting. This also catches a crafted spell that
+			-- was dissolved or reworked during the wind-up, since it resolves the
+			-- id against the live registry rather than trusting the captured table.
+			local canExecute, failure = self:CanCastSpellForOwner(owner, spellId)
 			if not canExecute then
-				if IsValid(owner) and owner:IsPlayer() then
-					Arcana:SendErrorNotification(owner, "Spell Caster: " .. (reason or "Cannot cast"))
-				end
+				self:NotifyOwner(owner, failure or "Cannot cast")
 
 				net.Start("Arcana_SpellFailed", true)
 				net.WriteEntity(self)
@@ -232,7 +258,10 @@ if SERVER then
 				return
 			end
 
-			self:ExecuteSpell(owner, spellId, spell, castTime, forwardLike, pos, ang, size)
+			-- Cast whatever that id means NOW: reworking a crafted spell keeps its
+			-- id but replaces the definition, and the captured table would fire
+			-- the old build with the old cost.
+			self:ExecuteSpell(owner, spellId, Arcana.RegisteredSpells[spellId], castTime, forwardLike, pos, ang, size)
 		end)
 
 		return true
@@ -240,6 +269,19 @@ if SERVER then
 
 	function ENT:ExecuteSpell(owner, spellId, spell, castTime, forwardLike, pos, ang, size)
 		if not IsValid(owner) then return end
+
+		-- Nothing left to cast (the spell vanished between validation and here):
+		-- release the machine rather than leaving it stuck mid-cast.
+		if not spell then
+			self.CastingUntil = 0
+			self.QueuedSpell = nil
+
+			if WireLib then
+				WireLib.TriggerOutput(self, "Ready", 1)
+			end
+
+			return
+		end
 
 		local data = Arcana:GetPlayerData(owner)
 		local takeDamageInfo = owner.ForceTakeDamageInfo or owner.TakeDamageInfo
@@ -270,8 +312,9 @@ if SERVER then
 
 		-- Set entity-specific cooldown (not owner's cooldown)
 		self.SpellCooldowns[spellId] = CurTime() + spell.cooldown
+		self:SetCooldownEnd(self.SpellCooldowns[spellId])
 
-		pos = self:GetPos() + self:GetForward() * 30
+		pos = self:WorldSpaceCenter() + self:GetForward() * 30
 		ang = self:GetForward():Angle()
 		ang:RotateAroundAxis(ang:Right(), 90)
 		size = 30
@@ -347,11 +390,7 @@ if SERVER then
 			local spellId = self:GetActiveSpellID()
 
 			if spellId == "" then
-				local owner = self.CPPIGetOwner and self:CPPIGetOwner()
-				if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
-				if not IsValid(owner) then return end
-
-				Arcana:SendErrorNotification(owner, "Spell Caster: No spell ID provided")
+				self:NotifyOwner(self:GetCasterOwner(), "No spell ID provided")
 				return
 			end
 
@@ -365,6 +404,10 @@ if SERVER then
 		if self:GetCurrentSpell() ~= activeSpell and not self:GetIsCasting() then
 			self:SetCurrentSpell(activeSpell)
 		end
+
+		-- Publish the active spell's cooldown so the menu can show the entity's
+		-- own timer instead of the owner's.
+		self:SetCooldownEnd(activeSpell ~= "" and (self.SpellCooldowns[activeSpell] or 0) or 0)
 
 		-- Update wire outputs
 		if WireLib then
@@ -397,11 +440,7 @@ if SERVER then
 
 	function ENT:Use(activator)
 		if not IsValid(activator) or not activator:IsPlayer() then return end
-
-		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
-		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
-		if not IsValid(owner) then return end
-		if owner ~= activator then return end
+		if self:GetCasterOwner() ~= activator then return end
 
 		-- Open spell selection menu
 		net.Start("Arcana_SpellCaster_OpenMenu")
@@ -416,12 +455,7 @@ if SERVER then
 		local spellId = net.ReadString()
 
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_spell_caster" then return end
-
-		-- Check ownership
-		local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
-		if not IsValid(owner) then owner = ent:GetNWEntity("FallbackOwner") end
-		if not IsValid(owner) then return end
-		if owner ~= ply then return end
+		if ent:GetCasterOwner() ~= ply then return end
 
 		spellId = string.lower(string.Trim(spellId))
 		ent:SetSelectedSpell(spellId)
@@ -431,12 +465,7 @@ if SERVER then
 		local ent = net.ReadEntity()
 
 		if not IsValid(ent) or ent:GetClass() ~= "arcana_spell_caster" then return end
-
-		-- Check ownership
-		local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
-		if not IsValid(owner) then owner = ent:GetNWEntity("FallbackOwner") end
-		if not IsValid(owner) then return end
-		if owner ~= ply then return end
+		if ent:GetCasterOwner() ~= ply then return end
 
 		local spellId = ent:GetActiveSpellID()
 		if spellId ~= "" then
@@ -549,18 +578,14 @@ if CLIENT then
 			local label = "Cast Spell"
 			local col = enabled and ArtDeco.Colors.textBright or ArtDeco.Colors.textDim
 
-			-- Show cooldown if applicable
-			local spellId = caster:GetSelectedSpell() or ""
-			if spellId ~= "" and IsValid(ply) then
-				local data = Arcana:GetPlayerData(ply)
-				if data and data.spell_cooldowns then
-					local cd = data.spell_cooldowns[spellId]
-					if cd and cd > CurTime() then
-						local remaining = math.max(0, math.ceil(cd - CurTime()))
-						label = tostring(remaining) .. "s"
-						col = ArtDeco.Colors.textDim
-					end
-				end
+			-- This machine keeps its own cooldowns, separate from the player's.
+			local cooldownEnd = caster:GetCooldownEnd() or 0
+			if caster:GetIsCasting() then
+				label = "Casting"
+				col = ArtDeco.Colors.textDim
+			elseif cooldownEnd > CurTime() then
+				label = tostring(math.max(0, math.ceil(cooldownEnd - CurTime()))) .. "s"
+				col = ArtDeco.Colors.textDim
 			end
 
 			draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -577,8 +602,14 @@ if CLIENT then
 
 		-- Update cast button state
 		castBtn.Think = function(pnl)
+			if not IsValid(caster) then
+				pnl:SetEnabled(false)
+				return
+			end
+
 			local spellId = caster:GetSelectedSpell() or ""
-			pnl:SetEnabled(spellId ~= "" and IsValid(caster))
+			local ready = not caster:GetIsCasting() and (caster:GetCooldownEnd() or 0) <= CurTime()
+			pnl:SetEnabled(spellId ~= "" and ready)
 		end
 
 		local scroll = vgui.Create("DScrollPanel", listPanel)
@@ -686,65 +717,47 @@ if CLIENT then
 	end)
 
 	local LINE_COLOR = Color(0, 255, 0, 255)
+	local TEXT_OUTLINE = Color(0, 0, 0)
+	local TEXT_FACES = { 90, -90 } -- one roll per readable side
+
 	function ENT:Draw()
 		self:DrawModel()
 
-		-- Draw direction indicator and spell info for owner with physgun
+		-- Direction indicator and spell name, shown to the owner while holding
+		-- the physgun. The line is the direction the machine actually fires.
 		local ply = LocalPlayer()
 		local owner = self.CPPIGetOwner and self:CPPIGetOwner()
 		if not IsValid(owner) then owner = self:GetNWEntity("FallbackOwner") end
-		if not IsValid(owner) then return end
 		if owner ~= ply then return end
 
-		if isOwner then
-			local wep = ply:GetActiveWeapon()
-			if IsValid(wep) and wep:GetClass() == "weapon_physgun" then
-				-- Draw direction line
-				local startPos = self:WorldSpaceCenter()
-				local endPos = util.TraceLine({
-					start = startPos,
-					endpos = startPos + self:GetForward() * 1000,
-					mask = MASK_SOLID_BRUSHONLY
-				}).HitPos
+		local wep = ply:GetActiveWeapon()
+		if not IsValid(wep) or wep:GetClass() ~= "weapon_physgun" then return end
 
-				render.DrawLine(startPos, endPos, LINE_COLOR, true)
+		local startPos = self:WorldSpaceCenter()
+		local endPos = util.TraceLine({
+			start = startPos,
+			endpos = startPos + self:GetForward() * 1000,
+			mask = MASK_SOLID_BRUSHONLY
+		}).HitPos
 
-				local spellId = self:GetCurrentSpell()
-				if spellId == "" then spellId = "None" end
+		render.DrawLine(startPos, endPos, LINE_COLOR, true)
 
-				-- Position text alongside the line, oriented in the same direction
-				local textPos = startPos + self:GetForward() * 40
-				local ang = self:GetAngles()
-				ang:RotateAroundAxis(ang:Forward(), 90)
-				--ang:RotateAroundAxis(ang:Right(), 90)
+		-- Crafted spell ids are unreadable (spellcraft_<steamid>_<slot>), so show
+		-- the spell's name whenever it resolves.
+		local spellId = self:GetCurrentSpell()
+		local spell = spellId ~= "" and Arcana.RegisteredSpells[spellId] or nil
+		local label = "Spell: " .. (spell and spell.name or (spellId ~= "" and spellId or "None"))
 
-				cam.Start3D2D(textPos, ang, 0.1)
-					draw.SimpleTextOutlined(
-						"Spell: " .. spellId,
-						"DermaLarge",
-						0, 0,
-						LINE_COLOR,
-						TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER,
-						1,
-						Color(0, 0, 0)
-					)
-				cam.End3D2D()
+		-- Readable from either side: the same text drawn on both faces.
+		local textPos = startPos + self:GetForward() * 40
+		for _, roll in ipairs(TEXT_FACES) do
+			local ang = self:GetAngles()
+			ang:RotateAroundAxis(ang:Forward(), roll)
+			if roll < 0 then ang:RotateAroundAxis(ang:Up(), 180) end
 
-				ang = self:GetAngles()
-				ang:RotateAroundAxis(ang:Forward(), -90)
-				ang:RotateAroundAxis(ang:Up(), 180)
-				cam.Start3D2D(textPos, ang, 0.1)
-					draw.SimpleTextOutlined(
-						"Spell: " .. spellId,
-						"DermaLarge",
-						0, 0,
-						LINE_COLOR,
-						TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER,
-						1,
-						Color(0, 0, 0)
-					)
-				cam.End3D2D()
-			end
+			cam.Start3D2D(textPos, ang, 0.1)
+				draw.SimpleTextOutlined(label, "DermaLarge", 0, 0, LINE_COLOR, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, TEXT_OUTLINE)
+			cam.End3D2D()
 		end
 	end
 
