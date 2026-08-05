@@ -7,6 +7,41 @@ ENT.Spawnable = false
 ENT.AdminOnly = false
 ENT.Category = "Arcana"
 
+function ENT:UpdateTransmitState()
+	-- Transmission is decided per player in Think via SetPreventTransmit:
+	-- plain TRANSMIT_PVS tests only the entity origin, which hides the storm
+	-- when its center sits in another PVS cluster even with the cloud's edge
+	-- right in front of the player. Players that cannot see any part of the
+	-- cloud (sealed rooms, inaccessible areas) stay blocked so they never pay
+	-- for the particle-heavy cloud
+	return TRANSMIT_ALWAYS
+end
+
+-- Only send the storm to players with some part of the cloud in their PVS,
+-- sampled at the center and around the cloud ring
+function ENT:UpdatePlayerTransmit()
+	local radius = self:GetNWInt("Radius", 2000)
+	local cloudCenter = self:GetPos() + Vector(0, 0, self:GetNWInt("CloudHeight", 400) * 0.75)
+
+	for _, ply in ipairs(player.GetAll()) do
+		if not IsValid(ply) then continue end
+
+		local toPly = ply:EyePos() - cloudCenter
+		toPly.z = 0
+		local dist = toPly:Length()
+		local dir = dist > 1 and toPly / dist or Vector(1, 0, 0)
+		local side = dir:Cross(vector_up)
+
+		local visible = ply:TestPVS(cloudCenter)
+			or ply:TestPVS(cloudCenter + dir * radius)
+			or ply:TestPVS(cloudCenter + side * radius)
+			or ply:TestPVS(cloudCenter - side * radius)
+			or ply:TestPVS(cloudCenter - dir * radius)
+
+		self:SetPreventTransmit(ply, not visible)
+	end
+end
+
 -- Server-side initialization
 function ENT:Initialize()
 	if SERVER then
@@ -73,6 +108,11 @@ end
 
 function ENT:Think()
 	if SERVER then
+		if CurTime() >= (self._nextTransmitCheck or 0) then
+			self:UpdatePlayerTransmit()
+			self._nextTransmitCheck = CurTime() + 0.5
+		end
+
 		-- Check if it's time for a lightning strike
 		if CurTime() >= self.NextStrike then
 			self:CreateLightningStrike()
@@ -193,16 +233,15 @@ function ENT:CreateLightningStrike()
 			if IsValid(self) then
 				local soundEnt = IsValid(targetEnt) and targetEnt or self
 				-- Play the sound with variance in pitch and volume
-				soundEnt:EmitSound("ambient/weather/thunderstorm/thunder_3.wav", 100)
-				soundEnt:EmitSound("ambient/weather/thunderstorm/lightning_strike_" .. math.random(1, 4) .. ".wav", 100, math.random(100, 120))
+				soundEnt:EmitSound("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", 100, math.random(100, 120))
 
 				-- Create a distant rolling thunder effect a bit later
 				timer.Simple(math.Rand(1.5, 3.0), function()
 					soundEnt = IsValid(targetEnt) and targetEnt or self
 
 					if IsValid(self) then
-						soundEnt:EmitSound("ambient/weather/thunderstorm/thunder_3.wav", 85)
-						soundEnt:EmitSound("ambient/weather/thunderstorm/distant_thunder_" .. math.random(1, 4) .. ".wav", 85, math.random(100, 120))
+						-- lower pitch to sound like a far-off rumble
+						soundEnt:EmitSound("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", 85, math.random(70, 90))
 					end
 				end)
 			end
