@@ -15,9 +15,13 @@ function ENT:SetupDataTables()
 end
 
 function ENT:UpdateTransmitState()
-	-- PVS only: players that cannot see the area must not render the
-	-- corruption (the screen-space effect corrupts stale framebuffer pixels)
-	return TRANSMIT_PVS
+	-- Transmission is decided per player in Think via SetPreventTransmit:
+	-- plain TRANSMIT_PVS tests only the entity origin, so a sphere whose
+	-- edge reaches into the player's PVS while the center sits in another
+	-- cluster would never network. Players that cannot see any part of the
+	-- area still get transmission blocked (the screen-space effect corrupts
+	-- stale framebuffer pixels)
+	return TRANSMIT_ALWAYS
 end
 
 if SERVER then
@@ -113,6 +117,43 @@ if SERVER then
 		end
 
 		self:AddEFlags(EFL_FORCE_CHECK_TRANSMIT)
+	end
+
+	-- A player should receive the area if any part of the sphere is in their
+	-- PVS, not just the center. Sample the center plus surface points facing
+	-- the player; players inside or near the radius always receive it.
+	local TRANSMIT_MARGIN = 256
+
+	local function updatePlayerTransmit(self, center, radius)
+		for _, ply in ipairs(player.GetAll()) do
+			if not IsValid(ply) then continue end
+
+			local eye = ply:EyePos()
+			local dist = eye:Distance(center)
+			local visible = false
+
+			if dist <= radius + TRANSMIT_MARGIN then
+				visible = true
+			elseif ply:TestPVS(center) then
+				visible = true
+			else
+				local dir = (eye - center) / dist
+				local side = dir:Cross(vector_up)
+
+				if side:LengthSqr() < 0.001 then
+					side = Vector(1, 0, 0)
+				else
+					side:Normalize()
+				end
+
+				visible = ply:TestPVS(center + dir * radius)
+					or ply:TestPVS(center + side * radius)
+					or ply:TestPVS(center - side * radius)
+					or ply:TestPVS(center + vector_up * radius * 0.5)
+			end
+
+			self:SetPreventTransmit(ply, not visible)
+		end
 	end
 
 	local function playerInRange(center, radius)
@@ -302,6 +343,8 @@ if SERVER then
 				w._areaRadius = radius
 			end
 		end
+
+		updatePlayerTransmit(self, center, radius)
 
 		local hasPlayer = playerInRange(center, radius)
 		if hasPlayer then
