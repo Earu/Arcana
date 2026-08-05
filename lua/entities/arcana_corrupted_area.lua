@@ -15,13 +15,13 @@ function ENT:SetupDataTables()
 end
 
 function ENT:UpdateTransmitState()
-	-- Transmission is decided per player in Think via SetPreventTransmit:
-	-- plain TRANSMIT_PVS tests only the entity origin, so a sphere whose
-	-- edge reaches into the player's PVS while the center sits in another
-	-- cluster would never network. Players that cannot see any part of the
-	-- area still get transmission blocked (the screen-space effect corrupts
-	-- stale framebuffer pixels)
-	return TRANSMIT_ALWAYS
+	-- Correct only because UpdatePVSBounds resizes the surrounding box to the
+	-- sphere: the engine derives an entity's PVS clusters from that box, and
+	-- the barrel model's default box would network a 900+ unit area as if it
+	-- were 28 units wide at the center. Players who can see no part of the
+	-- sphere still get nothing (the screen-space effect corrupts stale
+	-- framebuffer pixels)
+	return TRANSMIT_PVS
 end
 
 if SERVER then
@@ -45,6 +45,8 @@ if SERVER then
 		if not self:GetRadius() or self:GetRadius() <= 0 then
 			self:SetRadius(900)
 		end
+
+		self:UpdatePVSBounds()
 
 		-- Wisp spawn control
 		self._wisps = {}
@@ -74,6 +76,17 @@ if SERVER then
 		self._decayGracePeriod = 600 -- 10 minutes in seconds
 		self._decayRate = 0.001 -- intensity decrease per second (~20 min for 1.2 intensity)
 		self._isDecaying = false
+	end
+
+	-- The surrounding box is what the engine walks to list the clusters an
+	-- entity occupies, which is what TRANSMIT_PVS is tested against. Sized to
+	-- the sphere it makes the engine transmit whenever any part of the area
+	-- is potentially visible, and always to players standing inside it (their
+	-- own cluster is in the box and in their own PVS).
+	function ENT:UpdatePVSBounds()
+		local r = math.max(64, self:GetRadius() or 500)
+		self._boundsRadius = r
+		self:SetSurroundingBounds(Vector(-r, -r, -r), Vector(r, r, r))
 	end
 
 	local function applyIntensityServer(self)
@@ -117,43 +130,6 @@ if SERVER then
 		end
 
 		self:AddEFlags(EFL_FORCE_CHECK_TRANSMIT)
-	end
-
-	-- A player should receive the area if any part of the sphere is in their
-	-- PVS, not just the center. Sample the center plus surface points facing
-	-- the player; players inside or near the radius always receive it.
-	local TRANSMIT_MARGIN = 256
-
-	local function updatePlayerTransmit(self, center, radius)
-		for _, ply in ipairs(player.GetAll()) do
-			if not IsValid(ply) then continue end
-
-			local eye = ply:EyePos()
-			local dist = eye:Distance(center)
-			local visible = false
-
-			if dist <= radius + TRANSMIT_MARGIN then
-				visible = true
-			elseif ply:TestPVS(center) then
-				visible = true
-			else
-				local dir = (eye - center) / dist
-				local side = dir:Cross(vector_up)
-
-				if side:LengthSqr() < 0.001 then
-					side = Vector(1, 0, 0)
-				else
-					side:Normalize()
-				end
-
-				visible = ply:TestPVS(center + dir * radius)
-					or ply:TestPVS(center + side * radius)
-					or ply:TestPVS(center - side * radius)
-					or ply:TestPVS(center + vector_up * radius * 0.5)
-			end
-
-			self:SetPreventTransmit(ply, not visible)
-		end
 	end
 
 	local function playerInRange(center, radius)
@@ -344,7 +320,9 @@ if SERVER then
 			end
 		end
 
-		updatePlayerTransmit(self, center, radius)
+		if math.max(64, radius) ~= self._boundsRadius then
+			self:UpdatePVSBounds()
+		end
 
 		local hasPlayer = playerInRange(center, radius)
 		if hasPlayer then
@@ -834,8 +812,11 @@ if CLIENT then
 	end
 
 	local function updateRenderBounds(self)
+		-- Symmetric: the sphere reaches a full radius below the origin too, and
+		-- a box that stops at -32 lets the engine cull Draw when only the lower
+		-- part of the area is on screen
 		local r = math.max(64, (self:GetRadius() or 100) + 64)
-		self:SetRenderBounds(Vector(-r, -r, -32), Vector(r, r, r))
+		self:SetRenderBounds(Vector(-r, -r, -r), Vector(r, r, r))
 	end
 
 	function ENT:Initialize()
