@@ -8,38 +8,24 @@ ENT.AdminOnly = false
 ENT.Category = "Arcana"
 
 function ENT:UpdateTransmitState()
-	-- Transmission is decided per player in Think via SetPreventTransmit:
-	-- plain TRANSMIT_PVS tests only the entity origin, which hides the storm
-	-- when its center sits in another PVS cluster even with the cloud's edge
-	-- right in front of the player. Players that cannot see any part of the
-	-- cloud (sealed rooms, inaccessible areas) stay blocked so they never pay
-	-- for the particle-heavy cloud
-	return TRANSMIT_ALWAYS
+	-- Correct only because UpdatePVSBounds resizes the surrounding box to the
+	-- cloud: the engine derives an entity's PVS clusters from that box, and
+	-- the watermelon model's default box would network a 2000 unit storm as if
+	-- it were a few units wide at the center. Players who can see no part of
+	-- the cloud never receive it, so they never pay for its particles
+	return TRANSMIT_PVS
 end
 
--- Only send the storm to players with some part of the cloud in their PVS,
--- sampled at the center and around the cloud ring
-function ENT:UpdatePlayerTransmit()
-	local radius = self:GetNWInt("Radius", 2000)
-	local cloudCenter = self:GetPos() + Vector(0, 0, self:GetNWInt("CloudHeight", 400) * 0.75)
+-- The surrounding box is what the engine walks to list the clusters an entity
+-- occupies, which is what TRANSMIT_PVS is tested against. Sized to the cloud
+-- disc plus the ground below it, where the strikes land.
+function ENT:UpdatePVSBounds()
+	self._boundsRadius = self:GetNWInt("Radius", 2000)
+	self._boundsHeight = self:GetNWInt("CloudHeight", 400)
 
-	for _, ply in ipairs(player.GetAll()) do
-		if not IsValid(ply) then continue end
-
-		local toPly = ply:EyePos() - cloudCenter
-		toPly.z = 0
-		local dist = toPly:Length()
-		local dir = dist > 1 and toPly / dist or Vector(1, 0, 0)
-		local side = dir:Cross(vector_up)
-
-		local visible = ply:TestPVS(cloudCenter)
-			or ply:TestPVS(cloudCenter + dir * radius)
-			or ply:TestPVS(cloudCenter + side * radius)
-			or ply:TestPVS(cloudCenter - side * radius)
-			or ply:TestPVS(cloudCenter - dir * radius)
-
-		self:SetPreventTransmit(ply, not visible)
-	end
+	local r = math.max(64, self._boundsRadius)
+	local cloudHeight = math.max(64, self._boundsHeight)
+	self:SetSurroundingBounds(Vector(-r, -r, -r), Vector(r, r, cloudHeight * 1.5))
 end
 
 -- Server-side initialization
@@ -64,6 +50,7 @@ function ENT:Initialize()
 		self:SetNWFloat("MinStrikeInterval", 0.5) -- Minimum time between strikes
 		self:SetNWFloat("MaxStrikeInterval", 3) -- Maximum time between strikes
 		self:SetNWFloat("DarknessIntensity", 0.4) -- How dark it gets under the cloud (0-1)
+		self:UpdatePVSBounds()
 		-- Start the lightning strikes with random interval
 		self:SetNextStrikeTime()
 		-- Create the cloud effect
@@ -108,9 +95,8 @@ end
 
 function ENT:Think()
 	if SERVER then
-		if CurTime() >= (self._nextTransmitCheck or 0) then
-			self:UpdatePlayerTransmit()
-			self._nextTransmitCheck = CurTime() + 0.5
+		if self:GetNWInt("Radius", 2000) ~= self._boundsRadius or self:GetNWInt("CloudHeight", 400) ~= self._boundsHeight then
+			self:UpdatePVSBounds()
 		end
 
 		-- Check if it's time for a lightning strike
@@ -159,7 +145,12 @@ function ENT:CreateLightningStrike()
 
 	for _, ent in ipairs(ents.FindInSphere(cloudCenter, radius)) do
 		-- Skip the owner
-		if ent == owner then continue end
+		if ent == owner or ent == self then continue end
+
+		-- FindInSphere enumerates by bounding box, so entities sized to a whole
+		-- area (corrupted areas, other storms) come back from well outside the
+		-- cloud; require the entity itself to stand under it
+		if ent:GetPos():DistToSqr(cloudCenter) > radius * radius then continue end
 
 		-- Check if NPC is outdoors
 		local tr = util.TraceLine({
