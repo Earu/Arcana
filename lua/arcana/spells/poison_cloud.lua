@@ -125,7 +125,7 @@ Arcana.RegisterSpell({
 					dmg:SetDamageType(DMG_POISON)
 					dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 					dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-					Arcana.TakeDamageInfo(ent, dmg)
+					ent:TakeDamageInfo(dmg)
 
 					if ent:IsPlayer() then
 						applyOrRefreshPoisonSlow(ent, slowRefresh)

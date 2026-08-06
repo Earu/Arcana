@@ -3,14 +3,20 @@
 -- Arcana.TakeDamageInfo (invulnerability-aware damage wrapper),
 -- and bad-entity tracking for Arcana.IsPotentialCheater.
 --
--- ALL damage the addon deals must go through Arcana.TakeDamageInfo(ent, dmg), not
--- ent:TakeDamageInfo(dmg). The wrapper is where the invulnerability check lives: it
--- samples the victim's health a tick later and flags ArcanaInvulnerable when a hit
--- lands for far less than it should. Every direct call is a hole in that check, since
--- a cheater simply avoids the spells that happen to use the wrapper.
+-- Arcana.TakeDamageInfo is NOT a blanket replacement for ent:TakeDamageInfo, and applying
+-- it everywhere is a mistake that has been made and reverted once already.
 --
--- The exception is an entity taking damage itself (self:TakeDamageInfo inside
--- OnTraceAttack and similar), which is the receive path, not damage we are dealing.
+-- For a non-player victim it is exactly ent:TakeDamageInfo plus an IsValid guard. For a
+-- player it also samples health a tick later and sets ArcanaInvulnerable when the hit landed
+-- for less than half what it asked for. That heuristic cannot tell cheating apart from the
+-- addon's own damage absorption: arcane_barrier and arcana_ward zero incoming damage,
+-- duelist_aegis calls SetDamage(0), fire_phoenix runs the caster in godmode, and any server
+-- armour or spawn protection does the same. Every one of those reads as invulnerability.
+--
+-- The flag is only consulted by the six Arcana NPCs, which withhold kill XP from a flagged
+-- player. So a false positive costs a player XP for reasons they cannot see. Widen the set of
+-- call sites only if you are willing to pay that, and prefer teaching the check about
+-- legitimate absorption first.
 
 Arcana = Arcana or {}
 

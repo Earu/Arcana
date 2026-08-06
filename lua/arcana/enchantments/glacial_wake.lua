@@ -31,7 +31,7 @@ local function fireWake(owner, impactPos, path)
 			dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 			dmg:SetInflictor(IsValid(owner) and owner or game.GetWorld())
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcana.TakeDamageInfo(ent, dmg)
+			ent:TakeDamageInfo(dmg)
 
 			Arcana.Status.Frost.Apply(ent, {
 				slowMult     = 0.45,

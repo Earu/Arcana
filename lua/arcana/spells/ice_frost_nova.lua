@@ -63,7 +63,7 @@ Arcana.RegisterSpell({
 			dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 			dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 			dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-			Arcana.TakeDamageInfo(ent, dmg)
+			ent:TakeDamageInfo(dmg)
 
 			-- Knockback
 			local pushDir = (ent:WorldSpaceCenter() - pos):GetNormalized()

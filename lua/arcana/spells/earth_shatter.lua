@@ -128,7 +128,7 @@ Arcana.RegisterSpell({
 				dmg:SetDamageType(DMG_CLUB)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				Arcana.TakeDamageInfo(ent, dmg)
+				ent:TakeDamageInfo(dmg)
 				-- Pop upward slightly then out
 				if ent.SetVelocity then
 					ent:SetVelocity(dir * (pushPlayer * fall) + Vector(0, 0, 180))

@@ -65,7 +65,7 @@ Arcana.RegisterSpell({
 				dmg:SetDamageType(DMG_SONIC)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				Arcana.TakeDamageInfo(ent, dmg)
+				ent:TakeDamageInfo(dmg)
 
 				local vel = dir * (strengthPlayer * falloff) + Vector(0, 0, upBoost)
 				if ent.SetGroundEntity then ent:SetGroundEntity(NULL) end

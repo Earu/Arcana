@@ -76,7 +76,7 @@ local function zapNearestTarget(proj, attacker)
 	dmg:SetAttacker(attacker)
 	dmg:SetInflictor(attacker)
 	dmg:SetDamagePosition(tpos)
-	Arcana.TakeDamageInfo(best, dmg)
+	best:TakeDamageInfo(dmg)
 
 	-- Arc visual: reuses arcana_lightning_orb's existing client-side jagged beam renderer
 	net.Start("Arcana_LightningOrbZap", true)

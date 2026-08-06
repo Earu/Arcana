@@ -61,7 +61,7 @@ local function spawnCloud(attacker, pos)
 			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 			dmg:SetInflictor(IsValid(marker) and marker or game.GetWorld())
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcana.TakeDamageInfo(ent, dmg)
+			ent:TakeDamageInfo(dmg)
 
 			if ent:IsPlayer() then
 				local now = CurTime()

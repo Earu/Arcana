@@ -70,7 +70,7 @@ local function fireThunderLine(attacker, wep, baseDamage)
 		dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 		dmg:SetInflictor(IsValid(wep) and wep or attacker)
 		dmg:SetDamagePosition(ent:WorldSpaceCenter())
-		Arcana.TakeDamageInfo(ent, dmg)
+		ent:TakeDamageInfo(dmg)
 	end
 end
 

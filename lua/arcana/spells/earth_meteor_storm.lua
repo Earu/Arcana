@@ -312,7 +312,7 @@ Arcana.RegisterSpell({
 									dmg:SetDamageType(DMG_CRUSH)
 									dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 									dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-									Arcana.TakeDamageInfo(e, dmg)
+									e:TakeDamageInfo(dmg)
 
 									if e.SetVelocity then
 										e:SetVelocity(Vector(0, 0, 600))
