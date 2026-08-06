@@ -6,7 +6,7 @@ glyph fills a configurable fraction of the canvas (~85 % by default).
 
 Requirements:  pip install Pillow
 
-Output (default): <addon_root>/lua/arcana/tools/glyph_exports/glyph_<charcode>.png
+Output (default): tools/glyph_exports/glyph_<charcode>.png
 
 Usage:
     python export_glyphs.py
@@ -26,8 +26,7 @@ CANVAS_SIZE = 1024               # output PNG size in pixels (square)
 FILL_RATIO  = 0.85               # glyph fills this fraction of the canvas edge
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-# Addon root is 3 levels up from lua/arcana/tools/
-_ADDON_ROOT = (_SCRIPT_DIR / "../../..").resolve()
+_ADDON_ROOT = _SCRIPT_DIR.parent
 FONT_PATH   = _ADDON_ROOT / "resource" / "fonts" / "pulsian.ttf"
 
 # ── Core rendering ─────────────────────────────────────────────────────────────
