@@ -457,7 +457,7 @@ hook.Add("Think", "Arcana_GrimoireTutorial", function()
 	if not ply:HasWeapon("grimoire") then return end
 
 	if cookie.GetString("arcana_grimoire_tutorial_completed", "false") == "false" then
-		Arcana:StartTutorialSequence({
+		Arcana.StartTutorialSequence({
 			id = SCENE_ID,
 			nodes = NODES,
 			startNode = "START",

@@ -148,7 +148,7 @@ if SERVER then
 			dmg:SetAttacker(attacker)
 			dmg:SetInflictor(attacker)
 			dmg:SetDamagePosition(pp)
-			Arcana:TakeDamageInfo(ply, dmg)
+			Arcana.TakeDamageInfo(ply, dmg)
 		end
 	end
 
@@ -321,8 +321,8 @@ if SERVER then
 	function ENT:OnKilled(dmginfo)
 		local killer = dmginfo:GetAttacker()
 		if not (IsValid(killer) and killer:IsPlayer()) then killer = self._lastHurtBy end
-		if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
-			Arcana:GiveXP(killer, XP_REWARD, "Crawling Skulls defeated")
+		if IsValid(killer) and killer:IsPlayer() and not Arcana.IsPotentialCheater(killer) then
+			Arcana.GiveXP(killer, XP_REWARD, "Crawling Skulls defeated")
 		end
 
 		-- Scatter gibs from each skull's visual position at death

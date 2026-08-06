@@ -9,7 +9,7 @@
 -- standing at its center, a sun aura blazing above it, and coins endlessly raining
 -- from above, rolling across the floor and burning where they come to rest.
 --
--- Start it with: Arcana:StartGoldenSunSequence()
+-- Start it with: Arcana.StartGoldenSunSequence()
 
 if SERVER then return end
 
@@ -700,7 +700,7 @@ local NODES = {
 
 -- The Golden Sun draws the newly-revived soul into its vision
 net.Receive("Arcana_Midas_StartEncounter", function()
-	Arcana:StartTutorialSequence({
+	Arcana.StartTutorialSequence({
 		id = SCENE_ID,
 		nodes = NODES,
 		startNode = "START",

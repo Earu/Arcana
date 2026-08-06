@@ -611,7 +611,7 @@ if CLIENT then
 	-- Client menu
 	local function BuildEligibleSpellList(ply)
 		if not Arcana or not IsValid(ply) then return {}, {} end
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return {}, {} end
 		local regularSpells = {}
 		local rituals = {}
@@ -660,7 +660,7 @@ if CLIENT then
 	-- Emissary, so neither appears here.
 	local function BuildForgettableSpellList(ply)
 		if not Arcana or not IsValid(ply) then return {}, {} end
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return {}, {} end
 		local regularSpells = {}
 		local rituals = {}
@@ -845,7 +845,7 @@ if CLIENT then
 			local titleRight = ArtDeco.DrawTitle("Arcana_DecoTitle", "ALTAR", bandTop, bandBottom, ArtDeco.Colors.paleGold)
 
 			-- Level and Knowledge Points chips (XP progression hidden by request)
-			local data = Arcana:GetPlayerData(ply)
+			local data = Arcana.GetPlayerData(ply)
 
 			if data then
 				local gap = 14
@@ -1031,7 +1031,7 @@ if CLIENT then
 
 				-- Determine affordability live from current data
 				local function updateEnabled()
-					local d = Arcana:GetPlayerData(ply)
+					local d = Arcana.GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
 					btn:SetEnabled(curKP >= cost)
@@ -1044,7 +1044,7 @@ if CLIENT then
 				end
 
 				function btn:DoClick()
-					local d = Arcana:GetPlayerData(ply)
+					local d = Arcana.GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
 
@@ -1128,7 +1128,7 @@ if CLIENT then
 
 					-- Determine affordability live from current data
 					local function updateEnabled()
-						local d = Arcana:GetPlayerData(ply)
+						local d = Arcana.GetPlayerData(ply)
 						local curKP = (d and d.knowledge_points) or 0
 						local cost = sp.knowledge_cost or 1
 						btn:SetEnabled(curKP >= cost)
@@ -1141,7 +1141,7 @@ if CLIENT then
 					end
 
 					function btn:DoClick()
-						local d = Arcana:GetPlayerData(ply)
+						local d = Arcana.GetPlayerData(ply)
 						local curKP = (d and d.knowledge_points) or 0
 						local cost = sp.knowledge_cost or 1
 
@@ -1224,9 +1224,9 @@ if CLIENT then
 				-- button still has to quote what the spell costs, and CanForgetSpell refuses
 				-- (broke, casting, a third-party hook) before it can vouch for anything.
 				local function refreshPrice()
-					local ok = Arcana:CanForgetSpell(ply, item.id)
-					isFree = Arcana:IsForgetFree(ply, item.id)
-					coins, shards = Arcana:GetForgetCost(item.id)
+					local ok = Arcana.CanForgetSpell(ply, item.id)
+					isFree = Arcana.IsForgetFree(ply, item.id)
+					coins, shards = Arcana.GetForgetCost(item.id)
 					btn:SetEnabled(ok == true)
 				end
 
@@ -1243,7 +1243,7 @@ if CLIENT then
 				end
 
 				function btn:DoClick()
-					local ok, reason = Arcana:CanForgetSpell(ply, item.id)
+					local ok, reason = Arcana.CanForgetSpell(ply, item.id)
 
 					if not ok then
 						surface.PlaySound("buttons/button8.wav")
@@ -1307,10 +1307,10 @@ if CLIENT then
 
 		rebuild()
 		-- Live-rebuild when KP changes while the menu is open
-		local lastKP = Arcana:GetKnowledgePoints(ply)
+		local lastKP = Arcana.GetKnowledgePoints(ply)
 
 		function frame:Think()
-			local d = Arcana:GetPlayerData(ply)
+			local d = Arcana.GetPlayerData(ply)
 			local kp = (d and d.knowledge_points) or 0
 
 			if kp ~= lastKP then

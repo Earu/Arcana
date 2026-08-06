@@ -16,7 +16,7 @@ Arcana.Inventory.Items = Arcana.Inventory.Items or {}
 -- Register an item for display in the inventory
 -- @param itemClass string - Unique identifier for the item
 -- @param itemData table - Item definition with name, description, model, etc.
-function Arcana:RegisterItem(itemClass, itemData)
+function Arcana.RegisterItem(itemClass, itemData)
 	if not itemClass or not itemData then
 		ErrorNoHalt("[Arcana] RegisterItem: Invalid itemClass or itemData\n")
 		return
@@ -31,45 +31,45 @@ end
 -- ============================================================================
 -- Register default items used in rituals
 
-Arcana:RegisterItem("poison", {
+Arcana.RegisterItem("poison", {
 	name = "Poison Vial",
 	description = "A vial containing toxic liquid.",
 	model = "models/props_junk/garbage_glassbottle001a.mdl",
 	color = Color(100, 200, 100)
 })
 
-Arcana:RegisterItem("radioactive", {
+Arcana.RegisterItem("radioactive", {
 	name = "Radioactive Material",
 	description = "Highly radioactive material. Handle with extreme caution.",
 	model = "models/props_c17/oildrum001.mdl",
 	color = Color(255, 220, 0)
 })
 
-Arcana:RegisterItem("battery", {
+Arcana.RegisterItem("battery", {
 	name = "Battery",
 	description = "A charged battery crackling with electrical energy.",
 	model = "models/Items/car_battery01.mdl"
 })
 
-Arcana:RegisterItem("waterbottle", {
+Arcana.RegisterItem("waterbottle", {
 	name = "Water Bottle",
 	description = "A bottle of pure water.",
 	model = "models/props_junk/garbage_plasticbottle003a.mdl",
 })
 
-Arcana:RegisterItem("banana", {
+Arcana.RegisterItem("banana", {
 	name = "Banana",
 	description = "A ripe banana. Full of potassium.",
 	model = "models/props/cs_italy/bananna.mdl"
 })
 
-Arcana:RegisterItem("melon", {
+Arcana.RegisterItem("melon", {
 	name = "Melon",
 	description = "A fresh, juicy melon.",
 	model = "models/props_junk/watermelon01.mdl"
 })
 
-Arcana:RegisterItem("orange", {
+Arcana.RegisterItem("orange", {
 	name = "Orange",
 	description = "A bright orange citrus fruit.",
 	model = "models/props/cs_italy/orange.mdl"
@@ -174,7 +174,7 @@ if SERVER then
 	end
 
 	-- Override default functions with actual implementation
-	function Arcana:GiveCoins(ply, amount, reason)
+	function Arcana.GiveCoins(ply, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
 		if not Arcana.Inventory:IsLoaded(ply) then return false end
@@ -191,7 +191,7 @@ if SERVER then
 		return true
 	end
 
-	function Arcana:TakeCoins(ply, amount, reason)
+	function Arcana.TakeCoins(ply, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
 		if not Arcana.Inventory:IsLoaded(ply) then return false end
@@ -209,7 +209,7 @@ if SERVER then
 		return true
 	end
 
-	function Arcana:GiveItem(ply, itemClass, amount, reason)
+	function Arcana.GiveItem(ply, itemClass, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
 		if not Arcana.Inventory:IsLoaded(ply) then return false end
@@ -227,7 +227,7 @@ if SERVER then
 		return true
 	end
 
-	function Arcana:TakeItem(ply, itemClass, amount, reason)
+	function Arcana.TakeItem(ply, itemClass, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
 		if not Arcana.Inventory:IsLoaded(ply) then return false end
@@ -580,7 +580,7 @@ end
 -- ============================================================================
 -- SHARED: Default Getter Functions
 -- ============================================================================
-function Arcana:GetCoins(ply)
+function Arcana.GetCoins(ply)
 	if SERVER then
 		local inv = Arcana.Inventory:Get(ply)
 		return inv.coins
@@ -589,7 +589,7 @@ function Arcana:GetCoins(ply)
 	end
 end
 
-function Arcana:GetItemCount(ply, itemClass)
+function Arcana.GetItemCount(ply, itemClass)
 	if SERVER then
 		local inv = Arcana.Inventory:Get(ply)
 		return inv.items[itemClass] or 0

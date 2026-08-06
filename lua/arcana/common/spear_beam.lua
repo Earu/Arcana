@@ -67,12 +67,12 @@ if SERVER then
 				dmg:SetAttacker(attacker)
 				dmg:SetInflictor(attacker)
 				dmg:SetDamagePosition(hitPos)
-				Arcana:TakeDamageInfo(hitEnt, dmg)
+				Arcana.TakeDamageInfo(hitEnt, dmg)
 			end
 
 			-- Splash damage around impact
 			if splashDamage > 0 and splashRadius > 0 then
-				Arcana:BlastDamage(attacker, hitPos, splashRadius, splashDamage, { damageType = damageType, ignoreAttacker = true })
+				Arcana.BlastDamage(attacker, hitPos, splashRadius, splashDamage, { damageType = damageType, ignoreAttacker = true })
 			end
 
 			-- Impact callback (essence riders, custom effects)

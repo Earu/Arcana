@@ -8,7 +8,7 @@ if SERVER then
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "healing",
 	name = "Healing",
 	description = "Restore a player's health.",
@@ -37,7 +37,7 @@ Arcana:RegisterSpell({
 		local healColor = Color(120, 255, 140, 255)
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
 
-		Arcana:SendAttachBandVFX(target, healColor, 26, 2.5, {
+		Arcana.SendAttachBandVFX(target, healColor, 26, 2.5, {
 			{
 				radius = r * 0.9,
 				height = 3,

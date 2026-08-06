@@ -10,27 +10,27 @@ Arcana ships with a built-in coin and item inventory system. To integrate with a
 
 ```lua
 -- Example: DarkRP coin integration
-function Arcana:GiveCoins(ply, amount) ply:addMoney(amount) end
-function Arcana:TakeCoins(ply, amount) ply:addMoney(-amount) end
-function Arcana:GetCoins(ply) return ply:getDarkRPVar("money") end
+function Arcana.GiveCoins(ply, amount) ply:addMoney(amount) end
+function Arcana.TakeCoins(ply, amount) ply:addMoney(-amount) end
+function Arcana.GetCoins(ply) return ply:getDarkRPVar("money") end
 ```
 
 ```lua
 -- Example: PointShop 2 item integration
-function Arcana:GiveItem(ply, itemClass, amount, reason)
+function Arcana.GiveItem(ply, itemClass, amount, reason)
     if not IsValid(ply) or amount <= 0 then return false end
     ply:PS2_AddItem(itemClass, amount)
     return true
 end
 
-function Arcana:TakeItem(ply, itemClass, amount, reason)
+function Arcana.TakeItem(ply, itemClass, amount, reason)
     if not IsValid(ply) or amount <= 0 then return false end
     if ply:PS2_GetItemCount(itemClass) < amount then return false end
     ply:PS2_RemoveItem(itemClass, amount)
     return true
 end
 
-function Arcana:GetItemCount(ply, itemClass)
+function Arcana.GetItemCount(ply, itemClass)
     if SERVER then
         return ply:PS2_GetItemCount(itemClass) or 0
     else
@@ -59,7 +59,7 @@ To replace the default SQLite persistence entirely, return `true` from any of th
 ### Registering a Spell
 
 ```lua
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
     id = "my_spell",
     name = "My Spell",
     description = "Does something magical.",
@@ -86,7 +86,7 @@ Arcana:RegisterSpell({
 ### Registering a Ritual Spell
 
 ```lua
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
     id = "ritual_my_ritual",
     name = "My Ritual",
     description = "Summons something.",
@@ -109,7 +109,7 @@ Arcana:RegisterRitualSpell({
 ### Registering an Enchantment
 
 ```lua
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
     id = "my_enchantment",
     name = "My Enchantment",
     description = "Enchants a weapon with something.",
@@ -138,28 +138,28 @@ Registration only declares an enchantment. These apply it to a specific weapon e
 
 | Function | Notes |
 | --- | --- |
-| `Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)` | Applies and awards XP. Returns `false, reason` if it cannot. |
-| `Arcana:RestoreEnchantmentToWeaponEntity(ply, wep, enchId)` | Same, without awarding XP. Use for system operations such as a vault restore. |
-| `Arcana:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)` | Runs the enchantment's `remove`, drops it and re-syncs. |
-| `Arcana:GetEntityEnchantments(wep)` | The weapon's applied enchantments. |
-| `Arcana:HasEntityEnchantment(wep, enchId)` | Whether one specific enchantment is applied. |
+| `Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId)` | Applies and awards XP. Returns `false, reason` if it cannot. |
+| `Arcana.RestoreEnchantmentToWeaponEntity(ply, wep, enchId)` | Same, without awarding XP. Use for system operations such as a vault restore. |
+| `Arcana.RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)` | Runs the enchantment's `remove`, drops it and re-syncs. |
+| `Arcana.GetEntityEnchantments(wep)` | The weapon's applied enchantments. |
+| `Arcana.HasEntityEnchantment(wep, enchId)` | Whether one specific enchantment is applied. |
 | `Arcana.SyncWeaponEnchantNW(wep)` | Force a network re-sync after bulk changes. |
 
 ### Progression and tutorial
 
 | Function | Realm | Notes |
 | --- | --- | --- |
-| `Arcana:GetLevel(ply)` / `GetXP(ply)` / `GetKnowledgePoints(ply)` | shared | Read progression without touching `GetPlayerData` directly. |
-| `Arcana:HasSpellUnlocked(ply, spellId)` | shared | Whether the player knows a spell. |
-| `Arcana:RecalculateAndRepairKnowledgePoints(ply)` | server | Recomputes KP from level and known spells, overwrites the stored value, saves and syncs. Returns the corrected amount. Intended as an admin repair tool after external edits to player data. |
-| `Arcana:StartTutorialSequence(sequence)` | client | Starts a tutorial sequence. |
-| `Arcana:IsTutorialActive()` | client | Whether a sequence is currently running, for suppressing your own UI. |
+| `Arcana.GetLevel(ply)` / `GetXP(ply)` / `GetKnowledgePoints(ply)` | shared | Read progression without touching `GetPlayerData` directly. |
+| `Arcana.HasSpellUnlocked(ply, spellId)` | shared | Whether the player knows a spell. |
+| `Arcana.RecalculateAndRepairKnowledgePoints(ply)` | server | Recomputes KP from level and known spells, overwrites the stored value, saves and syncs. Returns the corrected amount. Intended as an admin repair tool after external edits to player data. |
+| `Arcana.StartTutorialSequence(sequence)` | client | Starts a tutorial sequence. |
+| `Arcana.IsTutorialActive()` | client | Whether a sequence is currently running, for suppressing your own UI. |
 
 ### Voice activation
 
-`Arcana:RegisterSpell` adds a trigger phrase for the spell name automatically on the client.
-Use `Arcana:AddTriggerPhrase(phrase, spellId)` for extra phrases and
-`Arcana:RemoveTriggerPhrase(phrase)` to drop one, for example when unregistering a spell.
+`Arcana.RegisterSpell` adds a trigger phrase for the spell name automatically on the client.
+Use `Arcana.AddTriggerPhrase(phrase, spellId)` for extra phrases and
+`Arcana.RemoveTriggerPhrase(phrase)` to drop one, for example when unregistering a spell.
 
 ### Registering an Environment
 

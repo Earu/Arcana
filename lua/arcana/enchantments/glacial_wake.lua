@@ -31,7 +31,7 @@ local function fireWake(owner, impactPos, path)
 			dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 			dmg:SetInflictor(IsValid(owner) and owner or game.GetWorld())
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcana:TakeDamageInfo(ent, dmg)
+			Arcana.TakeDamageInfo(ent, dmg)
 
 			Arcana.Status.Frost.Apply(ent, {
 				slowMult     = 0.45,
@@ -56,7 +56,7 @@ local function fireWake(owner, impactPos, path)
 	net.Broadcast()
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "glacial_wake",
 	name = "Glacial Wake",
 	description = "Your projectile leaves a frost scar through the air. On impact the entire flight path erupts with ice, chilling and slowing every entity it passed near.",

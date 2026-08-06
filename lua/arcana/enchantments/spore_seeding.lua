@@ -61,7 +61,7 @@ local function spawnCloud(attacker, pos)
 			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 			dmg:SetInflictor(IsValid(marker) and marker or game.GetWorld())
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcana:TakeDamageInfo(ent, dmg)
+			Arcana.TakeDamageInfo(ent, dmg)
 
 			if ent:IsPlayer() then
 				local now = CurTime()
@@ -81,7 +81,7 @@ local function spawnCloud(attacker, pos)
 	end)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "spore_seeding",
 	name = "Spore Seeding",
 	description = "On impact, your projectile bursts into a lingering spore cloud. Enemies inside are poisoned each tick, and any player who lingers is overcome with disorienting hallucinations.",

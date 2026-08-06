@@ -104,7 +104,7 @@ if SERVER then
 
 		-- Capture existing enchantments on player's weapon
 		local transferIds = {}
-		local map = Arcana:GetEntityEnchantments(orig)
+		local map = Arcana.GetEntityEnchantments(orig)
 		for id, _ in pairs(map or {}) do
 			transferIds[#transferIds + 1] = id
 		end
@@ -140,7 +140,7 @@ if SERVER then
 
 		-- Re-apply enchantments to new entity and sync
 		for _, id in ipairs(transferIds) do
-			Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
+			Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
 		end
 
 		Arcana.SyncWeaponEnchantNW(wep)
@@ -217,7 +217,7 @@ if SERVER then
 				if IsValid(newWep) then
 					local ids = ent._containedEnchantIds or {}
 				for _, id in ipairs(ids) do
-					Arcana:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
+					Arcana.ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
 				end
 
 			Arcana.SyncWeaponEnchantNW(newWep)
@@ -244,14 +244,14 @@ if SERVER then
 		local wep = ent:GetContainedWeapon()
 		if not IsValid(wep) then
 			if Arcana.SendErrorNotification then
-				Arcana:SendErrorNotification(ply, "Deposit a weapon first")
+				Arcana.SendErrorNotification(ply, "Deposit a weapon first")
 			end
 
 			return
 		end
 
 		-- Collect unique enchantments, drop duplicates or ones already present
-		local targetCurrent = Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
+		local targetCurrent = Arcana.GetEntityEnchantments and Arcana.GetEntityEnchantments(wep) or {}
 		local selected = {}
 		for _, id in ipairs(list) do
 			if not targetCurrent[id] then
@@ -300,7 +300,7 @@ if SERVER then
 				if not callOk or allowed == false then
 					if Arcana.SendErrorNotification then
 						local msg = callOk and tostring(reason or "weapon not eligible") or tostring(allowed)
-						Arcana:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. msg)
+						Arcana.SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. msg)
 					end
 
 					return
@@ -323,21 +323,21 @@ if SERVER then
 			end
 		end
 
-		local coins = Arcana:GetCoins(ply)
+		local coins = Arcana.GetCoins(ply)
 		if coins < sumCoins then
 			if Arcana.SendErrorNotification then
-				Arcana:SendErrorNotification(ply, "Insufficient coins")
+				Arcana.SendErrorNotification(ply, "Insufficient coins")
 			end
 
 			return
 		end
 
 		for name, amt in pairs(itemTotals) do
-			local have = Arcana:GetItemCount(ply, name)
+			local have = Arcana.GetItemCount(ply, name)
 
 			if have < amt then
 				if Arcana.SendErrorNotification then
-					Arcana:SendErrorNotification(ply, "Missing item: " .. tostring(name))
+					Arcana.SendErrorNotification(ply, "Missing item: " .. tostring(name))
 				end
 
 				return
@@ -347,17 +347,17 @@ if SERVER then
 
 		-- Deduct currency/items up front
 		if sumCoins > 0 then
-			Arcana:TakeCoins(ply, sumCoins)
+			Arcana.TakeCoins(ply, sumCoins)
 		end
 		for name, amt in pairs(itemTotals) do
-			Arcana:TakeItem(ply, name, amt)
+			Arcana.TakeItem(ply, name, amt)
 		end
 
 		local chance = ent:ComputeSuccessChance(ply)
 		local successes = 0
 		for _, it in ipairs(enchs) do
 			if math.Rand(0, 1) <= chance then
-				Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
+				Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
 				successes = successes + 1
 			end
 		end
@@ -370,7 +370,7 @@ if SERVER then
 
 		-- Refresh stored enchantment IDs snapshot on the contained weapon
 		if IsValid(wep) then
-			local cur = Arcana:GetEntityEnchantments(wep)
+			local cur = Arcana.GetEntityEnchantments(wep)
 			local arr = {}
 			for id, _ in pairs(cur or {}) do arr[#arr + 1] = id end
 			ent._containedEnchantIds = arr
@@ -1125,8 +1125,8 @@ if CLIENT then
 			-- name, have / need, each line in its own color.
 			local infoY = cy + radius + 36
 			if needCoins > 0 or needShards > 0 then
-				local haveCoins = Arcana:GetCoins(ply)
-				local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
+				local haveCoins = Arcana.GetCoins(ply)
+				local haveShards = Arcana.GetItemCount(ply, "mana_crystal_shard")
 				ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, {
 					{text = string.Comma(haveCoins) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
 				}, TEXT_ALIGN_CENTER)
@@ -1169,7 +1169,7 @@ if CLIENT then
 			-- Count 0 (a plain weapon, or one whose enchantments were just stripped)
 			-- draws nothing and releases the bands, so this needs no guard
 			local col = (LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or _circleCol
-			Arcana:RenderEnchantBandsForEntity(ent, self._enchantCount or 0, col, self._bandStyle or "axis", {isMelee = self._bandIsMelee})
+			Arcana.RenderEnchantBandsForEntity(ent, self._enchantCount or 0, col, self._bandStyle or "axis", {isMelee = self._bandIsMelee})
 		end
 
 		local nameLabel = vgui.Create("DLabel", left)
@@ -1330,7 +1330,7 @@ if CLIENT then
 			modelPanel:SetModel(model)
 			nameLabel:SetText(nice)
 			ArtDeco.FitModelPanel(modelPanel, PREVIEW_FOV, nil, modelPanel._fitPadding)
-			modelPanel._bandStyle, modelPanel._bandIsMelee = Arcana:GetEnchantBandPreviewInfo(cls)
+			modelPanel._bandStyle, modelPanel._bandIsMelee = Arcana.GetEnchantBandPreviewInfo(cls)
 		end
 
 		-- Position the model and name inside left panel (centered in the circle)
@@ -1572,7 +1572,7 @@ function ENT:ComputeSuccessChance(ply)
 	end
 
 	-- Scale from base (25%) up to 80% at max Arcana level
-	local playerLevel = Arcana:GetLevel(ply) or 0
+	local playerLevel = Arcana.GetLevel(ply) or 0
 	local maxLevel = ((Arcana.Config and Arcana.Config.MAX_LEVEL) or 100) / 1.75
 	local t = math.Clamp(playerLevel / math.max(1, maxLevel), 0, 1)
 	local maxCap = 0.80

@@ -1,4 +1,4 @@
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "stone_volley",
 	name = "Stone Volley",
 	description = "Summon pebbles above and launch them forward.",
@@ -49,7 +49,7 @@ Arcana:RegisterSpell({
 					dmg:SetDamageType(DMG_CLUB)
 					dmg:SetAttacker(IsValid(ent._ArcanaStoneOwner) and ent._ArcanaStoneOwner or game.GetWorld())
 					dmg:SetInflictor(ent)
-					Arcana:TakeDamageInfo(hitEnt, dmg)
+					Arcana.TakeDamageInfo(hitEnt, dmg)
 				end
 			end)
 

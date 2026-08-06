@@ -225,7 +225,7 @@ local function openVault(items)
 		end
 		function model:PostDrawModel(ent)
 			if Arcana.RenderEnchantBandsForEntity then
-				Arcana:RenderEnchantBandsForEntity(ent, self._EnchantCount or 3,
+				Arcana.RenderEnchantBandsForEntity(ent, self._EnchantCount or 3,
 					(LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or COLOR_GOLD,
 					self._BandStyle or "axis", {isMelee = self._BandIsMelee})
 			end
@@ -238,7 +238,7 @@ local function openVault(items)
 			model:SetModel((swep and (swep.WorldModel or swep.ViewModel)) or HL2_MODELS[cls] or "models/weapons/w_pistol.mdl")
 			ArtDeco.FitModelPanel(model, MODEL_FOV, MODEL_DIR)
 			model._EnchantCount = math.max(1, #(it.enchant_ids or {}))
-			model._BandStyle, model._BandIsMelee = Arcana:GetEnchantBandPreviewInfo(cls)
+			model._BandStyle, model._BandIsMelee = Arcana.GetEnchantBandPreviewInfo(cls)
 		else
 			model:SetVisible(false)
 		end
@@ -347,10 +347,10 @@ local function openVault(items)
 				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
 				draw.SimpleText("Summon weapon", "Arcana_AncientSmall", w * 0.5, 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
 				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, 27, {
-					{text = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+					{text = string.Comma(Arcana.GetCoins(lp)) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
 				}, TEXT_ALIGN_CENTER)
 				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, 45, {
-					{text = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+					{text = string.Comma(Arcana.GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
 				}, TEXT_ALIGN_CENTER)
 			end
 			pnl._hint = tip
@@ -417,8 +417,8 @@ local function openVault(items)
 		summon.Think = function(pnl)
 			if not it then pnl:SetEnabled(false) return end
 			local lp = LocalPlayer()
-			pnl:SetEnabled(Arcana:GetCoins(lp) >= (tonumber(VAULT_CFG.SUMMON_COINS) or 0)
-				and Arcana:GetItemCount(lp, "mana_crystal_shard") >= (tonumber(VAULT_CFG.SUMMON_SHARDS) or 0))
+			pnl:SetEnabled(Arcana.GetCoins(lp) >= (tonumber(VAULT_CFG.SUMMON_COINS) or 0)
+				and Arcana.GetItemCount(lp, "mana_crystal_shard") >= (tonumber(VAULT_CFG.SUMMON_SHARDS) or 0))
 		end
 		if it then
 			summon.DoClick = function()
@@ -622,8 +622,8 @@ local function openVault(items)
 		-- around a small diamond, matching the summon hint.
 		local lp = LocalPlayer()
 		ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 2, {
-			{text = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-			{text = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+			{text = string.Comma(Arcana.GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+			{text = string.Comma(Arcana.GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
 		}, TEXT_ALIGN_CENTER, true)
 	end
 	-- Enable/disable imprint based on weapon presence, vault space and affordability
@@ -632,8 +632,8 @@ local function openVault(items)
 		local hasWeapon = IsValid(lp) and IsValid(lp:GetActiveWeapon())
 		local items = VAULT.items or {}
 		local hasRoom = (#items) < (tonumber(VAULT_CFG.MAX_SLOTS) or 0)
-		local haveCoins = Arcana:GetCoins(lp)
-		local haveShards = Arcana:GetItemCount(lp, "mana_crystal_shard")
+		local haveCoins = Arcana.GetCoins(lp)
+		local haveShards = Arcana.GetItemCount(lp, "mana_crystal_shard")
 		local needCoins = tonumber(VAULT_CFG.STORE_COINS) or 0
 		local needShards = tonumber(VAULT_CFG.STORE_SHARDS) or 0
 		local ok = hasWeapon and hasRoom and (haveCoins >= needCoins) and (haveShards >= needShards)

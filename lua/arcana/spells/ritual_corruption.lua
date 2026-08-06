@@ -1,4 +1,4 @@
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_of_corruption",
 	name = "Ritual: Corruption",
 	description = "Perform a ritual that increases corruption nearby or creates a new corrupted area.",

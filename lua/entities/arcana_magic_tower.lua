@@ -148,8 +148,8 @@ if SERVER then
 	function ENT:ChargePilot(ply)
 		if not IsValid(ply) then return end
 
-		if Arcana:GetCoins(ply) >= self.CannonCost then
-			Arcana:TakeCoins(ply, self.CannonCost, "Magic Tower")
+		if Arcana.GetCoins(ply) >= self.CannonCost then
+			Arcana.TakeCoins(ply, self.CannonCost, "Magic Tower")
 			return
 		end
 
@@ -169,7 +169,7 @@ if SERVER then
 		local attacker = IsValid(pilot) and pilot or self
 
 		-- AoE excludes the tower (inflictor) and the pilot (attacker + ignoreAttacker).
-		Arcana:BlastDamage(attacker, pos, self.ImpactRadius, self.ImpactDamage, {
+		Arcana.BlastDamage(attacker, pos, self.ImpactRadius, self.ImpactDamage, {
 			inflictor      = self,
 			damageType     = bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM, DMG_BLAST),
 			ignoreAttacker = true,
@@ -212,7 +212,7 @@ if SERVER then
 			dmg:SetAttacker(ply)
 			dmg:SetInflictor(self)
 			dmg:SetDamagePosition(tr.HitPos)
-			Arcana:TakeDamageInfo(hit, dmg)
+			Arcana.TakeDamageInfo(hit, dmg)
 		end
 
 		-- Beam visual (owned by the tower for full control over thickness).
@@ -232,14 +232,14 @@ if SERVER then
 	-- Can the pilot afford one flak bullet (coins, or a little HP to spare)?
 	function ENT:CanAffordFlak(ply)
 		if not IsValid(ply) then return false end
-		return Arcana:GetCoins(ply) >= self.FlakCost or ply:Health() > self.FlakHealthCost
+		return Arcana.GetCoins(ply) >= self.FlakCost or ply:Health() > self.FlakHealthCost
 	end
 
 	-- One flak bullet's cost: coins first, otherwise a small chunk of HP.
 	function ENT:ChargeFlak(ply)
 		if not IsValid(ply) then return end
-		if Arcana:GetCoins(ply) >= self.FlakCost then
-			Arcana:TakeCoins(ply, self.FlakCost, "Magic Tower Flak")
+		if Arcana.GetCoins(ply) >= self.FlakCost then
+			Arcana.TakeCoins(ply, self.FlakCost, "Magic Tower Flak")
 			return
 		end
 
@@ -289,11 +289,11 @@ if SERVER then
 			dmg:SetAttacker(ply)
 			dmg:SetInflictor(self)
 			dmg:SetDamagePosition(tr.HitPos)
-			Arcana:TakeDamageInfo(hit, dmg)
+			Arcana.TakeDamageInfo(hit, dmg)
 		end
 
 		-- Small flak burst at the impact (excludes tower + pilot).
-		Arcana:BlastDamage(ply, tr.HitPos, self.FlakBurstRadius, self.FlakBurstDamage, {
+		Arcana.BlastDamage(ply, tr.HitPos, self.FlakBurstRadius, self.FlakBurstDamage, {
 			inflictor      = self,
 			damageType     = DMG_BLAST,
 			ignoreAttacker = true,

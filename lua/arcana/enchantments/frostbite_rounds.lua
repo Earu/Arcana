@@ -12,7 +12,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 	dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 	dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-	Arcana:TakeDamageInfo(target, dmg)
+	Arcana.TakeDamageInfo(target, dmg)
 
 	-- Light knockback away from impact/caster
 	local pushDir = (pos - ((IsValid(attacker) and attacker:WorldSpaceCenter()) or (hitPos or pos))):GetNormalized()
@@ -45,7 +45,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	sound.Play("physics/glass/glass_impact_bullet1.wav", impact, 70, 130)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "frostbite_rounds",
 	name = "Frostbite Rounds",
 	description = "Bullets freeze the struck target with chilling slow and cold VFX.",

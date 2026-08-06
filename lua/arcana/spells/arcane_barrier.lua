@@ -8,7 +8,7 @@ local function clearBarrier(ply)
 	ply._arcanaBarrierUntil = nil
 
 	if SERVER then
-		Arcana:ClearBandVFX(ply, "spell_barrier")
+		Arcana.ClearBandVFX(ply, "spell_barrier")
 	end
 
 	if CLIENT then return end
@@ -46,7 +46,7 @@ if SERVER then
 			ent._arcanaBarrierNextPing = CurTime() + 0.15
 			local r = math.max(ent:OBBMaxs():Unpack()) * 0.55
 
-			Arcana:SendAttachBandVFX(ent, BARRIER_COLOR, 28, 0.25, {
+			Arcana.SendAttachBandVFX(ent, BARRIER_COLOR, 28, 0.25, {
 				{
 					radius = r * 0.85,
 					height = 4,
@@ -70,7 +70,7 @@ if SERVER then
 			ed:SetOrigin(ent:WorldSpaceCenter())
 			util.Effect("GlassImpact", ed, true, true)
 			-- Clear barrier VFX instantly on shatter
-			Arcana:ClearBandVFX(ent, "spell_barrier")
+			Arcana.ClearBandVFX(ent, "spell_barrier")
 		end
 	end)
 
@@ -85,7 +85,7 @@ if SERVER then
 end
 
 -- Spell registration
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "arcane_barrier",
 	name = "Arcane Barrier",
 	description = "Summon a protective shield that absorbs damage for a short time.",
@@ -107,7 +107,7 @@ Arcana:RegisterSpell({
 		if CLIENT then return true end
 		local duration = 120
 		-- Capacity scales slightly with level: 60 base + 6 per level, capped
-		local level = Arcana:GetLevel(caster)
+		local level = Arcana.GetLevel(caster)
 		local capacity = math.Clamp(60 + (level * 6), 60, 1000)
 		caster._arcanaBarrierHP = capacity
 		caster._arcanaBarrierUntil = CurTime() + duration
@@ -115,7 +115,7 @@ Arcana:RegisterSpell({
 		sound.Play("items/suitchargeok1.wav", caster:WorldSpaceCenter(), 70, 120, 0.7)
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.6
 
-		Arcana:SendAttachBandVFX(caster, BARRIER_COLOR, 34, duration, {
+		Arcana.SendAttachBandVFX(caster, BARRIER_COLOR, 34, duration, {
 			{
 				radius = r * 0.95,
 				height = 6,

@@ -84,7 +84,7 @@ function ENT:Think()
 						dmg:SetDamageType(DMG_DISSOLVE)
 						dmg:SetAttacker(self.CPPIGetOwner and IsValid(self:CPPIGetOwner()) and self:CPPIGetOwner() or self)
 						dmg:SetInflictor(self)
-						Arcana:TakeDamageInfo(ent, dmg)
+						Arcana.TakeDamageInfo(ent, dmg)
 					end
 				end
 			end

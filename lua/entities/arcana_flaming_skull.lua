@@ -202,8 +202,8 @@ function ENT:OnTakeDamage(dmginfo)
 			killer = self._lastHurtBy
 		end
 
-		if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
-			Arcana:GiveXP(killer, XP_REWARD, "Flaming Skull defeated")
+		if IsValid(killer) and killer:IsPlayer() and not Arcana.IsPotentialCheater(killer) then
+			Arcana.GiveXP(killer, XP_REWARD, "Flaming Skull defeated")
 		end
 
 		-- Fire explosion effect

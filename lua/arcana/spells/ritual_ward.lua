@@ -1,4 +1,4 @@
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_of_ward",
 	name = "Ritual: Ward",
 	description = "Erect an invisible magical ward that repels anything not already within the protected area. Bullets, props, creatures, and players are all turned away at the boundary.",

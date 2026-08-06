@@ -1,5 +1,5 @@
 -- Flame Wave: A sweeping cone of fire that ignites and damages enemies
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "flame_wave",
 	name = "Flame Wave",
 	description = "Unleash a sweeping cone of flame, burning enemies ahead.",
@@ -45,7 +45,7 @@ Arcana:RegisterSpell({
 				dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				Arcana:TakeDamageInfo(ent, dmg)
+				Arcana.TakeDamageInfo(ent, dmg)
 
 				if ent.Ignite then
 					ent:Ignite(igniteTime, 0)

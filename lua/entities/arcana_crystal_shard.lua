@@ -58,7 +58,7 @@ if SERVER then
 	local function tryPickup(self, ply)
 		if not IsValid(self) or not IsValid(ply) or not ply:IsPlayer() then return false end
 		local amount = self:GetShardAmount()
-		Arcana:GiveItem(ply, "mana_crystal_shard", amount)
+		Arcana.GiveItem(ply, "mana_crystal_shard", amount)
 		self:EmitSound("physics/glass/glass_cup_break1.wav", 70, math.random(190, 210), 0.75)
 		local ed = EffectData()
 		ed:SetOrigin(self:WorldSpaceCenter())
@@ -313,7 +313,7 @@ if CLIENT then
 end
 
 hook.Add("Initialize", "arcana_crystal_shard_item", function()
-	Arcana:RegisterItem("mana_crystal_shard", {
+	Arcana.RegisterItem("mana_crystal_shard", {
 		name = "Crystal Shard",
 		description = "A crystallized fragment of pure magical energy.",
 		model = "models/props_debris/concrete_chunk05g.mdl",

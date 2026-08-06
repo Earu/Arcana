@@ -356,7 +356,7 @@ if SERVER then
 		if not accepted then return end
 
 		if Arcana.GiveCoins then
-			Arcana:GiveCoins(ply, ENCOUNTER_COIN_REWARD, "The Golden Sun's Bargain")
+			Arcana.GiveCoins(ply, ENCOUNTER_COIN_REWARD, "The Golden Sun's Bargain")
 		end
 
 		-- Striking the bargain also earns the hidden Aurum essence for crafted spells.

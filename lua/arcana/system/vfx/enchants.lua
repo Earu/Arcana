@@ -1965,7 +1965,7 @@ local PREVIEW_COLOR = Color(198, 160, 74, 255)
 -- hold-type helpers to read. Mirrors ensureVFXFor's mapping for a weapon that is
 -- not held (the state a model panel depicts).
 -- @return style string ("axis" or "orbital"), isMelee boolean
-function Arcana:GetEnchantBandPreviewInfo(class)
+function Arcana.GetEnchantBandPreviewInfo(class)
 	local wc = Arcana.WeaponClassification
 	local ht = wc.GetHoldTypeForClass(class)
 	local isMelee = wc.IsMeleeHoldTypeName(ht)
@@ -1978,7 +1978,7 @@ end
 -- opts.isMelee tells us what the hold-type helpers cannot read off a bare model.
 -- A count of 0 draws nothing and releases the entity's bands, so callers can keep
 -- calling unconditionally as a weapon's enchantments come and go.
-function Arcana:RenderEnchantBandsForEntity(ent, count, color, style, opts)
+function Arcana.RenderEnchantBandsForEntity(ent, count, color, style, opts)
 	if not IsValid(ent) or not BandCircle then return end
 	count = math.max(0, math.floor(count or 0))
 	style = style or "axis"

@@ -76,7 +76,7 @@ local function zapNearestTarget(proj, attacker)
 	dmg:SetAttacker(attacker)
 	dmg:SetInflictor(attacker)
 	dmg:SetDamagePosition(tpos)
-	Arcana:TakeDamageInfo(best, dmg)
+	Arcana.TakeDamageInfo(best, dmg)
 
 	-- Arc visual: reuses arcana_lightning_orb's existing client-side jagged beam renderer
 	net.Start("Arcana_LightningOrbZap", true)
@@ -97,7 +97,7 @@ local function augmentProjectile(proj, owner)
 	net.Broadcast()
 
 	-- Band rings identical to the lightning orb spell
-	Arcana:SendAttachBandVFX(proj, Color(170, 210, 255, 255), 14, 6, {
+	Arcana.SendAttachBandVFX(proj, Color(170, 210, 255, 255), 14, 6, {
 		{ radius = 15, height = 4, spin = { p = 0,      y = 80 * 50, r = 60 * 50 }, lineWidth = 2 },
 		{ radius = 13, height = 3, spin = { p = 60 * 50, y = -45 * 50, r = 0    }, lineWidth = 2 },
 	})
@@ -134,7 +134,7 @@ local function augmentProjectile(proj, owner)
 	end)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "conductive_shell",
 	name = "Conductive Shell",
 	description = "Your projectile crackles with electricity in flight, zapping the nearest enemy every 0.1s. On detonation it fully discharges into a chained lightning burst.",

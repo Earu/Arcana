@@ -1,4 +1,4 @@
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "blazing_salvo",
 	name = "Blazing Salvo",
 	description = "Fires a fireball every second while shooting this weapon.",
@@ -25,7 +25,7 @@ Arcana:RegisterEnchantment({
 		Arcana.Common.LaunchProjectile(fb, ply, ply:GetAimVector())
 
 		if Arcana.SendAttachBandVFX then
-			Arcana:SendAttachBandVFX(fb, Color(255, 150, 80, 255), 14, 6, {
+			Arcana.SendAttachBandVFX(fb, Color(255, 150, 80, 255), 14, 6, {
 				{ radius = 15, height = 4, spin = { p = 0, y = 80 * 50, r = 60 * 50 }, lineWidth = 2 },
 				{ radius = 13, height = 3, spin = { p = 60 * 50, y = -45 * 50, r = 0 }, lineWidth = 2 },
 			})

@@ -502,7 +502,7 @@ if SERVER then
 		if not IsValid(ply) or not ply:IsPlayer() then return end
 		if not self:GetNWBool("Arcana_FairyVendor", false) then return end
 
-		local have = Arcana:GetItemCount(ply, "solidified_spores")
+		local have = Arcana.GetItemCount(ply, "solidified_spores")
 		local price = self:GetNWInt("Arcana_FairyVendorPrice", 250)
 
 		net.Start("Arcana_FairyVendor_Open")
@@ -521,7 +521,7 @@ if SERVER then
 		if not ent:GetNWBool("Arcana_FairyVendor", false) then return end
 		if qty <= 0 then return end
 
-		local have = Arcana:GetItemCount(ply, "solidified_spores")
+		local have = Arcana.GetItemCount(ply, "solidified_spores")
 		if have <= 0 or qty > have then
 			ply:ChatPrint("You don't have enough spores to exchange.")
 			return
@@ -531,8 +531,8 @@ if SERVER then
 		local coins = math.min(1e6, math.max(1, qty * price)) -- cap at 1 million coins, min 1 coin
 
 		-- consume and payout
-		Arcana:TakeItem(ply, "solidified_spores", qty, "Fairy Vendor Exchange")
-		Arcana:GiveCoins(ply, coins, "Fairy Vendor Exchange")
+		Arcana.TakeItem(ply, "solidified_spores", qty, "Fairy Vendor Exchange")
+		Arcana.GiveCoins(ply, coins, "Fairy Vendor Exchange")
 		ent:EmitSound("buttons/button14.wav", 60, 120)
 
 		ply:ChatPrint("Exchanged " .. tostring(qty) .. " spores for " .. tostring(coins) .. " coins.")

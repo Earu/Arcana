@@ -26,7 +26,7 @@ local function attachHook(ply, wep, state)
 					dmg:SetAttacker(ply)
 					dmg:SetInflictor(IsValid(wep) and wep or ply)
 					dmg:SetDamagePosition(ent:WorldSpaceCenter())
-					Arcana:TakeDamageInfo(ent, dmg)
+					Arcana.TakeDamageInfo(ent, dmg)
 				end
 			end
 			if ply.LagCompensation then ply:LagCompensation(false) end
@@ -36,7 +36,7 @@ local function attachHook(ply, wep, state)
 			util.Effect("ManhackSparks", ed, true, true)
 			sound.Play("npc/fast_zombie/claw_strike" .. math.random(1, 3) .. ".wav", impactPos, 85, 110)
 			if Arcana.SendAttachBandVFX then
-				Arcana:SendAttachBandVFX(ply, Color(180, 240, 255, 255), 24, 0.4, {
+				Arcana.SendAttachBandVFX(ply, Color(180, 240, 255, 255), 24, 0.4, {
 					{ radius = 18, height = 4, spin = { p = 0, y = 360 * 40, r = 0 }, lineWidth = 2 },
 					{ radius = 12, height = 3, spin = { p = 0, y = -300 * 40, r = 0 }, lineWidth = 2 },
 				}, "dash_land_fx")
@@ -92,7 +92,7 @@ local function attachHook(ply, wep, state)
 
 		-- Quick visual feedback
 		if Arcana.SendAttachBandVFX then
-			Arcana:SendAttachBandVFX(p, Color(180, 240, 255, 255), 28, 0.35, {
+			Arcana.SendAttachBandVFX(p, Color(180, 240, 255, 255), 28, 0.35, {
 				{ radius = 18, height = 4, spin = { p = 0, y = 360 * 50, r = 0 }, lineWidth = 2 },
 				{ radius = 14, height = 3, spin = { p = 0, y = -300 * 50, r = 0 }, lineWidth = 2 },
 			}, "dash_fx")
@@ -124,7 +124,7 @@ local function detachHook(ply, wep, state)
 	end
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "dashing_strikes",
 	name = "Dashing Strikes",
 	description = "On melee attack, dash forward toward your aim (1.5s cooldown).",

@@ -60,7 +60,7 @@ local function applyLightningDamage(attacker, hitPos)
 	})
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "lightning_strike",
 	name = "Lightning Strike",
 	description = "Call a focused lightning bolt at your aim point, chaining to nearby foes.",
@@ -77,7 +77,7 @@ Arcana:RegisterSpell({
 		if not SERVER then return true end
 
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local targetPos = Arcana:ResolveGroundTarget(srcEnt, 1500)
+		local targetPos = Arcana.ResolveGroundTarget(srcEnt, 1500)
 
 		-- Perform 1 strong strike and 2 lighter offset strikes for style
 		local strikes = {
@@ -115,7 +115,7 @@ Arcana:RegisterSpell({
 				if s.power >= 1.0 then
 					applyLightningDamage(caster, targetPos + s.offset, normal)
 				else
-					Arcana:BlastDamage(caster, targetPos + s.offset, 120, 30, { damageType = DMG_SHOCK, ignoreAttacker = true })
+					Arcana.BlastDamage(caster, targetPos + s.offset, 120, 30, { damageType = DMG_SHOCK, ignoreAttacker = true })
 				end
 			end)
 		end
@@ -434,12 +434,12 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_LightningStrike_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "lightning_strike" then return end
 
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(170, 200, 255, 255),
 			size = 26,
 			intensity = 4,
 			positionResolver = function(c)
-				return Arcana:ResolveGroundTarget(c, 1500)
+				return Arcana.ResolveGroundTarget(c, 1500)
 			end
 		})
 	end)

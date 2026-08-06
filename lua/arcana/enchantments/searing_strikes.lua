@@ -9,7 +9,7 @@ local function igniteTarget(attacker, target)
 
 	-- Brief visual ring on target
 	if Arcana.SendAttachBandVFX then
-		Arcana:SendAttachBandVFX(target, Color(255, 140, 80, 255), 20, 0.5, {
+		Arcana.SendAttachBandVFX(target, Color(255, 140, 80, 255), 20, 0.5, {
 			{ radius = 14, height = 4, spin = { p = 0, y = 120 * 50, r = 0 }, lineWidth = 2 },
 		}, "ignite_fx")
 	end
@@ -48,7 +48,7 @@ local function detachIgniteHook(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "searing_strikes",
 	name = "Searing Strikes",
 	description = "Melee hits ignite targets for 3 seconds.",

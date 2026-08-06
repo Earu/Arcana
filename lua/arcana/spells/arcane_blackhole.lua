@@ -18,7 +18,7 @@ local function registerBlackholeServerHooks(spell)
 		timer.Simple(8, function()
 			if not IsValid(caster) then return end
 
-			local targetPos = Arcana:ResolveGroundTarget(caster, 1000)
+			local targetPos = Arcana.ResolveGroundTarget(caster, 1000)
 			if not targetPos then return end
 
 			darkStarServerData[caster] = {
@@ -46,7 +46,7 @@ local function registerBlackholeServerHooks(spell)
 				end
 
 			-- Update dark star position with lerp so it drags toward the aim
-			local currentTargetPos = Arcana:ResolveGroundTarget(caster, 1000)
+			local currentTargetPos = Arcana.ResolveGroundTarget(caster, 1000)
 			if currentTargetPos then
 				local lerpedGroundPos = data.lerpedPos or currentTargetPos
 				lerpedGroundPos = LerpVector(0.006, lerpedGroundPos, currentTargetPos)
@@ -88,7 +88,7 @@ local function registerBlackholeServerHooks(spell)
 							dmgInfo:SetInflictor(caster)
 							dmgInfo:SetDamageType(DMG_DISSOLVE)
 							dmgInfo:SetDamagePosition(data.pos)
-							Arcana:TakeDamageInfo(ent, dmgInfo)
+							Arcana.TakeDamageInfo(ent, dmgInfo)
 
 							-- Vaporization effect
 							local ed = EffectData()
@@ -127,7 +127,7 @@ local function registerBlackholeServerHooks(spell)
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "blackhole",
 	on_register = function(spell)
 		if not SERVER then return end
@@ -151,7 +151,7 @@ Arcana:RegisterSpell({
 		if not SERVER then return true end
 
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local targetPos = Arcana:ResolveGroundTarget(srcEnt, 1000)
+		local targetPos = Arcana.ResolveGroundTarget(srcEnt, 1000)
 
 		-- Climax moment: Multi-stage collapse with building screen shakes
 		-- Stage 1: Initial compression
@@ -1142,7 +1142,7 @@ if CLIENT then
 		local startTime = CurTime()
 
 		-- Store casting data
-		local initialTargetPos = Arcana:ResolveGroundTarget(caster, 1000) or caster:GetPos()
+		local initialTargetPos = Arcana.ResolveGroundTarget(caster, 1000) or caster:GetPos()
 		blackholeCastingData[caster] = {
 			startTime = startTime,
 			circles = {},
@@ -1151,13 +1151,13 @@ if CLIENT then
 		}
 
 		-- Ground target indicator (follows aim) using lerped position
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = color,
 			size = 1000,
 			intensity = 100,
 			positionResolver = function(c)
 				if not blackholeCastingData[c] then
-					return Arcana:ResolveGroundTarget(c, 1000)
+					return Arcana.ResolveGroundTarget(c, 1000)
 				end
 				return blackholeCastingData[c].lerpedPos
 			end
@@ -1263,7 +1263,7 @@ if CLIENT then
 			end
 
 			-- Create dark star visual above target position (grows until climax)
-			local targetPos = blackholeCastingData[caster] and blackholeCastingData[caster].lerpedPos or Arcana:ResolveGroundTarget(caster, 1000)
+			local targetPos = blackholeCastingData[caster] and blackholeCastingData[caster].lerpedPos or Arcana.ResolveGroundTarget(caster, 1000)
 			if targetPos then
 				darkStarData[caster] = {
 					pos = targetPos + Vector(0, 0, 200),
@@ -1397,7 +1397,7 @@ if CLIENT then
 			end
 
 			-- Update lerped ground position (used by following circle and dark star)
-			local rawTargetPos = Arcana:ResolveGroundTarget(caster, 1000)
+			local rawTargetPos = Arcana.ResolveGroundTarget(caster, 1000)
 			if rawTargetPos then
 				data.lerpedPos = LerpVector(FrameTime() * 0.4, data.lerpedPos or rawTargetPos, rawTargetPos)
 			end

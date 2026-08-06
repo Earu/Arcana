@@ -1,7 +1,7 @@
 -- Ring of Fire: A rapidly expanding ring that scorches and ignites nearby foes
 if SERVER then util.AddNetworkString("Arcana_RingOfFire_VFX") end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "ring_of_fire",
 	name = "Ring of Fire",
 	description = "Summon a blazing ring that rapidly expands, scorching and igniting foes around you.",
@@ -80,7 +80,7 @@ Arcana:RegisterSpell({
 						dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
 						dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 						dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-						Arcana:TakeDamageInfo(ent, dmg)
+						Arcana.TakeDamageInfo(ent, dmg)
 
 						if ent.Ignite then
 							ent:Ignite(igniteTime, 0)

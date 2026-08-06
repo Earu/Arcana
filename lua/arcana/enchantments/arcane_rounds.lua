@@ -15,7 +15,7 @@ local function fireArcaneSpear(caster, origin, dir)
 	caster:EmitSound("arcana/arcane_1.ogg", 70, 120)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "arcane_rounds",
 	name = "Arcane Rounds",
 	description = "Each bullet also launches an arcane spear from around you.",

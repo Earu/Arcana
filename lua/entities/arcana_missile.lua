@@ -41,7 +41,7 @@ if SERVER then
 			phys:EnableGravity(false)
 		end
 
-		Arcana:SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
+		Arcana.SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
 			{
 				radius = 10,
 				height = 3,
@@ -115,7 +115,7 @@ if SERVER then
 		dmg:SetDamageType(bit.bor(DMG_ENERGYBEAM, DMG_DISSOLVE))
 		dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 		dmg:SetInflictor(self)
-		Arcana:TakeDamageInfo(ent, dmg)
+		Arcana.TakeDamageInfo(ent, dmg)
 
 		-- Enhanced impact effects
 		local pos = self:GetPos()

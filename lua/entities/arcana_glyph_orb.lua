@@ -79,7 +79,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcana:BlastDamage(IsValid(owner) and owner or self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400, { inflictor = self, damageType = DMG_DISSOLVE, ignoreAttacker = true })
+		Arcana.BlastDamage(IsValid(owner) and owner or self, pos, self.ExplodeRadius or 260, self.ExplodeDamage or 400, { inflictor = self, damageType = DMG_DISSOLVE, ignoreAttacker = true })
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)

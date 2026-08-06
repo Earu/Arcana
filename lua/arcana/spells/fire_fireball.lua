@@ -1,4 +1,4 @@
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "fireball",
 	name = "Fireball",
 	description = "Launch a blazing orb that explodes and ignites on impact.",
@@ -29,7 +29,7 @@ Arcana:RegisterSpell({
 		ent:Spawn()
 		Arcana.Common.LaunchProjectile(ent, caster, srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 
-		Arcana:SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {
+		Arcana.SendAttachBandVFX(ent, Color(255, 150, 80, 255), 14, 6, {
 			{
 				radius = 15,
 				height = 4,

@@ -235,7 +235,7 @@ if SERVER then
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "wind_sky_walk",
 	name = "Sky Walk",
 	description = "Take to the sky and glide for 45s — steer by looking, dive to build speed. While aloft, Wind Dash charges, then hurls you in any direction with no need for solid ground.",
