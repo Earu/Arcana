@@ -2,7 +2,8 @@
 -- DEFAULT INVENTORY SYSTEM
 -- ============================================================================
 -- This provides a basic coin and item inventory for Arcana.
--- Implements the functions defined in third_party.lua
+-- Owns the default implementations of the overridable economy API (GetCoins, TakeCoins,
+-- GiveCoins, GetItemCount, GiveItem, TakeItem, RegisterItem). See docs/INTEGRATION.md.
 -- ============================================================================
 
 local Arcana = _G.Arcana or {}

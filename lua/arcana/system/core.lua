@@ -6,15 +6,24 @@
 --   camelCase   → module-private helpers and local functions
 --                 e.g. broadcastCastStart, validateCostForSpell, buildDamageInfo
 --
--- Peer modules (included by init.lua after this file):
---   arcana/persistence.lua       — Player data storage, SQL, SyncPlayerData, lifecycle hooks
---   arcana/xp.lua                — GiveXP, LevelUp, UnlockSpell, knowledge point accessors
---   arcana/enchantments_api.lua  — RegisterEnchantment, Apply/Remove, SyncWeaponEnchantNW
---   arcana/damage.lua            — BlastDamage, TakeDamageInfo, IsPotentialCheater
---   arcana/map_setup.lua         — Altar/portal spawning (server-topology-specific)
---   arcana/vfx_network.lua       — Band VFX broadcast + all cast-circle/gesture client receivers
---   arcana/quickslots.lua        — Quickslot server handlers with debounced saves
---   arcana/lifecycle.lua         — PlayerInitialSpawn/Death/Disconnect hooks
+-- Peer modules (included by init.lua after this file, in this order):
+--   system/persistence.lua          : Player data storage, SQL, SyncPlayerData
+--   system/xp.lua                   : GiveXP, LevelUp, UnlockSpell, knowledge point accessors
+--   system/weapon_classification.lua: Hold-type and hitscan/projectile classification
+--   system/enchantments.lua         : RegisterEnchantment, Apply/Remove, SyncWeaponEnchantNW
+--   system/damage.lua               : BlastDamage, TakeDamageInfo, IsPotentialCheater
+--   system/circles.lua              : Loads ring/magic_circle/band_circle from circles/
+--   system/quickslots.lua           : Quickslot server handlers with debounced saves
+--   system/npc_casting.lua          : NPC mages: speciality roll + crafted spell combat
+--   system/lifecycle.lua            : PlayerInitialSpawn/Death/Disconnect hooks
+--   system/environments.lua         : RegisterEnvironment, Activate/Deactivate
+--   system/mana_network.lua         : Mana producer network and pulse distribution
+--   system/tutorial.lua             : Tutorial sequence engine (scenes/ registers into it)
+--   system/vfx/casting.lua          : Cast-circle/gesture broadcast + client receivers
+--   system/vfx/bloom.lua            : Screenspace bloom pipeline for circles
+--
+-- Realm-only peers: system/mana_crystals.lua and system/default_inventory.lua (server),
+-- system/art_deco.lua, system/hud.lua, system/vfx/enchants.lua (client).
 --
 -- NOTE: Arcana.Circle (circles.lua) is loaded AFTER core.lua by init.lua, so file-scope local
 -- aliases like `local MagicCircle = Arcana.Circle.MagicCircle` would be nil at load time.
@@ -144,10 +153,10 @@ Arcana.CATEGORIES = {
 	ENCHANTMENT = "enchantment",
 }
 
--- Persistence (player data, SQL, SyncPlayerData, SendErrorNotification) → arcana/persistence.lua
--- XP/leveling (GetXPRequiredForLevel, GiveXP, LevelUp, UnlockSpell, etc.) → arcana/xp.lua
--- Enchantment API → arcana/enchantments_api.lua
--- Damage utils → arcana/damage.lua
+-- Persistence (player data, SQL, SyncPlayerData, SendErrorNotification) → system/persistence.lua
+-- XP/leveling (GetXPRequiredForLevel, GiveXP, LevelUp, UnlockSpell, etc.) → system/xp.lua
+-- Enchantment API → system/enchantments.lua
+-- Damage utils → system/damage.lua
 
 -- Interrupt an ongoing spell cast
 function Arcana:InterruptSpell(ply, spellId)
@@ -305,7 +314,7 @@ function Arcana:StartCasting(ply, spellId)
 end
 
 -- XP and Leveling System
--- GiveXP, CalculateLevel, LevelUp → arcana/xp.lua
+-- GiveXP, CalculateLevel, LevelUp → system/xp.lua
 
 -- Spell Registration API
 function Arcana:RegisterSpell(spellData)
@@ -547,7 +556,7 @@ function Arcana:CanCastSpell(ply, spellId)
 	return true
 end
 
--- Band VFX API (SendAttachBandVFX, ClearBandVFX) → arcana/vfx_network.lua
+-- Band VFX API (SendAttachBandVFX, ClearBandVFX) → system/vfx/casting.lua
 
 -- Side-effect mutator — deducts cost. Called only after validateCostForSpell has passed.
 local function applyCostForSpell(ply, spell)
@@ -654,11 +663,11 @@ function Arcana:CastSpell(ply, spellId, has_target, context)
 end
 
 -- Knowledge System
--- CanUnlockSpell, UnlockSpell, GetLevel, GetXP, GetKnowledgePoints, HasSpellUnlocked → arcana/xp.lua
+-- CanUnlockSpell, UnlockSpell, GetLevel, GetXP, GetKnowledgePoints, HasSpellUnlocked → system/xp.lua
 
--- Networking: XPUpdate/LevelUp/UnlockSpell → arcana/xp.lua
---             FullSync/ErrorNotification → arcana/persistence.lua
---             SetQuickslot/SetSelectedQuickslot → arcana/quickslots.lua
+-- Networking: XPUpdate/LevelUp/UnlockSpell → system/xp.lua
+--             FullSync/ErrorNotification → system/persistence.lua
+--             SetQuickslot/SetSelectedQuickslot → system/quickslots.lua
 
 if SERVER then
 	util.AddNetworkString("Arcana_BeginCasting")
@@ -712,9 +721,8 @@ if SERVER then
 	end)
 end
 
--- Client-side VFX receivers (BeginCasting, SpellFailed, PlayCastGesture, BandVFX) → arcana/vfx_network.lua
--- Player lifecycle hooks (PlayerInitialSpawn, SetupMove, PlayerDeath, PlayerDisconnected) → arcana/lifecycle.lua
--- Map-specific entity spawning (altar, portal) lives in arcana/map_setup.lua
+-- Client-side VFX receivers (BeginCasting, SpellFailed, PlayCastGesture, BandVFX) → system/vfx/casting.lua
+-- Player lifecycle hooks (PlayerInitialSpawn, SetupMove, PlayerDeath, PlayerDisconnected) → system/lifecycle.lua
 
 
 -- Common position resolver for ground-targeted spells
@@ -738,6 +746,6 @@ function Arcana:ResolveGroundTarget(caster, maxRange)
 	end
 end
 
--- CreateFollowingCastCircle (CLIENT helper for ground-following cast circles) → arcana/vfx_network.lua
+-- CreateFollowingCastCircle (CLIENT helper for ground-following cast circles) → system/vfx/casting.lua
 
--- Damage utilities (BlastDamage, TakeDamageInfo, IsPotentialCheater) moved to arcana/damage.lua
+-- Damage utilities (BlastDamage, TakeDamageInfo, IsPotentialCheater) → system/damage.lua

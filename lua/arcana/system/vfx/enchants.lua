@@ -6,8 +6,8 @@ if SERVER then return end
 -- Load-order contract: init.lua must include circles.lua and arcana/common/ before this file.
 -- These file-scope aliases become nil if the load order changes; they are guarded with asserts
 -- that surface the problem immediately rather than silently at first render.
-assert(Arcana.Circle and Arcana.Circle.BandCircle, "enchant_vfx.lua requires circles.lua to be loaded first")
-assert(Arcana.WeaponClassification and Arcana.WeaponClassification.IsMeleeHoldType, "enchant_vfx.lua requires arcana/system/weapon_classification.lua to be loaded first")
+assert(Arcana.Circle and Arcana.Circle.BandCircle, "system/vfx/enchants.lua requires system/circles.lua to be loaded first")
+assert(Arcana.WeaponClassification and Arcana.WeaponClassification.IsMeleeHoldType, "system/vfx/enchants.lua requires system/weapon_classification.lua to be loaded first")
 
 local BandCircle = Arcana.Circle.BandCircle
 

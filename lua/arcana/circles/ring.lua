@@ -478,8 +478,7 @@ function Ring:BuildBandMesh()
 		BAND_MESH_CACHE[meshKey] = meshEntry
 	end
 
-	self.bandMesh    = meshEntry
-	self.bandRTBuilt = true   -- kept for legacy flag checks in BandCircle
+	self.bandMesh = meshEntry
 end
 
 function Ring:DrawBandMesh(centerPos, angles, color, rotationAngle)

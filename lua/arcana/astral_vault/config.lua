@@ -1,5 +1,5 @@
 -- Astral Vault shared configuration — single source of truth for cost constants.
--- Included by both astral_vault.lua (server) and astral_vault_ui.lua (client).
+-- Included by both vault.lua (server) and ui.lua (client).
 Arcana = Arcana or {}
 
 Arcana.VaultConfig = {

@@ -313,7 +313,7 @@ if SERVER then
 	end
 
 end
--- Player lifecycle hooks (load on SetupMove, save on disconnect) are in arcana/lifecycle.lua
+-- Player lifecycle hooks (load on SetupMove, save on disconnect) are in system/lifecycle.lua
 
 if CLIENT then
 	net.Receive("Arcana_ErrorNotification", function()

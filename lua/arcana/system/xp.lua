@@ -239,7 +239,7 @@ if SERVER then
 		if not isFree then
 			-- Affordability was already established in CanForgetSpell via GetCoins/GetItemCount,
 			-- which is how the rituals and the enchanter do it. Do NOT gate on the return value
-			-- of TakeCoins/TakeItem: third-party economy overrides (see third_party.lua) commonly
+			-- of TakeCoins/TakeItem: third-party economy overrides (see docs/INTEGRATION.md) commonly
 			-- forward to the host server's economy and return nil, which would read as failure
 			-- here and strand the player having paid for a spell they still have.
 			if coins > 0 then
