@@ -59,7 +59,7 @@ Arcana.RegisterSpell({
 		end
 
 		-- Powerful wind blast sounds
-		sound.Play("ambient/wind/wind_roar1.wav", origin, 95, 100)
+		sound.Play("ambient/wind/wind_hit2.wav", origin, 95, 100)
 		sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", origin, 90, 140)
 		sound.Play("physics/concrete/boulder_impact_hard" .. math.random(1, 4) .. ".wav", origin, 85, 60)
 		timer.Simple(0.05, function()

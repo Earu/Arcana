@@ -36,7 +36,7 @@ if SERVER then
 		self:StartMotionController()
 
 		-- Soft ambient hum
-		self._hum = CreateSound(self, "ambient/atmosphere/undercity_ambience.wav")
+		self._hum = CreateSound(self, "ambient/atmosphere/tone_quiet.wav")
 		if self._hum then
 			self._hum:PlayEx(0.12, 120)
 		end

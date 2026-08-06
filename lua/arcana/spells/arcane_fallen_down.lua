@@ -184,7 +184,7 @@ local function startBeamPhase(caster, targetPos)
 		caster:StopSound("ambient/atmosphere/city_rumble_loop1.wav")
 		caster:StopSound("weapons/physcannon/superphys_launch3.wav")
 		caster:StopSound("ambient/wind/wind_rooftop1.wav")
-		caster:StopSound("ambient/atmosphere/ambience01.wav")
+		caster:StopSound("ambient/atmosphere/ambience5.wav")
 		-- Absolutely MASSIVE final blast with layered sounds
 		sound.Play("ambient/explosions/explode_9.wav", targetPos, 130, 40) -- Deepest explosion
 		sound.Play("ambient/explosions/explode_8.wav", targetPos, 128, 50)

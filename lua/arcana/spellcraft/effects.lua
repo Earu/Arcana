@@ -15,6 +15,9 @@ Arcana = Arcana or {}
 Arcana.Spellcraft = Arcana.Spellcraft or {}
 local P = Arcana.Spellcraft
 
+-- ambient/energy/ ships zap1-3 and zap5-9; there is no zap4.wav.
+local ZAP_IDS = { 1, 2, 3, 5, 6, 7, 8, 9 }
+
 ----------------------------------------------------------------------
 -- SERVER: authoritative sounds/decals/shakes + broadcast to clients
 ----------------------------------------------------------------------
@@ -78,7 +81,7 @@ if SERVER then
 			util.Effect("ThumperDust", ed, true, true)
 			if intensity >= 0.9 then
 				sound.Play("physics/concrete/concrete_break2.wav", pos, 80, 95)
-				sound.Play("ambient/materials/rock_impact_hard2.wav", pos, 80, 100)
+				sound.Play("physics/concrete/rock_impact_hard2.wav", pos, 80, 100)
 				Arcana.Common.ScreenShake(pos, 7, 40, 0.4, radius * 2)
 				util.Decal("Scorch", pos + UP * 8, pos + DOWN)
 			else
@@ -88,17 +91,17 @@ if SERVER then
 		wind = function(pos, radius, intensity)
 			sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", pos, intensity >= 0.9 and 85 or 65, math.random(100, 125))
 			if intensity >= 0.9 then
-				sound.Play("ambient/wind/wind_roar1.wav", pos, 75, 130)
+				sound.Play("ambient/wind/wind_hit2.wav", pos, 75, 130)
 			end
 		end,
 		poison = function(pos, radius, intensity)
-			sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(1, 8) .. ".wav", pos, intensity >= 0.9 and 80 or 62, 90)
+			sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(2, 8) .. ".wav", pos, intensity >= 0.9 and 80 or 62, 90)
 		end,
 		arcane = function(pos, radius, intensity)
 			local ed = EffectData()
 			ed:SetOrigin(pos)
 			util.Effect("cball_explode", ed, true, true)
-			sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, intensity >= 0.9 and 85 or 65, 110)
+			sound.Play("ambient/energy/zap" .. ZAP_IDS[math.random(#ZAP_IDS)] .. ".wav", pos, intensity >= 0.9 and 85 or 65, 110)
 			if intensity >= 0.9 then
 				util.Decal("FadingScorch", pos + UP * 8, pos + DOWN)
 			end

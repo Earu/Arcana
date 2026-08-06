@@ -33,7 +33,7 @@ Arcana.RegisterSpell({
 		util.Effect("cball_explode", ed, true, true)
 		Arcana.Common.ScreenShake(pos, 8, 80, 0.5, 800)
 		srcEnt:EmitSound("physics/concrete/concrete_break2.wav", 80, 95)
-		sound.Play("ambient/materials/rock_impact_hard2.wav", pos, 80, 100)
+		sound.Play("physics/concrete/rock_impact_hard2.wav", pos, 80, 100)
 		-- Tell clients to render expanding earthy rings + dust/debris
 		net.Start("Arcana_EarthShatter_VFX", true)
 		net.WriteVector(pos)
