@@ -1,4 +1,4 @@
--- Spellcraft — server persistence & authority.
+-- Spellcraft: server persistence and authority.
 --
 -- The clientside file (data/arcana/spellcraft.json) owns the definitions; this
 -- server owns activation. Two tables record per-server, per-player state:
@@ -8,6 +8,10 @@
 -- On join we load that state, ask the client for its definitions, register the
 -- structurally-valid ones (locked until eligible), and broadcast them so every
 -- client can render each other's crafted spells.
+--
+-- Storage is replaceable the same way player data and the astral vault are: return true
+-- from Arcana_ReadSpellcraftState / Arcana_WriteSpellcraftState to take over from SQLite.
+-- See docs/INTEGRATION.md.
 
 if not SERVER then return end
 
@@ -59,41 +63,88 @@ local function ensureTables()
 	return ensured
 end
 
--- Consecrations and essence unlocks are purchases. If the row cannot be written the player
--- has already been charged, so say so out loud rather than leaving them to discover on the
--- next map change that what they bought is gone.
-local function persistPurchase(query, context, ply)
-	if not ensureTables() then
-		Arcana.SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
-		return false
+-- Read/write the player's whole per-server spellcraft state, overridable through the same
+-- RunHook convention system/persistence.lua and astral_vault/vault.lua use. A state is:
+--   { essences = { [essenceId] = true }, consecrations = { [defhash] = true } }
+--
+-- Return true from Arcana_ReadSpellcraftState / Arcana_WriteSpellcraftState to suppress the
+-- default SQLite path. The read hook must invoke its callback as callback(success, state) on
+-- every path, failure included, or the player joins with no crafted spells and no error.
+local function readSpellcraftState(ply, callback)
+	if not IsValid(ply) then callback(false, nil) return end
+
+	local handled = Arcana.RunHook("ReadSpellcraftState", ply, callback)
+	if handled == true then return end
+
+	if not ensureTables() then callback(false, nil) return end
+
+	local sid64 = ply:SteamID64()
+	local esc = sql.SQLStr(sid64)
+	local state = {essences = {}, consecrations = {}}
+
+	local rows = Arcana.SQLCheck(sql.Query("SELECT essence FROM arcane_essence_unlocks WHERE steamid = " .. esc .. ";"),
+		"read essence unlocks for " .. sid64)
+	if rows == false then callback(false, nil) return end
+	if istable(rows) then
+		for _, r in ipairs(rows) do state.essences[r.essence] = true end
 	end
 
-	if Arcana.SQLCheck(sql.Query(query), context) == false then
+	rows = Arcana.SQLCheck(sql.Query("SELECT defhash FROM arcane_spellcraft_activations WHERE steamid = " .. esc .. ";"),
+		"read consecrations for " .. sid64)
+	if rows == false then callback(false, nil) return end
+	if istable(rows) then
+		for _, r in ipairs(rows) do state.consecrations[r.defhash] = true end
+	end
+
+	callback(true, state)
+end
+
+-- The default write is append-only rather than a replace: spellcraft state only ever grows
+-- (a consecration persists by defhash so re-importing the same build stays consecrated, and
+-- an essence unlock is a purchase), so there is nothing to delete and no window where a
+-- failed re-insert could lose what a delete already removed.
+local function writeSpellcraftState(ply, state)
+	if not IsValid(ply) then return false end
+
+	local handled = Arcana.RunHook("WriteSpellcraftState", ply, state)
+	if handled == true then return true end
+
+	if not ensureTables() then return false end
+
+	local sid = sql.SQLStr(ply:SteamID64())
+	local ok = true
+
+	for essenceId in pairs(state.essences or {}) do
+		local q = string.format("INSERT OR REPLACE INTO arcane_essence_unlocks (steamid, essence) VALUES (%s, %s);",
+			sid, sql.SQLStr(essenceId))
+		if Arcana.SQLCheck(sql.Query(q), "persist essence unlock " .. essenceId) == false then ok = false end
+	end
+
+	for hash in pairs(state.consecrations or {}) do
+		local q = string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
+			sid, sql.SQLStr(hash))
+		if Arcana.SQLCheck(sql.Query(q), "persist consecration " .. hash) == false then ok = false end
+	end
+
+	return ok
+end
+
+-- Consecrations and essence unlocks are purchases: the player has already been charged by the
+-- time we get here, so a write failure is told to them rather than left to be discovered on
+-- the next map change.
+local function persistPurchase(ply)
+	local sid = ply:SteamID64()
+	local state = {
+		essences = P.EssenceUnlocks[sid] or {},
+		consecrations = P.Consecrations[sid] or {},
+	}
+
+	if not writeSpellcraftState(ply, state) then
 		Arcana.SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
 		return false
 	end
 
 	return true
-end
-
-local function loadPlayerState(sid64)
-	P.EssenceUnlocks[sid64] = {}
-	P.Consecrations[sid64] = {}
-	if not ensureTables() then return end
-
-	local esc = sql.SQLStr(sid64)
-
-	local rows = Arcana.SQLCheck(sql.Query("SELECT essence FROM arcane_essence_unlocks WHERE steamid = " .. esc .. ";"),
-		"read essence unlocks for " .. sid64)
-	if istable(rows) then
-		for _, r in ipairs(rows) do P.EssenceUnlocks[sid64][r.essence] = true end
-	end
-
-	rows = Arcana.SQLCheck(sql.Query("SELECT defhash FROM arcane_spellcraft_activations WHERE steamid = " .. esc .. ";"),
-		"read consecrations for " .. sid64)
-	if istable(rows) then
-		for _, r in ipairs(rows) do P.Consecrations[sid64][r.defhash] = true end
-	end
 end
 
 ----------------------------------------------------------------------
@@ -235,14 +286,29 @@ end
 ----------------------------------------------------------------------
 hook.Add("Arcana_LoadedPlayerData", "Arcana_Spellcraft_Load", function(ply)
 	if not IsValid(ply) then return end
-	local sid = ply:SteamID64()
-	loadPlayerState(sid)
-	sendRoster(ply)
-	P.SendState(ply)
 
-	awaitingSync[sid] = true
-	net.Start("Arcana_Spellcraft_RequestSync")
-	net.Send(ply)
+	local sid = ply:SteamID64()
+	readSpellcraftState(ply, function(ok, state)
+		if not IsValid(ply) then return end
+
+		-- An unreadable state is not an empty one, but there is nothing to gate on here:
+		-- consecration and essence checks both fail closed, so the player simply finds their
+		-- crafted spells locked rather than silently losing them. SQLCheck has already said
+		-- what went wrong.
+		P.EssenceUnlocks[sid] = (ok and state and state.essences) or {}
+		P.Consecrations[sid] = (ok and state and state.consecrations) or {}
+
+		if not ok then
+			Arcana.SendErrorNotification(ply, "Could not read your spellcraft activations, they may show as locked")
+		end
+
+		sendRoster(ply)
+		P.SendState(ply)
+
+		awaitingSync[sid] = true
+		net.Start("Arcana_Spellcraft_RequestSync")
+		net.Send(ply)
+	end)
 end)
 
 hook.Add("PlayerDisconnected", "Arcana_Spellcraft_Cleanup", function(ply)
@@ -424,8 +490,7 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	P.Consecrations[sid] = P.Consecrations[sid] or {}
 	if not P.Consecrations[sid][hash] then
 		P.Consecrations[sid][hash] = true
-		persistPurchase(string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
-			sql.SQLStr(sid), sql.SQLStr(hash)), "persist consecration " .. hash, ply)
+		persistPurchase(ply)
 	end
 
 	registerAndBroadcast(sid, slot, name, def)
@@ -476,8 +541,7 @@ net.Receive("Arcana_Spellcraft_Consecrate", function(_, ply)
 	local hash = P.DefHash(def)
 	P.Consecrations[sid] = P.Consecrations[sid] or {}
 	P.Consecrations[sid][hash] = true
-	persistPurchase(string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
-		sql.SQLStr(sid), sql.SQLStr(hash)), "persist consecration " .. hash, ply)
+	persistPurchase(ply)
 
 	P.SendState(ply)
 end)
@@ -516,8 +580,7 @@ net.Receive("Arcana_Spellcraft_UnlockEssence", function(_, ply)
 
 	P.EssenceUnlocks[sid] = P.EssenceUnlocks[sid] or {}
 	P.EssenceUnlocks[sid][essenceId] = true
-	persistPurchase(string.format("INSERT OR REPLACE INTO arcane_essence_unlocks (steamid, essence) VALUES (%s, %s);",
-		sql.SQLStr(sid), sql.SQLStr(essenceId)), "persist essence unlock " .. essenceId, ply)
+	persistPurchase(ply)
 
 	P.SendState(ply)
 end)
