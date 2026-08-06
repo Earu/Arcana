@@ -1,15 +1,15 @@
--- Arcana Target Lock — per-frame crosshair scanner that latches onto the first entity
+-- Arcana Target Lock: per-frame crosshair scanner that latches onto the first entity
 -- passing a spell's filter function during a cast wind-up.
 --
 -- API (server-side):
 --   Arcana.Common.TargetScan(caster, filter, range)
 --     Begin scanning the caster's crosshair every server frame.
---     filter : function(entity) -> bool  — return true to accept the entity as the target.
+--     filter : function(entity) -> bool, return true to accept the entity as the target.
 --              Defaults to accepting any valid non-caster entity.
---     range  : number (optional) — max trace distance, defaults to 1000.
+--     range  : number (optional), max trace distance, defaults to 1000.
 --     The scan stops automatically once a valid target is found.
 --     The lock and the client indicator are cleared automatically when the spell
---     succeeds or fails — spells do not need to do any cleanup.
+--     succeeds or fails: spells do not need to do any cleanup.
 --
 --   Arcana.Common.GetLockedTarget(caster) -> Entity|nil
 --     Returns the locked entity once acquired, or nil.
@@ -98,7 +98,7 @@ if SERVER then
 	-- Spells never need this; entity casters use it on their abort paths.
 	Arcana.Common.ClearTargetLock = clearLock
 
-	-- Single Think hook — runs every server frame, scans all active casters at once.
+	-- Single Think hook: runs every server frame, scans all active casters at once.
 	hook.Add("Think", "ArcanaTargetLock_Scan", function()
 		for caster, scanner in pairs(activeScanners) do
 			if not IsValid(caster) then
@@ -125,7 +125,7 @@ if SERVER then
 			if not IsValid(target) or target == caster then continue end
 			if scanner.filter and not scanner.filter(target) then continue end
 
-			-- First accepted entity — lock and stop scanning.
+			-- First accepted entity: lock and stop scanning.
 			lockedTargets[caster] = target
 			activeScanners[caster] = nil
 
@@ -214,7 +214,7 @@ if CLIENT then
 			seed = tonumber(util.CRC(spellId))
 		end
 
-		-- Ground circle at target's feet, facing upward — same transform as the
+		-- Ground circle at target's feet, facing upward, same transform as the
 		-- player's own ground casting circle in computeCastCircleTransform.
 		local pos = target:GetPos() + Vector(0, 0, 2)
 		local ang = Angle(0, 180, 180)

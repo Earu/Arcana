@@ -952,7 +952,7 @@ if CLIENT then
 			surface.SetDrawColor(ArtDeco.Colors.paleGold)
 
 			-- Circle outline. DrawLine lights the pixel right/below its coordinate, so a
-			-- circle drawn about (cx, cy) rasterizes half a pixel down-right of it — which
+			-- circle drawn about (cx, cy) rasterizes half a pixel down-right of it, which
 			-- is what threw the glyph off center. Drawing it about (cx, cy) - 0.5 lands its
 			-- ink symmetric about (cx, cy), where the glyph below already is.
 			local segments = 16
@@ -1063,7 +1063,7 @@ if CLIENT then
 	-- far from the geometry (the RPG's is 20 units out, most of its own radius), so a bare
 	-- SetAngles swings the model in an arc around the camera's look-at point. Offsetting
 	-- the entity by its rotated bounds center pins that center on the world origin, where
-	-- ArtDeco.FitModelPanel aims the camera — the model turns in place.
+	-- ArtDeco.FitModelPanel aims the camera, the model turns in place.
 	-- @param ent Model panel entity
 	-- @param ang Angle to spin to
 	function ArtDeco.SpinModelPanelEntity(ent, ang)
@@ -1079,8 +1079,8 @@ if CLIENT then
 	end
 
 	--- Frames a model panel's camera on a model pinned at the origin by SpinModelPanelEntity.
-	-- The framing radius is yaw-invariant — the model's XY diagonal, or its height, whichever
-	-- is larger — so a long weapon keeps a constant size and never clips the panel as it turns.
+	-- The framing radius is yaw-invariant: the model's XY diagonal, or its height, whichever
+	-- is larger: so a long weapon keeps a constant size and never clips the panel as it turns.
 	-- @param panel The DModelPanel
 	-- @param fov Camera FOV (default 30)
 	-- @param dir Direction the camera sits in, from the model (default 1, 1, 0.5)

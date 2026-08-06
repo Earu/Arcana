@@ -396,7 +396,7 @@ if CLIENT then
 				end
 
 				-- draw refractive passes with distance-based fade
-				local PASSES = 4 -- try 3–6
+				local PASSES = 4 -- try 3-6
 				local baseDisp = 0.5 * (0.6 + 0.4 * fade)
 				local perPassOpacity = (1 / PASSES) * fade * spawnFade
 

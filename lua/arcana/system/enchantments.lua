@@ -21,7 +21,7 @@ local function syncWeaponEnchantNW(wep)
 	end
 end
 -- Enchantment API
--- RegisterEnchantment(def) — registers an enchantment with the following fields:
+-- RegisterEnchantment(def): registers an enchantment with the following fields:
 --   id (string): unique identifier
 --   name (string): display name
 --   description (string): tooltip text
@@ -32,7 +32,7 @@ end
 --   remove(ply, wep, state): remove runtime behavior when enchantment is stripped
 --   on_projectile_fired(ply, wep, proj, state): optional; called automatically by the system
 --     whenever a player fires a projectile from this enchanted weapon. Ownership is resolved
---     via Arcana.WeaponClassification.ResolveProjectileOwner — no manual OnEntityCreated hook needed.
+--     via Arcana.WeaponClassification.ResolveProjectileOwner, no manual OnEntityCreated hook needed.
 --   on_shot_fired(ply, wep, data, state): optional; called automatically by the system whenever
 --     a player shoots this enchanted HITSCAN weapon, whether it fires real bullets (relayed from
 --     EntityFireBullets) or not (synthesized trace shot, data.ArcanaSynthesized == true). data is
@@ -63,7 +63,7 @@ function Arcana.RegisterEnchantment(def)
 		cost_items = istable(def.cost_items) and def.cost_items or { -- array of {name="mana_crystal_shard", amount=5}
 			{name = "mana_crystal_shard", amount = 1}
 		},
-		-- Applicability: return (bool, reason) — reason is a human-readable string on failure, matching can_cast contract
+		-- Applicability: return (bool, reason), reason is a human-readable string on failure, matching can_cast contract
 		can_apply = def.can_apply, -- function(ply, wep) -> (bool, reason?)
 		on_projectile_fired = def.on_projectile_fired, -- function(ply, wep, proj, state)
 		on_shot_fired = def.on_shot_fired, -- function(ply, wep, data, state)

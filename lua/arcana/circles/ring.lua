@@ -380,7 +380,7 @@ function Ring:DrawTexturedQuad(centerPos, angles, color, rotationAngle)
 		-- The sub-circles sit at 45°/135°/225°/315° on RING_RADIUS_PX.
 		local glyphDraw = RING_RADIUS_PX * 0.35
 		-- DrawTexturedRectRotated rotates counterclockwise for positive angles (screen space),
-		-- while cos/sin in Y-down traces clockwise — negate to keep glyphs locked to the texture's sub-circles.
+		-- while cos/sin in Y-down traces clockwise: negate to keep glyphs locked to the texture's sub-circles.
 		local rot = -math.rad(rotationAngle or 0)
 		for i = 1, 4 do
 			local a  = (i - 1) * math_pi * 0.5 + math_pi * 0.25 + rot
@@ -567,7 +567,7 @@ function Arcana.Circle.Draw2DRing(ringType, cx, cy, radius, angle, color, alpha)
 	surface_DrawTexturedRectRotated(cx, cy, s, s, angle or 0)
 end
 
--- Draws a pattern-lines ring (variant 1–3) centred at (cx, cy) in screen space.
+-- Draws a pattern-lines ring (variant 1-3) centred at (cx, cy) in screen space.
 function Arcana.Circle.Draw2DPatternRing(variant, cx, cy, radius, angle, color, alpha)
 	if not RING_MATS then return end
 
@@ -580,7 +580,7 @@ function Arcana.Circle.Draw2DPatternRing(variant, cx, cy, radius, angle, color, 
 end
 
 -- Draws a RUNE_STAR ring with four co-rotating glyph overlays in screen space.
--- glyphs: array of 4 char codes from EXPORTED_GLYPH_CODES (65–72 = 'A'–'H').
+-- glyphs: array of 4 char codes from EXPORTED_GLYPH_CODES (65-72 = 'A', 'H').
 function Arcana.Circle.Draw2DRuneStar(cx, cy, radius, angle, glyphs, color, alpha)
 	if not RING_MATS then return end
 

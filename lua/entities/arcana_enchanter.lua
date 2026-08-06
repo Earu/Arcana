@@ -957,8 +957,8 @@ if CLIENT then
 	end
 
 	-- Themed background, in the family of the other stations: dark brass
-	-- plate with concentric rings radiating out from the magic circle —
-	-- the enchantment rippling through the bench — and faint runes sinking
+	-- plate with concentric rings radiating out from the magic circle,
+	-- the enchantment rippling through the bench: and faint runes sinking
 	-- slowly down into the weapon.
 	local function drawEnchanterBackground(w, h, seed)
 		-- Clip everything to the art-deco octagon using the stencil buffer.

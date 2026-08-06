@@ -39,9 +39,9 @@ function Arcana.GetItemCount(ply, itemClass)
 end
 ```
 
-Full examples for DarkRP, PointShop2, MySQL, and custom database backends are documented in [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
+Full examples for DarkRP, PointShop2, MySQL and custom backends are in [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
 
-Note that persistence hooks are dispatched through `Arcana.RunHook`, which prefixes every name with `Arcana_`. Listen for the prefixed name.
+Hooks are dispatched through `Arcana.RunHook`, which prefixes every name with `Arcana_`. Listen for the prefixed name.
 
 ### Persistence Hook Overrides
 
@@ -134,34 +134,31 @@ Arcana.RegisterEnchantment({
 })
 ```
 
-### Applying and removing enchantments at runtime
+### Runtime API
 
-Registration only declares an enchantment. These apply it to a specific weapon entity:
+Enchantments, on a specific weapon entity:
 
 | Function | Notes |
 | --- | --- |
-| `Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId)` | Applies and awards XP. Returns `false, reason` if it cannot. |
-| `Arcana.RestoreEnchantmentToWeaponEntity(ply, wep, enchId)` | Same, without awarding XP. Use for system operations such as a vault restore. |
-| `Arcana.RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)` | Runs the enchantment's `remove`, drops it and re-syncs. |
-| `Arcana.GetEntityEnchantments(wep)` | The weapon's applied enchantments. |
-| `Arcana.HasEntityEnchantment(wep, enchId)` | Whether one specific enchantment is applied. |
-| `Arcana.SyncWeaponEnchantNW(wep)` | Force a network re-sync after bulk changes. |
+| `Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId)` | Applies and awards XP. Returns `false, reason` on failure. |
+| `Arcana.RestoreEnchantmentToWeaponEntity(ply, wep, enchId)` | Same, no XP. For system operations like a vault restore. |
+| `Arcana.RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)` | Runs `remove`, drops it, re-syncs. |
+| `Arcana.GetEntityEnchantments(wep)` | Applied enchantments. |
+| `Arcana.HasEntityEnchantment(wep, enchId)` | Whether one is applied. |
+| `Arcana.SyncWeaponEnchantNW(wep)` | Force a re-sync after bulk changes. |
 
-### Progression and tutorial
+Progression and tutorial:
 
 | Function | Realm | Notes |
 | --- | --- | --- |
-| `Arcana.GetLevel(ply)` / `GetXP(ply)` / `GetKnowledgePoints(ply)` | shared | Read progression without touching `GetPlayerData` directly. |
-| `Arcana.HasSpellUnlocked(ply, spellId)` | shared | Whether the player knows a spell. |
-| `Arcana.RecalculateAndRepairKnowledgePoints(ply)` | server | Recomputes KP from level and known spells, overwrites the stored value, saves and syncs. Returns the corrected amount. Intended as an admin repair tool after external edits to player data. |
-| `Arcana.StartTutorialSequence(sequence)` | client | Starts a tutorial sequence. |
-| `Arcana.IsTutorialActive()` | client | Whether a sequence is currently running, for suppressing your own UI. |
+| `Arcana.GetLevel(ply)` / `GetXP(ply)` / `GetKnowledgePoints(ply)` | shared | |
+| `Arcana.HasSpellUnlocked(ply, spellId)` | shared | |
+| `Arcana.RecalculateAndRepairKnowledgePoints(ply)` | server | Recomputes KP from level and known spells, saves and syncs. Admin repair tool. |
+| `Arcana.StartTutorialSequence(sequence)` | client | |
+| `Arcana.IsTutorialActive()` | client | For suppressing your own UI. |
 
-### Voice activation
-
-`Arcana.RegisterSpell` adds a trigger phrase for the spell name automatically on the client.
-Use `Arcana.AddTriggerPhrase(phrase, spellId)` for extra phrases and
-`Arcana.RemoveTriggerPhrase(phrase)` to drop one, for example when unregistering a spell.
+Voice activation: `Arcana.RegisterSpell` registers a trigger phrase for the spell name.
+`Arcana.AddTriggerPhrase(phrase, spellId)` and `Arcana.RemoveTriggerPhrase(phrase)` manage extras.
 
 ### Registering an Environment
 
@@ -194,18 +191,17 @@ Arcana.Environments:RegisterEnvironment({
 
 ### Extending the Spellcraft Catalog
 
-Spellcraft lets players author their own spells from components at the spellcrafting bench.
-A crafted spell is stored as component **ids only**, never numbers. The server recompiles
-every stat, cost, and offering from the catalog on load, so a modified client can inject ids
-at worst, and a balance change here applies retroactively to every crafted spell that exists.
+Crafted spells are stored as component ids only, never numbers. The server recompiles every
+stat and cost from the catalog on load, so a modified client can inject ids at worst, and a
+balance change applies retroactively.
 
 Components live in three tables in `lua/arcana/spellcraft/catalog.lua`. Adding an entry is
-enough to make it appear in the bench UI, be priced, and be castable.
+enough to make it appear in the bench, be priced, and be castable.
 
 ```lua
 local P = Arcana.Spellcraft
 
--- A Form is the delivery shape. Exactly one per spell.
+-- Form: the delivery shape. One per spell.
 P.Forms.wave = {
     id = "wave", label = "Wave", order = 5, points = 25,
     desc = "A spreading front that washes outward from you.",
@@ -214,39 +210,36 @@ P.Forms.wave = {
     baseCooldown = 7, baseCastTime = 1.0,
 }
 
--- An Essence is the element. Exactly one per spell, unlocked with a one-time offering.
+-- Essence: the element. One per spell, unlocked with a one-time offering.
 P.Essences.acid = {
     id = "acid", label = "Acid", order = 7, points = 8,
     desc = "Corrodes victims over time.",
-    rider = "corrode",                      -- effect id handled in effects.lua
+    rider = "corrode",                      -- needs a handler in effects.lua
     damageType = bit.bor(DMG_ACID, DMG_BLAST),
     color = Color(140, 220, 60),
     unlock = { coins = 20000, shards = 5 },
 }
 
--- A Clause is a modifier. Up to P.MAX_CLAUSE_SLOTS per spell, each with a rank.
+-- Clause: a modifier. Up to P.MAX_CLAUSE_SLOTS per spell, each with a rank.
 P.Clauses.linger = {
     id = "linger", label = "Linger", order = 20, points = 12,
     desc = "The effect persists for +3s per rank.",
     maxRank = 2,
-    levels = { 44, 49 },                    -- Arcana level required for each rank
+    levels = { 44, 49 },                    -- level required per rank
     onlyForm = { aoe = true },              -- optional whitelist
     denyForm = { self = true },             -- optional blacklist
     denyEssence = { fire = true },
-    conflicts = { widen = true },           -- mutually exclusive with these clauses
+    conflicts = { widen = true },
 }
 ```
 
-`points` is the power budget cost. A player's budget is `arcana_spellcraft_budget_base` plus
-`arcana_spellcraft_budget_per_level` per level above `arcana_spellcraft_min_level`, so points
-are the primary balance lever. New `rider` values need a matching handler in
-`lua/arcana/spellcraft/effects.lua`.
+`points` is the power budget cost and the main balance lever. Budget is
+`arcana_spellcraft_budget_base` plus `arcana_spellcraft_budget_per_level` per level above
+`arcana_spellcraft_min_level`.
 
-Server operators tune the system with replicated convars (`arcana_spellcraft_enabled`,
-`arcana_spellcraft_max_damage`, `arcana_spellcraft_max_radius`, `arcana_spellcraft_max_projectiles`,
-`arcana_spellcraft_min_cooldown`, `arcana_spellcraft_min_casttime`, `arcana_spellcraft_max_range`,
-`arcana_spellcraft_cost_mult`, `arcana_spellcraft_offering_mult`, `arcana_spellcraft_max_slots`).
-The caps are enforced inside `P.Compile`, so they hold regardless of what components exist.
+Operators also get `arcana_spellcraft_enabled`, `_max_damage`, `_max_radius`,
+`_max_projectiles`, `_min_cooldown`, `_min_casttime`, `_max_range`, `_cost_mult`,
+`_offering_mult` and `_max_slots`. Caps are enforced in `P.Compile`.
 
 ## Hooks
 
@@ -291,14 +284,14 @@ The caps are enforced inside `P.Compile`, so they hold regardless of what compon
 
 | Hook | Realm | Parameters | Notes |
 |---|---|---|---|
-| `Arcana_SavePlayerDataToSQL` | Server | `ply, data, authoritative` | Return `true` to suppress the default SQLite save. `authoritative` marks a save allowed to overwrite a newer stored row |
-| `Arcana_LoadPlayerDataFromSQL` | Server | `ply, callback` | Return `true` to suppress the default SQLite load; you must then call `callback(success, data)` on every path, failure included |
+| `Arcana_SavePlayerDataToSQL` | Server | `ply, data, authoritative` | Return `true` to suppress the default SQLite save. `authoritative` may overwrite a newer stored row |
+| `Arcana_LoadPlayerDataFromSQL` | Server | `ply, callback` | Return `true` to suppress the default SQLite load. Must call `callback(success, data)` on every path, failure included |
 | `Arcana_SavedPlayerData` | Server | `ply, data` | Fired after player data is saved (any backend) |
 | `Arcana_LoadedPlayerData` | Server | `ply, data` | Fired after player data is loaded and ready |
 | `Arcana_SyncPlayerData` | Client | `ply, data` | Fired after the client receives a full data sync from the server |
-| `Arcana_ReadAstralVault` | Server | `ply, callback` | Return `true` to suppress the default vault read; you must then call `callback(success, items)` on every path, failure included |
+| `Arcana_ReadAstralVault` | Server | `ply, callback` | Return `true` to suppress the default vault read. Must call `callback(success, items)` on every path |
 | `Arcana_WriteAstralVault` | Server | `ply, items` | Return `true` to suppress the default vault write |
-| `Arcana_ReadSpellcraftState` | Server | `ply, callback` | Return `true` to suppress the default spellcraft read; you must then call `callback(success, state)` on every path, failure included |
+| `Arcana_ReadSpellcraftState` | Server | `ply, callback` | Return `true` to suppress the default spellcraft read. Must call `callback(success, state)` on every path |
 | `Arcana_WriteSpellcraftState` | Server | `ply, state` | Return `true` to suppress the default spellcraft write |
 
 ### Economy & Inventory
@@ -325,8 +318,8 @@ Core constants are defined in `lua/arcana/system/core.lua` under `Arcana.Config`
 | `DEFAULT_SPELL_COOLDOWN` | `1.0` | Fallback cooldown if none is specified |
 | `RITUAL_CASTING_TIME` | `10.0` | Default ritual casting time in seconds |
 | `FORGET_COIN_BASE` | `2000` | Coin base for the forget price: `FORGET_COIN_BASE × knowledge_cost ^ FORGET_COIN_EXPONENT` |
-| `FORGET_COIN_EXPONENT` | `1.3` | Superlinear exponent, so undoing an expensive ritual costs far more than a cantrip |
+| `FORGET_COIN_EXPONENT` | `1.3` | Superlinear, so undoing an expensive ritual costs far more than a cantrip |
 | `FORGET_SHARDS_PER_KP` | `2` | Crystal shards charged per knowledge point refunded |
-| `FORGET_GRACE_PERIOD` | `300` | Seconds after learning during which forgetting is free (misclick undo, not a refund policy) |
+| `FORGET_GRACE_PERIOD` | `300` | Seconds after learning during which forgetting is free |
 
 Astral Vault costs are configured in `lua/arcana/astral_vault/config.lua`. Mana crystal growth, hotspot decay, and corruption escalation parameters are in `lua/arcana/system/mana_crystals.lua`.

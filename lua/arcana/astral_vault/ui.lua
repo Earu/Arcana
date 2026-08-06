@@ -1,4 +1,4 @@
--- Astral Vault UI — client-side panel, slot cards, galaxy background renderer.
+-- Astral Vault UI: client-side panel, slot cards, galaxy background renderer.
 -- Server-side persistence, SQL schema, and net.Receive handlers live in vault.lua.
 if not CLIENT then return end
 
@@ -247,7 +247,7 @@ local function openVault(items)
 
 	-- Below the model: the weapon class as a fancy centered heading with
 	-- flanking strokes, a wide diamond divider, then the enchantments as
-	-- tarot captions — a pale-gold numeral over the name in small caps,
+	-- tarot captions: a pale-gold numeral over the name in small caps,
 	-- slim diamond dividers between them.
 	local ROMAN = {"I", "II", "III", "IV", "V"}
 	local COLOR_SEP = Color(160, 130, 60, 180)
@@ -460,7 +460,7 @@ local function openVault(items)
 	end
 
 	-- Tarot-style luxury frame: gold outline, an inner brass frame, and
-	-- gilded corners — the band between the outlines filled at the corner
+	-- gilded corners: the band between the outlines filled at the corner
 	-- cut, extended by a wing along each edge that tapers with a slant
 	-- toward the outer outline.
 	local TAROT_CORNER_MIRRORS = {{0, 0}, {1, 0}, {1, 1}, {0, 1}}

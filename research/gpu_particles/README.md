@@ -48,7 +48,7 @@ For every vertex the shader:
 6. Interpolates alpha between `startAlpha` and `endAlpha`, also modulated by the same sine fade curve
 
 Shader constants (time, lifetime, sizes, alphas) are passed to the vertex shader through the
-**ambient cube registers** (`cAmbientCubeX`, slots 0–1) via `render.SetModelLighting`, a workaround
+**ambient cube registers** (`cAmbientCubeX`, slots 0-1) via `render.SetModelLighting`, a workaround
 needed because Garry's Mod provides no direct mechanism to set custom vertex shader float constants
 from Lua. A hidden zero-scale clientside model is drawn each frame solely to force the engine to
 commit the lighting constants before the mesh draw call.

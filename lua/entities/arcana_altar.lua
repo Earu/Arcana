@@ -725,7 +725,7 @@ if CLIENT then
 		local t = CurTime()
 
 		-- Three pattern rings spinning in the bottom-right corner at different
-		-- speeds and directions — the altar's own motif, not a full magic circle.
+		-- speeds and directions: the altar's own motif, not a full magic circle.
 		local base = math.min(ww, hh)
 		local dim = Color(226, 200, 132)
 		Arcana.Circle.Draw2DPatternRing(2, x + ww * 0.94, y + hh * 0.96, base * 0.36, t * 3, dim, 140)
@@ -792,7 +792,7 @@ if CLIENT then
 			draw.SimpleText(cost .. " KP", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, enabled and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
-		-- Forget buttons echo the unlock button's shape — label above, price below — so
+		-- Forget buttons echo the unlock button's shape: label above, price below, so
 		-- the two tabs read as one station. A spell still inside its grace window is
 		-- free, and says so in green rather than quoting a price.
 		local BTN_FREE = Color(150, 214, 140, 255)

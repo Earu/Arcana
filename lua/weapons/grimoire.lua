@@ -123,7 +123,7 @@ end
 -- An NPC given a grimoire becomes an Arcana mage: Arcana.NPC rolls its elemental
 -- speciality, generates its spellbook out of the spellcraft catalog, and drives the
 -- casting from its own think loop. The engine-facing plumbing here only shapes the
--- NPC's posture — advertising a ranged attack so the AI keeps its distance and faces
+-- NPC's posture: advertising a ranged attack so the AI keeps its distance and faces
 -- its enemy instead of closing in to club it.
 
 local function isNPCOwner(ent)
@@ -276,7 +276,7 @@ end
 function SWEP:Think()
 end
 
--- Viewmodel offset table – tune these to taste in-game.
+-- Viewmodel offset table: tune these to taste in-game.
 -- pos: forward / right / up offset from the eye origin (world units).
 -- ang: pitch / yaw / roll applied after the base eye angle.
 -- scale: uniform scale applied to the viewmodel entity.
@@ -331,7 +331,7 @@ SWEP.WorldModelOffset = {
 -- "anim_attachment_RH" is nothing but a fixed transform of the right hand bone: measured
 -- identical to five decimals on every ValveBiped playermodel that ships it (kleiner, male_07,
 -- alyx, combine_soldier). Plenty of custom playermodels omit the attachment entirely though,
--- so reading it directly meant those models anchored on the raw bone instead — a frame rolled
+-- so reading it directly meant those models anchored on the raw bone instead, a frame rolled
 -- a half turn away from the one WorldModelOffset is tuned against, which is what made the book
 -- sit at the wrong angle on them. Rebuilding the attachment from the bone gives every
 -- playermodel the same convention whether or not the attachment exists.

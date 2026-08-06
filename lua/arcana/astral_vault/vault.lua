@@ -1,4 +1,4 @@
--- Astral Vault — server-side persistence, SQL schema, and net.Receive handlers.
+-- Astral Vault: server-side persistence, SQL schema, and net.Receive handlers.
 -- Client UI (panels, galaxy background, slot cards) lives in ui.lua.
 local Arcana = _G.Arcana or {}
 

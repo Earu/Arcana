@@ -1,4 +1,4 @@
--- Quickslot Network — Server-side handlers for player quickslot assignment
+-- Quickslot Network: Server-side handlers for player quickslot assignment
 -- and selection, with debounced SQL saves to prevent write spam.
 -- Extracted from core.lua to isolate the quickslot networking concern.
 

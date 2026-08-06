@@ -1,4 +1,4 @@
--- Arcana XP & Leveling — XP accumulation, level-up logic, and spell unlocking.
+-- Arcana XP & Leveling: XP accumulation, level-up logic, and spell unlocking.
 -- Depends on: Arcana.Config, Arcana.RegisteredSpells, Arcana.GetPlayerData,
 --             Arcana.SavePlayerData, Arcana.SyncPlayerData, Arcana.RunHook
 
@@ -131,7 +131,7 @@ function Arcana.UnlockSpell(ply, spellId, force)
 	data.unlocked_spells[spellId] = true
 
 	-- Stamp the learn time so the altar can offer a brief free undo (see IsForgetFree).
-	-- Forced grants — divine pacts, the starter spell — cost nothing and are not
+	-- Forced grants: divine pacts, the starter spell, cost nothing and are not
 	-- undoable, so they are deliberately left unstamped.
 	if not force then
 		data.unlock_times = data.unlock_times or {}
@@ -163,7 +163,7 @@ end
 -- ============================================================================
 -- Forgetting is the inverse of unlocking. Because KP is derived rather than stored
 -- (see CalculateExpectedKnowledgePoints), removing a spell from unlocked_spells IS
--- the refund — no arithmetic, no drift. The price is therefore paid in coins and
+-- the refund: no arithmetic, no drift. The price is therefore paid in coins and
 -- mana crystal shards, the resources a mid-game player is actually short of.
 
 Arcana.FORGET_ITEM = "mana_crystal_shard"

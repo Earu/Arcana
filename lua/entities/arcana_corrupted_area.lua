@@ -745,7 +745,7 @@ if CLIENT then
 				-- projection via ToScreen probes: for a point at fwd + right,
 				-- the ray model gives ndcX = 1 / halfW (and likewise up/halfH),
 				-- so measuring where the engine actually projects it yields
-				-- exact half-tangents — immune to fov/aspect conventions.
+				-- exact half-tangents: immune to fov/aspect conventions.
 				local probeR = (origin + (fwd + right) * 512):ToScreen()
 				local probeU = (origin + (fwd + up) * 512):ToScreen()
 				local ndcR = (probeR.x / ScrW()) * 2 - 1

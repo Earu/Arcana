@@ -113,7 +113,7 @@ local function isHeldActive(wep)
 end
 
 -- Some SWEPs (hl2m-style packs) draw their weapon mesh as a throwaway
--- ClientsideModel every frame — created, positioned, drawn and removed inside
+-- ClientsideModel every frame: created, positioned, drawn and removed inside
 -- SWEP:PostDrawViewModel, which runs AFTER all PostDrawViewModel hooks. The mesh
 -- is never queryable when we run, so detour Entity.DrawModel (only ever invoked
 -- by Lua-side manual draws) to record where such meshes get drawn; eval reads the
@@ -123,7 +123,7 @@ end
 Arcana._VMDrawnModels = Arcana._VMDrawnModels or {}
 -- Recording logic lives in a global reassigned on every reload so the
 -- once-installed metatable detour always runs the newest version. Two capture
--- gates: _VMDrawCaptureFrame (viewmodel pass, armed same-frame — that works
+-- gates: _VMDrawCaptureFrame (viewmodel pass, armed same-frame, that works
 -- because the SWEP's own vm draws run later in the SAME pass) and
 -- _WMCaptureUntil, a rolling RealTime window for the world pass. Frame-number
 -- arming does NOT work there: FrameNumber() as read from render hooks never
@@ -147,7 +147,7 @@ if CLIENT and not Arcana._DrawModelDetoured then
 end
 
 -- Most recent drawn-model record near a viewmodel position (raw vm space on both
--- sides — these packs position their ents from vm bone matrices). Records whose
+-- sides: these packs position their ents from vm bone matrices). Records whose
 -- model matches the weapon's WorldModel win: that's the prop such SWEPs paint.
 -- excludeEnt filters out the weapon entity itself: a SWEP whose DrawWorldModel
 -- just draws the entity produces a record at the entity origin, not at the mesh.
@@ -581,7 +581,7 @@ local function getMeleeBladeSlide(vm, fromPos, bladeDir)
 		if d > maxExt then maxExt = d end
 	end
 	if maxExt <= 2 then return 8 end
-	-- Arms inflate the bounds, so the factor usually saturates the max — keep it
+	-- Arms inflate the bounds, so the factor usually saturates the max, keep it
 	-- short-blade sized: everything long resolves via hitboxes or drawn records
 	return math.Clamp(maxExt * 0.6, 4, 10)
 end
@@ -698,7 +698,7 @@ local function isBodyBoneName(name)
 end
 
 -- Dominant axis of a local-space AABB: center, unit axis (signed towards the
--- centroid — the heavy side is the blade on melee), length, elongation, and the
+-- centroid: the heavy side is the blade on melee), length, elongation, and the
 -- two cross-section extents perpendicular to the dominant axis
 local function dominantAxisOfBox(mins, maxs)
 	local size = maxs - mins
@@ -716,7 +716,7 @@ local function dominantAxisOfBox(mins, maxs)
 end
 
 -- Weapon meshes rigidly skinned to bones get hitboxes that tightly wrap them.
--- A long hitbox on the anchor bone (or a child of it — gun barrels live on slide
+-- A long hitbox on the anchor bone (or a child of it, gun barrels live on slide
 -- bones) beats every heuristic: it yields the blade axis and the mesh centerline
 -- (bones often sit off it). The most elongated qualifying box wins: a thin barrel
 -- box describes the weapon line better than a chunky frame-plus-grip box.
@@ -747,7 +747,7 @@ end
 
 -- Synthetic per-bone hitbox measured from the model's own vertices, for rigs
 -- that ship no usable hitboxes (CS:S knives). Verts weighted to a bone, taken
--- in that bone's bind-pose space, bound exactly the geometry that bone drives —
+-- in that bone's bind-pose space, bound exactly the geometry that bone drives,
 -- including depth lean the hand-bone axes can't express. One-time per model,
 -- then evaluated like a real hitbox on the live bone matrix.
 local meshBladeCache = {}
@@ -816,8 +816,8 @@ local function getBladeFromMesh(vm, anchorBoneId, minLen, excludeBody)
 	for _, c in ipairs(cands) do
 		-- Near-tied elongations (a balisong's blade vs its handles): a bone
 		-- literally named after the blade wins outright; otherwise resolve by
-		-- hierarchy — moving parts (handles, slides) hang off the main body
-		-- bone, which carries the blade — preferring the shallowest cluster
+		-- hierarchy: moving parts (handles, slides) hang off the main body
+		-- bone, which carries the blade, preferring the shallowest cluster
 		if c.len >= minLen and c.aspect >= bestAspect * 0.8 then
 			local lname = (vm:GetBoneName(c.bone) or ""):lower()
 			local isBlade = lname:find("blade", 1, true) ~= nil or lname:find("tip", 1, true) ~= nil
@@ -841,7 +841,7 @@ end
 -- Held (third-person) weapon geometry
 --
 -- Bonemerged world models expose live bone matrices, their own hitbox sets and
--- mesh data, but the entity's angles are just the owner's yaw — so placement
+-- mesh data, but the entity's angles are just the owner's yaw, so placement
 -- must come from per-bone geometry, never from OBB axes. Resolve a bone-local
 -- box once per model (shipped hitboxes first, mesh vertices as fallback) and
 -- evaluate it per frame on the live bone matrix.
@@ -858,7 +858,7 @@ local function resolveHeldWeaponGeometry(wep)
 	-- excludeBody first: c_models carry arm/hand bones in the world mesh. But most
 	-- w_ models hang their entire mesh off a bone literally named
 	-- ValveBiped.Bip01_R_Hand (that's how bonemerge attaches them), so when the
-	-- body filter leaves nothing, retry without it — there are no real arms in
+	-- body filter leaves nothing, retry without it, there are no real arms in
 	-- that case, the "hand" bone IS the weapon.
 	local center, axis, len, bone, crossR, mins, maxs = getBladeHitbox(wep, nil, 8, true)
 	local source = "hitbox"
@@ -898,7 +898,7 @@ local function resolveHeldWeaponGeometry(wep)
 end
 
 -- Muzzle attachment id for axis refinement: only attachments literally named
--- after the muzzle — numeric ones ("1") can point sideways (shell ejects etc.)
+-- after the muzzle: numeric ones ("1") can point sideways (shell ejects etc.)
 local MUZZLE_AXIS_ATTACHMENTS = {"muzzle", "muzzle_flash", "muzzle_flash1", "muzzle_end"}
 local function getMuzzleAxisAttachmentId(wep)
 	if not (wep.LookupAttachment and wep.GetAttachment) then return nil end
@@ -919,7 +919,7 @@ local function evalWeaponGeometry(wep, st, owner, isMelee)
 	-- ClientsideModel at the hand while the entity's own bones sit stale near
 	-- the player origin (TF2 c_models: their weapon_bone has no ValveBiped
 	-- counterpart to bonemerge to). A drawn-model record of the WorldModel near
-	-- the gripping hand IS the mesh on screen — trust it over the entity bones.
+	-- the gripping hand IS the mesh on screen: trust it over the entity bones.
 	-- Records of the weapon entity itself are excluded: those sit at the entity
 	-- origin, and entity bones are the better source there.
 	if isfunction(wep.DrawWorldModel) and IsValid(owner) then
@@ -958,7 +958,7 @@ local function evalWeaponGeometry(wep, st, owner, isMelee)
 
 	local geo = st.geo
 	-- Always SetupBones: idle bonemerged weapons serve stale (even bind-pose)
-	-- matrices until something forces a recompute — movement used to "fix" the
+	-- matrices until something forces a recompute: movement used to "fix" the
 	-- rings for exactly that reason. The engine no-ops it when already set up.
 	wep:SetupBones()
 	local m = wep:GetBoneMatrix(geo.bone)
@@ -1014,9 +1014,9 @@ local function evalWeaponGeometry(wep, st, owner, isMelee)
 		-- Refine axis and centerline via the muzzle attachment. Its direction is
 		-- only trusted when it broadly agrees with the mesh principal axis:
 		-- HL2 attachments track the barrel exactly (measured up to 7.2 deg from
-		-- PCA on w_shotgun — stock/pump mass tilts PCA), while hl1 pack
+		-- PCA on w_shotgun: stock/pump mass tilts PCA), while hl1 pack
 		-- attachments can point ~11.5 deg off the tube (weapon_hl1_rpg), so the
-		-- gate sits between at ~9 deg. Its POSITION is trusted either way — the
+		-- gate sits between at ~9 deg. Its POSITION is trusted either way, the
 		-- box centerline averages in the stock/grip and sits off the barrel, so
 		-- slide the ring center sideways onto the barrel line through the
 		-- muzzle, keeping its station along the axis.
@@ -1091,7 +1091,7 @@ local function evalVMAnchor(vm, wep, anchor, style, eyePos, eyeAng)
 		-- SWEPs with their own PostDrawViewModel may paint a replacement weapon
 		-- mesh over a hidden vm one (hl2m-style packs). Arm the drawn-model capture
 		-- and, when a record of the weapon's WorldModel shows up near the anchor,
-		-- trust it over anything the vm itself can tell us — it's the exact mesh on
+		-- trust it over anything the vm itself can tell us: it's the exact mesh on
 		-- screen. Packs whose PostDrawViewModel does something else (HL1's zoom
 		-- overlays) never produce a matching record and fall through.
 		Arcana._VMDrawCaptureFrame = FrameNumber()
@@ -1119,7 +1119,7 @@ local function evalVMAnchor(vm, wep, anchor, style, eyePos, eyeAng)
 			anchor.hbChecked = true
 			-- Melee/dual weapons hang off the anchor bone, so search its subtree.
 			-- Other bone-anchored guns (models without attachments) can carry the
-			-- weapon on any bone — search them all, but with the stricter length
+			-- weapon on any bone: search them all, but with the stricter length
 			-- gate so limb/fist boxes never qualify.
 			local searchRoot = (isMelee or style == "dual") and anchor.id or nil
 			local minLen = (searchRoot == nil or isHandBoneName(anchor.name)) and 12 or 8
@@ -1129,7 +1129,7 @@ local function evalVMAnchor(vm, wep, anchor, style, eyePos, eyeAng)
 				anchor.hbCenter, anchor.hbAxis, anchor.hbLen, anchor.hbBone = getBladeFromMesh(vm, searchRoot, minLen)
 			end
 			-- Melee weapons can hang off a root-level weapon bone entirely outside
-			-- the hand's subtree (TF2's weapon_bone) — widen to the whole rig,
+			-- the hand's subtree (TF2's weapon_bone): widen to the whole rig,
 			-- keeping body-part bones out by name so forearm boxes can't win
 			-- (which also lets the length gate drop low enough for short blades).
 			-- Dual stays subtree-only: each side must find its own gun.
@@ -1166,7 +1166,7 @@ local function evalVMAnchor(vm, wep, anchor, style, eyePos, eyeAng)
 	elseif isMelee and anchor.kind == "bone" and isHandBoneName(anchor.name) and rawAng and style ~= "orbital" then
 		-- The weapon mesh hangs off the hand bone (c_ arm models carry no weapon
 		-- bones), so derive the blade direction from the hand bone itself and follow
-		-- it on the live matrix each frame — render-bounds directions are pose-
+		-- it on the live matrix each frame: render-bounds directions are pose-
 		-- dependent (sequence bboxes swing around) and point off-model on some idles.
 		if not anchor.bladeAxis then
 			if anchor.name:find("ValveBiped", 1, true) then
@@ -1238,7 +1238,7 @@ end
 
 --- Populates `bc` with band rings for the given style.
 -- @param bc BandCircle instance to add rings to
--- @param ringCount number of rings (1–3)
+-- @param ringCount number of rings (1-3)
 -- @param style "orbital" or "axis"
 -- @param p table of style-specific scalars:
 --   orbital: { base, heightscale, zBiasStep }
@@ -1288,7 +1288,7 @@ local function buildBandsForEntity(wep, count, style, held, isMelee, col)
 	style = style or "axis"
 
 	-- Axis-style weapons with resolvable model geometry get geometry-driven
-	-- bands (held AND world/dropped — bones follow the entity transform either
+	-- bands (held AND world/dropped, bones follow the entity transform either
 	-- way): the follow hook positions/orients them on the live bone matrix each
 	-- frame. Melee also takes radii and per-ring stations from the geometry (one
 	-- ring on the handle, the rest along the blade); guns keep the OBB-extent
@@ -1504,7 +1504,7 @@ local function rescanWeapons()
 end
 
 -- Positions and orients a state's rings for this frame. owner is the weapon's
--- carrier, or NULL for a weapon lying in the world — and for UI previews, which
+-- carrier, or NULL for a weapon lying in the world, and for UI previews, which
 -- take exactly the dropped-weapon path this way. isMelee/colorOverride are
 -- explicit for the same reason buildBandsForEntity takes them.
 local function updateBandPlacement(wep, st, owner, isMelee, colorOverride)
@@ -1548,7 +1548,7 @@ local function updateBandPlacement(wep, st, owner, isMelee, colorOverride)
 		if rp then pos = rp + aim * fwdOff end
 		if lp then st.bcL.position = lp + aim * fwdOff end
 		-- The generic builder rolls against the eye FORWARD, which is parallel
-		-- to this ring's normal (the aim) and therefore degenerate — the rings
+		-- to this ring's normal (the aim) and therefore degenerate, the rings
 		-- spin wildly on look. Roll against the eye right instead.
 		angOverride = anglesFromUpRight(aim, owner:EyeAngles():Right())
 	elseif IsValid(owner) and isHeldActive(wep) and isRifleHoldType(wep) then
@@ -1898,7 +1898,7 @@ hook.Add("PostDrawViewModel", "Arcana_EnchantVFX_ViewModel", function(vm, ply, w
 	if isfunction(wep.PostDrawViewModel) then
 		-- The gamemode calls SWEP:PostDrawViewModel AFTER every hook; packs that
 		-- paint their weapon mesh there (TF2, hl2m-style) would cover rings drawn
-		-- now. Wrap the SWEP fn once per weapon so the rings draw right after it —
+		-- now. Wrap the SWEP fn once per weapon so the rings draw right after it,
 		-- which also puts that mesh's depth in the buffer, so they wrap it too.
 		if not wep._ArcanaVMRingWrap then
 			wep._ArcanaVMRingWrap = true

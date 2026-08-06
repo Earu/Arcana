@@ -1,15 +1,15 @@
--- Arcana Spawnmenu Icon Exporter — developer one-shot tool.
+-- Arcana Spawnmenu Icon Exporter: developer one-shot tool.
 -- Renders every spawnable Arcana entity to a framed spawnicon PNG in the DATA folder.
 --
 -- WHY THIS IS NOT AN OFFSCREEN RENDER TARGET:
 -- The obvious approach is PushRenderTarget + cam.Start3D + ent:Draw(). It does not work here.
 -- ParticleEmitter and DynamicLight only ever render in the main scene pass, and Arcana's bloom
--- (arcana/system/vfx/bloom.lua) isolates its glow by diffing framebuffer snapshots — all three
+-- (arcana/system/vfx/bloom.lua) isolates its glow by diffing framebuffer snapshots, all three
 -- vanish in an offscreen pass, which is most of what makes a brazier or a fae lantern readable.
 -- So the icon IS a real engine frame: the world is erased out from under the subject and our own
 -- backdrop is painted in its place, then the finished frame is captured.
 --
--- Usage — load in BOTH realms, then set up before exporting:
+-- Usage: load in BOTH realms, then set up before exporting:
 --   lua_openscript    arcana/tools/export_spawnicons.lua   -- server half: staging
 --   lua_openscript_cl arcana/tools/export_spawnicons.lua   -- client half: rig + capture
 --   arcana_spawnicon_setup                                 -- (server) stage every subject
@@ -51,7 +51,7 @@ local KEEP_RADIUS = 400
 local STAGE_WAIT = 1.2
 
 -- A shot lasts a fraction of a second. If the rig is still armed after this long, something went
--- wrong between arming and disarming — a map change mid-batch, an error, a queue left orphaned —
+-- wrong between arming and disarming: a map change mid-batch, an error, a queue left orphaned,
 -- and an armed rig is not a harmless state: it paints over the world, holds the view, and leaves
 -- every entity it hid invisible. The watchdog is what stops that becoming a game you have to
 -- restart. Anything not recoverable this way is what arcana_spawnicon_reset is for.
@@ -80,14 +80,14 @@ local STUDIO_LIGHT = {
 -- Per-entity config, shared by both realms.
 --
 -- `dir` is where the camera sits, in the SUBJECT'S OWN space: x forward, y right, z up. World-space
--- directions would shoot each entity from whatever way it happened to be facing — which is how the
+-- directions would shoot each entity from whatever way it happened to be facing, which is how the
 -- emissary ended up photographed from behind.
 --
 -- `pad` is the slack around the subject, `radius` overrides the fit where the mesh does not cover
 -- the visuals, and `settle` is how long the entity runs before the shot so emitters have particles
 -- and fade-ins have finished. `stage` runs serverside to put the entity in the state worth
--- photographing, `suppress` names draw methods to stub out for the shot — set dressing that reads
--- as clutter once it is cropped to a 64px tile — and `preDraw` runs every frame just before the
+-- photographing, `suppress` names draw methods to stub out for the shot, set dressing that reads
+-- as clutter once it is cropped to a 64px tile: and `preDraw` runs every frame just before the
 -- translucent pass, for effects that are inline in DrawTranslucent and so cannot be stubbed by
 -- name; the entity's Think refills their state each frame, hence per-frame rather than on arm.
 local EMBER = Color(255, 160, 50)
@@ -128,7 +128,7 @@ local TARGETS = {
 		-- GetEmissaryIsOpen drives; the client eases _grimFrac / _tearFrac to 1 over a few seconds.
 		stage = function(ent) ent:SetEmissaryIsOpen(true) end,
 		-- The ceremony also rings the bench with eight bookshelves and tears the floor open under
-		-- it. Both are set dressing that swallows the bench at icon size — and the shelf ring is
+		-- it. Both are set dressing that swallows the bench at icon size, and the shelf ring is
 		-- what forced the camera outside it in the first place. Drop them and the subject is just
 		-- the bench, framed on its own mesh.
 		suppress = {"_DrawShelves", "_DrawAbyssCap", "_DrawTearShape"},
@@ -138,7 +138,7 @@ local TARGETS = {
 		--
 		-- _grimFrac drives both the grimoire's lift off the bench and its aura, and zeroing it
 		-- sets the book back down and hides the aura. The bench runes survive because their
-		-- brightness is max(_grimFrac, _tearFrac) and the tear is still open — just not drawn.
+		-- brightness is max(_grimFrac, _tearFrac) and the tear is still open, just not drawn.
 		preDraw = function(ent)
 			ent._runes = {}
 			ent._grimFrac = 0
@@ -158,7 +158,7 @@ local TARGETS = {
 		end,
 	},
 	{
-		-- Stood upright with the cover square to the lens — the emblem pose. Pitch +90, not -90:
+		-- Stood upright with the cover square to the lens: the emblem pose. Pitch +90, not -90:
 		-- the model's +x axis is the BOTTOM of the cover art, so -90 stands it on its head. With
 		-- the pitch flipped, +up is the side the sigil cover faces. camRoll does the 180 the
 		-- entity pose cannot (see computeView).
@@ -177,7 +177,7 @@ end
 if SERVER then
 	-- Exactly one subject exists in the world at a time. Staging the whole set at once and relying
 	-- on distance to keep them apart does not work: SetNoDraw only stops an entity drawing ITSELF,
-	-- and Arcana's biggest effects are drawn by global systems that never consult it — the mana
+	-- and Arcana's biggest effects are drawn by global systems that never consult it, the mana
 	-- network's glyph flows render anything within 2000 units of the eye, and magic circles are
 	-- drawn by the circle system for every registered circle. Those leaked a neighbour's runes and
 	-- band circles into the altar, enchanter and emissary shots.
@@ -284,7 +284,7 @@ if SERVER then
 				-- Everything is frozen for the shot. Live physics has no upside for a still frame
 				-- and two demonstrated downsides: the grimoire tumbled through the floor, and the
 				-- brazier's float controller death-spiraled to z -15000 ("Crazy origin ...
-				-- Removing!") — its PhysicsSimulate traces down 1000 units for ground, and one
+				-- Removing!"): its PhysicsSimulate traces down 1000 units for ground, and one
 				-- missed trace turns the float target into currentPos - 752, forever.
 				local phys = ent:GetPhysicsObject()
 
@@ -302,7 +302,7 @@ if SERVER then
 				MsgC(Color(120, 230, 120), "[ArcanaIcons] Staged " .. t.class .. "\n")
 			end
 
-			MsgC(Color(180, 255, 180), "[ArcanaIcons] Staging done — run arcana_export_spawnicons on the client.\n")
+			MsgC(Color(180, 255, 180), "[ArcanaIcons] Staging done, run arcana_export_spawnicons on the client.\n")
 		end)
 	end)
 
@@ -362,7 +362,7 @@ end
 
 -- Diagonal stroke as a filled quad, same half-thickness end extension. Minus side first: with
 -- screen-space y pointing down this walks the quad clockwise, which is the winding DrawPoly
--- renders — the mirror order gets culled.
+-- renders: the mirror order gets culled.
 local function slantBar(x1, y1, x2, y2, t)
 	local dx, dy = x2 - x1, y2 - y1
 	local len = math.sqrt(dx * dx + dy * dy)
@@ -384,7 +384,7 @@ local function slantBar(x1, y1, x2, y2, t)
 	})
 end
 
--- Closed outline of a square with 45 degree cut corners — the ArtDeco.DrawDecoFrame octagon, so
+-- Closed outline of a square with 45 degree cut corners: the ArtDeco.DrawDecoFrame octagon, so
 -- the icons speak the addon's dialect. Each corner is the two-point cut mirrored into its
 -- quadrant; the two singly-mirrored ones are walked backwards so the path stays continuous.
 local function octagonPath(x, y, s, c)
@@ -518,7 +518,7 @@ local function paintBackdrop(x, y, w, h, s)
 
 	local cx, cy = x + w * 0.5, y + h * 0.5
 
-	-- Warm core bloom behind wherever the subject sits — the only thing lifting the middle off
+	-- Warm core bloom behind wherever the subject sits: the only thing lifting the middle off
 	-- black; the subject is the hero, the backdrop just has to seat it.
 	surface.SetMaterial(MAT_GLOW)
 	surface.SetDrawColor(COL_GOLD.r, COL_GOLD.g, COL_GOLD.b, 46)
@@ -542,7 +542,7 @@ end
 -- It is baked into a render target rather than drawn straight into the scene: the opaque pass runs
 -- with alpha blending OFF, so a 2D draw there ignores its alpha entirely and every faint layer
 -- comes out solid gold. Baking it where blending behaves and blitting the result opaquely is both
--- correct and cheaper — the backdrop never changes between icons.
+-- correct and cheaper: the backdrop never changes between icons.
 
 local MAT_GRAD_UP   = Material("gui/gradient_up")
 local MAT_GRAD_DOWN = Material("gui/gradient_down")
@@ -620,7 +620,7 @@ end
 
 -- Yaw-invariant framing, same radius rule as ArtDeco.FitModelPanel: the model's XY diagonal or its
 -- height, whichever is larger, so nothing pops in or out as the subject turns.
--- Bounds come from GetModelRenderBounds — the mesh's own extent.
+-- Bounds come from GetModelRenderBounds: the mesh's own extent.
 --   GetRenderBounds is inflated by the entity so its VFX survive culling (the brazier's are +-450
 --     around a +-48 model), which frames the subject as a speck.
 --   GetModelBounds is the physics hull, which is not the mesh: the grimoire's runs 11 units below
@@ -651,7 +651,7 @@ local function computeView(ent, t)
 
 	-- camRoll rotates the photograph in the image plane. It exists because the entity route is a
 	-- dead end for this: with the camera riding the subject's own axes, flipping the subject
-	-- rotates the whole rig and produces the identical picture (measured, not guessed — pitch
+	-- rotates the whole rig and produces the identical picture (measured, not guessed, pitch
 	-- -90 and +90 exports of the grimoire diff to framing noise).
 	local viewAng = (lookAt - origin):Angle()
 	viewAng.roll = t.camRoll or 0
@@ -820,13 +820,13 @@ end)
 
 -- This is the world replacement. The hook fires after the world has been drawn, so painting a
 -- fullscreen 2D pass here erases it from the colour buffer, and ClearDepth drops its depth with
--- it so nothing left behind can occlude the subject. No cheat convars involved — r_drawworld is
+-- it so nothing left behind can occlude the subject. No cheat convars involved, r_drawworld is
 -- FCVAR_CHEAT and would need sv_cheats.
 hook.Add("PreDrawOpaqueRenderables", "Arcana_SpawnIconRig", function(bDrawingDepth, bDrawingSkybox)
 	if not rig.active or bDrawingDepth or bDrawingSkybox then return end
 
 	-- Ahead of the OPAQUE pass, not the translucent one. Some of what preDraw fixes up is opaque
-	-- geometry — the emissary's grimoire is a plain ClientsideModel — and running after the opaque
+	-- geometry: the emissary's grimoire is a plain ClientsideModel, and running after the opaque
 	-- pass repositions it a full pass too late, so the frame still shows it where Think last put it.
 	if rig.target and rig.target.preDraw and IsValid(rig.ent) then
 		pcall(rig.target.preDraw, rig.ent)
@@ -883,21 +883,21 @@ hook.Add("PostRender", "Arcana_SpawnIconRig", function()
 	local png = render.Capture({format = "png", x = x, y = y, w = s, h = s, alpha = false})
 
 	if not png then
-		MsgC(Color(255, 80, 80), "[ArcanaIcons] Capture returned nil (escape menu open?) — " .. name .. "\n")
+		MsgC(Color(255, 80, 80), "[ArcanaIcons] Capture returned nil (escape menu open?), " .. name .. "\n")
 
 		return
 	end
 
 	-- A capture taken while the window is not rendering comes back a uniform black frame, which
 	-- compresses to a fraction of a real icon (real ones run 500 KB+). One black frame is not a
-	-- verdict — the window may regain focus a frame later — so re-queue the capture and only give
+	-- verdict: the window may regain focus a frame later, so re-queue the capture and only give
 	-- up if the shot window runs out, rather than silently writing a blank tile.
 	if #png < 60 * 1024 then
 		rig.blankTries = (rig.blankTries or 0) + 1
 		rig.pendingName = name
 
 		if rig.blankTries == 1 then
-			MsgC(Color(255, 160, 60), "[ArcanaIcons] " .. name .. " capturing blank — retrying while armed. Keep the game window focused.\n")
+			MsgC(Color(255, 160, 60), "[ArcanaIcons] " .. name .. " capturing blank, retrying while armed. Keep the game window focused.\n")
 		end
 
 		return
@@ -918,7 +918,7 @@ local function findSubject(t)
 
 	for _, e in ipairs(ents.FindByClass(t.class)) do
 		-- Skip carried weapons: a grimoire equipped by the exporting player reports the player's
-		-- own position, so it always wins the nearest-check against the staged world copy — and a
+		-- own position, so it always wins the nearest-check against the staged world copy, and a
 		-- holstered weapon renders no world model, which photographs as an empty frame.
 		if IsValid(e) and not IsValid(e:GetOwner()) then
 			local d = e:GetPos():DistToSqr(eye)
@@ -938,7 +938,7 @@ local function finish()
 	disarm()
 	queue = nil
 	RunConsoleCommand("arcana_spawnicon_setup", "none")
-	MsgC(Color(180, 255, 180), "[ArcanaIcons] Done — files in data/" .. OUTPUT .. "/\n")
+	MsgC(Color(180, 255, 180), "[ArcanaIcons] Done, files in data/" .. OUTPUT .. "/\n")
 end
 
 local function step()
@@ -1042,7 +1042,7 @@ concommand.Add("arcana_spawnicon_preview", function(_, _, args)
 
 	disarm()
 	arm(ent, t)
-	MsgC(Color(180, 255, 180), "[ArcanaIcons] Previewing " .. class .. " — 'arcana_spawnicon_preview off' to stop.\n")
+	MsgC(Color(180, 255, 180), "[ArcanaIcons] Previewing " .. class .. ", 'arcana_spawnicon_preview off' to stop.\n")
 end)
 
 -- Panic button. The rig hides entities with SetNoDraw and remembers what it hid, but that record
@@ -1069,7 +1069,7 @@ concommand.Add("arcana_spawnicon_reset", function()
 		hook.Remove("PostRender", "Arcana_SpawnIconResetLight")
 	end)
 
-	MsgC(Color(180, 255, 180), "[ArcanaIcons] Reset — un-hid " .. n .. " entities, rig disarmed.\n")
+	MsgC(Color(180, 255, 180), "[ArcanaIcons] Reset, un-hid " .. n .. " entities, rig disarmed.\n")
 end)
 
 MsgC(Color(180, 255, 180), "[ArcanaIcons] Loaded. arcana_spawnicon_preview <class> / arcana_export_spawnicons / arcana_spawnicon_reset\n")

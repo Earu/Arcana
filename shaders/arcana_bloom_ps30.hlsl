@@ -3,9 +3,9 @@
 // Constants0: x = blur direction X (1 or 0), y = blur direction Y (0 or 1), z = radius scale (texels)
 // Constants1: x = bloom intensity multiplier, y = chromatic aberration strength (0 = off)
 // Constants2: x = snapshot-diff mode (1 = output max($basetexture - $texture1, 0)),
-//             y = daylight boost — scales the captured contribution with
+//             y = daylight boost: scales the captured contribution with
 //                 background luminance (0 = off)
-//             z = dark-colour boost cap — max perceptual equalisation factor
+//             z = dark-colour boost cap: max perceptual equalisation factor
 //                 for low-luminance hues like purple/deep green (1 = off)
 #define DIR_X          Constants0.x
 #define DIR_Y          Constants0.y
@@ -44,7 +44,7 @@ float4 main(PS_IN i) : COLOR
 		float3 diff = max(tex2D(TexBase, i.uv).rgb - before, float3(0.0, 0.0, 0.0));
 
 		// Bright backgrounds swallow the circles' blended contribution, and
-		// the screen-blend composite attenuates it again — so daylight scenes
+		// the screen-blend composite attenuates it again: so daylight scenes
 		// barely bloom.  Compensate by scaling the contribution with the
 		// background luminance; dark scenes (luma ~0) are unaffected.
 		float bgLuma = dot(before, float3(0.2126, 0.7152, 0.0722));
@@ -75,7 +75,7 @@ float4 main(PS_IN i) : COLOR
 	col += SAMPLE(i.uv + step * 4) * W[4];
 	col += SAMPLE(i.uv - step * 4) * W[4];
 
-	// Chromatic aberration — active only in the composite pass (CA_STRENGTH > 0).
+	// Chromatic aberration: active only in the composite pass (CA_STRENGTH > 0).
 	// Applied before perceptual boost and intensity so all three channels receive
 	// the same uniform scaling afterwards.  Red is pushed outward from the screen
 	// centre, blue inward, creating the classic lens-fringe split on bloom edges.
@@ -88,13 +88,13 @@ float4 main(PS_IN i) : COLOR
 	}
 
 	// (Perceptual equalisation for dark colours now happens in the snapshot
-	// diff pass above, per-pixel before the blur — not here.)
+	// diff pass above, per-pixel before the blur, not here.)
 
 	float intensity = INTENSITY > 0.001 ? INTENSITY : 2.0;
 	col.rgb *= intensity;
 
 	// Composite passthrough only (dir = 0): the pipeline works in linear light
-	// but the screen framebuffer is gamma-encoded — re-encode on the way out or
+	// but the screen framebuffer is gamma-encoded: re-encode on the way out or
 	// the halo's small linear values get displayed ~4-6x darker than intended.
 	// Blur passes (dir != 0) write to linear-read RTs and must stay linear.
 	if (DIR_X + DIR_Y < 0.5) {

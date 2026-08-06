@@ -1,4 +1,4 @@
--- Astral Vault shared configuration — single source of truth for cost constants.
+-- Astral Vault shared configuration: single source of truth for cost constants.
 -- Included by both vault.lua (server) and ui.lua (client).
 Arcana = Arcana or {}
 

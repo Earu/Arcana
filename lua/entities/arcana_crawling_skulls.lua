@@ -49,8 +49,8 @@ local SKULL_PARAMS = {}
 for i = 1, SKULL_COUNT do
 	local seed = i * 1.618033
 	SKULL_PARAMS[i] = {
-		freqX  = 0.7 + (i * 0.37) % 0.7,   -- 0.7 – 1.4 Hz wander
-		freqY  = 0.8 + (i * 0.53) % 0.6,   -- 0.8 – 1.4 Hz
+		freqX  = 0.7 + (i * 0.37) % 0.7,   -- 0.7, 1.4 Hz wander
+		freqY  = 0.8 + (i * 0.53) % 0.6,   -- 0.8, 1.4 Hz
 		phaseX = seed * TWO_PI * 0.41,
 		phaseY = seed * TWO_PI * 0.67,
 		rollOff = i * 72,                   -- unique starting roll per skull
@@ -58,7 +58,7 @@ for i = 1, SKULL_COUNT do
 end
 
 -- Returns world pos and angles for skull i at time t.
--- Fully deterministic — server uses this for death gibs, client for rendering.
+-- Fully deterministic: server uses this for death gibs, client for rendering.
 local function SkullState(ctrlPos, ctrlAng, i, isCharging, isStunned, t)
 	local p = SKULL_PARAMS[i]
 
@@ -86,13 +86,13 @@ local function SkullState(ctrlPos, ctrlAng, i, isCharging, isStunned, t)
 		moveYaw    = (skullSpeed > 0.5) and (math.atan2(velY, velX) * RAD2DEG) or 0
 	end
 
-	-- Ground bounce: absolute-value of a fast sine — skull bounces off the floor
+	-- Ground bounce: absolute-value of a fast sine, skull bounces off the floor
 	local bounce = math.abs(math.sin(t * p.freqX * 3.1 + p.phaseY)) * 3
 
 	local pos = ctrlPos + Vector(offsetX, offsetY, SKULL_Z + bounce)
 
 	-- During a charge the swarm lunges forward, converging on a point ahead of its
-	-- center so the skulls (and the impact) land where the target actually is — the
+	-- center so the skulls (and the impact) land where the target actually is, the
 	-- collision box otherwise holds the controller's origin well short of the player.
 	if isCharging then
 		local fwd = ctrlAng:Forward()
@@ -127,7 +127,7 @@ if SERVER then
 	-- The swarm crawls along the ground while players are tall and get shoved to the
 	-- collision-box edge, so a spherical blast (centered low, 3D falloff) barely scratches
 	-- them. Damage players with a horizontal (cylinder) check plus a damage floor instead,
-	-- so a hit anywhere around the swarm — including the sides — lands meaningfully.
+	-- so a hit anywhere around the swarm: including the sides, lands meaningfully.
 	local function DamagePlayersAround(attacker, center, radius, baseDamage, minFrac, dmgType)
 		local r2 = radius * radius
 		for _, ply in ipairs(player.GetAll()) do
@@ -154,7 +154,7 @@ if SERVER then
 
 	function ENT:Initialize()
 		-- Use a minimal model; Draw() never calls DrawModel() so it stays invisible.
-		-- Do NOT scale the model — model scale can override SetCollisionBounds.
+		-- Do NOT scale the model: model scale can override SetCollisionBounds.
 		self:SetModel("models/hunter/misc/sphere025x025.mdl")
 		self:SetSolid(SOLID_BBOX)
 		-- Tighter box so the low-crawling swarm can actually press up against players
@@ -406,7 +406,7 @@ if CLIENT then
 	local function EyeFlicker(i, t)
 		local p = SKULL_PARAMS[i]
 		local base = 0.78 + 0.22 * math.sin(t * (5.0 + i * 0.7) + p.phaseX)
-		-- Occasional sharp dip — a guttering candle / dying soul
+		-- Occasional sharp dip: a guttering candle / dying soul
 		local dip = math.sin(t * (1.7 + i * 0.31) + p.phaseY)
 		if dip > 0.92 then base = base * 0.35 end
 		return math.Clamp(base, 0.2, 1.0)

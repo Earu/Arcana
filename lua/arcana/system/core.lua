@@ -1,4 +1,4 @@
--- Arcana Core — bootstrap, config, spell registration, casting flow, and networking.
+-- Arcana Core: bootstrap, config, spell registration, casting flow, and networking.
 --
 -- Naming convention:
 --   PascalCase  → public Arcana.* namespace members (functions, tables, API constants)
@@ -542,7 +542,7 @@ local function buildDamageInfo(ply, amount)
 	return dmg
 end
 
--- Pure feasibility gate — reads state, never mutates. Returns false when the cast must be blocked.
+-- Pure feasibility gate: reads state, never mutates. Returns false when the cast must be blocked.
 local function validateCostForSpell(ply, spell)
 	if spell.cost_type == Arcana.COST_TYPES.COINS then
 		if Arcana.GetCoins(ply) < spell.cost_amount then
@@ -597,7 +597,7 @@ end
 
 -- Band VFX API (SendAttachBandVFX, ClearBandVFX) → system/vfx/casting.lua
 
--- Side-effect mutator — deducts cost. Called only after validateCostForSpell has passed.
+-- Side-effect mutator: deducts cost. Called only after validateCostForSpell has passed.
 local function applyCostForSpell(ply, spell)
 	local takeDamageInfo = ply.ForceTakeDamageInfo or ply.TakeDamageInfo
 	if spell.cost_type == Arcana.COST_TYPES.COINS then

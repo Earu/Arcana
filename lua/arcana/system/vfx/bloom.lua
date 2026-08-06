@@ -1,6 +1,6 @@
--- Arcana Magic Circle Bloom — custom screenspace bloom + glow pipeline.
+-- Arcana Magic Circle Bloom: custom screenspace bloom + glow pipeline.
 -- Circles are drawn straight to the screen, where the engine's real z-buffer
--- occludes them exactly (world, props, viewmodel — no depth-texture tricks).
+-- occludes them exactly (world, props, viewmodel, no depth-texture tricks).
 -- Their visible contribution is isolated by diffing framebuffer snapshots
 -- (after - before) into a render target, which then feeds multiple separable
 -- Gaussian blur passes (half-res tight bloom, quarter-res wide glow) that are
@@ -137,7 +137,7 @@ local function initBloom()
 		caScale = caScale or 1
 
 		if tight then
-			-- ── Tight-only — a single H+V pass at half-res, no fog ───────────
+			-- ── Tight-only: a single H+V pass at half-res, no fog ───────────
 			blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
 			blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 0.4) -- bake bloom intensity
 
@@ -148,14 +148,14 @@ local function initBloom()
 			return
 		end
 
-		-- ── Tight bloom — 3 successive H+V passes at half-res ────────────────
+		-- ── Tight bloom: 3 successive H+V passes at half-res ────────────────
 		blurPass(CIRCLE_RT, BLOOM_RT_A, 1, 0, 1, 1)
 		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 1)
 		blurPass(BLOOM_RT_B, BLOOM_RT_A, 1, 0, 1, 1)
 		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 1, 1)
 		blurPass(BLOOM_RT_B, BLOOM_RT_A, 1, 0, 2, 1)
 		blurPass(BLOOM_RT_A, BLOOM_RT_B, 0, 1, 2, 0.9) -- bake bloom intensity
-		-- ── Glow fog — 2 successive H+V passes at quarter-res ────────────────
+		-- ── Glow fog: 2 successive H+V passes at quarter-res ────────────────
 		-- Radii/intensity retuned after the composite gamma re-encode: the
 		-- re-encode lifts faint tails ~4-6x, so the wide fog needs far less
 		-- energy than it did when those tails were being gamma-crushed.

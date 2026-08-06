@@ -73,7 +73,7 @@ Arcana.RegisterSpell({
 	cast = function(caster, _, _, ctx)
 		if not SERVER then return true end
 
-		-- Windborne dash: Sky Walk empowers Wind Dash. It's a "fake cast" — a brief charge
+		-- Windborne dash: Sky Walk empowers Wind Dash. It's a "fake cast", a brief charge
 		-- where you hover in a crouch and the magic circle + particles gather, then a hard
 		-- propel in any direction with no ground/pitch gate. Levitation owns movement, so we
 		-- don't set the ArcanaWindDash* land flags (the land hook never fires under FLY).
@@ -215,7 +215,7 @@ if SERVER then
 end
 
 if CLIENT then
-	-- While gliding, a windborne dash's charge circle stands in for the cast circle — so hide
+	-- While gliding, a windborne dash's charge circle stands in for the cast circle, so hide
 	-- the default cast circle in that context (returning true suppresses it).
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_WindDash_HideCast", function(caster, spellId)
 		if spellId == "wind_dash" and IsValid(caster) and caster:GetNW2Bool("ArcanaSkyWalkGliding", false) then
@@ -226,7 +226,7 @@ if CLIENT then
 	-- Launch pose during the windborne-dash charge: pivot the whole body at the feet so its
 	-- up-axis points along the aim (head leads, feet planted on the charge circle). Reads as
 	-- the player coiled to propel forward off the circle. Render-only; doesn't touch aiming.
-	-- No manual reset needed — render angles auto-reset to the player's angles each frame right
+	-- No manual reset needed: render angles auto-reset to the player's angles each frame right
 	-- after GM:UpdateAnimation, so simply not setting it (when not charging) leaves it normal.
 	hook.Add("PrePlayerDraw", "Arcana_WindDash_ChargePose", function(ply)
 		if not ply:GetNW2Bool("ArcanaSkyWalkGliding", false) then return end
@@ -298,7 +298,7 @@ if CLIENT then
 		local pcol = physgunColor(caster)
 
 		-- Magic circle at the player's feet, standing perpendicular to the dash (face normal =
-		-- aim) — the launch pad. With the launch pose below, the body lies along the aim with
+		-- aim): the launch pad. With the launch pose below, the body lies along the aim with
 		-- feet planted on this circle, so it reads as pushing off it. Follows live feet + aim.
 		if Arcana.Circle and Arcana.Circle.MagicCircle then
 			local function circleAng()

@@ -1,14 +1,11 @@
 # Third-party integration
 
-Arcana ships a self-contained economy and inventory ([`lua/arcana/system/default_inventory.lua`](../lua/arcana/system/default_inventory.lua)).
-To back it with your own system (DarkRP money, PointShop 2, a custom database), override
-the functions below or implement the persistence hooks.
-
-Override **after** Arcana has loaded, from an `Initialize` hook.
+Arcana ships its own economy and inventory in
+[`system/default_inventory.lua`](../lua/arcana/system/default_inventory.lua). Override the
+functions below, or the persistence hooks, to back it with your own. Override after Arcana has
+loaded, from an `Initialize` hook.
 
 ## Economy API
-
-`default_inventory.lua` defines the real implementations. Overriding one replaces it wholesale.
 
 | Function | Realm | Returns |
 | --- | --- | --- |
@@ -19,12 +16,13 @@ Override **after** Arcana has loaded, from an `Initialize` hook.
 | `Arcana.GiveItem(ply, itemClass, amount, reason)` | server | `true` on success |
 | `Arcana.TakeItem(ply, itemClass, amount, reason)` | server | `false` if the player lacks the items |
 
-`reason` is a free-form string for your own logging. `TakeCoins` and `TakeItem` must return
-`false` rather than going negative: callers treat `false` as "cannot afford" and abort the
-purchase. Around 25 call sites depend on that.
+`reason` is free-form, for your own logging.
 
-The client-side branch of `GetCoins` / `GetItemCount` must work without a server round trip,
-since UI affordability checks call it every frame.
+`TakeCoins` and `TakeItem` must return `false` rather than going negative. ~25 call sites treat
+`false` as "cannot afford" and abort the purchase.
+
+The client branch of `GetCoins` / `GetItemCount` must work without a round trip: UI
+affordability checks call it every frame.
 
 ### DarkRP
 
@@ -80,8 +78,7 @@ end)
 
 ### Wrapping instead of replacing
 
-`Arcana` is a namespace, not a class, so everything on it is a plain dot function. There is
-no `self` to forward.
+`Arcana` is a namespace, not a class. Everything on it is a plain dot function, no `self`.
 
 ```lua
 local oldRegisterItem = Arcana.RegisterItem
@@ -129,11 +126,11 @@ hook.Add("Arcana_LoadPlayerDataFromSQL", "YourAddonName", function(ply, callback
 end)
 ```
 
-`authoritative` marks a save that may overwrite a newer row. Non-authoritative saves are
-merged rather than replacing, so a slow load cannot roll a player's progression back.
+`authoritative` marks a save that may overwrite a newer row. Non-authoritative saves merge, so
+a slow load cannot roll progression back.
 
-You must invoke `callback` on **every** path, including failure (`callback(false)`).
-`Arcana_LoadedPlayerData` and everything chained behind it stall otherwise.
+Call `callback` on **every** path including failure (`callback(false)`), or
+`Arcana_LoadedPlayerData` and everything behind it stalls.
 
 ### Astral Vault
 
@@ -152,12 +149,12 @@ hook.Add("Arcana_WriteAstralVault", "YourAddonName", function(ply, items)
 end)
 ```
 
-`items` is an array of vault entries, each carrying weapon info and its enchantments.
+`items` is an array of vault entries, each carrying weapon info and enchantments.
 
 ### Spellcraft activations
 
-Crafted spell definitions live in the player's own client file; the server only records what
-they have unlocked and consecrated *here*. That per-server state is one table:
+Definitions live in the player's client file. The server only records what they unlocked and
+consecrated *here*:
 
 ```lua
 {
@@ -180,10 +177,8 @@ hook.Add("Arcana_WriteSpellcraftState", "YourAddonName", function(ply, state)
 end)
 ```
 
-Consecration is keyed by the definition's hash rather than by slot, so re-importing the same
-build later stays consecrated. Both sets only ever grow, which is why the default write is
-append-only and never deletes.
+Consecration is keyed by defhash, not by slot, so re-importing the same build stays
+consecrated. Both sets only grow, which is why the default write is append-only.
 
-As with the vault, the read hook must call `callback` on every path including failure. A
-player whose state fails to load finds their crafted spells locked, not deleted: both the
-consecration and essence checks fail closed.
+Call `callback` on every path including failure. A player whose state fails to load finds their
+crafted spells locked, not deleted: both checks fail closed.

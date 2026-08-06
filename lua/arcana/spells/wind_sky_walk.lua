@@ -1,9 +1,9 @@
 -- Sky Walk
 -- Wear the wind for 45s. Like an elytra: leaving the ground (a jump or stepping off a ledge)
--- opens the glide — steer by looking, dive to build speed, climb to trade it back (real collision,
--- not noclip). Touch ground and it retracts — you land and it redeploys next time you're airborne,
+-- opens the glide: steer by looking, dive to build speed, climb to trade it back (real collision,
+-- not noclip). Touch ground and it retracts, you land and it redeploys next time you're airborne,
 -- until the window runs out. While gliding, Wind Dash is windborne: a brief charge (fake cast),
--- then a hard propel in any direction — your "firework rocket". (Dash logic lives in wind_dash.lua.)
+-- then a hard propel in any direction: your "firework rocket". (Dash logic lives in wind_dash.lua.)
 local DURATION = 45 -- Seconds the spell stays armed
 
 -- Elytra-style glide. You don't thrust with WASD; you steer by looking and trade altitude
@@ -122,7 +122,7 @@ if SERVER then
 		end
 
 		-- Armed but not deployed: auto-deploy the glide the moment we're airborne (clear of the
-		-- ground). No key needed — while Sky Walk is armed you're "wearing wings", so a jump or
+		-- ground). No key needed, while Sky Walk is armed you're "wearing wings", so a jump or
 		-- stepping off a ledge opens the glide. Checked EVERY tick, which is why it works where a
 		-- jump-press check didn't: the press was always grounded and the engine hides IN_JUMP mid-air.
 		if not st.gliding then
@@ -151,7 +151,7 @@ if SERVER then
 		ply:SetGroundEntity(NULL)
 
 		-- We drive velocity directly; stop the engine adding its own WASD acceleration
-		-- (no thrust — steering is purely by looking, elytra-style).
+		-- (no thrust, steering is purely by looking, elytra-style).
 		mv:SetForwardSpeed(0)
 		mv:SetSideSpeed(0)
 		mv:SetUpSpeed(0)
@@ -198,9 +198,9 @@ if SERVER then
 
 		-- Look down (aim.z < 0) to accelerate along the look axis; look up to bleed speed.
 		vel = vel + aim * (-aim.z * GLIDE_PITCH * dt)
-		-- Gravity always pulls down, independent of heading — you sink unless you keep diving.
+		-- Gravity always pulls down, independent of heading, you sink unless you keep diving.
 		vel.z = vel.z - GLIDE_GRAVITY * dt
-		-- Air drag — this alone sets a natural terminal speed. No hard cap.
+		-- Air drag: this alone sets a natural terminal speed. No hard cap.
 		vel = vel * (1 - GLIDE_DRAG * dt)
 
 		-- Keep the engine's speed clamp far out of the way so MOVETYPE_FLY never limits velocity.
@@ -238,7 +238,7 @@ end
 Arcana.RegisterSpell({
 	id = "wind_sky_walk",
 	name = "Sky Walk",
-	description = "Take to the sky and glide for 45s — steer by looking, dive to build speed. While aloft, Wind Dash charges, then hurls you in any direction with no need for solid ground.",
+	description = "Take to the sky and glide for 45s: steer by looking, dive to build speed. While aloft, Wind Dash charges, then hurls you in any direction with no need for solid ground.",
 	category = Arcana.CATEGORIES.UTILITY,
 	level_required = 35,
 	knowledge_cost = 3,

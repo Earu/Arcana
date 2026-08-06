@@ -1,4 +1,4 @@
--- Ritual: Magic Tower — summons a pilotable arcane battle tower for 10 minutes.
+-- Ritual: Magic Tower, summons a pilotable arcane battle tower for 10 minutes.
 local TOWER_LIFETIME = 60 * 10 -- 10 minutes
 
 Arcana.RegisterRitualSpell({
