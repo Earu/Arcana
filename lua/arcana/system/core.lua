@@ -269,20 +269,20 @@ local function broadcastCastStart(ply, spellId, castTime, forwardLike)
 end
 
 -- Schedule the deferred spell execution after the cast wind-up timer elapses.
-local function scheduleCastExecution(self, ply, spellId, spell, castTime, forwardLike)
+local function scheduleCastExecution(ply, spellId, spell, castTime, forwardLike)
 	local timerName = "Arcana_CastSpell_" .. ply:SteamID64() .. "_" .. spellId
 	timer.Create(timerName, castTime, 1, function()
 		if not IsValid(ply) then return end
 
 		-- Clear casting lock before final validation and execution
-		local d = self:GetPlayerData(ply)
+		local d = Arcana.GetPlayerData(ply)
 		if d then
 			d.casting_until = nil
 			d.casting_spell = nil
 		end
 
 		-- Re-check conditions at actual cast moment (player may have moved, died, etc.)
-		local ok, _ = self:CanCastSpell(ply, spellId)
+		local ok, _ = Arcana.CanCastSpell(ply, spellId)
 		if not ok then
 			net.Start("Arcana_SpellFailed", true)
 			net.WriteEntity(ply)
@@ -311,7 +311,7 @@ local function scheduleCastExecution(self, ply, spellId, spell, castTime, forwar
 			ctxSize = 30
 		end
 
-		self:CastSpell(ply, spellId, spell.has_target, Arcana.NewSpellContext({
+		Arcana.CastSpell(ply, spellId, spell.has_target, Arcana.NewSpellContext({
 			circlePos = ctxPos,
 			circleAng = ctxAng,
 			circleSize = ctxSize,
@@ -346,7 +346,7 @@ function Arcana.StartCasting(ply, spellId)
 	if SERVER then
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
 		broadcastCastStart(ply, spellId, castTime, forwardLike)
-		scheduleCastExecution(Arcana, ply, spellId, spell, castTime, forwardLike)
+		scheduleCastExecution(ply, spellId, spell, castTime, forwardLike)
 	end
 
 	return true
@@ -615,7 +615,7 @@ local function applyCostForSpell(ply, spell)
 end
 
 -- castInfo = { spellId, spell, has_target, context }
-local function handleSpellResult(self, ply, data, castInfo, success)
+local function handleSpellResult(ply, data, castInfo, success)
 	local spellId = castInfo.spellId
 	local spell = castInfo.spell
 	local has_target = castInfo.has_target
@@ -625,7 +625,7 @@ local function handleSpellResult(self, ply, data, castInfo, success)
 		local castTime = math.max(0.05, tonumber(spell.cast_time) or 0)
 		local ratio = math.Clamp(castTime / baseCast, 0.001, 2.0)
 		local xpGain = math.floor(math.max(20, (tonumber(spell.knowledge_cost) or 1) * 10) * ratio)
-		self:GiveXP(ply, xpGain, "Cast " .. spell.name)
+		Arcana.GiveXP(ply, xpGain, "Cast " .. spell.name)
 
 		if spell.on_success then
 			spell.on_success(ply, has_target, data, context)
@@ -690,7 +690,7 @@ function Arcana.CastSpell(ply, spellId, has_target, context)
 	local success = castOk and (castResult ~= false)
 
 	runHook("CastSpell", ply, spellId, has_target, data, context, success)
-	handleSpellResult(Arcana, ply, data, castInfo, success)
+	handleSpellResult(ply, data, castInfo, success)
 
 	Arcana.SavePlayerData(ply)
 
