@@ -126,14 +126,12 @@ if SERVER then
 
 	-- The swarm crawls along the ground while players are tall and get shoved to the
 	-- collision-box edge, so a spherical blast (centered low, 3D falloff) barely scratches
-	-- them. Damage players with a horizontal (cylinder) check plus a damage floor instead,
+	-- them. Damage victims with a horizontal (cylinder) check plus a damage floor instead,
 	-- so a hit anywhere around the swarm: including the sides, lands meaningfully.
-	local function DamagePlayersAround(attacker, center, radius, baseDamage, minFrac, dmgType)
+	local function DamageEnemiesAround(attacker, center, radius, baseDamage, minFrac, dmgType)
 		local r2 = radius * radius
-		for _, ply in ipairs(player.GetAll()) do
-			if not (IsValid(ply) and ply:Alive()) then continue end
-
-			local pp = ply:WorldSpaceCenter()
+		for _, victim in ipairs(Arcana.Common.MonsterEnemies()) do
+			local pp = victim:WorldSpaceCenter()
 			if math.abs(pp.z - center.z) > VERTICAL_REACH then continue end
 
 			local dx, dy = pp.x - center.x, pp.y - center.y
@@ -148,7 +146,7 @@ if SERVER then
 			dmg:SetAttacker(attacker)
 			dmg:SetInflictor(attacker)
 			dmg:SetDamagePosition(pp)
-			Arcana.TakeDamageInfo(ply, dmg)
+			Arcana.TakeDamageInfo(victim, dmg)
 		end
 	end
 
@@ -189,12 +187,8 @@ if SERVER then
 		self:FrameAdvance()
 	end
 
-	local function IsEnemy(ply)
-		return IsValid(ply) and ply:IsPlayer() and ply:Alive()
-	end
-
 	function ENT:AcquireTarget()
-		return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.35)
+		return Arcana.Common.AcquireNearestEnemy(self, CHASE_RANGE, 0.35)
 	end
 
 	function ENT:FaceTowards(pos)
@@ -275,9 +269,8 @@ if SERVER then
 			end
 			local lungePos = LungePoint()
 			if self:GetPos():DistToSqr(chargeTarget) < 50 * 50 then break end
-			for _, ply in ipairs(player.GetAll()) do
-				if not IsEnemy(ply) then continue end
-				local pp = ply:WorldSpaceCenter()
+			for _, victim in ipairs(Arcana.Common.MonsterEnemies()) do
+				local pp = victim:WorldSpaceCenter()
 				if math.abs(pp.z - lungePos.z) > VERTICAL_REACH then continue end
 				local dx, dy = pp.x - lungePos.x, pp.y - lungePos.y
 				if (dx * dx + dy * dy) <= CHARGE_RADIUS * CHARGE_RADIUS then
@@ -291,7 +284,7 @@ if SERVER then
 		local impactPos = LungePoint()
 		self:EmitSound("physics/concrete/concrete_impact_hard" .. math.random(1, 3) .. ".wav", 78, math.random(85, 105), 1)
 
-		DamagePlayersAround(self, impactPos, CHARGE_RADIUS, CHARGE_DAMAGE, CHARGE_MIN_FRAC, DMG_CRUSH)
+		DamageEnemiesAround(self, impactPos, CHARGE_RADIUS, CHARGE_DAMAGE, CHARGE_MIN_FRAC, DMG_CRUSH)
 
 		-- Reset the contact-damage timer so the slam and the gnaw don't stack on the same frame
 		self._nextContact = CurTime() + CONTACT_INTERVAL
@@ -370,7 +363,7 @@ if SERVER then
 		-- players can't just facetank it between charges (stun is a safe recovery window).
 		if not self:GetCharging() and not self:GetStunned() and now >= self._nextContact then
 			self._nextContact = now + CONTACT_INTERVAL
-			DamagePlayersAround(self, self:GetPos(), CONTACT_RADIUS, CONTACT_DAMAGE, 1, DMG_SLASH)
+			DamageEnemiesAround(self, self:GetPos(), CONTACT_RADIUS, CONTACT_DAMAGE, 1, DMG_SLASH)
 		end
 
 		self:NextThink(now)

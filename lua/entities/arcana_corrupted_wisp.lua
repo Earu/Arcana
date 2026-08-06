@@ -121,10 +121,6 @@ if SERVER then
 		end
 	end
 
-	local function isValidEnemy(ply)
-		return IsValid(ply) and ply:IsPlayer() and ply:Alive()
-	end
-
 	function ENT:_PickTarget()
 		local now = CurTime()
 		if now < (self._lastTargetCheck or 0) then return end
@@ -132,13 +128,11 @@ if SERVER then
 		local myPos = self:GetPos()
 		local nearest, nd2 = nil, math.huge
 
-		for _, ply in ipairs(player.GetAll()) do
-			if isValidEnemy(ply) then
-				local d2 = myPos:DistToSqr(ply:GetPos())
+		for _, enemy in ipairs(Arcana.Common.MonsterEnemies()) do
+			local d2 = myPos:DistToSqr(enemy:GetPos())
 
-				if d2 < nd2 then
-					nearest, nd2 = ply, d2
-				end
+			if d2 < nd2 then
+				nearest, nd2 = enemy, d2
 			end
 		end
 
@@ -238,7 +232,7 @@ if SERVER then
 		self:SetLaserEnd(hitPos)
 		self:SetLaserTime(CurTime())
 
-		if tr.Entity and tr.Entity:IsPlayer() then
+		if Arcana.Common.IsMonsterEnemy(tr.Entity) then
 			local dmg = DamageInfo()
 			dmg:SetDamage(LASER_DAMAGE)
 			dmg:SetDamageType(DMG_ENERGYBEAM)

@@ -116,11 +116,7 @@ if SERVER then
 		local r = (self._areaRadius or 500) * SEARCH_RADIUS_FACTOR
 		local best, bestD2 = nil, math.huge
 		for _, ent in ipairs(ents.FindInSphere(center, r)) do
-			if not IsValid(ent) then continue end
-			if ent:IsPlayer() and not ent:Alive() then continue end
-
-			local isTarget =Arcana.Common.IsActor(ent)
-			if not isTarget then continue end
+			if not Arcana.Common.IsMonsterEnemy(ent) then continue end
 
 			local d2 = center:DistToSqr(ent:GetPos())
 			if d2 < bestD2 then best, bestD2 = ent, d2 end
@@ -146,10 +142,6 @@ if SERVER then
 		self:EmitSound("weapons/physcannon/energy_sing_flyby1.wav", 65, 90)
 	end
 
-	local function isValidEnemy(ply)
-		return IsValid(ply) and ply:IsPlayer() and ply:Alive()
-	end
-
 	function ENT:_PickTarget()
 		local now = CurTime()
 		if now < (self._lastTargetCheck or 0) then return end
@@ -157,12 +149,10 @@ if SERVER then
 		local myPos = self:GetPos()
 		local nearest, nd2 = nil, math.huge
 
-		for _, ply in ipairs(player.GetAll()) do
-			if isValidEnemy(ply) then
-				local d2 = myPos:DistToSqr(ply:GetPos())
-				if d2 < nd2 then
-					nearest, nd2 = ply, d2
-				end
+		for _, enemy in ipairs(Arcana.Common.MonsterEnemies()) do
+			local d2 = myPos:DistToSqr(enemy:GetPos())
+			if d2 < nd2 then
+				nearest, nd2 = enemy, d2
 			end
 		end
 

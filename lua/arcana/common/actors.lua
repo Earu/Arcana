@@ -32,15 +32,53 @@ function Arcana.Common.IsLivingActor(ent)
 	return ent:Health() > 0
 end
 
---- Nearest living player to `ent` within `range`, rate-limited per entity.
+--- True when `ent` is something an Arcana monster should fight.
+-- Everything alive qualifies except Arcana's own creatures, which would otherwise tear each
+-- other apart the moment two of them shared a corrupted area.
+-- @param ent Entity to test
+-- @return boolean
+function Arcana.Common.IsMonsterEnemy(ent)
+	if not Arcana.Common.IsLivingActor(ent) then return false end
+	if Arcana.NPC and Arcana.NPC.IsMonster(ent) then return false end
+
+	return true
+end
+
+local function livingPlayers()
+	local out = {}
+
+	for _, ply in ipairs(player.GetAll()) do
+		if IsValid(ply) and ply:Alive() then
+			out[#out + 1] = ply
+		end
+	end
+
+	return out
+end
+
+--- Everything an Arcana monster hunts: living players plus every NPC in the world.
+-- The NPC half comes from the registry arcana/system/npc_relations.lua keeps, which is the
+-- same set of NPCs taught to hate the monsters back. Other addons' nextbots are not in it,
+-- so they are never picked as a target, though they are still valid to damage on contact
+-- (see IsMonsterEnemy). Allocates a fresh table per call.
+-- @return table array of entities
+function Arcana.Common.MonsterEnemies()
+	local out = livingPlayers()
+
+	local npcs = Arcana.NPC and Arcana.NPC.GetNPCs and Arcana.NPC.GetNPCs()
+	for npc in pairs(npcs or {}) do
+		if IsValid(npc) and npc:Health() > 0 then
+			out[#out + 1] = npc
+		end
+	end
+
+	return out
+end
+
 -- Between scans the previously acquired target is returned unchanged, so callers can run
--- this every Think without walking the player list every tick. The result is cached on
--- ent._target, which the AI entities already read directly.
--- @param ent Entity doing the looking
--- @param range Maximum distance in units
--- @param interval Seconds between rescans (default 0.4)
--- @return Player or nil
-function Arcana.Common.AcquireNearestPlayer(ent, range, interval)
+-- acquisition every Think without walking the candidate list every tick. The result is
+-- cached on ent._target, which the AI entities already read directly.
+local function acquireNearest(ent, range, interval, listCandidates)
 	if not IsValid(ent) then return nil end
 
 	local now = CurTime()
@@ -50,12 +88,12 @@ function Arcana.Common.AcquireNearestPlayer(ent, range, interval)
 	local myPos = ent:GetPos()
 	local nearest, bestD2 = nil, range * range
 
-	for _, ply in ipairs(player.GetAll()) do
-		if IsValid(ply) and ply:Alive() then
-			local d2 = myPos:DistToSqr(ply:GetPos())
+	for _, candidate in ipairs(listCandidates()) do
+		if candidate ~= ent then
+			local d2 = myPos:DistToSqr(candidate:GetPos())
 			if d2 < bestD2 then
 				bestD2 = d2
-				nearest = ply
+				nearest = candidate
 			end
 		end
 	end
@@ -63,4 +101,24 @@ function Arcana.Common.AcquireNearestPlayer(ent, range, interval)
 	ent._target = nearest
 
 	return nearest
+end
+
+--- Nearest living player to `ent` within `range`, rate-limited per entity.
+-- @param ent Entity doing the looking
+-- @param range Maximum distance in units
+-- @param interval Seconds between rescans (default 0.4)
+-- @return Player or nil
+function Arcana.Common.AcquireNearestPlayer(ent, range, interval)
+	return acquireNearest(ent, range, interval, livingPlayers)
+end
+
+--- Nearest thing an Arcana monster should fight within `range`, rate-limited per entity.
+-- Same contract as AcquireNearestPlayer, but NPCs count too, so a skeleton hunted by a
+-- squad of Combine fights back instead of standing there being shot.
+-- @param ent Entity doing the looking
+-- @param range Maximum distance in units
+-- @param interval Seconds between rescans (default 0.4)
+-- @return Entity or nil
+function Arcana.Common.AcquireNearestEnemy(ent, range, interval)
+	return acquireNearest(ent, range, interval, Arcana.Common.MonsterEnemies)
 end

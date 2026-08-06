@@ -87,7 +87,7 @@ function ENT:SpawnFunction(ply, tr, classname)
 end
 
 function ENT:AcquireTarget()
-	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
+	return Arcana.Common.AcquireNearestEnemy(self, CHASE_RANGE, 0.4)
 end
 
 function ENT:_Chase(dt)
