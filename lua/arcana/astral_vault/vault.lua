@@ -37,28 +37,19 @@ if SERVER then
 			steamid	TEXT PRIMARY KEY,
 			items	TEXT NOT NULL DEFAULT '[]'
 		);]])
-		if ok == false then
-			MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255,255,255), "CREATE TABLE arcane_astral_vault failed: " .. tostring(sql.LastError() or "?") .. "\n")
-			return false
-		end
+		if Arcana.SQLCheck(ok, "CREATE TABLE arcane_astral_vault") == false then return false end
 
 		ensured = true
 		return true
 	end
 
 	local function deserializeVaultRows(rows)
-		local function decodeJSON(json)
-			json = (json or "[]"):gsub("^%'", ""):gsub("%'$", "")
-			local ok, arr = pcall(util.JSONToTable, json)
-			if ok and istable(arr) then return arr end
-			return {}
-		end
 		if not istable(rows) or not rows[1] then return {} end
-		return decodeJSON(rows[1].items)
+		return Arcana.DecodeJSON(rows[1].items, "astral vault items column", {})
 	end
 
 	local function readVault(ply, callback)
-		if not IsValid(ply) then return end
+		if not IsValid(ply) then callback(false, {}) return end
 
 		local sid = ply:SteamID64()
 		if Arcana.AstralVaultCache[sid] then
@@ -70,10 +61,12 @@ if SERVER then
 		local handled = Arcana.RunHook("ReadAstralVault", ply, callback)
 		if handled == true then return end
 
-		if not ensureVaultTable() then return end
+		-- Every exit from here must call back. The vault UI opens from this continuation,
+		-- so a silent return leaves the player looking at nothing with no error.
+		if not ensureVaultTable() then callback(false, {}) return end
 
 		local q = string.format("SELECT * FROM arcane_astral_vault WHERE steamid = '%s' LIMIT 1;", sql.SQLStr(sid, true))
-		local rows = sql.Query(q)
+		local rows = Arcana.SQLCheck(sql.Query(q), "read vault for " .. tostring(sid))
 		if rows == false then callback(false, {}) return end
 
 		local items = deserializeVaultRows(rows)
@@ -97,10 +90,14 @@ if SERVER then
 		local id = sql.SQLStr(sid, true)
 
 		local q = string.format("INSERT OR REPLACE INTO arcane_astral_vault (steamid, items) VALUES ('%s', %s);", id, json)
-		local writeOk = sql.Query(q)
-		if writeOk == false then
-			MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), "writeVault failed for " .. tostring(sid) .. ": " .. tostring(sql.LastError() or "?") .. "\n")
-		end
+		Arcana.SQLCheck(sql.Query(q), "writeVault for " .. tostring(sid))
+	end
+
+	-- A vault read only fails when the database is unavailable. Every caller below acts on
+	-- the returned list, so there is nothing sensible to continue with; tell the player
+	-- instead of leaving the menu silently inert, the way affordability failures do.
+	local function vaultReadFailed(ply)
+		Arcana:SendErrorNotification(ply, "Could not reach the astral vault, try again shortly")
 	end
 
 	local function canAfford(ply, coins, shards)
@@ -131,7 +128,7 @@ if SERVER then
 	net.Receive("Arcana_AstralVault_RequestOpen", function(_, ply)
 		if not validateVaultActor(ply) then return end
 		readVault(ply, function(ok, items)
-			if not ok then return end
+			if not ok then vaultReadFailed(ply) return end
 			sendOpen(ply, items)
 		end)
 	end)
@@ -152,7 +149,7 @@ if SERVER then
 
 		local ids = collectEnchantIds(wep)
 		readVault(ply, function(ok, items)
-			if not ok then return end
+			if not ok then vaultReadFailed(ply) return end
 			items = items or {}
 			if #items >= VAULT_CFG.MAX_SLOTS then
 				if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, "Astral vault is full") end
@@ -188,7 +185,7 @@ if SERVER then
 
 		local entryId = tostring(net.ReadString() or "")
 		readVault(ply, function(ok, items)
-			if not ok then return end
+			if not ok then vaultReadFailed(ply) return end
 			local entry
 			for _, it in ipairs(items or {}) do
 				if tostring(it.id) == entryId then entry = it break end
@@ -232,7 +229,7 @@ if SERVER then
 		if not validateVaultActor(ply) then return end
 		local entryId = tostring(net.ReadString() or "")
 		readVault(ply, function(ok, items)
-			if not ok then return end
+			if not ok then vaultReadFailed(ply) return end
 			local out = {}
 			for _, it in ipairs(items or {}) do if tostring(it.id) ~= entryId then out[#out + 1] = it end end
 			writeVault(ply, out)

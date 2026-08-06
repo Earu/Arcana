@@ -96,9 +96,9 @@ function Arcana:GetEntityEnchantments(wep)
 		wep.ArcanaEnchantmentsNextUpdate = CurTime() + 0.5
 
 		local appliedSet = {}
-		local json = wep:GetNWString("Arcana_EnchantIds", "[]")
-		local ok, arr = pcall(util.JSONToTable, json)
-		if ok and istable(arr) then
+		local arr = Arcana.DecodeJSON(wep:GetNWString("Arcana_EnchantIds", "[]"),
+			"Arcana_EnchantIds on " .. tostring(wep), nil)
+		if arr then
 			for _, id in ipairs(arr) do
 				appliedSet[id] = true
 			end

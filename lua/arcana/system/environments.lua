@@ -292,8 +292,12 @@ function Envs:_StartServer(id, origin, owner)
 	if isfunction(def.spawn_base) then
 		local ok, res = pcall(def.spawn_base, ctx)
 		if not ok then
+			-- res is the error from the environment's own spawn_base. It is the only
+			-- diagnostic that exists for a failed environment, so keep it instead of
+			-- replacing it with a generic string nobody can act on.
+			ErrorNoHalt("[Arcana] environment '" .. tostring(id) .. "' spawn_base failed: " .. tostring(res) .. "\n")
 			self:Stop("base spawn failed")
-			return false, "Base spawn failed"
+			return false, "Base spawn failed: " .. tostring(res)
 		end
 		if istable(res) then
 			if istable(res.entities) then for _, e in ipairs(res.entities) do if IsValid(e) then table.insert(ctx.spawned, e) end end end

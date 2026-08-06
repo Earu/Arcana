@@ -372,9 +372,8 @@ if SERVER then
 		local savePath = self:GetSaveFile()
 		if not file.Exists(savePath, "DATA") then return false end
 
-		local raw = file.Read(savePath, "DATA") or "{}"
-		local ok, data = pcall(util.JSONToTable, raw)
-		if not ok or not istable(data) then return false end
+		local data = Arcana.DecodeJSON(file.Read(savePath, "DATA"), "mana crystal state (" .. savePath .. ")", nil)
+		if not data then return false end
 
 		-- Guard: ensure the stored map matches current map (in case of manual copy)
 		local curMap = (game and game.GetMap and game.GetMap()) or "unknown_map"

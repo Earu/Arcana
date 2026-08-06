@@ -26,8 +26,7 @@ local RESCAN_INTERVAL = 0.50
 local lastRescan = 0
 
 local function safeJSONToTable(json)
-	local ok, t = pcall(util.JSONToTable, json or "[]")
-	return ok and istable(t) and t or {}
+	return Arcana.DecodeJSON(json, "Arcana_EnchantIds NWString", {})
 end
 
 local function getEnchantCount(wep)

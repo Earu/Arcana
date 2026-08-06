@@ -33,30 +33,64 @@ P.Active         = P.Active         or {} -- [sid64] = { [slot] = def }
 
 local BARGAIN_PDATA = "arcana_golden_sun_accepted"
 
+-- SyncUp is only ever a reply to the RequestSync we send on join. Tracking the outstanding
+-- request means an unsolicited SyncUp cannot re-broadcast a fresh set of names to every
+-- client on demand, which is the one path here that puts player-authored text on other
+-- people's screens.
+local awaitingSync = {}
+
 ----------------------------------------------------------------------
 -- SQL
 ----------------------------------------------------------------------
+-- Deferred like every sibling persistence module: creating tables at module scope runs
+-- before the map has finished loading and gives nowhere to report a failure to.
+local ensured = false
 local function ensureTables()
-	sql.Query([[CREATE TABLE IF NOT EXISTS arcane_essence_unlocks (
+	if ensured then return true end
+
+	local a = Arcana.SQLCheck(sql.Query([[CREATE TABLE IF NOT EXISTS arcane_essence_unlocks (
 		steamid TEXT NOT NULL, essence TEXT NOT NULL,
-		PRIMARY KEY (steamid, essence));]])
-	sql.Query([[CREATE TABLE IF NOT EXISTS arcane_spellcraft_activations (
+		PRIMARY KEY (steamid, essence));]]), "CREATE TABLE arcane_essence_unlocks")
+	local b = Arcana.SQLCheck(sql.Query([[CREATE TABLE IF NOT EXISTS arcane_spellcraft_activations (
 		steamid TEXT NOT NULL, defhash TEXT NOT NULL,
-		PRIMARY KEY (steamid, defhash));]])
+		PRIMARY KEY (steamid, defhash));]]), "CREATE TABLE arcane_spellcraft_activations")
+
+	ensured = a ~= false and b ~= false
+	return ensured
 end
-ensureTables()
+
+-- Consecrations and essence unlocks are purchases. If the row cannot be written the player
+-- has already been charged, so say so out loud rather than leaving them to discover on the
+-- next map change that what they bought is gone.
+local function persistPurchase(query, context, ply)
+	if not ensureTables() then
+		Arcana:SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
+		return false
+	end
+
+	if Arcana.SQLCheck(sql.Query(query), context) == false then
+		Arcana:SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
+		return false
+	end
+
+	return true
+end
 
 local function loadPlayerState(sid64)
-	local esc = sql.SQLStr(sid64)
 	P.EssenceUnlocks[sid64] = {}
 	P.Consecrations[sid64] = {}
+	if not ensureTables() then return end
 
-	local rows = sql.Query("SELECT essence FROM arcane_essence_unlocks WHERE steamid = " .. esc .. ";")
+	local esc = sql.SQLStr(sid64)
+
+	local rows = Arcana.SQLCheck(sql.Query("SELECT essence FROM arcane_essence_unlocks WHERE steamid = " .. esc .. ";"),
+		"read essence unlocks for " .. sid64)
 	if istable(rows) then
 		for _, r in ipairs(rows) do P.EssenceUnlocks[sid64][r.essence] = true end
 	end
 
-	rows = sql.Query("SELECT defhash FROM arcane_spellcraft_activations WHERE steamid = " .. esc .. ";")
+	rows = Arcana.SQLCheck(sql.Query("SELECT defhash FROM arcane_spellcraft_activations WHERE steamid = " .. esc .. ";"),
+		"read consecrations for " .. sid64)
 	if istable(rows) then
 		for _, r in ipairs(rows) do P.Consecrations[sid64][r.defhash] = true end
 	end
@@ -207,6 +241,7 @@ hook.Add("Arcana_LoadedPlayerData", "Arcana_Spellcraft_Load", function(ply)
 	sendRoster(ply)
 	P.SendState(ply)
 
+	awaitingSync[sid] = true
 	net.Start("Arcana_Spellcraft_RequestSync")
 	net.Send(ply)
 end)
@@ -226,50 +261,7 @@ hook.Add("PlayerDisconnected", "Arcana_Spellcraft_Cleanup", function(ply)
 	P.Active[sid] = nil
 	P.EssenceUnlocks[sid] = nil
 	P.Consecrations[sid] = nil
-end)
-
-----------------------------------------------------------------------
--- Receiver: the client uploads its definition list on request
-----------------------------------------------------------------------
-local function readClauses()
-	local n = math.min(net.ReadUInt(8), 8)
-	local out = {}
-	for i = 1, n do out[i] = net.ReadString() end
-	return out
-end
-
-net.Receive("Arcana_Spellcraft_SyncUp", function(_, ply)
-	if not IsValid(ply) then return end
-	local sid = ply:SteamID64()
-	local maxSlots = P.Config().maxSlots
-
-	-- Clear any previous registrations for this player (fresh authoritative set).
-	if P.Active[sid] then
-		for slot in pairs(P.Active[sid]) do
-			unregisterAndBroadcast(sid, slot)
-		end
-	end
-	P.Active[sid] = {}
-
-	local count = math.min(net.ReadUInt(8), 64)
-	local seenSlots = {}
-	for i = 1, count do
-		local slot = net.ReadUInt(8)
-		local name = string.sub(net.ReadString(), 1, 24)
-		local form = net.ReadString()
-		local essence = net.ReadString()
-		local clauses = readClauses()
-
-		-- Only register up to this server's slot allowance; ignore duplicates.
-		if slot >= 1 and slot <= maxSlots and not seenSlots[slot] then
-			seenSlots[slot] = true
-			local def = { form = form, essence = essence, clauses = clauses }
-			local compiled = P.Compile(def)
-			if compiled then -- structural validity only; eligibility is checked at cast time
-				registerAndBroadcast(sid, slot, name, def)
-			end
-		end
-	end
+	awaitingSync[sid] = nil
 end)
 
 ----------------------------------------------------------------------
@@ -294,6 +286,59 @@ local function nameValid(name)
 	if not string.match(name, "^[%w%s%-']+$") then return false end
 	return true, name
 end
+
+----------------------------------------------------------------------
+-- Receiver: the client uploads its definition list on request
+----------------------------------------------------------------------
+local function readClauses()
+	local n = math.min(net.ReadUInt(8), 8)
+	local out = {}
+	for i = 1, n do out[i] = net.ReadString() end
+	return out
+end
+
+net.Receive("Arcana_Spellcraft_SyncUp", function(_, ply)
+	if not IsValid(ply) then return end
+	local sid = ply:SteamID64()
+	if not awaitingSync[sid] then return end
+	awaitingSync[sid] = nil
+
+	local maxSlots = P.Config().maxSlots
+
+	-- Clear any previous registrations for this player (fresh authoritative set).
+	if P.Active[sid] then
+		for slot in pairs(P.Active[sid]) do
+			unregisterAndBroadcast(sid, slot)
+		end
+	end
+	P.Active[sid] = {}
+
+	local count = math.min(net.ReadUInt(8), 64)
+	local seenSlots = {}
+	for i = 1, count do
+		local slot = net.ReadUInt(8)
+		local rawName = net.ReadString()
+		local form = net.ReadString()
+		local essence = net.ReadString()
+		local clauses = readClauses()
+
+		-- Same name rule the craft path enforces. These names are broadcast to every
+		-- client, so a name that would be rejected at the bench is not accepted here
+		-- either; fall back rather than dropping the player's spell over its label.
+		local okName, name = nameValid(rawName)
+		if not okName then name = "Crafted Spell" end
+
+		-- Only register up to this server's slot allowance; ignore duplicates.
+		if slot >= 1 and slot <= maxSlots and not seenSlots[slot] then
+			seenSlots[slot] = true
+			local def = { form = form, essence = essence, clauses = clauses }
+			local compiled = P.Compile(def)
+			if compiled then -- structural validity only; eligibility is checked at cast time
+				registerAndBroadcast(sid, slot, name, def)
+			end
+		end
+	end
+end)
 
 ----------------------------------------------------------------------
 -- Receiver: craft (consecrate a new crafted spell into a slot)
@@ -380,8 +425,8 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	P.Consecrations[sid] = P.Consecrations[sid] or {}
 	if not P.Consecrations[sid][hash] then
 		P.Consecrations[sid][hash] = true
-		sql.Query(string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
-			sql.SQLStr(sid), sql.SQLStr(hash)))
+		persistPurchase(string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
+			sql.SQLStr(sid), sql.SQLStr(hash)), "persist consecration " .. hash, ply)
 	end
 
 	registerAndBroadcast(sid, slot, name, def)
@@ -432,8 +477,8 @@ net.Receive("Arcana_Spellcraft_Consecrate", function(_, ply)
 	local hash = P.DefHash(def)
 	P.Consecrations[sid] = P.Consecrations[sid] or {}
 	P.Consecrations[sid][hash] = true
-	sql.Query(string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
-		sql.SQLStr(sid), sql.SQLStr(hash)))
+	persistPurchase(string.format("INSERT OR REPLACE INTO arcane_spellcraft_activations (steamid, defhash) VALUES (%s, %s);",
+		sql.SQLStr(sid), sql.SQLStr(hash)), "persist consecration " .. hash, ply)
 
 	P.SendState(ply)
 end)
@@ -472,8 +517,8 @@ net.Receive("Arcana_Spellcraft_UnlockEssence", function(_, ply)
 
 	P.EssenceUnlocks[sid] = P.EssenceUnlocks[sid] or {}
 	P.EssenceUnlocks[sid][essenceId] = true
-	sql.Query(string.format("INSERT OR REPLACE INTO arcane_essence_unlocks (steamid, essence) VALUES (%s, %s);",
-		sql.SQLStr(sid), sql.SQLStr(essenceId)))
+	persistPurchase(string.format("INSERT OR REPLACE INTO arcane_essence_unlocks (steamid, essence) VALUES (%s, %s);",
+		sql.SQLStr(sid), sql.SQLStr(essenceId)), "persist essence unlock " .. essenceId, ply)
 
 	P.SendState(ply)
 end)

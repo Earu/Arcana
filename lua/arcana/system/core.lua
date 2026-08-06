@@ -58,6 +58,43 @@ end
 
 Arcana.RunHook = runHook
 
+-- Shared SQL failure reporting. sql.Query returns false (not nil) on error, and the
+-- reason is only available from sql.LastError() until the next query runs, so every
+-- caller has to check the return immediately or the diagnostic is gone. All four SQL
+-- modules (system/persistence, system/default_inventory, spellcraft/persistence,
+-- astral_vault/vault) report through here so a failure looks the same wherever it happens.
+--
+-- Returns the result unchanged so it can wrap a query inline:
+--   local rows = Arcana.SQLCheck(sql.Query(q), "read vault")
+function Arcana.SQLCheck(result, context)
+	if result ~= false then return result end
+
+	local err = sql.LastError() or "unknown error"
+	MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), tostring(context) .. ": " .. tostring(err) .. "\n")
+
+	return false
+end
+
+-- Shared decode for stored and networked JSON. Every caller here is reading a value it did
+-- not produce this session (a SQL column, an NWString, a net payload), so a malformed one is
+-- expected and must not error. It must also not pass silently: an unreadable unlocked_spells
+-- column looks exactly like a player who knows no spells, which is the same shape as data
+-- loss. SQL columns arrive quoted, so the surrounding single quotes are stripped first.
+--
+--   local ids = Arcana.DecodeJSON(row.unlocked_spells, "unlocked_spells for " .. sid, {})
+function Arcana.DecodeJSON(json, context, fallback)
+	json = tostring(json or ""):gsub("^'", ""):gsub("'$", "")
+	if json == "" then return fallback end
+
+	local ok, decoded = pcall(util.JSONToTable, json)
+	if ok and istable(decoded) then return decoded end
+
+	MsgC(Color(255, 80, 80), "[Arcana][JSON] ", Color(255, 255, 255),
+		"could not decode " .. tostring(context) .. ", falling back: " .. tostring(ok and "not a table" or decoded) .. "\n")
+
+	return fallback
+end
+
 -- Client-side stub for autocomplete and help so players see the command
 if CLIENT then
 	local function arcanaAutoComplete(cmd, stringargs)
