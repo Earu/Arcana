@@ -312,7 +312,7 @@ if SERVER then
 		ply._arcanaMidasEncounterPending = true
 	end)
 
-	-- The tutorial system needs a living player, so the vision waits for respawn.
+	-- The scene system needs a living player, so the vision waits for respawn.
 	-- The "seen" flag is only set once the vision actually reaches the player, so
 	-- disconnecting between death and respawn does not burn the guaranteed first.
 	hook.Add("PlayerSpawn", "Arcana_Midas_Encounter", function(ply)

@@ -20,7 +20,7 @@
 --   system/npc_casting.lua          : NPC mages: speciality roll + crafted spell combat
 --   system/lifecycle.lua            : PlayerInitialSpawn/Death/Disconnect hooks
 --   system/environments.lua         : RegisterEnvironment, Activate/Deactivate
---   system/tutorial.lua             : Tutorial sequence engine (scenes/ registers into it)
+--   system/scenes.lua               : Scene engine (scenes/ registers into it)
 --   system/vfx/casting.lua          : Cast-circle/gesture broadcast + client receivers
 --   system/vfx/bloom.lua            : Screenspace bloom pipeline for circles
 --

@@ -1,10 +1,10 @@
--- Grimoire tutorial scene: Iara and the golden tree in Elysion.
+-- Grimoire scene: Iara and the golden tree in Elysion.
 -- Provides the dialogue tree, the auto-trigger when a player first carries the
 -- grimoire, and the scene visuals (crystal tree + white/cyan/purple sparkles)
--- rendered through the Arcana_Tutorial_* scene hooks (see arcana/system/tutorial.lua).
+-- rendered through the Arcana_Scene_* hooks (see arcana/system/scenes.lua).
 
 if SERVER then
-	-- add the sound files for the tutorial
+	-- add the sound files for the scene
 	for _, f in ipairs(file.Find("sound/arcana/tutorials/grimoire/*.ogg", "GAME")) do
 		resource.AddFile("sound/arcana/tutorials/grimoire/" .. f)
 	end
@@ -14,12 +14,12 @@ end
 
 local SCENE_ID = "grimoire"
 
-local function isSceneActive(tutorial)
-	return tutorial.currentSequence and tutorial.currentSequence.id == SCENE_ID
+local function isSceneActive(scenes)
+	return scenes.currentSequence and scenes.currentSequence.id == SCENE_ID
 end
 
 -- Crystal shader material for the tree (provided by the optional shader_to_gma module,
--- required by tutorial.lua; falls back to tinted model rendering when unavailable)
+-- required by system/scenes.lua; falls back to tinted model rendering when unavailable)
 local TREE_SHADER_MAT
 
 if WaitForShaderMounted then
@@ -110,7 +110,7 @@ local function drawWaterPlate()
 	render.OverrideDepthEnable(false)
 end
 
-hook.Add("Arcana_Tutorial_CreateScene", "Arcana_GrimoireScene", function(tutorial, sequence)
+hook.Add("Arcana_Scene_Create", "Arcana_GrimoireScene", function(scenes, sequence)
 	if sequence.id ~= SCENE_ID then return end
 
 	if IsValid(tree) then
@@ -124,11 +124,11 @@ hook.Add("Arcana_Tutorial_CreateScene", "Arcana_GrimoireScene", function(tutoria
 	tree:SetModelScale(0.25)
 
 	-- Position tree in front of player
-	local treePos = tutorial.simulatedPos + tutorial.simulatedAng:Forward() * -200 + tutorial.simulatedAng:Up() * -60
+	local treePos = scenes.simulatedPos + scenes.simulatedAng:Forward() * -200 + scenes.simulatedAng:Up() * -60
 	tree:SetPos(treePos)
-	tree:SetAngles(Angle(0, tutorial.simulatedAng.y - 180, 0))
+	tree:SetAngles(Angle(0, scenes.simulatedAng.y - 180, 0))
 
-	tutorial.focusEnt = tree
+	scenes.focusEnt = tree
 	treeParticles = nil
 
 	-- Ambient sparkles: random positions in a ring around the playable area
@@ -155,7 +155,7 @@ hook.Add("Arcana_Tutorial_CreateScene", "Arcana_GrimoireScene", function(tutoria
 	end
 end)
 
-hook.Add("Arcana_Tutorial_DestroyScene", "Arcana_GrimoireScene", function(tutorial, sequence)
+hook.Add("Arcana_Scene_Destroy", "Arcana_GrimoireScene", function(scenes, sequence)
 	if sequence and sequence.id ~= SCENE_ID then return end
 
 	if IsValid(tree) then
@@ -168,8 +168,8 @@ hook.Add("Arcana_Tutorial_DestroyScene", "Arcana_GrimoireScene", function(tutori
 	ambientParticles = nil
 end)
 
-hook.Add("Arcana_Tutorial_DrawAmbientParticles", "Arcana_GrimoireScene", function(tutorial, eyePos)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_DrawAmbientParticles", "Arcana_GrimoireScene", function(scenes, eyePos)
+	if not isSceneActive(scenes) then return end
 	if not ambientParticles then return end
 
 	local now = RealTime()
@@ -177,7 +177,7 @@ hook.Add("Arcana_Tutorial_DrawAmbientParticles", "Arcana_GrimoireScene", functio
 
 	for _, particle in ipairs(ambientParticles) do
 		-- Sparkle - static position around the player, twinkles
-		local pos = tutorial.simulatedPos + Vector(
+		local pos = scenes.simulatedPos + Vector(
 			math.cos(particle.startAngle) * particle.distance,
 			math.sin(particle.startAngle) * particle.distance,
 			particle.startHeight
@@ -265,8 +265,8 @@ end
 
 -- Draw the golden tree
 local TREE_COLOR = Color(255, 180, 0)
-hook.Add("Arcana_Tutorial_DrawScene", "Arcana_GrimoireScene", function(tutorial, eyePos)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_Draw", "Arcana_GrimoireScene", function(scenes, eyePos)
+	if not isSceneActive(scenes) then return end
 
 	-- Water floor first so the tree renders over it
 	drawWaterPlate()
@@ -364,8 +364,8 @@ hook.Add("Arcana_Tutorial_DrawScene", "Arcana_GrimoireScene", function(tutorial,
 end)
 
 -- Quiet water splashes as the player wades through the astral plane
-hook.Add("Arcana_Tutorial_Footstep", "Arcana_GrimoireScene", function(tutorial, ply)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_Footstep", "Arcana_GrimoireScene", function(scenes, ply)
+	if not isSceneActive(scenes) then return end
 
 	ply:EmitSound("ambient/water/water_splash" .. math.random(1, 3) .. ".wav", 40, math.random(90, 110), 0.2)
 end)
@@ -451,13 +451,13 @@ local NODES = {
 	}
 }
 
-hook.Add("Think", "Arcana_GrimoireTutorial", function()
+hook.Add("Think", "Arcana_GrimoireScene_Autostart", function()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return end
 	if not ply:HasWeapon("grimoire") then return end
 
 	if cookie.GetString("arcana_grimoire_tutorial_completed", "false") == "false" then
-		Arcana.StartTutorialSequence({
+		Arcana.StartScene({
 			id = SCENE_ID,
 			nodes = NODES,
 			startNode = "START",

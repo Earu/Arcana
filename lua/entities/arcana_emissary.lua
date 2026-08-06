@@ -228,18 +228,18 @@ if CLIENT then
 		return benchGlowMat
 	end
 
-	-- Reuse the tutorial's Elysion skybox wholesale (materials, face layout,
+	-- Reuse the scene system's Elysion skybox wholesale (materials, face layout,
 	-- UV rotations) so the cube connects exactly like it does in the scenes
 	local function getSkyFaces()
-		local Tutorial = Arcana.Tutorial
-		if not Tutorial then return end
+		local Scenes = Arcana.Scenes
+		if not Scenes then return end
 
-		if not Tutorial.cubeFaces then
-			Tutorial:InitializeSkybox()
-			Tutorial:CreateCubeMesh()
+		if not Scenes.cubeFaces then
+			Scenes:InitializeSkybox()
+			Scenes:CreateCubeMesh()
 		end
 
-		return Tutorial.cubeFaces
+		return Scenes.cubeFaces
 	end
 
 	local function drawAbyssSky(eyePos)
