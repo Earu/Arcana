@@ -448,7 +448,6 @@ Arcana:RegisterSpell({
 })
 
 if CLIENT then
-	local matBeam = Material("effects/laser1")
 	local matGlow = Material("sprites/light_glow02_add")
 	local matRing = Material("effects/select_ring")
 	local matFlare = Material("effects/blueflare1")

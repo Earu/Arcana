@@ -102,7 +102,7 @@ if CLIENT then
 		local sid = IsValid(LocalPlayer()) and LocalPlayer():SteamID64() or nil
 		local out = {}
 
-		for id, sp in pairs(Arcana and Arcana.RegisteredSpells or {}) do
+		for id, sp in pairs(Arcana.RegisteredSpells or {}) do
 			-- Crafted spells register on every client (to render other players'
 			-- casts); only the local player's own belong in their autocomplete.
 			local foreignCrafted = sp.is_crafted and sp.crafted_owner ~= sid
@@ -518,7 +518,7 @@ function Arcana:RegisterRitualSpell(opts)
 		cost_type = opts.cost_type or self.COST_TYPES.COINS,
 		cost_amount = tonumber(opts.cost_amount) or 100,
 		cast_time = tonumber(opts.cast_time) or 10,
-		has_target = opts.has_target == true and true or false,
+		has_target = opts.has_target == true,
 		cast_anim = opts.cast_anim or "becon",
 		can_cast = opts.can_cast or defaultCanCast,
 		cast = ritualCast,

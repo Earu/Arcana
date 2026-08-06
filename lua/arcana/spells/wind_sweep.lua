@@ -77,9 +77,6 @@ Arcana:RegisterSpell({
 -- Network string registered in arcana/init.lua
 
 if CLIENT then
-	local matGlow = Material("sprites/light_glow02_add")
-	local matBeam = Material("effects/laser1")
-	local matSmoke = Material("particle/particle_smokegrenade")
 
 	net.Receive("Arcana_WindSweep", function()
 		local origin = net.ReadVector()

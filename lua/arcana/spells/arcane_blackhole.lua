@@ -1100,7 +1100,6 @@ if CLIENT then
 					-- Expanding shockwave ring
 					local radius = Lerp(progress, 50, 1200)
 					local alpha = math.floor(255 * (1 - math.pow(progress, 2)))
-					local thickness = Lerp(progress, 80, 200)
 
 					render.SetMaterial(matGlow)
 
@@ -1292,7 +1291,6 @@ if CLIENT then
 				end)
 
 				-- Energy particles streaming into the dark star as it grows
-				local darkStarPos = targetPos + Vector(0, 0, 200)
 				local growthParticleSteps = 40
 				for step = 0, growthParticleSteps do
 					timer.Simple(step * 0.42, function()
@@ -1335,7 +1333,6 @@ if CLIENT then
 				end
 
 				-- Periodic lightning from dark star (every 1.5-2.5s)
-				local lightningTimer = "Arcana_Blackhole_Lightning_" .. tostring(caster)
 				local numLightningBursts = math.floor((castTime - 8) / 2)
 				for burst = 1, numLightningBursts do
 					timer.Simple(burst * 2, function()

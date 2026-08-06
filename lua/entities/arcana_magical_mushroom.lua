@@ -88,7 +88,7 @@ if SERVER then
 		ply._arcanaNextMushroomTrip = CurTime() + self.TripCooldown
 
 		local dur = self.TripCooldown
-		if Arcana and Arcana.Status and Arcana.Status.SporeHigh and Arcana.Status.SporeHigh.Apply then
+		if Arcana.Status and Arcana.Status.SporeHigh and Arcana.Status.SporeHigh.Apply then
 			Arcana.Status.SporeHigh.Apply(ply, { duration = dur, intensity = 0.25 })
 		end
 

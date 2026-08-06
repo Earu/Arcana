@@ -24,7 +24,7 @@ if SERVER then
 		net.WriteVector(ctx.origin or Vector(0, 0, 0))
 		net.WriteFloat(tonumber(ctx.started or CurTime()) or CurTime())
 		net.WriteFloat(tonumber(ctx.expires or (CurTime() + 1)) or (CurTime() + 1))
-		net.WriteFloat(tonumber(ctx.effective_radius or 0) or 0)
+		net.WriteFloat(tonumber(ctx.effective_radius) or 0)
 		if rcpt then
 			net.Send(rcpt)
 		else
@@ -74,12 +74,14 @@ function Envs:RegisterEnvironment(def)
 	local id = tostring(def.id or "")
 	if id == "" then return false end
 	def.name = def.name or id
-	def.lifetime = tonumber(def.lifetime or 3600) or 3600
-	def.lock_duration = tonumber(def.lock_duration or 0) or 0 -- seconds to prevent immediate re-cast/start
-	def.min_radius = tonumber(def.min_radius or 0) or 0 -- minimum effective radius required to allow spawn
-	def.max_radius = tonumber(def.max_radius or 0) or 32768 -- maximum effective radius allowed to spawn
-	def.poi_min = math.max(0, tonumber(def.poi_min or 0) or 0)
-	def.poi_max = math.max(def.poi_min, tonumber(def.poi_max or def.poi_min) or def.poi_min)
+	def.lifetime = tonumber(def.lifetime) or 3600
+	def.lock_duration = tonumber(def.lock_duration) or 0 -- seconds to prevent immediate re-cast/start
+	def.min_radius = tonumber(def.min_radius) or 0 -- minimum effective radius required to allow spawn
+	-- Omitting max_radius used to yield 0, not 32768: the inner default won, so eff_radius
+	-- was clamped to 0 and the poi_max scaling on it divided by zero.
+	def.max_radius = tonumber(def.max_radius) or 32768 -- maximum effective radius allowed to spawn
+	def.poi_min = math.max(0, tonumber(def.poi_min) or 0)
+	def.poi_max = math.max(def.poi_min, tonumber(def.poi_max) or def.poi_min)
 	def.pois = istable(def.pois) and def.pois or {}
 	self.Registered[id] = def
 	return true
@@ -130,7 +132,7 @@ function Envs:ExtendDuration(id, duration)
 	net.WriteVector(ctx.origin or Vector(0, 0, 0))
 	net.WriteFloat(tonumber(ctx.started or CurTime()) or CurTime())
 	net.WriteFloat(tonumber(ctx.expires) or CurTime())
-	net.WriteFloat(tonumber(ctx.effective_radius or 0) or 0)
+	net.WriteFloat(tonumber(ctx.effective_radius) or 0)
 	net.Broadcast()
 
 	return true
@@ -282,7 +284,7 @@ function Envs:_StartServer(id, origin, owner)
 	net.WriteVector(ctx.origin or Vector(0, 0, 0))
 	net.WriteFloat(tonumber(ctx.started or CurTime()) or CurTime())
 	net.WriteFloat(tonumber(ctx.expires or (CurTime() + 1)) or (CurTime() + 1))
-	net.WriteFloat(tonumber(ctx.effective_radius or 0) or 0)
+	net.WriteFloat(tonumber(ctx.effective_radius) or 0)
 	net.Broadcast()
 
 	if (def.lock_duration or 0) > 0 then
@@ -374,26 +376,26 @@ function Envs:Start(id, origin, owner, opts)
 end
 
 if CLIENT then
-    -- Receive environment start/stop and invoke the same Start/Stop API on client
-    net.Receive("Arcana_EnvStart", function()
-        local id = net.ReadString() or ""
-        local origin = net.ReadVector() or Vector(0, 0, 0)
-        local started = net.ReadFloat() or CurTime()
-        local expires = net.ReadFloat() or (CurTime() + 1)
-        local effr = net.ReadFloat() or 0
+	-- Receive environment start/stop and invoke the same Start/Stop API on client
+	net.Receive("Arcana_EnvStart", function()
+		local id = net.ReadString() or ""
+		local origin = net.ReadVector() or Vector(0, 0, 0)
+		local started = net.ReadFloat() or CurTime()
+		local expires = net.ReadFloat() or (CurTime() + 1)
+		local effr = net.ReadFloat() or 0
 
-        Envs:Start(id, origin, LocalPlayer(), {
-            started = started,
-            expires = expires,
-            effective_radius = effr,
-        })
-    end)
+		Envs:Start(id, origin, LocalPlayer(), {
+			started = started,
+			expires = expires,
+			effective_radius = effr,
+		})
+	end)
 
-    net.Receive("Arcana_EnvStop", function()
-        local _ = net.ReadString() or ""
+	net.Receive("Arcana_EnvStop", function()
+		local _ = net.ReadString() or ""
 		local reason = net.ReadString() or "unknown reason"
-        if Envs.Active then Envs:Stop(reason) end
-    end)
+		if Envs.Active then Envs:Stop(reason) end
+	end)
 end
 
 return Envs

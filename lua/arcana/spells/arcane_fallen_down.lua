@@ -103,7 +103,6 @@ local function startBeamPhase(caster, targetPos)
 	-- Initial MASSIVE screen shake
 	Arcana.Common.ScreenShake(targetPos, 30, 150, 3.0, MAX_BEAM_RADIUS * 2)
 	local startTime = CurTime()
-	local endTime = startTime + BEAM_DURATION
 	-- Damage tick rate
 	local damageTickRate = 0.1
 	local damageTicks = math.floor(BEAM_DURATION / damageTickRate)
@@ -353,7 +352,6 @@ Arcana:RegisterSpell({
 if CLIENT then
 	local matBeam = Material("effects/laser1")
 	local matGlow = Material("sprites/light_glow02_add")
-	local matFlare = Material("effects/blueflare1")
 	local matRing = Material("effects/select_ring")
 	-- Active beams being rendered
 	local activeBeams = {}
@@ -394,7 +392,6 @@ if CLIENT then
 	local terminalNextCharTime = 0
 	local terminalCharDelay = 0.015 -- 15ms per character (faster)
 	local terminalLineDelay = 0.2 -- 200ms between lines (faster)
-	local currentlyTypingLine = nil -- Track which line is currently being typed
 	local phase1Complete = false -- Track when Phase 1 terminal is done
 	local phase1CompleteTime = 0 -- When Phase 1 completed
 	local transitionDuration = 1.5 -- 1.5 second transition with noise

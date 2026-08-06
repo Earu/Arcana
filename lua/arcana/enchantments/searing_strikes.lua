@@ -8,7 +8,7 @@ local function igniteTarget(attacker, target)
 	end
 
 	-- Brief visual ring on target
-	if Arcana and Arcana.SendAttachBandVFX then
+	if Arcana.SendAttachBandVFX then
 		Arcana:SendAttachBandVFX(target, Color(255, 140, 80, 255), 20, 0.5, {
 			{ radius = 14, height = 4, spin = { p = 0, y = 120 * 50, r = 0 }, lineWidth = 2 },
 		}, "ignite_fx")

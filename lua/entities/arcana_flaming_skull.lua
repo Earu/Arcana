@@ -36,11 +36,8 @@ end
 local CHASE_RANGE = 2500
 local FIRE_RANGE = 1800
 local FIRE_COOLDOWN = 4
-local FIRE_INTERVAL = 2.0
-local PROJECTILE_SPEED = 580
 local HOVER_HEIGHT = 180
 local MOVE_SPEED = 140
-local TURN_RATE = 360 -- deg/sec (faster turn rate for always looking at target)
 local XP_REWARD = 45
 local STANDOFF_DISTANCE = 400 -- prefer to keep this far from target
 

@@ -132,6 +132,24 @@ Arcana:RegisterEnchantment({
 })
 ```
 
+### Applying and removing enchantments at runtime
+
+Registration only declares an enchantment. These apply it to a specific weapon entity:
+
+| Function | Notes |
+| --- | --- |
+| `Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId)` | Applies and awards XP. Returns `false, reason` if it cannot. |
+| `Arcana:RestoreEnchantmentToWeaponEntity(ply, wep, enchId)` | Same, without awarding XP. Use for system operations such as a vault restore. |
+| `Arcana:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)` | Runs the enchantment's `remove`, drops it and re-syncs. |
+| `Arcana:GetEntityEnchantments(wep)` | The weapon's applied enchantments. |
+| `Arcana.SyncWeaponEnchantNW(wep)` | Force a network re-sync after bulk changes. |
+
+### Voice activation
+
+`Arcana:RegisterSpell` adds a trigger phrase for the spell name automatically on the client.
+Use `Arcana:AddTriggerPhrase(phrase, spellId)` for extra phrases and
+`Arcana:RemoveTriggerPhrase(phrase)` to drop one, for example when unregistering a spell.
+
 ### Registering an Environment
 
 ```lua

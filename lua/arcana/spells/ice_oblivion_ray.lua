@@ -843,12 +843,14 @@ if CLIENT then
 	end)
 
 	net.Receive("Arcana_IceOblivionRay_BeamTick", function()
-		local origin   = net.ReadVector()
-		local dir      = net.ReadVector()
+		-- Origin and direction are driven client-side in the Think hook for instant visual
+		-- response, so they are read and dropped. They still have to be read: the two floats
+		-- after them would decode garbage otherwise.
+		net.ReadVector()
+		net.ReadVector()
 		local radius   = net.ReadFloat()
 		local progress = net.ReadFloat()
 		if not activeBeam then return end
-		-- Direction and origin are driven client-side in the Think hook for instant visual response.
 		-- Only sync the server-authoritative values that can't be derived locally.
 		activeBeam.radius   = radius
 		activeBeam.progress = progress

@@ -111,7 +111,6 @@ if CLIENT then
 	local matBeam = Material("sprites/physbeam")
 	local bursts = {}
 	local iceSpikes = {}
-	local frostOverlayMat = Material("particle/particle_smokegrenade")
 
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_FrostNova_Render", function(bDrawingDepth, isSkybox)
 		if bDrawingDepth or isSkybox then return end

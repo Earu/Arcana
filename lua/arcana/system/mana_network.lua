@@ -39,7 +39,7 @@ if SERVER then
 		if not IsValid(ent) then return nil end
 
 		opts = opts or {}
-		local range = tonumber(opts.range or MN.Config.defaultRange) or MN.Config.defaultRange
+		local range = tonumber(opts.range) or MN.Config.defaultRange
 		return addProducer(ent, range)
 	end
 
@@ -65,7 +65,7 @@ if SERVER then
 				continue
 			end
 
-			local range = tonumber(p.range or MN.Config.defaultRange) or MN.Config.defaultRange
+			local range = tonumber(p.range) or MN.Config.defaultRange
 			local pos = ent:GetPos()
 			local around = ents.FindInSphere(pos, range)
 			for _, target in ipairs(around or {}) do

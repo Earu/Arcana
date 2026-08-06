@@ -663,7 +663,7 @@ if CLIENT then
 					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
 
 					-- Cost info
-					local ca = tonumber(sp.cost_amount or 0) or 0
+					local ca = tonumber(sp.cost_amount) or 0
 					local ct = tostring(sp.cost_type or "")
 					if ct == Arcana.COST_TYPES.COINS then
 						ArtDeco.DrawCostLine("Arcana_AncientSmall", 12, 32, {

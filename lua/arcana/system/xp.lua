@@ -333,21 +333,6 @@ function Arcana:CalculateExpectedKnowledgePoints(ply)
 end
 
 if SERVER then
-	-- Recalculates a player's KP from first principles and overwrites the stored value.
-	-- Useful as an admin repair tool or a post-load integrity check.
-	-- Returns the corrected KP amount.
-	function Arcana:RecalculateAndRepairKnowledgePoints(ply)
-		local data = self:GetPlayerData(ply)
-		if not data then return 0 end
-		local corrected = self:CalculateExpectedKnowledgePoints(ply)
-		data.knowledge_points = corrected
-		self:SavePlayerData(ply)
-		self:SyncPlayerData(ply)
-		return corrected
-	end
-end
-
-if SERVER then
 	util.AddNetworkString("Arcana_XPUpdate")
 	util.AddNetworkString("Arcana_LevelUp")
 	util.AddNetworkString("Arcana_UnlockSpell")

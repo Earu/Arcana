@@ -370,51 +370,51 @@ end
 
 -- Apply contact damage when hit by physics props or vehicles
 function ENT:OnContact(other)
-    if not IsValid(other) then return end
+	if not IsValid(other) then return end
 
-    local now = CurTime()
-    if now < (self._nextImpactDamage or 0) then return end
+	local now = CurTime()
+	if now < (self._nextImpactDamage or 0) then return end
 
-    local impactSpeed = 0
-    local mass = 0
-    local attacker = other
-    local inflictor = other
+	local impactSpeed = 0
+	local mass = 0
+	local attacker = other
+	local inflictor = other
 
-    if other:IsVehicle() then
-        impactSpeed = other:GetVelocity():Length()
-        mass = 800 -- approximate effective mass for vehicles
-        local driver = other:GetDriver()
-        if IsValid(driver) then attacker = driver end
-    else
+	if other:IsVehicle() then
+		impactSpeed = other:GetVelocity():Length()
+		mass = 800 -- approximate effective mass for vehicles
+		local driver = other:GetDriver()
+		if IsValid(driver) then attacker = driver end
+	else
 		if other:IsPlayer() or other:IsNPC() or other:IsNextBot() then return end
 
-        local phys = other:GetPhysicsObject()
-        if IsValid(phys) then
-            -- Use the other's own speed only so the skeleton doesn't damage itself by running into static props
-            local otherVel = phys:GetVelocity()
-            impactSpeed = otherVel:Length()
-            mass = phys:GetMass()
-        end
-    end
+		local phys = other:GetPhysicsObject()
+		if IsValid(phys) then
+			-- Use the other's own speed only so the skeleton doesn't damage itself by running into static props
+			local otherVel = phys:GetVelocity()
+			impactSpeed = otherVel:Length()
+			mass = phys:GetMass()
+		end
+	end
 
-    if impactSpeed <= 0 or mass <= 0 then return end
+	if impactSpeed <= 0 or mass <= 0 then return end
 
-    -- Ignore glancing or slow touches
-    if impactSpeed < 140 then return end
+	-- Ignore glancing or slow touches
+	if impactSpeed < 140 then return end
 
-    -- Scale damage by momentum with sane clamps
-    local damage = math.Clamp((impactSpeed * mass) / 500, 8, 120)
+	-- Scale damage by momentum with sane clamps
+	local damage = math.Clamp((impactSpeed * mass) / 500, 8, 120)
 
-    local dmg = DamageInfo()
-    dmg:SetDamage(damage)
-    dmg:SetDamageType(other:IsVehicle() and DMG_VEHICLE or DMG_CRUSH)
-    dmg:SetAttacker(IsValid(attacker) and attacker or other)
-    dmg:SetInflictor(IsValid(inflictor) and inflictor or other)
+	local dmg = DamageInfo()
+	dmg:SetDamage(damage)
+	dmg:SetDamageType(other:IsVehicle() and DMG_VEHICLE or DMG_CRUSH)
+	dmg:SetAttacker(IsValid(attacker) and attacker or other)
+	dmg:SetInflictor(IsValid(inflictor) and inflictor or other)
 
-    self:TakeDamageInfo(dmg)
+	self:TakeDamageInfo(dmg)
 
-    -- brief cooldown to prevent multiple rapid applications from the same contact
-    self._nextImpactDamage = now + 0.1
+	-- brief cooldown to prevent multiple rapid applications from the same contact
+	self._nextImpactDamage = now + 0.1
 end
 
 function ENT:OnTraceAttack(dmg, dir, tr)

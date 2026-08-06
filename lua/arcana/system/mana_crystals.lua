@@ -252,8 +252,8 @@ if SERVER then
 
 		-- Determine size factor from crystal scale (normalized 0..1 between min/max)
 		local s = (crystalEnt.GetCrystalScale and crystalEnt:GetCrystalScale()) or 1
-		local minS = tonumber(cfg.crystalMinScale or 0.35) or 0.35
-		local maxS = tonumber(cfg.crystalMaxScale or 2.2) or 2.2
+		local minS = tonumber(cfg.crystalMinScale) or 0.35
+		local maxS = tonumber(cfg.crystalMaxScale) or 2.2
 		local sizeT = 0
 		if maxS > minS then
 			sizeT = math.Clamp((s - minS) / (maxS - minS), 0, 1)

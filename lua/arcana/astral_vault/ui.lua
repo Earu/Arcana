@@ -146,7 +146,7 @@ end
 local function getEnchantDisplayList(ids)
 	local out = {}
 	for _, id in ipairs(ids or {}) do
-		local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
+		local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 		out[#out + 1] = (e and e.name) or tostring(id)
 	end
 	table.sort(out)
@@ -224,7 +224,7 @@ local function openVault(items)
 			ArtDeco.FitModelPanel(self, MODEL_FOV, MODEL_DIR)
 		end
 		function model:PostDrawModel(ent)
-			if Arcana and Arcana.RenderEnchantBandsForEntity then
+			if Arcana.RenderEnchantBandsForEntity then
 				Arcana:RenderEnchantBandsForEntity(ent, self._EnchantCount or 3,
 					(LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or COLOR_GOLD,
 					self._BandStyle or "axis", {isMelee = self._BandIsMelee})

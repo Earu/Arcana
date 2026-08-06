@@ -122,7 +122,7 @@ if SERVER then
 			local replenishCost = self:GetReplenishCost()
 
 			if replenishCost > 0 and Arcana:GetCoins(ply) < replenishCost then
-				if Arcana and Arcana.SendErrorNotification then
+				if Arcana.SendErrorNotification then
 					Arcana:SendErrorNotification(ply, "Insufficient coins to replenish ritual")
 				end
 
@@ -174,7 +174,7 @@ if SERVER then
 		end
 
 		if #missing > 0 then
-			if Arcana and Arcana.SendErrorNotification then
+			if Arcana.SendErrorNotification then
 				Arcana:SendErrorNotification(ply, "Missing: " .. table.concat(missing, ", "))
 			end
 
@@ -200,7 +200,7 @@ if SERVER then
 		net.Broadcast()
 
 		-- Report magic use at ritual activation
-		if Arcana and Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
+		if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
 			local pos = self:GetPos()
 			local rid = self.GetRitualId and self:GetRitualId() or "ritual"
 			Arcana.ManaCrystals:ReportMagicUse(ply, pos, rid, {isRitual = true})
@@ -230,17 +230,17 @@ if SERVER then
 		-- config: { id, owner, coin_cost, items = {name=amt}, on_activate = function(self) end, lifetime,
 		--           replenishable, replenish_cost, on_replenish }
 		self._requirements = shallowCopy(config.items or {})
-		self._coinCost = tonumber(config.coin_cost or 0) or 0
+		self._coinCost = tonumber(config.coin_cost) or 0
 		self._owner = IsValid(config.owner) and config.owner or nil
 		self._onActivate = isfunction(config.on_activate) and config.on_activate or nil
 		self._onReplenish = isfunction(config.on_replenish) and config.on_replenish or nil
-		self._lifetime = math.max(1, tonumber(config.lifetime or 300) or 300)
+		self._lifetime = math.max(1, tonumber(config.lifetime) or 300)
 		self._replenishable = config.replenishable == true
 		self:SetRitualId(tostring(config.id or ""))
 		self:SetExpireAt(CurTime() + self._lifetime)
 		self:SetIsReplenishable(self._replenishable)
 		self:SetIsActivated(false)
-		self:SetReplenishCost(math.Clamp(tonumber(config.replenish_cost or 0) or 0, 0, 2147483647))
+		self:SetReplenishCost(math.Clamp(tonumber(config.replenish_cost) or 0, 0, 2147483647))
 		self:SetTotalLifetime(self._lifetime)
 		self:_Sync()
 	end

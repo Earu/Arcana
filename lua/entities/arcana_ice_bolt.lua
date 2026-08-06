@@ -85,7 +85,6 @@ if SERVER then
 		if self._detonated then return end
 
 		self._detonated = true
-		local owner = self:GetSpellOwner() or self
 		local pos = self._impactPos or self:GetPos()
 		local target = self._impactEnt
 

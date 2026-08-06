@@ -242,7 +242,7 @@ if SERVER then
 
 		local wep = ent:GetContainedWeapon()
 		if not IsValid(wep) then
-			if Arcana and Arcana.SendErrorNotification then
+			if Arcana.SendErrorNotification then
 				Arcana:SendErrorNotification(ply, "Deposit a weapon first")
 			end
 
@@ -250,7 +250,7 @@ if SERVER then
 		end
 
 		-- Collect unique enchantments, drop duplicates or ones already present
-		local targetCurrent = Arcana and Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
+		local targetCurrent = Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
 		local selected = {}
 		for _, id in ipairs(list) do
 			if not targetCurrent[id] then
@@ -282,7 +282,7 @@ if SERVER then
 		-- Validate applicability and aggregate costs
 		local enchs = {}
 		for _, id in ipairs(idsOrdered) do
-			local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
+			local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 
 			if e then
 				table.insert(enchs, {
@@ -297,7 +297,7 @@ if SERVER then
 				local callOk, allowed, reason = pcall(it.ench.can_apply, ply, wep)
 
 				if not callOk or allowed == false then
-					if Arcana and Arcana.SendErrorNotification then
+					if Arcana.SendErrorNotification then
 						local msg = callOk and tostring(reason or "weapon not eligible") or tostring(allowed)
 						Arcana:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. msg)
 					end
@@ -310,11 +310,11 @@ if SERVER then
 		local sumCoins = 0
 		local itemTotals = {}
 		for _, it in ipairs(enchs) do
-			sumCoins = sumCoins + (tonumber(it.ench.cost_coins or 0) or 0)
+			sumCoins = sumCoins + (tonumber(it.ench.cost_coins) or 0)
 
 			for _, it2 in ipairs(it.ench.cost_items or {}) do
 				local name = tostring(it2.name or "")
-				local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+				local amt = math.max(1, math.floor(tonumber(it2.amount) or 1))
 
 				if name ~= "" then
 					itemTotals[name] = (itemTotals[name] or 0) + amt
@@ -324,7 +324,7 @@ if SERVER then
 
 		local coins = Arcana:GetCoins(ply)
 		if coins < sumCoins then
-			if Arcana and Arcana.SendErrorNotification then
+			if Arcana.SendErrorNotification then
 				Arcana:SendErrorNotification(ply, "Insufficient coins")
 			end
 
@@ -335,7 +335,7 @@ if SERVER then
 			local have = Arcana:GetItemCount(ply, name)
 
 			if have < amt then
-				if Arcana and Arcana.SendErrorNotification then
+				if Arcana.SendErrorNotification then
 					Arcana:SendErrorNotification(ply, "Missing item: " .. tostring(name))
 				end
 
@@ -651,7 +651,7 @@ if CLIENT then
 	end
 
 	local function getEnchantmentsList()
-		return Arcana and Arcana.RegisteredEnchantments or {}
+		return Arcana.RegisteredEnchantments or {}
 	end
 
 	local HL2_MODELS = {
@@ -909,12 +909,12 @@ if CLIENT then
 			needCoins, needShards = 0, 0
 			for id, on in pairs(selected) do
 				if on then
-					local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
+					local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 					if e then
-						needCoins = needCoins + (tonumber(e.cost_coins or 0) or 0)
+						needCoins = needCoins + (tonumber(e.cost_coins) or 0)
 						for _, it in ipairs(e.cost_items or {}) do
 							local name = tostring(it.name or "")
-							local amt = math.max(1, math.floor(tonumber(it.amount or 1) or 1))
+							local amt = math.max(1, math.floor(tonumber(it.amount) or 1))
 							if name == "mana_crystal_shard" then
 								needShards = needShards + amt
 							end
@@ -1341,14 +1341,14 @@ if CLIENT then
 
 					-- Cost amounts with currency icons under the name
 					local costSegs = {}
-					local coinAmt = tonumber(ench.cost_coins or 0) or 0
+					local coinAmt = tonumber(ench.cost_coins) or 0
 					if coinAmt > 0 then
 						costSegs[#costSegs + 1] = {text = string.Comma(coinAmt), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.textDim}
 					end
 
 					for _, it2 in ipairs(ench.cost_items or {}) do
 						local name = tostring(it2.name or "item")
-						local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+						local amt = math.max(1, math.floor(tonumber(it2.amount) or 1))
 						if name == "mana_crystal_shard" then
 							costSegs[#costSegs + 1] = {text = string.Comma(amt), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.textDim}
 						else

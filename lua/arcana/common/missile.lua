@@ -35,7 +35,6 @@ if SERVER then
 	--   - count: number of missiles (default 3)
 	--   - delay: delay between each missile spawn (default 0.06)
 	function Arcana.Common.LaunchMissiles(caster, origin, aim, options)
-		if not SERVER then return end
 		if not IsValid(caster) then return end
 		if not isvector(origin) or not isvector(aim) then return end
 
