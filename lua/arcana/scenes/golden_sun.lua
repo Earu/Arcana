@@ -1,4 +1,4 @@
--- Golden Sun scene — an encounter with the Golden Sun, an eldritch entity that
+-- Golden Sun scene: an encounter with the Golden Sun, an eldritch entity that
 -- speaks through a golden statue (its Avatar). Its mischief does not map to
 -- human mischief; its workings and goals are unknown. It offers coins in
 -- exchange for the midas touch (the actual midas status is not implemented

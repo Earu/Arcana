@@ -1,4 +1,4 @@
--- Grimoire tutorial scene — Iara and the golden tree in Elysion.
+-- Grimoire tutorial scene: Iara and the golden tree in Elysion.
 -- Provides the dialogue tree, the auto-trigger when a player first carries the
 -- grimoire, and the scene visuals (crystal tree + white/cyan/purple sparkles)
 -- rendered through the Arcana_Tutorial_* scene hooks (see arcana/system/tutorial.lua).

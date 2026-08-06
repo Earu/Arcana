@@ -398,7 +398,7 @@ if CLIENT then
 	end
 
 	function ENT:Think()
-		-- Lazy band creation — deferred so BandCircle is guaranteed to be loaded
+		-- Lazy band creation: deferred so BandCircle is guaranteed to be loaded
 		if not self._bands then
 			local BandCircle = Arcana.Circle.BandCircle
 			if BandCircle then

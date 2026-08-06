@@ -249,7 +249,7 @@ if SERVER then
 		return true
 	end
 
-	-- Direct lifecycle callbacks — called by lifecycle.lua before firing the matching hook,
+	-- Direct lifecycle callbacks: called by lifecycle.lua before firing the matching hook,
 	-- so these always run even if a third-party hook listener returns early.
 	function Arcana.Inventory.OnPlayerDataLoaded(ply)
 		Arcana.Inventory:SyncToClient(ply)

@@ -167,7 +167,7 @@ if CLIENT then
 	end)
 
 	-- Stop emitting particles for a projectile that has detonated (either via removal
-	-- or velocity timeout — the entity may still be valid in the latter case).
+	-- or velocity timeout: the entity may still be valid in the latter case).
 	net.Receive("Arcana_ConductiveShell_Untrack", function()
 		local ent = net.ReadEntity()
 		local data = trackedEntities[ent]

@@ -1,4 +1,4 @@
--- VFX Network — Server-side broadcast helpers and client-side VFX receivers
+-- VFX Network: Server-side broadcast helpers and client-side VFX receivers
 -- for spell cast circles, band circles, gestures, and cast failure visuals.
 -- Extracted from core.lua so core can stay focused on spell registration and casting flow.
 

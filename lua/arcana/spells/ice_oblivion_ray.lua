@@ -342,7 +342,7 @@ if CLIENT then
 	end
 
 	-- Fades all circles/bands stored in castingData for a caster (cast phase + beam phase).
-	-- With shatter set, the circles break apart instead — used when the cast is cut short.
+	-- With shatter set, the circles break apart instead, used when the cast is cut short.
 	local function fadeAllCastingCircles(caster, fadeDur, shatter)
 		local d = castingData[caster]
 		if not d then return end
@@ -740,7 +740,7 @@ if CLIENT then
 			Arcana.Common.ScreenShake(caster:EyePos(), 7, 115, 1.5, 750)
 		end)
 
-		-- Safety cleanup for cast failure / timeout (skip if beam phase is active —
+		-- Safety cleanup for cast failure / timeout (skip if beam phase is active,
 		-- BeamEnd handles cleanup in that case)
 		timer.Simple(castTime + 2, function()
 			local d2 = castingData[caster]
@@ -770,7 +770,7 @@ if CLIENT then
 		local duration   = net.ReadFloat()
 
 		-- Transition circles to beam phase: keep tracking aim, suppress casting-phase arcs.
-		-- The Think hook remains running — it will now also drive the beam direction/origin.
+		-- The Think hook remains running: it will now also drive the beam direction/origin.
 		if IsValid(caster) and castingData[caster] then
 			castingData[caster].beamPhase   = true
 			castingData[caster].arcStarted  = false  -- beam-origin arcs come from the render hook

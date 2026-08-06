@@ -1,4 +1,4 @@
--- Arcana Persistence — player data storage, retrieval, and network sync.
+-- Arcana Persistence: player data storage, retrieval, and network sync.
 -- Covers: default data schema, SQL CRUD, in-memory GetPlayerData/SavePlayerData/LoadPlayerData,
 --         SyncPlayerData, SendErrorNotification, and related player lifecycle hooks.
 
@@ -117,7 +117,7 @@ if SERVER then
 
 		-- Merge strategy: xp/level take max, unlocked_spells union, quickslots prefer incoming.
 		-- knowledge_points is fully derived from merged_level and merged_unlocked (earned - spent),
-		-- because it is a spendable value — higher is not necessarily truer, only the formula is.
+		-- because it is a spendable value: higher is not necessarily truer, only the formula is.
 		local function mergeWithExistingRow(row)
 			if not istable(row) then
 				local derived_kp = math.max(0,
@@ -185,7 +185,7 @@ if SERVER then
 			data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
 			data.last_save = tonumber(row.last_save) or data.last_save
 			-- KP is fully derived from level and spells rather than trusted from storage,
-			-- because it is a spendable value — the formula is the only ground truth.
+			-- because it is a spendable value: the formula is the only ground truth.
 			-- CalculateExpectedKnowledgePoints requires data to be in Arcana.PlayerData which
 			-- it isn't yet at this point, so we call the two constituent helpers directly.
 			data.knowledge_points = math.max(0,

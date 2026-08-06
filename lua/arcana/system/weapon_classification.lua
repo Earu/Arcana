@@ -353,8 +353,8 @@ if SERVER then
 	-- Returns the scripted entity class string when `source` contains an ents.Create call
 	-- that creates a scripted entity (truthy), true when the argument is a variable and
 	-- the class cannot be resolved statically (conservatively assumes scripted), or false.
-	-- `func`   – the function whose upvalues can be inspected to resolve bare variables
-	-- `weapon` – the SWEP table used to resolve self.Field / SWEP.Field member access
+	-- `func`: the function whose upvalues can be inspected to resolve bare variables
+	-- `weapon`: the SWEP table used to resolve self.Field / SWEP.Field member access
 	local function sourceHasScriptedCreate(source, func, weapon)
 		-- Parenthesised call: ents.Create("foo") or ents.Create(var)
 		for args in source:gmatch("ents%.Create%s*(%b())") do
@@ -394,10 +394,10 @@ if SERVER then
 	end
 
 	-- Recursively inspects `func`'s source using a caller-supplied match function.
-	-- `weapon`  – the SWEP table being analysed (used to resolve self:Method calls)
-	-- `visited` – set of "file:line" keys already examined (cycle guard)
-	-- `depth`   – current recursion depth
-	-- `matchFn` – function(source: string): bool called on each function body
+	-- `weapon`: the SWEP table being analysed (used to resolve self:Method calls)
+	-- `visited`: set of "file:line" keys already examined (cycle guard)
+	-- `depth`: current recursion depth
+	-- `matchFn`: function(source: string): bool called on each function body
 	local function checkForMatch(func, weapon, visited, depth, matchFn)
 		if depth > MAX_DEPTH then return false end
 
@@ -898,7 +898,7 @@ if SERVER then
 	end
 
 	--- Resolve the player owner of a freshly-created projectile entity.
-	-- Tries GetOwner, then CPPI (community standard, not vanilla — always guard), then
+	-- Tries GetOwner, then CPPI (community standard, not vanilla, always guard), then
 	-- spatial proximity to the closest player holding (or recently holding) a matching
 	-- PROJECTILE-classified weapon. The proximity fallback also checks the player's cached
 	-- previous weapon to handle weapons removed between fire and this deferred check.
@@ -911,7 +911,7 @@ if SERVER then
 		local owner = ent:GetOwner()
 		if IsValid(owner) and owner:IsPlayer() then return owner end
 
-		-- Tier 2: CPPI community standard (not part of vanilla GLua API — always guard)
+		-- Tier 2: CPPI community standard (not part of vanilla GLua API, always guard)
 		if isfunction(ent.CPPIGetOwner) then
 			owner = ent:CPPIGetOwner()
 			if IsValid(owner) and owner:IsPlayer() then return owner end
@@ -953,9 +953,9 @@ if SERVER then
 	end
 
 	--- Tracks a projectile and calls each registered onDetonate(ent) callback when either:
-	--   a) The entity is removed (standard detonation) — primary trigger via CallOnRemove.
+	--   a) The entity is removed (standard detonation): primary trigger via CallOnRemove.
 	--   b) The entity's speed has been below SLOW_VEL_THRESHOLD for SLOW_VEL_DURATION seconds
-	--      — catches sticky/long-lived projectiles that never naturally remove themselves.
+	-- - catches sticky/long-lived projectiles that never naturally remove themselves.
 	-- Multiple enchantments on the same projectile each call this independently; all callbacks
 	-- are stored in a list and fired together from a single shared CallOnRemove/velocity trigger.
 	-- Each callback fires exactly once per detonation event.

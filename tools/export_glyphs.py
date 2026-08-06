@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Arcana Glyph PNG Exporter
-Renders each of the 8 Pulsian runic glyphs (A–H) to a square PNG where the
+Renders each of the 8 Pulsian runic glyphs (A-H) to a square PNG where the
 glyph fills a configurable fraction of the canvas (~85 % by default).
 
 Requirements:  pip install Pillow
@@ -77,7 +77,7 @@ def render_glyph(char: str, font_path: Path, canvas: int, fill: float) -> Image.
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Export Arcana rune glyphs (A–H) to PNG using the Pulsian font."
+        description="Export Arcana rune glyphs (A-H) to PNG using the Pulsian font."
     )
     parser.add_argument(
         "--output", "-o",
@@ -130,7 +130,7 @@ def main() -> None:
         except Exception as exc:
             print(f"  [SKIP] '{ch}': {exc}", file=sys.stderr)
 
-    print(f"\nDone — {len(args.glyphs)} file(s) written to {output_dir.resolve()}")
+    print(f"\nDone, {len(args.glyphs)} file(s) written to {output_dir.resolve()}")
 
 
 if __name__ == "__main__":

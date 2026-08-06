@@ -51,7 +51,7 @@ local STANDOFF_DIST = 550
 local XP_REWARD     = 150
 local FOOTSTEP_MIN_SPEED = 60
 
--- Spell definitions — cast times are 3× their player counterparts, cooldowns are halved
+-- Spell definitions: cast times are 3× their player counterparts, cooldowns are halved
 local SPELLS = {
 	lightning_strike = { castTime = 3.0, cooldown = 7.0 },
 	lightning_orb    = { castTime = 3.6, cooldown = 11.0 },
@@ -223,7 +223,7 @@ function ENT:_NextSpell()
 	end
 end
 
--- Called inside the RunBehaviour coroutine — yields internally for the cast duration
+-- Called inside the RunBehaviour coroutine: yields internally for the cast duration
 function ENT:_DoCast(spellId, tgt)
 	-- Snapshot where the player is standing RIGHT NOW so they can dodge during the cast
 	local strikePos = (spellId == "lightning_strike" and IsValid(tgt)) and tgt:GetPos() or nil
@@ -267,7 +267,7 @@ function ENT:_DoCast(spellId, tgt)
 	self:SetAnimState("idle") -- back to normal holdtype
 end
 
--- targetPos is snapshotted at cast-start (feet position), not live — players can dodge by moving
+-- targetPos is snapshotted at cast-start (feet position), not live, players can dodge by moving
 function ENT:_FireLightningStrike(targetPos)
 	local strikes = {
 		{ delay = 0.00, offset = Vector(0, 0, 0),                                   power = 1.0 },
@@ -479,7 +479,7 @@ function ENT:OnRemove()
 	end
 end
 
--- ── Think (client visuals only — nextbot calls this automatically) ────────────
+-- ── Think (client visuals only, nextbot calls this automatically) ────────────
 
 local DRAW_DISTANCE = 2000 * 2000
 

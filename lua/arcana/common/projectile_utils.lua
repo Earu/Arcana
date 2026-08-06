@@ -57,7 +57,7 @@ if SERVER then
 		if ent.LaunchTowards and isvector(direction) then ent:LaunchTowards(direction) end
 	end
 
-	-- Canonical defaults for ApplyLightningChain opts — serves as documentation and
+	-- Canonical defaults for ApplyLightningChain opts: serves as documentation and
 	-- allows callers to override only the keys that differ from the standard behaviour.
 	Arcana.Common.LIGHTNING_CHAIN_DEFAULTS = {
 		baseDamage  = 60,   -- AoE damage at hitPos
@@ -74,8 +74,8 @@ if SERVER then
 	-- @param attacker Entity  Attacker (player or NPC)
 	-- @param hitPos   Vector  Center of the blast and chain search
 	-- @param opts     table   Optional overrides (see Arcana.Common.LIGHTNING_CHAIN_DEFAULTS for all keys):
-	--   spawnTesla: function(pos) -> Entity — called to spawn visual effect at chain position
-	--   onChain:    function(tgt, tpos, chainIdx) -> nil — called after each chain strike
+	--   spawnTesla: function(pos) -> Entity, called to spawn visual effect at chain position
+	--   onChain:    function(tgt, tpos, chainIdx) -> nil, called after each chain strike
 	function Arcana.Common.ApplyLightningChain(attacker, hitPos, opts)
 		opts = opts or {}
 		local D = Arcana.Common.LIGHTNING_CHAIN_DEFAULTS

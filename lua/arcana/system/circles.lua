@@ -1,4 +1,4 @@
--- Arcana Circles — orchestrator module.
+-- Arcana Circles: orchestrator module.
 -- Loads circles/ring.lua → circles/magic_circle.lua → circles/band_circle.lua in order,
 -- registers their shaders and ring/glyph materials, and publishes the public API as
 -- Arcana.Circle.{Ring,MagicCircle,BandCircle}. Consumers read it from there; there is no

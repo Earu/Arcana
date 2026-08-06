@@ -32,7 +32,7 @@ Fusion.Combine(spellIds)
     ├─ _callAnthropic(generator)   Claude generates the fusion spell code
     │   └─ extended thinking enabled (THINKING_BUDGET tokens)
     │
-    ├─ Gate 1: CompileString       syntax check — retries with error on fail
+    ├─ Gate 1: CompileString       syntax check, retries with error on fail
     │
     ├─ Gate 2: _callAnthropic(judge)   second Claude call scores the code
     │   └─ light thinking (JUDGE_THINKING_BUDGET tokens)
@@ -158,7 +158,7 @@ Hard-fail thresholds (any one fails → retry):
 | `overall` | 7.0 |
 
 The `fusion` score specifically measures whether **every** component spell's mechanic and visual
-theme is recognisably present. A spell that is essentially one parent re-coloured scores 1–2 and
+theme is recognisably present. A spell that is essentially one parent re-coloured scores 1-2 and
 will always be rejected and retried with a `CRITICAL` note in the retry message.
 
 ---

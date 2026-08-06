@@ -1,10 +1,10 @@
--- Spellcraft — shared component catalog, power budget, pricing, and the pure
+-- Spellcraft: shared component catalog, power budget, pricing, and the pure
 -- Compile/Requirements functions.
 --
 -- A crafted spell is authored as component ids only (a Form, an Essence, and up to
 -- four Clause ranks). Numbers never travel on the wire: the server recompiles
 -- every stat, per-cast cost, and offering from this catalog, so a modified
--- client can inject ids at worst — never values — and a balance patch here
+-- client can inject ids at worst: never values, and a balance patch here
 -- applies retroactively to every crafted spell on the next load.
 --
 -- Two pure entry points:
@@ -66,7 +66,7 @@ function P.Budget(level)
 end
 
 ----------------------------------------------------------------------
--- Forms — the four orthogonal delivery mechanisms (pick exactly one)
+-- Forms: the four orthogonal delivery mechanisms (pick exactly one)
 ----------------------------------------------------------------------
 P.Forms = {
 	bolt = {
@@ -100,7 +100,7 @@ P.Forms = {
 }
 
 ----------------------------------------------------------------------
--- Essences — pick one; each is unlocked with a one-time offering.
+-- Essences: pick one; each is unlocked with a one-time offering.
 -- Differentiation is behavioural (rider + damage type + colour), not points.
 ----------------------------------------------------------------------
 P.Essences = {
@@ -126,7 +126,7 @@ P.Essences = {
 }
 
 ----------------------------------------------------------------------
--- Clauses — 0..5 total ranks; each rank is level-gated. Repetition = rank.
+-- Clauses: 0..5 total ranks; each rank is level-gated. Repetition = rank.
 ----------------------------------------------------------------------
 -- allowForm/allowEssence: nil = allowed everywhere; a set restricts.
 -- deny: an explicit set that blocks specific forms.
@@ -213,7 +213,7 @@ function P.DefHash(def)
 end
 
 ----------------------------------------------------------------------
--- Compile — structural validity, clamped stats, and prices. Pure.
+-- Compile: structural validity, clamped stats, and prices. Pure.
 ----------------------------------------------------------------------
 -- Returns (compiled, nil) or (nil, errorString).
 function P.Compile(def)
@@ -393,7 +393,7 @@ function P.Compile(def)
 end
 
 ----------------------------------------------------------------------
--- Requirements — per-server eligibility, evaluated live. Pure.
+-- Requirements: per-server eligibility, evaluated live. Pure.
 ----------------------------------------------------------------------
 -- state = { level = number, essences = { [id]=true }, bargain = bool, consecrated = bool }
 -- Returns a checklist table with a `castable` flag and `firstMissing` reason.

@@ -1,4 +1,4 @@
--- environments.lua — Core environment registry and lifecycle management.
+-- environments.lua, Core environment registry and lifecycle management.
 -- This file owns the Arcana.Environments API (RegisterEnvironment, Activate, Deactivate,
 -- networking, and cooldown tracking). Concrete environment implementations live under
 -- arcana/environments/ and are loaded after this file by includePath("arcana/environments").

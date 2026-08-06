@@ -1,4 +1,4 @@
--- Spellcraft — runtime. One generic interpreter drives every crafted spell.
+-- Spellcraft: runtime. One generic interpreter drives every crafted spell.
 --
 -- SHARED : BuildSpellData (turns a compiled crafted spell into an Arcana spell),
 --          net-string strings used by both realms.
@@ -116,7 +116,7 @@ if SERVER then
 	end
 
 	-- Key for per-caster records (self auras). Players keep their SteamID64 so a record
-	-- survives their entity churn; anything else — NPC mages, spell casters — is keyed
+	-- survives their entity churn; anything else, NPC mages, spell casters, is keyed
 	-- by entity index.
 	local function casterKey(ent)
 		if not IsValid(ent) then return nil end

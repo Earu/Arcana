@@ -1,17 +1,17 @@
--- Arcana NPC Mages — an NPC handed a grimoire rolls an elemental speciality and
+-- Arcana NPC Mages: an NPC handed a grimoire rolls an elemental speciality and
 -- generates its own crafted spells through the spellcraft catalog, then fights with them.
 --
 -- SHARED : the speciality table (the client reads it to tint cast circles).
 -- SERVER : spellbook generation, the combat think loop, and the cast pipeline.
 --
--- NPCs have no player data — no unlocked spells, no knowledge level, no coins, no XP —
+-- NPCs have no player data: no unlocked spells, no knowledge level, no coins, no XP,
 -- so none of Arcana.StartCasting/CastSpell applies here. What is reused instead is the
 -- spellcraft interpreter: Arcana.Spellcraft.Compile turns a random {form, essence,
 -- clauses} definition into a compiled spell, and Arcana.Spellcraft.Execute casts it for
 -- any entity. Both are already caster-agnostic, so a mage needs no registered spell id.
 --
 -- NOTE: arcana/system/* is included before arcana/spellcraft/*, so Arcana.Spellcraft
--- must be read inside function bodies — a file-scope alias would be nil at load time.
+-- must be read inside function bodies: a file-scope alias would be nil at load time.
 -- Same gotcha core.lua documents for Arcana.Circle.
 
 Arcana = Arcana or {}
@@ -42,7 +42,7 @@ if SERVER then
 	local THINK_INTERVAL = 0.25
 
 	-- Power budget a generated spell may spend. A form costs 20-25 points and an essence
-	-- 8, so this leaves room for roughly two modifiers — and it is the only damage knob
+	-- 8, so this leaves room for roughly two modifiers, and it is the only damage knob
 	-- a mage has, since Compile derives everything else from the definition.
 	local SPELL_BUDGET = 48
 	local SPELLBOOK_SIZE = 3

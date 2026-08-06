@@ -1,5 +1,5 @@
 -- ============================================================
--- weapon_labeler.lua  —  Weapon Ground Truth Labeling Tool
+-- weapon_labeler.lua, Weapon Ground Truth Labeling Tool
 --
 -- SETUP (run both lines in the game console):
 --   lua_openscript    wip/weapon_labeler.lua     <- server  (registers give handler)

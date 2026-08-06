@@ -143,7 +143,7 @@ if SERVER then
 	end
 
 	-- Deduct one shot's cost: coins first, health otherwise.
-	-- Gate on GetCoins rather than TakeCoins' return value — third-party TakeCoins
+	-- Gate on GetCoins rather than TakeCoins' return value: third-party TakeCoins
 	-- overrides may not return anything, which would wrongly trigger the health cost.
 	function ENT:ChargePilot(ply)
 		if not IsValid(ply) then return end
@@ -162,7 +162,7 @@ if SERVER then
 		takeDamageInfo(ply, dmg)
 	end
 
-	-- Arcane explosion at the beam's impact — damage + networked visual, all owned by
+	-- Arcane explosion at the beam's impact: damage + networked visual, all owned by
 	-- the tower (the beam only draws itself and deals the direct line hit).
 	function ENT:ArcaneExplosion(pos, normal)
 		local pilot = self:GetPilot()

@@ -1,4 +1,4 @@
--- Arcana Ring PNG Exporter — developer one-shot tool.
+-- Arcana Ring PNG Exporter: developer one-shot tool.
 -- Renders every ring type and 8 rune glyphs to high-resolution PNGs in the DATA folder.
 --
 -- Usage (from a client Lua console or developer autorun):
@@ -10,7 +10,7 @@
 --   ring_rune_star.png
 --   ring_star_ring.png
 --   ring_band.png                 (2048×128 horizontal strip)
---   glyphs/glyph_<charcode>.png   (8 files, A–H)
+--   glyphs/glyph_<charcode>.png   (8 files, A-H)
 --
 -- These PNGs are the authoring format only. They are NOT kept in the repo and
 -- nothing loads them at runtime - only the DXT5 VTFs built from them ship, since
@@ -48,7 +48,7 @@ local EXPORT_GLYPHS = { "A", "B", "C", "D", "E", "F", "G", "H" }
 
 local function run()
 	if not (Arcana and Arcana.RUNIC_FONT) then
-		MsgC(Color(255, 80, 80), "[ArcanaExport] Arcana circle system not ready — aborting.\n")
+		MsgC(Color(255, 80, 80), "[ArcanaExport] Arcana circle system not ready, aborting.\n")
 		return
 	end
 
@@ -66,7 +66,7 @@ local function run()
 	-- Geometry constants for the ring canvas
 	local cx = RING_SIZE * 0.5
 	local cy = RING_SIZE * 0.5
-	local R  = math.floor(RING_SIZE * 0.47)   -- ring radius — ~3 % margin around the edge
+	local R  = math.floor(RING_SIZE * 0.47)   -- ring radius, ~3 % margin around the edge
 
 	-- ── Drawing primitives ───────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ local function run()
 
 	-- ── Per-character glyph materials (for circular text rotation) ───────────
 	-- Each unique font+char gets its own tiny RT rendered once here.
-	-- At 2 K with TEXT_FONT size 48, each glyph RT is roughly 30–45 px wide.
+	-- At 2 K with TEXT_FONT size 48, each glyph RT is roughly 30-45 px wide.
 
 	local glyphMats = {}
 
@@ -208,12 +208,12 @@ local function run()
 
 	-- ── Ring exports ──────────────────────────────────────────────────────────
 
-	-- 1. SIMPLE_LINE — single circle outline
+	-- 1. SIMPLE_LINE, single circle outline
 	exportRing("ring_simple_line.png", function()
 		thickCircle(cx, cy, R)
 	end)
 
-	-- 2. PATTERN_LINES — three variants with different baked phrases
+	-- 2. PATTERN_LINES, three variants with different baked phrases
 	local function exportPatternRing(filename, phrase)
 		exportRing(filename, function()
 			local gap    = math.max(5, math.floor(R * 0.05))
@@ -229,7 +229,7 @@ local function run()
 	exportPatternRing("ring_pattern_lines_2.png", PATTERN_PHRASE_2)
 	exportPatternRing("ring_pattern_lines_3.png", PATTERN_PHRASE_3)
 
-	-- 3. RUNE_STAR — main circle + 4 sub-circles at diagonals + cross-connections.
+	-- 3. RUNE_STAR, main circle + 4 sub-circles at diagonals + cross-connections.
 	-- Glyphs are NOT baked in: they are composited from the separate glyph PNGs at runtime
 	-- so they can be randomised per-cast.
 	exportRing("ring_rune_star.png", function()
@@ -251,7 +251,7 @@ local function run()
 		end
 	end)
 
-	-- 4. STAR_RING — 6-point star with spokes to centre (canonical variant)
+	-- 4. STAR_RING, 6-point star with spokes to centre (canonical variant)
 	exportRing("ring_star_ring.png", function()
 		local starPoints = 6
 		local innerR     = math.floor(R * 0.45)
@@ -276,7 +276,7 @@ local function run()
 		end
 	end)
 
-	-- 5. BAND_RING — three 2048×128 horizontal strips: line / text / line
+	-- 5. BAND_RING, three 2048×128 horizontal strips: line / text / line
 	-- The strip wraps around the cylindrical band mesh via UV repeat; all glyphs are
 	-- pre-warmed above so getGlyphMat is a cache-only lookup here (no nested RT push).
 	do
@@ -334,7 +334,7 @@ local function run()
 	end
 
 	-- ── Glyph exports ─────────────────────────────────────────────────────────
-	-- One 1024 × 1024 PNG per glyph — white character on transparent background.
+	-- One 1024 × 1024 PNG per glyph: white character on transparent background.
 
 	local glyphRT = GetRenderTarget("arcana_export_glyph_rt", GLYPH_SIZE, GLYPH_SIZE, false)
 
@@ -357,7 +357,7 @@ local function run()
 		MsgC(Color(120, 230, 120), string.format("[ArcanaExport]  %-45s  %d KB\n", path, math.floor(#png / 1024)))
 	end
 
-	MsgC(Color(180, 255, 180), "[ArcanaExport] Done — files written to data/" .. OUTPUT .. "/\n")
+	MsgC(Color(180, 255, 180), "[ArcanaExport] Done, files written to data/" .. OUTPUT .. "/\n")
 end
 
 -- ── Entry point ───────────────────────────────────────────────────────────────
