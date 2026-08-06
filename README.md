@@ -53,6 +53,8 @@ To replace the default SQLite persistence entirely, return `true` from any of th
 | `Arcana_LoadPlayerDataFromSQL(ply, callback)` | Override player data loading |
 | `Arcana_ReadAstralVault(ply, callback)` | Override vault reading |
 | `Arcana_WriteAstralVault(ply, items)` | Override vault writing |
+| `Arcana_ReadSpellcraftState(ply, callback)` | Override spellcraft activation reading |
+| `Arcana_WriteSpellcraftState(ply, state)` | Override spellcraft activation writing |
 
 ## Extending Arcana
 
@@ -296,6 +298,8 @@ The caps are enforced inside `P.Compile`, so they hold regardless of what compon
 | `Arcana_SyncPlayerData` | Client | `ply, data` | Fired after the client receives a full data sync from the server |
 | `Arcana_ReadAstralVault` | Server | `ply, callback` | Return `true` to suppress the default vault read; you must then call `callback(success, items)` on every path, failure included |
 | `Arcana_WriteAstralVault` | Server | `ply, items` | Return `true` to suppress the default vault write |
+| `Arcana_ReadSpellcraftState` | Server | `ply, callback` | Return `true` to suppress the default spellcraft read; you must then call `callback(success, state)` on every path, failure included |
+| `Arcana_WriteSpellcraftState` | Server | `ply, state` | Return `true` to suppress the default spellcraft write |
 
 ### Economy & Inventory
 

@@ -153,3 +153,37 @@ end)
 ```
 
 `items` is an array of vault entries, each carrying weapon info and its enchantments.
+
+### Spellcraft activations
+
+Crafted spell definitions live in the player's own client file; the server only records what
+they have unlocked and consecrated *here*. That per-server state is one table:
+
+```lua
+{
+    essences      = { fire = true, frost = true },   -- essences bought on this server
+    consecrations = { ["<defhash>"] = true },        -- crafted spells consecrated here
+}
+```
+
+```lua
+hook.Add("Arcana_ReadSpellcraftState", "YourAddonName", function(ply, callback)
+    YourDB:LoadSpellcraft(ply:SteamID64(), function(state)
+        callback(true, state)
+    end)
+    return true
+end)
+
+hook.Add("Arcana_WriteSpellcraftState", "YourAddonName", function(ply, state)
+    YourDB:SaveSpellcraft(ply:SteamID64(), state)
+    return true
+end)
+```
+
+Consecration is keyed by the definition's hash rather than by slot, so re-importing the same
+build later stays consecrated. Both sets only ever grow, which is why the default write is
+append-only and never deletes.
+
+As with the vault, the read hook must call `callback` on every path including failure. A
+player whose state fails to load finds their crafted spells locked, not deleted: both the
+consecration and essence checks fail closed.
