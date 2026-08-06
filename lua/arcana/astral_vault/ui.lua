@@ -1,10 +1,10 @@
 -- Astral Vault UI — client-side panel, slot cards, galaxy background renderer.
--- Server-side persistence, SQL schema, and net.Receive handlers live in astral_vault.lua.
+-- Server-side persistence, SQL schema, and net.Receive handlers live in vault.lua.
 if not CLIENT then return end
 
 local Arcana = Arcana
 
--- Cost constants come from astral_vault_config.lua (loaded before this file via init.lua).
+-- Cost constants come from config.lua (loaded before this file via init.lua).
 local VAULT_CFG = Arcana.VaultConfig
 
 local HL2_MODELS = {

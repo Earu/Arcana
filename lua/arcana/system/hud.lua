@@ -1,6 +1,6 @@
 -- Arcana Global HUD (casting + cooldown), shared independent of SWEP
 -- Reuses styling helpers/colors from the Art Deco library for visual cohesion
--- Depends on: arcana/default_inventory.lua (Arcana.Inventory.Items) — accessed at call time, not load time
+-- Depends on: system/default_inventory.lua (Arcana.Inventory.Items), accessed at call time, not load time
 if not CLIENT then return end
 
 -- Create HUD namespace

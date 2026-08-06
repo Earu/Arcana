@@ -467,12 +467,6 @@ hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(b
 	end
 end)
 
--- Convenience functions (maintaining backward compatibility)
-function MagicCircle.DrawMagicCircle(pos, ang, color, intensity, size, lineWidth)
-	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
-	circle:Draw()
-end
-
 function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duration, lineWidth, seed)
 	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)
 	circle:SetAnimated(duration or 5)
