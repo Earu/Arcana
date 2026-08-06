@@ -108,14 +108,14 @@ if SERVER then
 		if ent == owner then return end
 
 		-- Only damage players, NPCs, or NextBots
-		if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then return end
+		if not Arcana.Common.IsActor(ent) then return end
 
 		local dmg = DamageInfo()
 		dmg:SetDamage(self.MissileDamage or 45)
 		dmg:SetDamageType(bit.bor(DMG_ENERGYBEAM, DMG_DISSOLVE))
 		dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 		dmg:SetInflictor(self)
-		ent:TakeDamageInfo(dmg)
+		Arcana:TakeDamageInfo(ent, dmg)
 
 		-- Enhanced impact effects
 		local pos = self:GetPos()

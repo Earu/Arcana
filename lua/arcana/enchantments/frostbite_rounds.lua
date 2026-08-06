@@ -12,7 +12,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 	dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 	dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-	target:TakeDamageInfo(dmg)
+	Arcana:TakeDamageInfo(target, dmg)
 
 	-- Light knockback away from impact/caster
 	local pushDir = (pos - ((IsValid(attacker) and attacker:WorldSpaceCenter()) or (hitPos or pos))):GetNormalized()
@@ -26,7 +26,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	end
 
 	-- Apply slow via shared Frost status
-	local isActor = target:IsPlayer() or target:IsNPC() or (target.IsNextBot and target:IsNextBot())
+	local isActor =Arcana.Common.IsActor(target)
 	if isActor then
 		Arcana.Status.Frost.Apply(target, {
 			slowMult = slowMult,
@@ -69,7 +69,7 @@ Arcana:RegisterEnchantment({
 			local hitEnt = tr.Entity
 			if not IsValid(hitEnt) then return end
 			-- Only actors: players, NPCs, NextBots
-			local isActor = hitEnt:IsPlayer() or hitEnt:IsNPC() or (hitEnt.IsNextBot and hitEnt:IsNextBot())
+			local isActor =Arcana.Common.IsActor(hitEnt)
 			if not isActor then return end
 
 			applyFrostbite(attacker, hitEnt, tr.HitPos)

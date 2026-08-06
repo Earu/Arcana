@@ -17,7 +17,7 @@ function Frost.Apply(target, options)
 	local vfxTag = options.vfxTag or "frost_slow"
 	local sendClientFX = options.sendClientFX ~= false -- default true
 
-	local isActor = target:IsPlayer() or target:IsNPC() or (target.IsNextBot and target:IsNextBot())
+	local isActor =Arcana.Common.IsActor(target)
 	if not isActor then return end
 
 	local untilTime = CurTime() + duration

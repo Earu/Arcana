@@ -116,7 +116,7 @@ Arcana:RegisterSpell({
 			if not IsValid(ent) then continue end
 			if ent == srcEnt then continue end
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			local to = ent:WorldSpaceCenter() - pos
 			local dist = to:Length()
 			local dir = dist > 0 and (to / dist) or Vector(0, 0, 0)
@@ -128,7 +128,7 @@ Arcana:RegisterSpell({
 				dmg:SetDamageType(DMG_CLUB)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				ent:TakeDamageInfo(dmg)
+				Arcana:TakeDamageInfo(ent, dmg)
 				-- Pop upward slightly then out
 				if ent.SetVelocity then
 					ent:SetVelocity(dir * (pushPlayer * fall) + Vector(0, 0, 180))

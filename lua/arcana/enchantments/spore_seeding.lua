@@ -51,7 +51,7 @@ local function spawnCloud(attacker, pos)
 
 		for _, ent in ipairs(ents.FindInSphere(marker:GetPos(), CLOUD_RADIUS)) do
 			if not IsValid(ent) or ent == attacker then continue end
-			if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then continue end
+			if not Arcana.Common.IsActor(ent) then continue end
 			if ent:IsPlayer() and not ent:Alive() then continue end
 			if ent:IsNPC() and ent:Health() <= 0 then continue end
 
@@ -61,7 +61,7 @@ local function spawnCloud(attacker, pos)
 			dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 			dmg:SetInflictor(IsValid(marker) and marker or game.GetWorld())
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			ent:TakeDamageInfo(dmg)
+			Arcana:TakeDamageInfo(ent, dmg)
 
 			if ent:IsPlayer() then
 				local now = CurTime()

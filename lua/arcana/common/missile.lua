@@ -16,7 +16,7 @@ if SERVER then
 		local maxRange = 1600
 		for _, ent in ipairs(ents.FindInSphere(origin + aim * (maxRange * 0.6), maxRange)) do
 			if not IsValid(ent) or ent == caster then continue end
-			if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then continue end
+			if not Arcana.Common.IsActor(ent) then continue end
 			if not ent:IsNextBot() and ent:Health() <= 0 then continue end
 			local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
 			local d = dir:Dot(aim)

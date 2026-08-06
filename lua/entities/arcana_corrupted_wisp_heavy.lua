@@ -119,7 +119,7 @@ if SERVER then
 			if not IsValid(ent) then continue end
 			if ent:IsPlayer() and not ent:Alive() then continue end
 
-			local isTarget = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isTarget =Arcana.Common.IsActor(ent)
 			if not isTarget then continue end
 
 			local d2 = center:DistToSqr(ent:GetPos())

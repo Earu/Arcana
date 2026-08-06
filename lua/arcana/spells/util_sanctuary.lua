@@ -58,7 +58,7 @@ Arcana:RegisterSpell({
 				if not IsValid(ent) then continue end
 
 				-- Players and NPCs (and NextBots if SetHealth exists)
-				local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+				local isActor =Arcana.Common.IsActor(ent)
 				if not isActor then continue end
 
 				local max = ent.GetMaxHealth and ent:GetMaxHealth() or 100

@@ -31,7 +31,7 @@ local function collapseVortex(owner, pos)
 			phys:ApplyForceCenter(pushDir * 30000)
 		end
 
-		local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+		local isActor =Arcana.Common.IsActor(ent)
 		if isActor then
 			ent:SetVelocity(pushDir * 420)
 			ent:SetGroundEntity(NULL)
@@ -96,7 +96,7 @@ local function spawnVortex(owner, pos)
 				phys:ApplyForceCenter(pullDir * strength * phys:GetMass())
 			end
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			if isActor then
 				ent:SetVelocity(pullDir * strength * 0.5)
 				ent:SetGroundEntity(NULL)
@@ -109,7 +109,7 @@ local function spawnVortex(owner, pos)
 				dmg:SetAttacker(owner)
 				dmg:SetInflictor(owner)
 				dmg:SetDamagePosition(ent:WorldSpaceCenter())
-				ent:TakeDamageInfo(dmg)
+				Arcana:TakeDamageInfo(ent, dmg)
 			end
 		end
 	end)

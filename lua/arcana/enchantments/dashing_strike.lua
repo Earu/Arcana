@@ -19,14 +19,14 @@ local function attachHook(ply, wep, state)
 			end
 			if ply.LagCompensation then ply:LagCompensation(true) end
 			for _, ent in ipairs(ents.FindInSphere(impactPos, radius)) do
-				if IsValid(ent) and ent ~= ply and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then
+				if IsValid(ent) and ent ~= ply and Arcana.Common.IsActor(ent) then
 					local dmg = DamageInfo()
 					dmg:SetDamage(baseDamage)
 					dmg:SetDamageType(bit.bor(DMG_CLUB, DMG_CRUSH))
 					dmg:SetAttacker(ply)
 					dmg:SetInflictor(IsValid(wep) and wep or ply)
 					dmg:SetDamagePosition(ent:WorldSpaceCenter())
-					ent:TakeDamageInfo(dmg)
+					Arcana:TakeDamageInfo(ent, dmg)
 				end
 			end
 			if ply.LagCompensation then ply:LagCompensation(false) end

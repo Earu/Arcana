@@ -90,7 +90,7 @@ if SERVER then
 
 		local function applyFreeze(ent)
 			if not IsValid(ent) then return end
-			if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then return end
+			if not Arcana.Common.IsActor(ent) then return end
 			if not Arcana or not Arcana.Status or not Arcana.Status.Frost or not Arcana.Status.Frost.Apply then return end
 
 			Arcana.Status.Frost.Apply(ent, {

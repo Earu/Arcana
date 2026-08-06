@@ -67,7 +67,7 @@ if SERVER then
 				dmg:SetAttacker(attacker)
 				dmg:SetInflictor(attacker)
 				dmg:SetDamagePosition(hitPos)
-				hitEnt:TakeDamageInfo(dmg)
+				Arcana:TakeDamageInfo(hitEnt, dmg)
 			end
 
 			-- Splash damage around impact

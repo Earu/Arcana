@@ -194,7 +194,7 @@ Arcana:RegisterSpell({
 						local falloff = 1 - (dist / radius)
 						local actualDamage = damage * falloff
 
-						if ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then
+						if Arcana.Common.IsActor(ent) then
 							local dmg = DamageInfo()
 							dmg:SetDamage(actualDamage)
 							dmg:SetDamageType(bit.bor(DMG_BLAST, DMG_BURN))
@@ -306,13 +306,13 @@ Arcana:RegisterSpell({
 							for _, e in ipairs(ents.FindInSphere(trFissure.HitPos, 220)) do
 								if not IsValid(e) or e == caster or e == pillar then continue end
 
-								if e:IsPlayer() or e:IsNPC() or (e.IsNextBot and e:IsNextBot()) then
+								if Arcana.Common.IsActor(e) then
 									local dmg = DamageInfo()
 									dmg:SetDamage(isFinal and 150 or 80)
 									dmg:SetDamageType(DMG_CRUSH)
 									dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 									dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-									e:TakeDamageInfo(dmg)
+									Arcana:TakeDamageInfo(e, dmg)
 
 									if e.SetVelocity then
 										e:SetVelocity(Vector(0, 0, 600))

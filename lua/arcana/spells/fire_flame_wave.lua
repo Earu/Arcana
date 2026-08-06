@@ -45,7 +45,7 @@ Arcana:RegisterSpell({
 				dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				ent:TakeDamageInfo(dmg)
+				Arcana:TakeDamageInfo(ent, dmg)
 
 				if ent.Ignite then
 					ent:Ignite(igniteTime, 0)

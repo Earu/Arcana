@@ -58,14 +58,14 @@ Arcana:RegisterSpell({
 
 			-- Reduced falloff so the push feels impactful at range
 			local falloff = 0.75 + 0.25 * (1 - math.Clamp(dist / radius, 0, 1))
-			if ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then
+			if Arcana.Common.IsActor(ent) then
 				-- Deal damage
 				local dmg = DamageInfo()
 				dmg:SetDamage(baseDamage * falloff)
 				dmg:SetDamageType(DMG_SONIC)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				ent:TakeDamageInfo(dmg)
+				Arcana:TakeDamageInfo(ent, dmg)
 
 				local vel = dir * (strengthPlayer * falloff) + Vector(0, 0, upBoost)
 				if ent.SetGroundEntity then ent:SetGroundEntity(NULL) end

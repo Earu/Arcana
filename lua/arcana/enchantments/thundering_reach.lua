@@ -46,7 +46,7 @@ local function fireThunderLine(attacker, wep, baseDamage)
 	for i = 1, steps do
 		local p = start + dir * (i * spacing)
 		for _, ent in ipairs(ents.FindInSphere(p, radius + 8)) do
-			if IsValid(ent) and ent ~= attacker and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then
+			if IsValid(ent) and ent ~= attacker and Arcana.Common.IsActor(ent) then
 				-- Ensure the entity lies roughly in front within the segment range
 				local toEnt = ent:WorldSpaceCenter() - start
 				local proj = toEnt:Dot(dir)
@@ -70,7 +70,7 @@ local function fireThunderLine(attacker, wep, baseDamage)
 		dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 		dmg:SetInflictor(IsValid(wep) and wep or attacker)
 		dmg:SetDamagePosition(ent:WorldSpaceCenter())
-		ent:TakeDamageInfo(dmg)
+		Arcana:TakeDamageInfo(ent, dmg)
 	end
 end
 
