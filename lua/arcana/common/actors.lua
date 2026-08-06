@@ -31,3 +31,36 @@ function Arcana.Common.IsLivingActor(ent)
 
 	return ent:Health() > 0
 end
+
+--- Nearest living player to `ent` within `range`, rate-limited per entity.
+-- Between scans the previously acquired target is returned unchanged, so callers can run
+-- this every Think without walking the player list every tick. The result is cached on
+-- ent._target, which the AI entities already read directly.
+-- @param ent Entity doing the looking
+-- @param range Maximum distance in units
+-- @param interval Seconds between rescans (default 0.4)
+-- @return Player or nil
+function Arcana.Common.AcquireNearestPlayer(ent, range, interval)
+	if not IsValid(ent) then return nil end
+
+	local now = CurTime()
+	if now < (ent._arcanaNextTargetScan or 0) then return ent._target end
+	ent._arcanaNextTargetScan = now + (interval or 0.4)
+
+	local myPos = ent:GetPos()
+	local nearest, bestD2 = nil, range * range
+
+	for _, ply in ipairs(player.GetAll()) do
+		if IsValid(ply) and ply:Alive() then
+			local d2 = myPos:DistToSqr(ply:GetPos())
+			if d2 < bestD2 then
+				bestD2 = d2
+				nearest = ply
+			end
+		end
+	end
+
+	ent._target = nearest
+
+	return nearest
+end

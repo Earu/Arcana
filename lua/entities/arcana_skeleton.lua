@@ -94,7 +94,6 @@ function ENT:Initialize()
 		self:SetAnimState("idle")
 
 		self._nextSwing = 0
-		self._lastTargetScan = 0
 	else
 		-- client visuals
 		self._nextSmoke = 0
@@ -230,27 +229,8 @@ function ENT:SpawnFunction(ply, tr, classname)
 	return ent
 end
 
-local function IsEnemy(ply)
-	return IsValid(ply) and ply:IsPlayer() and ply:Alive()
-end
-
 function ENT:AcquireTarget()
-	local now = CurTime()
-	if now < (self._lastTargetScan or 0) then return self._target end
-	self._lastTargetScan = now + 0.4
-	local myPos = self:GetPos()
-	local nearest, bestD2 = nil, CHASE_RANGE * CHASE_RANGE
-	for _, ply in ipairs(player.GetAll()) do
-		if IsEnemy(ply) then
-			local d2 = myPos:DistToSqr(ply:GetPos())
-			if d2 < bestD2 then
-				bestD2 = d2
-				nearest = ply
-			end
-		end
-	end
-	self._target = nearest
-	return self._target
+	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
 end
 
 function ENT:RunBehaviour()

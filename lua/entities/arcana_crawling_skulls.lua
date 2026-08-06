@@ -176,7 +176,6 @@ if SERVER then
 
 		self:SetCharging(false)
 		self:SetStunned(false)
-		self._lastScan    = 0
 		self._nextClick   = 0
 		self._nextContact = 0
 	end
@@ -195,19 +194,7 @@ if SERVER then
 	end
 
 	function ENT:AcquireTarget()
-		local now = CurTime()
-		if now < self._lastScan then return self._target end
-		self._lastScan = now + 0.35
-		local myPos = self:GetPos()
-		local nearest, bestD2 = nil, CHASE_RANGE * CHASE_RANGE
-		for _, ply in ipairs(player.GetAll()) do
-			if IsEnemy(ply) then
-				local d2 = myPos:DistToSqr(ply:GetPos())
-				if d2 < bestD2 then bestD2 = d2; nearest = ply end
-			end
-		end
-		self._target = nearest
-		return nearest
+		return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.35)
 	end
 
 	function ENT:FaceTowards(pos)
