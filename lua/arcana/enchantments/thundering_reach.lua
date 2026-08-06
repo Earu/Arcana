@@ -70,7 +70,7 @@ local function fireThunderLine(attacker, wep, baseDamage)
 		dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 		dmg:SetInflictor(IsValid(wep) and wep or attacker)
 		dmg:SetDamagePosition(ent:WorldSpaceCenter())
-		Arcana:TakeDamageInfo(ent, dmg)
+		Arcana.TakeDamageInfo(ent, dmg)
 	end
 end
 
@@ -121,7 +121,7 @@ local function detachHook(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "thundering_reach",
 	name = "Thundering Reach",
 	description = "Unleash a line of thunder on melee swing, damaging foes ahead.",

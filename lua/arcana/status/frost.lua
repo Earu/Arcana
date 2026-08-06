@@ -24,7 +24,7 @@ function Frost.Apply(target, options)
 	target.ArcanaFrostSlowUntil = math.max(target.ArcanaFrostSlowUntil or 0, untilTime)
 
 	-- Visual band
-	Arcana:SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
+	Arcana.SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
 		{
 			radius = 18,
 			height = 6,
@@ -91,7 +91,7 @@ function Frost.Apply(target, options)
 			-- cleanup
 			target._ArcanaNPCGroundClamp = nil
 			target._ArcanaLocoClamp = nil
-			Arcana:ClearBandVFX(target, vfxTag)
+			Arcana.ClearBandVFX(target, vfxTag)
 			timer.Remove(timerId)
 
 			return

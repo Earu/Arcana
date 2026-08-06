@@ -7,7 +7,7 @@ if SERVER then
 end
 
 -- Meteor Storm: A divine pact granted at level 30 - call down a prolonged meteor storm while the earth ruptures
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "meteor_storm",
 	name = "Meteor Storm",
 	description = "Channel divine power to call down a devastating meteor storm while the earth ruptures beneath your enemies.",
@@ -27,7 +27,7 @@ Arcana:RegisterSpell({
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local center, normal = Arcana:ResolveGroundTarget(srcEnt, 1500)
+		local center, normal = Arcana.ResolveGroundTarget(srcEnt, 1500)
 		center = center or (srcEnt:GetPos() + Vector(0, 0, 2))
 		normal = normal or Vector(0, 0, 1)
 		local baseRadius = 1400 -- Larger area of effect
@@ -200,7 +200,7 @@ Arcana:RegisterSpell({
 							dmg:SetDamageType(bit.bor(DMG_BLAST, DMG_BURN))
 							dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 							dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-							Arcana:TakeDamageInfo(ent, dmg)
+							Arcana.TakeDamageInfo(ent, dmg)
 							-- Knockback
 							local dir = (ent:WorldSpaceCenter() - groundPos):GetNormalized()
 
@@ -312,7 +312,7 @@ Arcana:RegisterSpell({
 									dmg:SetDamageType(DMG_CRUSH)
 									dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 									dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-									Arcana:TakeDamageInfo(e, dmg)
+									Arcana.TakeDamageInfo(e, dmg)
 
 									if e.SetVelocity then
 										e:SetVelocity(Vector(0, 0, 600))
@@ -990,11 +990,11 @@ if CLIENT then
 		}
 
 		-- Ground target indicator (follows aim)
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = color,
 			size = 1400,
 			intensity = 100,
-			positionResolver = function(c) return Arcana:ResolveGroundTarget(c, 1500) end
+			positionResolver = function(c) return Arcana.ResolveGroundTarget(c, 1500) end
 		})
 
 		-- PHASE 1: Initial ground circle at caster's feet (0s)

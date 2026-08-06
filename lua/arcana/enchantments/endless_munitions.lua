@@ -46,7 +46,7 @@ local function detachInfiniteAmmo(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "endless_munitions",
 	name = "Endless Munitions",
 	description = "This weapon never consumes ammo while equipped; clips auto-refill.",

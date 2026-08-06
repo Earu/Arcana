@@ -1,5 +1,5 @@
 -- Arcana Missiles: Launch three homing projectiles that prefer the target closest to the caster's aim
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "arcane_missiles",
 	name = "Arcane Missiles",
 	description = "Launch three homing bolts that seek your aimed target.",

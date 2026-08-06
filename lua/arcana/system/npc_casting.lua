@@ -5,7 +5,7 @@
 -- SERVER : spellbook generation, the combat think loop, and the cast pipeline.
 --
 -- NPCs have no player data — no unlocked spells, no knowledge level, no coins, no XP —
--- so none of Arcana:StartCasting/CastSpell applies here. What is reused instead is the
+-- so none of Arcana.StartCasting/CastSpell applies here. What is reused instead is the
 -- spellcraft interpreter: Arcana.Spellcraft.Compile turns a random {form, essence,
 -- clauses} definition into a compiled spell, and Arcana.Spellcraft.Execute casts it for
 -- any entity. Both are already caster-agnostic, so a mage needs no registered spell id.

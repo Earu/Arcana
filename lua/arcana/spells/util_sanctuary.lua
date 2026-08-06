@@ -1,5 +1,5 @@
 -- Healing Sanctuary: Create a healing field at the aimed ground that restores health over time
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "sanctuary",
 	name = "Sanctuary",
 	description = "Conjure a restorative field that heals allies over time.",
@@ -69,7 +69,7 @@ Arcana:RegisterSpell({
 				if ent.SetHealth then ent:SetHealth(new) end
 
 				-- Gentle band on healed target
-				Arcana:SendAttachBandVFX(ent, Color(120, 255, 140, 255), 22, 0.6, {
+				Arcana.SendAttachBandVFX(ent, Color(120, 255, 140, 255), 22, 0.6, {
 					{ radius = 14, height = 3, spin = { p = 0, y = 35, r = 0 }, lineWidth = 2 }
 				})
 			end
@@ -86,7 +86,7 @@ Arcana:RegisterSpell({
 
 		-- Area VFX band(s)
 		timer.Simple(0.1, function()
-			Arcana:SendAttachBandVFX(anchor, Color(120, 255, 140, 255), radius * 0.9, duration, {
+			Arcana.SendAttachBandVFX(anchor, Color(120, 255, 140, 255), radius * 0.9, duration, {
 				{ radius = radius * 0.75, height = 6, spin = { p = 0, y = 28, r = 0 }, lineWidth = 3 },
 				{ radius = radius * 0.45, height = 4, spin = { p = 0, y = -24, r = 0 }, lineWidth = 2 }
 			})

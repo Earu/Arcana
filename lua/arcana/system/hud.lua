@@ -11,7 +11,7 @@ local function getLocalPlayerData()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return nil end
 
-	return Arcana:GetPlayerData(ply)
+	return Arcana.GetPlayerData(ply)
 end
 
 -- Reusable color objects to avoid allocation overhead in draw calls

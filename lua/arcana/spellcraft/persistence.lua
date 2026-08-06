@@ -64,12 +64,12 @@ end
 -- next map change that what they bought is gone.
 local function persistPurchase(query, context, ply)
 	if not ensureTables() then
-		Arcana:SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
+		Arcana.SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
 		return false
 	end
 
 	if Arcana.SQLCheck(sql.Query(query), context) == false then
-		Arcana:SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
+		Arcana.SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
 		return false
 	end
 
@@ -120,7 +120,7 @@ end
 function P.GetServerState(ply, def)
 	local sid = ply:SteamID64()
 	return {
-		level = Arcana:GetLevel(ply),
+		level = Arcana.GetLevel(ply),
 		essences = P.EssenceUnlocks[sid] or {},
 		bargain = P.HasBargain(ply),
 		consecrated = def and P.IsConsecrated(ply, def) or false,
@@ -172,7 +172,7 @@ local function registerAndBroadcast(sid64, slot, name, def)
 	-- serializeUnlockedSpells strips spellcraft_ ids on save).
 	local owner = player.GetBySteamID64(sid64)
 	if IsValid(owner) then
-		local data = Arcana:GetPlayerData(owner)
+		local data = Arcana.GetPlayerData(owner)
 		if data then data.unlocked_spells[spell.id] = true end
 	end
 
@@ -194,15 +194,15 @@ local function unregisterAndBroadcast(sid64, slot)
 
 	local owner = player.GetBySteamID64(sid64)
 	if IsValid(owner) then
-		local data = Arcana:GetPlayerData(owner)
+		local data = Arcana.GetPlayerData(owner)
 		if data then
 			data.unlocked_spells[id] = nil
 			-- Scrub the crafted spell out of any quickslots it occupied.
 			for i = 1, 8 do
 				if data.quickspell_slots[i] == id then data.quickspell_slots[i] = nil end
 			end
-			Arcana:SavePlayerData(owner)
-			Arcana:SyncPlayerData(owner)
+			Arcana.SavePlayerData(owner)
+			Arcana.SyncPlayerData(owner)
 		end
 	end
 
@@ -347,7 +347,7 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	if not rateOk(ply) then return end
 	local cfg = P.Config()
 	if not cfg.enabled then
-		Arcana:SendErrorNotification(ply, "Spell crafting is disabled here")
+		Arcana.SendErrorNotification(ply, "Spell crafting is disabled here")
 		return
 	end
 
@@ -361,7 +361,7 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 
 	local okName, name = nameValid(rawName)
 	if not okName then
-		Arcana:SendErrorNotification(ply, "Invalid name, 3 to 24 letters")
+		Arcana.SendErrorNotification(ply, "Invalid name, 3 to 24 letters")
 		return
 	end
 
@@ -378,7 +378,7 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 		if otherSlot ~= slot then
 			local otherSpell = Arcana.RegisteredSpells[P.SpellId(sid, otherSlot)]
 			if otherSpell and string.lower(otherSpell.name) == string.lower(name) then
-				Arcana:SendErrorNotification(ply, "You already have a spell with that name")
+				Arcana.SendErrorNotification(ply, "You already have a spell with that name")
 				return
 			end
 		end
@@ -390,7 +390,7 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	if previous and P.DefHash(previous) == P.DefHash(def) then
 		local prevSpell = Arcana.RegisteredSpells[P.SpellId(sid, slot)]
 		if prevSpell and prevSpell.name == name then
-			Arcana:SendErrorNotification(ply, "That spell is already exactly this")
+			Arcana.SendErrorNotification(ply, "That spell is already exactly this")
 			return
 		end
 	end
@@ -398,7 +398,7 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	state.consecrated = true -- crafting consecrates here; test the rest
 	local req = P.Requirements(def, state)
 	if not req.castable then
-		Arcana:SendErrorNotification(ply, req.firstMissing or "Cannot create this spell")
+		Arcana.SendErrorNotification(ply, req.firstMissing or "Cannot create this spell")
 		return
 	end
 
@@ -406,18 +406,18 @@ net.Receive("Arcana_Spellcraft_Submit", function(_, ply)
 	local coins = compiled.consecrationCoins
 	local shards = compiled.consecrationShards
 
-	if Arcana:GetCoins(ply) < coins then
-		Arcana:SendErrorNotification(ply, "Not enough coins (" .. string.Comma(coins) .. " needed)")
+	if Arcana.GetCoins(ply) < coins then
+		Arcana.SendErrorNotification(ply, "Not enough coins (" .. string.Comma(coins) .. " needed)")
 		return
 	end
-	if Arcana:GetItemCount(ply, "mana_crystal_shard") < shards then
-		Arcana:SendErrorNotification(ply, "You need " .. shards .. " crystal shards")
+	if Arcana.GetItemCount(ply, "mana_crystal_shard") < shards then
+		Arcana.SendErrorNotification(ply, "You need " .. shards .. " crystal shards")
 		return
 	end
 
 	local ledger = (previous and "Reworked spell: " or "Crafted spell: ") .. name
-	Arcana:TakeCoins(ply, coins, ledger)
-	Arcana:TakeItem(ply, "mana_crystal_shard", shards, ledger)
+	Arcana.TakeCoins(ply, coins, ledger)
+	Arcana.TakeItem(ply, "mana_crystal_shard", shards, ledger)
 
 	-- Consecrate + persist + register.
 	local hash = P.DefHash(def)
@@ -449,7 +449,7 @@ net.Receive("Arcana_Spellcraft_Consecrate", function(_, ply)
 
 	local def = P.Active[sid] and P.Active[sid][slot]
 	if not def then
-		Arcana:SendErrorNotification(ply, "No spell in that slot")
+		Arcana.SendErrorNotification(ply, "No spell in that slot")
 		return
 	end
 
@@ -461,17 +461,17 @@ net.Receive("Arcana_Spellcraft_Consecrate", function(_, ply)
 	local coins = compiled.consecrationCoins
 	local shards = compiled.consecrationShards
 
-	if Arcana:GetCoins(ply) < coins then
-		Arcana:SendErrorNotification(ply, "Not enough coins (" .. string.Comma(coins) .. " needed)")
+	if Arcana.GetCoins(ply) < coins then
+		Arcana.SendErrorNotification(ply, "Not enough coins (" .. string.Comma(coins) .. " needed)")
 		return
 	end
-	if Arcana:GetItemCount(ply, "mana_crystal_shard") < shards then
-		Arcana:SendErrorNotification(ply, "You need " .. shards .. " crystal shards")
+	if Arcana.GetItemCount(ply, "mana_crystal_shard") < shards then
+		Arcana.SendErrorNotification(ply, "You need " .. shards .. " crystal shards")
 		return
 	end
 
-	Arcana:TakeCoins(ply, coins, "Spell activation")
-	Arcana:TakeItem(ply, "mana_crystal_shard", shards, "Spell activation")
+	Arcana.TakeCoins(ply, coins, "Spell activation")
+	Arcana.TakeItem(ply, "mana_crystal_shard", shards, "Spell activation")
 
 	local hash = P.DefHash(def)
 	P.Consecrations[sid] = P.Consecrations[sid] or {}
@@ -492,7 +492,7 @@ net.Receive("Arcana_Spellcraft_UnlockEssence", function(_, ply)
 	local essence = P.Essences[essenceId]
 	if not essence then return end
 	if essence.bargain then
-		Arcana:SendErrorNotification(ply, "That element cannot be bought")
+		Arcana.SendErrorNotification(ply, "That element cannot be bought")
 		return
 	end
 
@@ -502,17 +502,17 @@ net.Receive("Arcana_Spellcraft_UnlockEssence", function(_, ply)
 	local coins = essence.unlock.coins or 0
 	local shards = essence.unlock.shards or 0
 
-	if Arcana:GetCoins(ply) < coins then
-		Arcana:SendErrorNotification(ply, "Not enough coins for the " .. essence.label .. " element")
+	if Arcana.GetCoins(ply) < coins then
+		Arcana.SendErrorNotification(ply, "Not enough coins for the " .. essence.label .. " element")
 		return
 	end
-	if Arcana:GetItemCount(ply, "mana_crystal_shard") < shards then
-		Arcana:SendErrorNotification(ply, "You need " .. shards .. " crystal shards")
+	if Arcana.GetItemCount(ply, "mana_crystal_shard") < shards then
+		Arcana.SendErrorNotification(ply, "You need " .. shards .. " crystal shards")
 		return
 	end
 
-	Arcana:TakeCoins(ply, coins, "Element: " .. essence.label)
-	Arcana:TakeItem(ply, "mana_crystal_shard", shards, "Element: " .. essence.label)
+	Arcana.TakeCoins(ply, coins, "Element: " .. essence.label)
+	Arcana.TakeItem(ply, "mana_crystal_shard", shards, "Element: " .. essence.label)
 
 	P.EssenceUnlocks[sid] = P.EssenceUnlocks[sid] or {}
 	P.EssenceUnlocks[sid][essenceId] = true

@@ -1,6 +1,6 @@
 if SERVER then util.AddNetworkString("Arcana_FrostNovaBurst") end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "frost_nova",
 	name = "Frost Nova",
 	description = "Release a burst of freezing air around you, damaging and slowing nearby foes.",
@@ -26,7 +26,7 @@ Arcana:RegisterSpell({
 		local slowDuration = 3.5
 
 		-- VFX: bands around caster
-		Arcana:SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
+		Arcana.SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
 			{
 				radius = radius * 0.35,
 				height = 18,
@@ -63,7 +63,7 @@ Arcana:RegisterSpell({
 			dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 			dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 			dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-			Arcana:TakeDamageInfo(ent, dmg)
+			Arcana.TakeDamageInfo(ent, dmg)
 
 			-- Knockback
 			local pushDir = (ent:WorldSpaceCenter() - pos):GetNormalized()

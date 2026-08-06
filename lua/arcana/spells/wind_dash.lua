@@ -24,7 +24,7 @@ local LEAP_PITCH  = -10  -- Eye pitch threshold: below this = looking "up enough
 local DIVE_PITCH  =  5   -- Eye pitch threshold: above this = looking "down enough" to dive
 local LAND_DAMAGE_SPEED = 700 -- Speed at which a heavy landing plays heavy impact sounds
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "wind_dash",
 	name = "Wind Dash",
 	description = "Aim upward to launch yourself skyward. Aim downward to crash back to earth.",

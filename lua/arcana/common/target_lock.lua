@@ -133,7 +133,7 @@ if SERVER then
 			-- matches the cast wind-up duration exactly.
 			local spellId, remaining
 			if caster:IsPlayer() then
-				local pdata = Arcana:GetPlayerData(caster)
+				local pdata = Arcana.GetPlayerData(caster)
 				spellId = (pdata and pdata.casting_spell) or ""
 				remaining = math.max(0.05, ((pdata and pdata.casting_until) or CurTime()) - CurTime())
 			else

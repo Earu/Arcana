@@ -149,7 +149,7 @@ if SERVER then
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
 			dmg:SetAttacker(IsValid(owner) and owner or self)
 			dmg:SetInflictor(self)
-			Arcana:TakeDamageInfo(tgt, dmg)
+			Arcana.TakeDamageInfo(tgt, dmg)
 
 			-- Send visual lightning arc to client
 			net.Start("Arcana_LightningOrbZap", true)
@@ -178,7 +178,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcana:BlastDamage(IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, { inflictor = self, damageType = bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), ignoreAttacker = true })
+		Arcana.BlastDamage(IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, { inflictor = self, damageType = bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), ignoreAttacker = true })
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)

@@ -1,7 +1,7 @@
 if SERVER then util.AddNetworkString("Arcana_EarthShatter_VFX") end
 
 -- Earth Shatter: Smash the ground to send a devastating seismic shockwave
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "earth_shatter",
 	name = "Earth Shatter",
 	description = "Smash the ground, fracturing earth in a wide radius and hurling foes away.",
@@ -128,7 +128,7 @@ Arcana:RegisterSpell({
 				dmg:SetDamageType(DMG_CLUB)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-				Arcana:TakeDamageInfo(ent, dmg)
+				Arcana.TakeDamageInfo(ent, dmg)
 				-- Pop upward slightly then out
 				if ent.SetVelocity then
 					ent:SetVelocity(dir * (pushPlayer * fall) + Vector(0, 0, 180))

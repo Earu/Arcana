@@ -88,7 +88,7 @@ if SERVER then
 		local spawnFn     = opts.spawnTesla  or function(pos) return Arcana.Common.SpawnTeslaBurst(pos) end
 		local onChain     = opts.onChain
 
-		Arcana:BlastDamage(attacker, hitPos, blastRadius, baseDamage, { damageType = DMG_SHOCK, ignoreAttacker = true })
+		Arcana.BlastDamage(attacker, hitPos, blastRadius, baseDamage, { damageType = DMG_SHOCK, ignoreAttacker = true })
 
 		local candidates = {}
 		for _, ent in ipairs(ents.FindInSphere(hitPos, chainRadius)) do
@@ -117,7 +117,7 @@ if SERVER then
 				dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 				dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
 				dmg:SetDamagePosition(tpos)
-				Arcana:TakeDamageInfo(tgt, dmg)
+				Arcana.TakeDamageInfo(tgt, dmg)
 				if isfunction(onChain) then onChain(tgt, tpos, i) end
 			end)
 		end

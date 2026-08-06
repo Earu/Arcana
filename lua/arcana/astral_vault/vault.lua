@@ -18,7 +18,7 @@ local VAULT_CFG = Arcana.VaultConfig
 
 -- Utility: fetch enchantment ids from a weapon entity, stable order
 local function collectEnchantIds(wep)
-	local set = Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
+	local set = Arcana.GetEntityEnchantments and Arcana.GetEntityEnchantments(wep) or {}
 	local out = {}
 	for id, on in pairs(set) do if on then out[#out + 1] = id end end
 	table.sort(out)
@@ -97,20 +97,20 @@ if SERVER then
 	-- the returned list, so there is nothing sensible to continue with; tell the player
 	-- instead of leaving the menu silently inert, the way affordability failures do.
 	local function vaultReadFailed(ply)
-		Arcana:SendErrorNotification(ply, "Could not reach the astral vault, try again shortly")
+		Arcana.SendErrorNotification(ply, "Could not reach the astral vault, try again shortly")
 	end
 
 	local function canAfford(ply, coins, shards)
-		local haveCoins = Arcana:GetCoins(ply)
-		local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
+		local haveCoins = Arcana.GetCoins(ply)
+		local haveShards = Arcana.GetItemCount(ply, "mana_crystal_shard")
 		if haveCoins < (coins or 0) then return false, "Insufficient coins" end
 		if haveShards < (shards or 0) then return false, "Missing item: mana_crystal_shard" end
 		return true
 	end
 
 	local function charge(ply, coins, shards, reason)
-		if coins and coins > 0 then Arcana:TakeCoins(ply, coins, reason or "Astral Vault") end
-		if shards and shards > 0 then Arcana:TakeItem(ply, "mana_crystal_shard", shards, reason or "Astral Vault") end
+		if coins and coins > 0 then Arcana.TakeCoins(ply, coins, reason or "Astral Vault") end
+		if shards and shards > 0 then Arcana.TakeItem(ply, "mana_crystal_shard", shards, reason or "Astral Vault") end
 	end
 
 	local function sendOpen(ply, items)
@@ -152,12 +152,12 @@ if SERVER then
 			if not ok then vaultReadFailed(ply) return end
 			items = items or {}
 			if #items >= VAULT_CFG.MAX_SLOTS then
-				if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, "Astral vault is full") end
+				if Arcana.SendErrorNotification then Arcana.SendErrorNotification(ply, "Astral vault is full") end
 				return
 			end
 
 			local canBuy, reason = canAfford(ply, VAULT_CFG.STORE_COINS, VAULT_CFG.STORE_SHARDS)
-			if not canBuy then if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, reason) end return end
+			if not canBuy then if Arcana.SendErrorNotification then Arcana.SendErrorNotification(ply, reason) end return end
 
 			charge(ply, VAULT_CFG.STORE_COINS, VAULT_CFG.STORE_SHARDS, "Astral Vault Imprint")
 
@@ -193,7 +193,7 @@ if SERVER then
 			if not entry then return end
 
 			local canBuy, reason = canAfford(ply, VAULT_CFG.SUMMON_COINS, VAULT_CFG.SUMMON_SHARDS)
-			if not canBuy then if Arcana.SendErrorNotification then Arcana:SendErrorNotification(ply, reason) end return end
+			if not canBuy then if Arcana.SendErrorNotification then Arcana.SendErrorNotification(ply, reason) end return end
 
 			local cls = entry.class
 			local swep = list.Get("Weapon")[cls]
@@ -215,7 +215,7 @@ if SERVER then
 				if not IsValid(newWep) then return end
 
 				for _, id in ipairs(entry.enchant_ids or {}) do
-					Arcana:RestoreEnchantmentToWeaponEntity(ply, newWep, id)
+					Arcana.RestoreEnchantmentToWeaponEntity(ply, newWep, id)
 				end
 
 				Arcana.SyncWeaponEnchantNW(newWep)

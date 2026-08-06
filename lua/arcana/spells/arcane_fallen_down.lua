@@ -135,7 +135,7 @@ local function startBeamPhase(caster, targetPos)
 					dmg:SetDamageType(DMG_DISSOLVE)
 					dmg:SetAttacker(caster)
 					dmg:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg)
+					Arcana.TakeDamageInfo(ent, dmg)
 				else
 					-- Ignite everything else
 					if ent:IsOnFire() == false then
@@ -201,7 +201,7 @@ local function startBeamPhase(caster, targetPos)
 
 		Arcana.Common.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
 		-- Final damage wave
-		Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS, 200, { damageType = bit.bor(DMG_BLAST, DMG_DISSOLVE), ignoreAttacker = true })
+		Arcana.BlastDamage(caster, targetPos, MAX_BEAM_RADIUS, 200, { damageType = bit.bor(DMG_BLAST, DMG_DISSOLVE), ignoreAttacker = true })
 		-- Broadcast final impact wave
 		net.Start("Arcana_FallenDown_ImpactWave", true)
 		net.WriteVector(targetPos)
@@ -256,7 +256,7 @@ local function startBeamPhase(caster, targetPos)
 								dmg:SetDamageType(DMG_CRUSH)
 								dmg:SetAttacker(caster)
 								dmg:SetInflictor(caster)
-								Arcana:TakeDamageInfo(ent, dmg)
+								Arcana.TakeDamageInfo(ent, dmg)
 							end
 						end
 					end
@@ -292,7 +292,7 @@ local function startBeamPhase(caster, targetPos)
 				end)
 
 				-- Final pull damage
-				Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, { damageType = bit.bor(DMG_CRUSH, DMG_BLAST), ignoreAttacker = true })
+				Arcana.BlastDamage(caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, { damageType = bit.bor(DMG_CRUSH, DMG_BLAST), ignoreAttacker = true })
 				Arcana.Common.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
 				-- Broadcast collapse visuals
 				net.Start("Arcana_FallenDown_VacuumCollapse", true)
@@ -304,7 +304,7 @@ local function startBeamPhase(caster, targetPos)
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "fallen_down",
 	on_register = function()
 		if not SERVER then return end
@@ -332,7 +332,7 @@ Arcana:RegisterSpell({
 		-- (cast function is called AFTER the 60-second charge time)
 		if SERVER then
 			-- Re-check target position at moment of cast completion
-			local finalTarget = Arcana:ResolveGroundTarget(caster, 2000)
+			local finalTarget = Arcana.ResolveGroundTarget(caster, 2000)
 
 			if not finalTarget then
 				cleanupChargingState(caster, true) -- Stop BGM on targeting failure
@@ -1598,12 +1598,12 @@ if CLIENT then
 			auraParticles = {}
 		end)
 
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(170, 220, 255, 255), -- Bright blue-white/cyan matching the spell's theme
 			size = MAX_BEAM_RADIUS, -- 2000 - shows the full impact radius
 			intensity = 150,
 			positionResolver = function(c)
-				return Arcana:ResolveGroundTarget(c, 1000)
+				return Arcana.ResolveGroundTarget(c, 1000)
 			end
 		})
 

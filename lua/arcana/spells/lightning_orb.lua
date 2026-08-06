@@ -1,4 +1,4 @@
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "lightning_orb",
 	name = "Lightning Orb",
 	description = "Launch a slow-moving orb of electricity that zaps nearby foes and detonates on impact.",
@@ -31,7 +31,7 @@ Arcana:RegisterSpell({
 		ent:Activate()
 		Arcana.Common.LaunchProjectile(ent, caster, srcEnt.GetAimVector and srcEnt:GetAimVector() or srcEnt:GetForward())
 
-		Arcana:SendAttachBandVFX(ent, Color(170, 210, 255, 255), 14, 6, {
+		Arcana.SendAttachBandVFX(ent, Color(170, 210, 255, 255), 14, 6, {
 			{
 				radius = 15,
 				height = 4,

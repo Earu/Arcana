@@ -198,7 +198,7 @@ if SERVER then
 end
 
 -- Spell registration
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "phoenix",
 	name = "Phoenix",
 	description = "Transform into a blazing phoenix for 24s. Fly swiftly, unleash fireball salvos (LMB) and deadly firebreath (RMB).",

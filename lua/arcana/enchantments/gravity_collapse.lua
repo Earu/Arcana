@@ -38,7 +38,7 @@ local function collapseVortex(owner, pos)
 		end
 	end
 
-	Arcana:BlastDamage(owner, pos, VORTEX_RADIUS * 0.7, COLLAPSE_DAMAGE, {
+	Arcana.BlastDamage(owner, pos, VORTEX_RADIUS * 0.7, COLLAPSE_DAMAGE, {
 		damageType = bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM),
 		ignoreAttacker = true,
 	})
@@ -109,13 +109,13 @@ local function spawnVortex(owner, pos)
 				dmg:SetAttacker(owner)
 				dmg:SetInflictor(owner)
 				dmg:SetDamagePosition(ent:WorldSpaceCenter())
-				Arcana:TakeDamageInfo(ent, dmg)
+				Arcana.TakeDamageInfo(ent, dmg)
 			end
 		end
 	end)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "gravity_collapse",
 	name = "Gravity Collapse",
 	description = "Your projectile tears open a short-lived arcane vortex on impact, pulling nearby enemies inward. When it collapses everything caught inside is blasted outward.",

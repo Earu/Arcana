@@ -101,7 +101,7 @@ if SERVER then
 	-- loaded in-memory state can never erase spells, but that same union would instantly
 	-- resurrect a spell the player just paid to forget. xp/level keep their max() merge
 	-- either way, since forgetting never touches them.
-	function Arcana:SavePlayerDataToSQL(ply, data, authoritative)
+	function Arcana.SavePlayerDataToSQL(ply, data, authoritative)
 		local handled = Arcana.RunHook("SavePlayerDataToSQL", ply, data, authoritative)
 		if handled == true then return end
 		if not ensureDatabase() then return end
@@ -121,8 +121,8 @@ if SERVER then
 		local function mergeWithExistingRow(row)
 			if not istable(row) then
 				local derived_kp = math.max(0,
-					Arcana:GetTotalEarnedKnowledgePoints(incoming_level) -
-					Arcana:GetTotalSpentKnowledgePoints(incoming_unlocked_map)
+					Arcana.GetTotalEarnedKnowledgePoints(incoming_level) -
+					Arcana.GetTotalSpentKnowledgePoints(incoming_unlocked_map)
 				)
 				return incoming_xp, incoming_level, derived_kp, incoming_unlocked_map, incoming_quickslots, incoming_selected
 			end
@@ -148,8 +148,8 @@ if SERVER then
 			end
 			local merged_selected = (incoming_selected >= 1 and incoming_selected <= 8) and incoming_selected or existing_selected
 			local derived_kp = math.max(0,
-				Arcana:GetTotalEarnedKnowledgePoints(merged_level) -
-				Arcana:GetTotalSpentKnowledgePoints(merged_unlocked)
+				Arcana.GetTotalEarnedKnowledgePoints(merged_level) -
+				Arcana.GetTotalSpentKnowledgePoints(merged_unlocked)
 			)
 			return merged_xp, merged_level, derived_kp, merged_unlocked, merged_quick, merged_selected
 		end
@@ -169,7 +169,7 @@ if SERVER then
 		Arcana.SQLCheck(sql.Query(q), "SavePlayerDataToSQL for " .. tostring(ply:SteamID64()))
 	end
 
-	function Arcana:LoadPlayerDataFromSQL(ply, callback)
+	function Arcana.LoadPlayerDataFromSQL(ply, callback)
 		if not IsValid(ply) then return end
 		local handled = Arcana.RunHook("LoadPlayerDataFromSQL", ply, callback)
 		if handled == true then return end
@@ -189,8 +189,8 @@ if SERVER then
 			-- CalculateExpectedKnowledgePoints requires data to be in Arcana.PlayerData which
 			-- it isn't yet at this point, so we call the two constituent helpers directly.
 			data.knowledge_points = math.max(0,
-				Arcana:GetTotalEarnedKnowledgePoints(data.level) -
-				Arcana:GetTotalSpentKnowledgePoints(data.unlocked_spells)
+				Arcana.GetTotalEarnedKnowledgePoints(data.level) -
+				Arcana.GetTotalSpentKnowledgePoints(data.unlocked_spells)
 			)
 			Arcana.SaveBlockedBySteamID[rawSid] = nil
 			Arcana.RetryStateBySteamID[rawSid] = nil
@@ -207,7 +207,7 @@ if SERVER then
 			timer.Create(tname, state.delay, 1, function()
 				if not IsValid(ply) then return end
 				state.delay = math.min((state.delay or 1) * 2, 60)
-				Arcana:LoadPlayerDataFromSQL(ply, callback)
+				Arcana.LoadPlayerDataFromSQL(ply, callback)
 			end)
 		end
 
@@ -232,7 +232,7 @@ if SERVER then
 			Arcana.RetryStateBySteamID[rawSid] = nil
 			local defaults = CreateDefaultPlayerData()
 			callback(true, defaults)
-			Arcana:SavePlayerDataToSQL(ply, defaults)
+			Arcana.SavePlayerDataToSQL(ply, defaults)
 			return
 		end
 
@@ -240,46 +240,46 @@ if SERVER then
 	end
 end
 
-function Arcana:GetPlayerData(ply)
+function Arcana.GetPlayerData(ply)
 	if not IsValid(ply) then return nil end
 	local steamid = ply:SteamID64()
-	if not self.PlayerData[steamid] then
-		self.PlayerData[steamid] = CreateDefaultPlayerData()
+	if not Arcana.PlayerData[steamid] then
+		Arcana.PlayerData[steamid] = CreateDefaultPlayerData()
 	end
-	return self.PlayerData[steamid]
+	return Arcana.PlayerData[steamid]
 end
 
 -- Pass authoritative = true to overwrite the stored spell list rather than union with
--- it. Required whenever spells are *removed* (see Arcana:ForgetSpell); harmful anywhere
+-- it. Required whenever spells are *removed* (see Arcana.ForgetSpell); harmful anywhere
 -- else, because the union is what protects a player's book from a bad in-memory state.
-function Arcana:SavePlayerData(ply, authoritative)
+function Arcana.SavePlayerData(ply, authoritative)
 	if not IsValid(ply) then return end
 	local sid = ply:SteamID64()
 	if Arcana.SaveBlockedBySteamID[sid] then return end
-	local data = self:GetPlayerData(ply)
+	local data = Arcana.GetPlayerData(ply)
 	data.last_save = os.time()
 	if SERVER then
-		self:SavePlayerDataToSQL(ply, data, authoritative)
+		Arcana.SavePlayerDataToSQL(ply, data, authoritative)
 	end
 	Arcana.RunHook("SavedPlayerData", ply, data)
 end
 
 -- Loads player data and, on the server, automatically syncs it to the client.
 -- Callers do not need to call SyncPlayerData separately after loading.
-function Arcana:LoadPlayerData(ply, callback)
+function Arcana.LoadPlayerData(ply, callback)
 	if not IsValid(ply) then return end
 	local steamid = ply:SteamID64()
 	if SERVER then
-		self:LoadPlayerDataFromSQL(ply, function(loaded, data)
-			self.PlayerData[steamid] = data
-			self:SyncPlayerData(ply)
+		Arcana.LoadPlayerDataFromSQL(ply, function(loaded, data)
+			Arcana.PlayerData[steamid] = data
+			Arcana.SyncPlayerData(ply)
 			callback(data)
 		end)
 	else
-		if not self.PlayerData[steamid] then
-			self.PlayerData[steamid] = CreateDefaultPlayerData()
+		if not Arcana.PlayerData[steamid] then
+			Arcana.PlayerData[steamid] = CreateDefaultPlayerData()
 		end
-		callback(self.PlayerData[steamid])
+		callback(Arcana.PlayerData[steamid])
 	end
 end
 
@@ -288,9 +288,9 @@ if SERVER then
 	util.AddNetworkString("Arcana_ErrorNotification")
 	util.AddNetworkString("Arcana_SpellUnlocked")
 
-	function Arcana:SyncPlayerData(ply)
+	function Arcana.SyncPlayerData(ply)
 		if not IsValid(ply) then return end
-		local data = self:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		local payload = {
 			xp = data.xp,
 			level = data.level,
@@ -307,7 +307,7 @@ if SERVER then
 		Arcana.RunHook("SyncPlayerData", ply, data)
 	end
 
-	function Arcana:SendErrorNotification(ply, msg)
+	function Arcana.SendErrorNotification(ply, msg)
 		if not IsValid(ply) then return end
 		net.Start("Arcana_ErrorNotification")
 		net.WriteString(msg)
@@ -320,7 +320,7 @@ end
 if CLIENT then
 	net.Receive("Arcana_ErrorNotification", function()
 		local msg = net.ReadString()
-		Arcana:Print(msg)
+		Arcana.Print(msg)
 		notification.AddLegacy(msg, NOTIFY_ERROR, 5)
 	end)
 
@@ -329,7 +329,7 @@ if CLIENT then
 		if not payload then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return end
 		data.xp = tonumber(payload.xp) or data.xp
 		data.level = tonumber(payload.level) or data.level

@@ -40,7 +40,7 @@ end
 --   max_stacks (number, default 1): max simultaneous applications
 --   grants_xp (bool, default true): whether a successful apply awards XP via GiveXP.
 --     Set to false for system-applied enchantments (e.g., vault restore) that should not grant XP.
-function Arcana:RegisterEnchantment(def)
+function Arcana.RegisterEnchantment(def)
 	if not istable(def) then
 		ErrorNoHalt("RegisterEnchantment requires a table definition\n")
 		return false
@@ -77,11 +77,11 @@ function Arcana:RegisterEnchantment(def)
 	}
 
 	Arcana.RegisteredEnchantments[id] = ench
-	Arcana:Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
+	Arcana.Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
 	return true
 end
 
-function Arcana:GetEntityEnchantments(wep)
+function Arcana.GetEntityEnchantments(wep)
 	if not IsValid(wep) then return {} end
 
 	if SERVER then
@@ -110,16 +110,16 @@ function Arcana:GetEntityEnchantments(wep)
 end
 
 --- True when `wep` currently has `enchId` applied.
--- Part of the public Arcana:* surface for third-party integrations; the addon itself
+-- Part of the public Arcana.* surface for third-party integrations; the addon itself
 -- reads the whole map through GetEntityEnchantments.
-function Arcana:HasEntityEnchantment(wep, enchId)
-	local list = self:GetEntityEnchantments(wep)
+function Arcana.HasEntityEnchantment(wep, enchId)
+	local list = Arcana.GetEntityEnchantments(wep)
 	return list[enchId] ~= nil
 end
 
 -- Apply/remove on a specific weapon entity instance.
 -- skipXP: if true, overrides the enchantment's grants_xp field and suppresses XP award (e.g., vault restore).
-function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
+function Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 
@@ -153,8 +153,8 @@ function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 
 	-- Award XP if allowed by both the enchantment definition and the call site
 	if SERVER and not skipXP and ench.grants_xp then
-		local amount = tonumber(self.Config.XP_PER_ENCHANT_SUCCESS) or 20
-		self:GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
+		local amount = tonumber(Arcana.Config.XP_PER_ENCHANT_SUCCESS) or 20
+		Arcana.GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
 	end
 
 	Arcana.RunHook("AppliedEnchantment", ply, wep, enchId)
@@ -164,11 +164,11 @@ end
 -- Restores an enchantment to a weapon without awarding XP.
 -- Use for system operations (e.g. vault restore) where XP should not be granted.
 -- Semantically distinct from ApplyEnchantmentToWeaponEntity which awards XP by default.
-function Arcana:RestoreEnchantmentToWeaponEntity(ply, wep, enchId)
-	return self:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, true)
+function Arcana.RestoreEnchantmentToWeaponEntity(ply, wep, enchId)
+	return Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId, true)
 end
 
-function Arcana:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
+function Arcana.RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 

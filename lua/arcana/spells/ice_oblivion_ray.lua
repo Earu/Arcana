@@ -118,7 +118,7 @@ local function startBeamPhase(caster)
 					dmg:SetDamageType(DMG_DISSOLVE)
 					dmg:SetAttacker(caster)
 					dmg:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg)
+					Arcana.TakeDamageInfo(ent, dmg)
 
 					-- Deeply freeze anything that survives
 					if IsValid(ent) then
@@ -161,7 +161,7 @@ local function startBeamPhase(caster)
 					dmg2:SetDamageType(DMG_DISSOLVE)
 					dmg2:SetAttacker(caster)
 					dmg2:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg2)
+					Arcana.TakeDamageInfo(ent, dmg2)
 
 					if IsValid(ent) then
 						Arcana.Status.Frost.Apply(ent, { slowMult = 0.5, duration = 4, vfxTag = "oblivion_nova" })
@@ -212,7 +212,7 @@ local function startBeamPhase(caster)
 			dmg:SetDamageType(DMG_DISSOLVE)
 			dmg:SetAttacker(caster)
 			dmg:SetInflictor(caster)
-			Arcana:TakeDamageInfo(ent, dmg)
+			Arcana.TakeDamageInfo(ent, dmg)
 
 			if IsValid(ent) then
 				Arcana.Status.Frost.Apply(ent, {
@@ -235,7 +235,7 @@ local function startBeamPhase(caster)
 					dmg2:SetDamageType(DMG_DISSOLVE)
 					dmg2:SetAttacker(caster)
 					dmg2:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg2)
+					Arcana.TakeDamageInfo(ent, dmg2)
 				end
 			end)
 		end
@@ -259,7 +259,7 @@ local function startBeamPhase(caster)
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "ice_oblivion_ray",
 	name = "Oblivion Ray",
 	description = "Channel the frozen void into a devastating beam of oblivion. Obliterates all in its path and deeply freezes anything that dares survive.",
@@ -349,7 +349,7 @@ if CLIENT then
 		fadeDur = fadeDur or 0.5
 
 		if shatter then
-			Arcana:BreakdownCastCircles(fadeDur, d.barrelCircles, d.muzzleSatellites, d.bandCircles, d.beamBandCircles)
+			Arcana.BreakdownCastCircles(fadeDur, d.barrelCircles, d.muzzleSatellites, d.bandCircles, d.beamBandCircles)
 			return
 		end
 

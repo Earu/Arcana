@@ -37,7 +37,7 @@ if SERVER then
 
 	local function tryPickup(self, ply)
 		if not IsValid(self) or not IsValid(ply) or not ply:IsPlayer() then return false end
-		Arcana:GiveItem(ply, "solidified_spores", 1)
+		Arcana.GiveItem(ply, "solidified_spores", 1)
 		self:EmitSound("physics/flesh/flesh_bloody_break.wav", 60, 180, 0.6)
 
 		local ed = EffectData()
@@ -158,7 +158,7 @@ if CLIENT then
 end
 
 hook.Add("Initialize", "arcana_solidified_spores_item", function()
-	Arcana:RegisterItem("solidified_spores", {
+	Arcana.RegisterItem("solidified_spores", {
 		name = "Solidified Spores",
 		description = "A solidified mass of spores. Fairies enjoy them.",
 		model = "models/props_hive/larval_essence.mdl",

@@ -12,12 +12,12 @@ Override **after** Arcana has loaded, from an `Initialize` hook.
 
 | Function | Realm | Returns |
 | --- | --- | --- |
-| `Arcana:GetCoins(ply)` | shared | number |
-| `Arcana:GetItemCount(ply, itemClass)` | shared | number |
-| `Arcana:GiveCoins(ply, amount, reason)` | server | `true` on success |
-| `Arcana:TakeCoins(ply, amount, reason)` | server | `false` if the player cannot afford it |
-| `Arcana:GiveItem(ply, itemClass, amount, reason)` | server | `true` on success |
-| `Arcana:TakeItem(ply, itemClass, amount, reason)` | server | `false` if the player lacks the items |
+| `Arcana.GetCoins(ply)` | shared | number |
+| `Arcana.GetItemCount(ply, itemClass)` | shared | number |
+| `Arcana.GiveCoins(ply, amount, reason)` | server | `true` on success |
+| `Arcana.TakeCoins(ply, amount, reason)` | server | `false` if the player cannot afford it |
+| `Arcana.GiveItem(ply, itemClass, amount, reason)` | server | `true` on success |
+| `Arcana.TakeItem(ply, itemClass, amount, reason)` | server | `false` if the player lacks the items |
 
 `reason` is a free-form string for your own logging. `TakeCoins` and `TakeItem` must return
 `false` rather than going negative: callers treat `false` as "cannot afford" and abort the
@@ -30,20 +30,20 @@ since UI affordability checks call it every frame.
 
 ```lua
 hook.Add("Initialize", "YourAddon_ArcanaCompat", function()
-    function Arcana:GiveCoins(ply, amount, reason)
+    function Arcana.GiveCoins(ply, amount, reason)
         if not IsValid(ply) or amount <= 0 then return false end
         ply:addMoney(amount)
         return true
     end
 
-    function Arcana:TakeCoins(ply, amount, reason)
+    function Arcana.TakeCoins(ply, amount, reason)
         if not IsValid(ply) or amount <= 0 then return false end
         if ply:getDarkRPVar("money") < amount then return false end
         ply:addMoney(-amount)
         return true
     end
 
-    function Arcana:GetCoins(ply)
+    function Arcana.GetCoins(ply)
         if SERVER then
             return IsValid(ply) and ply:getDarkRPVar("money") or 0
         end
@@ -56,20 +56,20 @@ end)
 
 ```lua
 hook.Add("Initialize", "YourAddon_ArcanaCompat", function()
-    function Arcana:GiveItem(ply, itemClass, amount, reason)
+    function Arcana.GiveItem(ply, itemClass, amount, reason)
         if not IsValid(ply) or amount <= 0 then return false end
         ply:PS2_AddItem(itemClass, amount)
         return true
     end
 
-    function Arcana:TakeItem(ply, itemClass, amount, reason)
+    function Arcana.TakeItem(ply, itemClass, amount, reason)
         if not IsValid(ply) or amount <= 0 then return false end
         if ply:PS2_GetItemCount(itemClass) < amount then return false end
         ply:PS2_RemoveItem(itemClass, amount)
         return true
     end
 
-    function Arcana:GetItemCount(ply, itemClass)
+    function Arcana.GetItemCount(ply, itemClass)
         if SERVER then
             return ply:PS2_GetItemCount(itemClass) or 0
         end
@@ -80,18 +80,21 @@ end)
 
 ### Wrapping instead of replacing
 
+`Arcana` is a namespace, not a class, so everything on it is a plain dot function. There is
+no `self` to forward.
+
 ```lua
 local oldRegisterItem = Arcana.RegisterItem
-function Arcana:RegisterItem(itemClass, itemData)
+function Arcana.RegisterItem(itemClass, itemData)
     print("Registering item:", itemClass)
-    oldRegisterItem(self, itemClass, itemData)
+    oldRegisterItem(itemClass, itemData)
 end
 ```
 
 ## Registering items
 
 ```lua
-Arcana:RegisterItem("mystic_gem", {
+Arcana.RegisterItem("mystic_gem", {
     name = "Mystic Gem",
     description = "A rare gemstone with mysterious properties.",
     model = "models/props_junk/rock001a.mdl",

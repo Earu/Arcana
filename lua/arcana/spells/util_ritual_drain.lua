@@ -18,7 +18,7 @@ end
 local function drain_bandvfx(target)
 	local r = math.max(target:OBBMaxs():Unpack()) * 0.5
 
-	Arcana:SendAttachBandVFX(target, Color(120, 40, 160, 255), 40, 0.6, {
+	Arcana.SendAttachBandVFX(target, Color(120, 40, 160, 255), 40, 0.6, {
 		{
 			radius = r * 1.1,
 			height = 6,
@@ -32,7 +32,7 @@ local function drain_bandvfx(target)
 	})
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "ritual_drain",
 	name = "Ritual Drain",
 	description = "Drains time from the ritual in your crosshair, cutting its remaining duration. Repeated casts collapse it.",

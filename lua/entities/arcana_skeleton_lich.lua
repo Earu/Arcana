@@ -318,7 +318,7 @@ function ENT:_FireLightningStrike(targetPos)
 					end,
 				})
 			else
-				Arcana:BlastDamage(self, pos, 60, 10, { damageType = DMG_SHOCK })
+				Arcana.BlastDamage(self, pos, 60, 10, { damageType = DMG_SHOCK })
 			end
 		end)
 	end
@@ -438,8 +438,8 @@ end
 function ENT:OnKilled(dmginfo)
 	local killer = dmginfo:GetAttacker()
 	if not (IsValid(killer) and killer:IsPlayer()) then killer = self._lastHurtBy end
-	if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
-		Arcana:GiveXP(killer, XP_REWARD, "Lich defeated")
+	if IsValid(killer) and killer:IsPlayer() and not Arcana.IsPotentialCheater(killer) then
+		Arcana.GiveXP(killer, XP_REWARD, "Lich defeated")
 	end
 
 	self:EmitSound("arcana/skeleton/death.ogg", 75, math.random(80, 95), 1)

@@ -178,7 +178,7 @@ if SERVER then
 				dmg:SetAttacker(caster)
 				dmg:SetInflictor(self)
 				dmg:SetDamagePosition(ent:WorldSpaceCenter())
-				Arcana:TakeDamageInfo(ent, dmg)
+				Arcana.TakeDamageInfo(ent, dmg)
 				Arcana.Spellcraft.ApplyEssenceHit(caster, ent, self:GetPos(), sc)
 				Arcana.Spellcraft.ImpactFX(self:GetElement(), self:GetPos(), 60, 0.4)
 			end

@@ -1,6 +1,6 @@
 if SERVER then util.AddNetworkString("Arcana_WindSweep") end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "wind_sweep",
 	name = "Wind Sweep",
 	description = "Unleash a violent gust pushing foes away.",
@@ -44,7 +44,7 @@ Arcana:RegisterSpell({
 						dmg:SetDamageType(DMG_SONIC)
 						dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 						dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-						Arcana:TakeDamageInfo(ent, dmg)
+						Arcana.TakeDamageInfo(ent, dmg)
 
 						ent:SetVelocity(forward * strength + Vector(0, 0, 120))
 						ent:SetGroundEntity(NULL)

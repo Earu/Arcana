@@ -1,7 +1,7 @@
 -- Ritual: Magic Tower — summons a pilotable arcane battle tower for 10 minutes.
 local TOWER_LIFETIME = 60 * 10 -- 10 minutes
 
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_magic_tower",
 	name = "Ritual: Magic Tower",
 	description = "Summon an arcane battle tower you can climb into and pilot for 10 minutes: a devastating beam on primary fire and spooling magic flak on secondary.",

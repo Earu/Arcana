@@ -1,9 +1,9 @@
 -- Arcana Damage utilities, server-side.
--- Provides Arcana:BlastDamage (radius damage with ForceTakeDamageInfo support),
--- Arcana:TakeDamageInfo (invulnerability-aware damage wrapper),
--- and bad-entity tracking for Arcana:IsPotentialCheater.
+-- Provides Arcana.BlastDamage (radius damage with ForceTakeDamageInfo support),
+-- Arcana.TakeDamageInfo (invulnerability-aware damage wrapper),
+-- and bad-entity tracking for Arcana.IsPotentialCheater.
 --
--- ALL damage the addon deals must go through Arcana:TakeDamageInfo(ent, dmg), not
+-- ALL damage the addon deals must go through Arcana.TakeDamageInfo(ent, dmg), not
 -- ent:TakeDamageInfo(dmg). The wrapper is where the invulnerability check lives: it
 -- samples the victim's health a tick later and flags ArcanaInvulnerable when a hit
 -- lands for far less than it should. Every direct call is a hole in that check, since
@@ -21,7 +21,7 @@ if SERVER then
 	-- @param radius    number  Blast radius in units
 	-- @param baseDamage number Maximum damage at ground zero
 	-- @param opts      table   Optional: damageType, inflictor, ignoreAttacker (bool), onChecked (function)
-	function Arcana:BlastDamage(attacker, center, radius, baseDamage, opts)
+	function Arcana.BlastDamage(attacker, center, radius, baseDamage, opts)
 		opts = opts or {}
 		attacker = IsValid(attacker) and attacker or game.GetWorld()
 		local inflictor = IsValid(opts.inflictor) and opts.inflictor or attacker
@@ -49,12 +49,12 @@ if SERVER then
 			dmg:SetAttacker(attacker)
 			dmg:SetInflictor(inflictor)
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcana:TakeDamageInfo(ent, dmg, onChecked)
+			Arcana.TakeDamageInfo(ent, dmg, onChecked)
 		end
 	end
 
 	-- Wrapper that detects invulnerability
-	function Arcana:TakeDamageInfo(ent, dmginfo, onChecked)
+	function Arcana.TakeDamageInfo(ent, dmginfo, onChecked)
 		if not IsValid(ent) then return end
 		if not ent:IsPlayer() then
 			return ent:TakeDamageInfo(dmginfo)
@@ -175,7 +175,7 @@ if SERVER then
 		end
 	end)
 
-	function Arcana:IsPotentialCheater(ply)
+	function Arcana.IsPotentialCheater(ply)
 		if not IsValid(ply) then return true end
 		if ply.ArcanaInvulnerable then return true end
 		if badEntities[ply] and badEntities[ply] > 0 then return true end
