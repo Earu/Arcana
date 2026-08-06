@@ -147,15 +147,15 @@ Enchantments, on a specific weapon entity:
 | `Arcana.HasEntityEnchantment(wep, enchId)` | Whether one is applied. |
 | `Arcana.SyncWeaponEnchantNW(wep)` | Force a re-sync after bulk changes. |
 
-Progression and tutorial:
+Progression and scenes:
 
 | Function | Realm | Notes |
 | --- | --- | --- |
 | `Arcana.GetLevel(ply)` / `GetXP(ply)` / `GetKnowledgePoints(ply)` | shared | |
 | `Arcana.HasSpellUnlocked(ply, spellId)` | shared | |
 | `Arcana.RecalculateAndRepairKnowledgePoints(ply)` | server | Recomputes KP from level and known spells, saves and syncs. Admin repair tool. |
-| `Arcana.StartTutorialSequence(sequence)` | client | |
-| `Arcana.IsTutorialActive()` | client | For suppressing your own UI. |
+| `Arcana.StartScene(sequence)` | client | |
+| `Arcana.IsSceneActive()` | client | For suppressing your own UI. |
 
 Voice activation: `Arcana.RegisterSpell` registers a trigger phrase for the spell name.
 `Arcana.AddTriggerPhrase(phrase, spellId)` and `Arcana.RemoveTriggerPhrase(phrase)` manage extras.
