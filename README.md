@@ -142,7 +142,18 @@ Registration only declares an enchantment. These apply it to a specific weapon e
 | `Arcana:RestoreEnchantmentToWeaponEntity(ply, wep, enchId)` | Same, without awarding XP. Use for system operations such as a vault restore. |
 | `Arcana:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)` | Runs the enchantment's `remove`, drops it and re-syncs. |
 | `Arcana:GetEntityEnchantments(wep)` | The weapon's applied enchantments. |
+| `Arcana:HasEntityEnchantment(wep, enchId)` | Whether one specific enchantment is applied. |
 | `Arcana.SyncWeaponEnchantNW(wep)` | Force a network re-sync after bulk changes. |
+
+### Progression and tutorial
+
+| Function | Realm | Notes |
+| --- | --- | --- |
+| `Arcana:GetLevel(ply)` / `GetXP(ply)` / `GetKnowledgePoints(ply)` | shared | Read progression without touching `GetPlayerData` directly. |
+| `Arcana:HasSpellUnlocked(ply, spellId)` | shared | Whether the player knows a spell. |
+| `Arcana:RecalculateAndRepairKnowledgePoints(ply)` | server | Recomputes KP from level and known spells, overwrites the stored value, saves and syncs. Returns the corrected amount. Intended as an admin repair tool after external edits to player data. |
+| `Arcana:StartTutorialSequence(sequence)` | client | Starts a tutorial sequence. |
+| `Arcana:IsTutorialActive()` | client | Whether a sequence is currently running, for suppressing your own UI. |
 
 ### Voice activation
 
