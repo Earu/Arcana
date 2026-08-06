@@ -59,7 +59,7 @@ function Arcana:RegisterEnchantment(def)
 		name = name,
 		description = def.description or "Mystic modification to a weapon",
 		-- Requirements/costs
-		cost_coins = tonumber(def.cost_coins or 0) or 0,
+		cost_coins = tonumber(def.cost_coins) or 0,
 		cost_items = istable(def.cost_items) and def.cost_items or { -- array of {name="mana_crystal_shard", amount=5}
 			{name = "mana_crystal_shard", amount = 1}
 		},
@@ -71,7 +71,7 @@ function Arcana:RegisterEnchantment(def)
 		apply = def.apply,   -- function(ply, wep, state)
 		remove = def.remove, -- function(ply, wep, state)
 		-- Optional: maximum stacks or config
-		max_stacks = tonumber(def.max_stacks or 1) or 1,
+		max_stacks = tonumber(def.max_stacks) or 1,
 		-- Whether a successful apply grants XP (default true); set false for system-applied enchantments
 		grants_xp = def.grants_xp ~= false,
 	}
@@ -107,11 +107,6 @@ function Arcana:GetEntityEnchantments(wep)
 		wep.ArcanaEnchantments = appliedSet
 		return wep.ArcanaEnchantments
 	end
-end
-
-function Arcana:HasEntityEnchantment(wep, enchId)
-	local list = self:GetEntityEnchantments(wep)
-	return list[enchId] ~= nil
 end
 
 -- Apply/remove on a specific weapon entity instance.

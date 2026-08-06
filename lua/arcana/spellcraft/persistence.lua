@@ -119,9 +119,8 @@ end
 -- Base per-server state for a player, with consecration filled for a given def.
 function P.GetServerState(ply, def)
 	local sid = ply:SteamID64()
-	local data = Arcana:GetPlayerData(ply)
 	return {
-		level = data and data.level or 0,
+		level = Arcana:GetLevel(ply),
 		essences = P.EssenceUnlocks[sid] or {},
 		bargain = P.HasBargain(ply),
 		consecrated = def and P.IsConsecrated(ply, def) or false,

@@ -262,7 +262,6 @@ if CLIENT then
 			if curTime > flash.dieTime then
 				table.remove(Arcana.LightningFlashes, i)
 			else
-				local age = curTime - flash.startTime
 				local frac = math.Clamp(age / 0.15, 0, 1)
 				local alpha = (1 - frac) * 255
 				local size = Lerp(frac, 800, 1200) * flash.power
@@ -287,7 +286,6 @@ if CLIENT then
 			if curTime > bolt.dieTime then
 				table.remove(Arcana.LightningBolts, i)
 			else
-				local age = curTime - bolt.startTime
 				local frac = 1 - math.Clamp((bolt.dieTime - curTime) / 0.4, 0, 1)
 
 				-- Flickering effect

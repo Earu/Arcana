@@ -57,7 +57,7 @@ if SERVER then
 		if dress.trail then
 			util.SpriteTrail(self, 0, Color(col.r, col.g, col.b, 220), true, 16, 2, 0.45, 1 / 128, dress.trail)
 		end
-		if Arcana and Arcana.Common and Arcana.Common.AddEntitySprite then
+		if Arcana.Common and Arcana.Common.AddEntitySprite then
 			for i, spr in ipairs(dress.sprites) do
 				Arcana.Common.AddEntitySprite(self, spr[1], col, spr[2], "ArcanaSB_S" .. i)
 			end
@@ -103,7 +103,7 @@ if SERVER then
 	end
 
 	local function isSolidNonTrigger(ent)
-		return Arcana and Arcana.Common and Arcana.Common.IsSolidNonTrigger(ent)
+		return Arcana.Common and Arcana.Common.IsSolidNonTrigger(ent)
 	end
 
 	local function isActorEnt(ent)
@@ -204,7 +204,7 @@ if SERVER then
 
 		-- All detonation visuals/sounds come from the element ImpactFX,
 		-- fired by the runtime's AreaEssence.
-		if Arcana and Arcana.Spellcraft and Arcana.Spellcraft.OnBoltDetonate then
+		if Arcana.Spellcraft and Arcana.Spellcraft.OnBoltDetonate then
 			Arcana.Spellcraft.OnBoltDetonate(self, self:GetPos())
 		end
 

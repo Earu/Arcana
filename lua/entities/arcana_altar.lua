@@ -1307,7 +1307,7 @@ if CLIENT then
 
 		rebuild()
 		-- Live-rebuild when KP changes while the menu is open
-		local lastKP = (Arcana:GetPlayerData(ply) and Arcana:GetPlayerData(ply).knowledge_points) or 0
+		local lastKP = Arcana:GetKnowledgePoints(ply)
 
 		function frame:Think()
 			local d = Arcana:GetPlayerData(ply)
@@ -1358,7 +1358,7 @@ if CLIENT then
 	function ENT:DrawGlyphParticles()
 		if not self._glyphParticles then return end
 
-		local bloom = Arcana and Arcana.Bloom
+		local bloom = Arcana.Bloom
 
 		if bloom and bloom.ProcessBloom then
 			-- Two passes. The bloom only ever sees a faint copy, which becomes the halo; putting

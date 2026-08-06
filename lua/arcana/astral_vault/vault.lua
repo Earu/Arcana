@@ -18,7 +18,7 @@ local VAULT_CFG = Arcana.VaultConfig
 
 -- Utility: fetch enchantment ids from a weapon entity, stable order
 local function collectEnchantIds(wep)
-	local set = Arcana and Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
+	local set = Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
 	local out = {}
 	for id, on in pairs(set) do if on then out[#out + 1] = id end end
 	table.sort(out)

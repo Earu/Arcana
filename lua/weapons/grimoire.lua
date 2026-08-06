@@ -138,7 +138,7 @@ function SWEP:SetupNPCOwner(npc)
 	self:SetHoldType("smg")
 	self._ArcanaNPCOwner = npc
 
-	if Arcana and Arcana.NPC then
+	if Arcana.NPC then
 		Arcana.NPC.Register(npc, self)
 	end
 end
@@ -154,7 +154,7 @@ function SWEP:OwnerChanged()
 	local current = self:GetOwner()
 	if previous == current then return end
 
-	if IsValid(previous) and Arcana and Arcana.NPC then
+	if IsValid(previous) and Arcana.NPC then
 		Arcana.NPC.Unregister(previous)
 	end
 
@@ -164,7 +164,7 @@ end
 function SWEP:OnRemove()
 	if not SERVER then return end
 
-	if IsValid(self._ArcanaNPCOwner) and Arcana and Arcana.NPC then
+	if IsValid(self._ArcanaNPCOwner) and Arcana.NPC then
 		Arcana.NPC.Unregister(self._ArcanaNPCOwner)
 	end
 end
@@ -193,7 +193,7 @@ function SWEP:NPCShoot_Primary()
 	local owner = self:GetOwner()
 	if not isNPCOwner(owner) then return end
 
-	if Arcana and Arcana.NPC then
+	if Arcana.NPC then
 		Arcana.NPC.TryCast(owner)
 	end
 end
@@ -472,7 +472,7 @@ if CLIENT then
 	-- for other cost types. y is the top edge.
 	local function drawSpellCost(sp, font, x, y, col, align)
 		local ct = tostring(sp.cost_type or "")
-		local ca = tonumber(sp.cost_amount or 0) or 0
+		local ca = tonumber(sp.cost_amount) or 0
 		local seg
 		if ct == Arcana.COST_TYPES.COINS then
 			seg = {text = string.Comma(ca), icon = ArtDeco.Icons.coin, color = col}

@@ -1,7 +1,7 @@
 -- Player Lifecycle Hooks — handles player join (data load), death (interrupt spell),
 -- and disconnect (save + cleanup). Extracted from core.lua to isolate the lifecycle concern.
 
-assert(Arcana and Arcana.RunHook, "lifecycle.lua requires core.lua to be loaded first")
+assert(Arcana.RunHook, "lifecycle.lua requires core.lua to be loaded first")
 local Arcana = Arcana
 
 if SERVER then

@@ -21,8 +21,8 @@ end
 
 local function hasBarrier(ply)
 	if not IsValid(ply) then return false end
-	local hp = tonumber(ply._arcanaBarrierHP or 0) or 0
-	local untilT = tonumber(ply._arcanaBarrierUntil or 0) or 0
+	local hp = tonumber(ply._arcanaBarrierHP) or 0
+	local untilT = tonumber(ply._arcanaBarrierUntil) or 0
 
 	return hp > 0 and CurTime() < untilT
 end
@@ -107,7 +107,7 @@ Arcana:RegisterSpell({
 		if CLIENT then return true end
 		local duration = 120
 		-- Capacity scales slightly with level: 60 base + 6 per level, capped
-		local level = Arcana:GetPlayerData(caster).level or 1
+		local level = Arcana:GetLevel(caster)
 		local capacity = math.Clamp(60 + (level * 6), 60, 1000)
 		caster._arcanaBarrierHP = capacity
 		caster._arcanaBarrierUntil = CurTime() + duration

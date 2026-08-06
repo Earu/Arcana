@@ -128,7 +128,6 @@ local statue = nil
 local goldPlate = nil
 local auraPos = nil
 local auraAng = nil
-local nextAuraEffect = 0
 local coins = nil
 local coinCenter = nil
 local coinRingMax = 1200
@@ -320,7 +319,7 @@ end)
 -- Warp every sound played while inside the scene, soul-mode style (see
 -- soul_mode.lua's EntityEmitSound pitch treatment)
 hook.Add("EntityEmitSound", "Arcana_GoldenSunScene", function(data)
-	local tutorial = Arcana and Arcana.Tutorial
+	local tutorial = Arcana.Tutorial
 	if not tutorial or not tutorial.active then return end
 	if not isSceneActive(tutorial) then return end
 

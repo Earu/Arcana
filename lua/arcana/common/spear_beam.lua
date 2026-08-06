@@ -23,7 +23,6 @@ if SERVER then
 	--   - damageType: number (default DMG_DISSOLVE|DMG_ENERGYBEAM) for direct + splash
 	--   - onHit: function(hitEnt, hitPos, hitNormal) called on impact (optional)
 	function Arcana.Common.SpearBeam(attacker, origin, direction, options)
-		if not SERVER then return end
 		if not IsValid(attacker) then return end
 		if not isvector(origin) or not isvector(direction) then return end
 

@@ -51,7 +51,7 @@ local function blinkVFX(fromPos, toPos, ply)
 	sound.Play("weapons/physcannon/energy_bounce2.wav", toPos, 70, 120)
 
 	-- Brief band ring
-	if Arcana and Arcana.SendAttachBandVFX and IsValid(ply) then
+	if Arcana.SendAttachBandVFX and IsValid(ply) then
 		local r = math.max(ply:OBBMaxs():Unpack()) * 0.55
 		Arcana:SendAttachBandVFX(ply, Color(196, 160, 255), 26, 0.4, {
 			{ radius = r * 0.9, height = 4, spin = { p = 0, y = 180, r = 0 }, lineWidth = 2 },

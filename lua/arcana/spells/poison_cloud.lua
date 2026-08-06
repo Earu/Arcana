@@ -157,8 +157,6 @@ Arcana:RegisterSpell({
 
 if CLIENT then
 	local activeEmitters = {}
-	local matGlow = Material("sprites/light_glow02_add")
-	local matFlare = Material("effects/blueflare1")
 
 	net.Receive("Arcana_PoisonCloud", function()
 		local cloud = net.ReadEntity()

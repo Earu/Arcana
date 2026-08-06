@@ -1040,7 +1040,6 @@ function Tutorial:RenderTutorial()
 
 	-- Set up rendering from simulated position
 	local eyePos = self.simulatedPos + Vector(0, 0, 64)
-	local eyeAng = self.simulatedAng
 
 	-- Draw skybox cube
 	self:DrawSkyboxCube(eyePos)
@@ -1323,9 +1322,4 @@ end
 -- Public API to start a tutorial sequence
 function Arcana:StartTutorialSequence(sequence)
 	return Tutorial:StartSequence(sequence)
-end
-
--- Public API to check if tutorial is active
-function Arcana:IsTutorialActive()
-	return Tutorial.active
 end

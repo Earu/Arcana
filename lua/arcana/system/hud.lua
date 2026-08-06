@@ -69,7 +69,7 @@ local function showUnlockAnnouncement(kind, displayName, knowledgeDelta, spellId
 	-- Longer for Divine Pacts, shorter for a forget: undoing a choice is a smaller
 	-- moment than making one, and the panel should not linger like a reward.
 	unlockAnnounce.endsAt = CurTime() + (isDivine and 6.0 or (isForget and 3.5 or 4.5))
-	unlockAnnounce.knowledgeDelta = tonumber(knowledgeDelta or 0) or 0
+	unlockAnnounce.knowledgeDelta = tonumber(knowledgeDelta) or 0
 
 	if isForget then
 		-- The learn chime, dropped to a low pitch: the same note, undone. EmitSound is
@@ -96,7 +96,7 @@ net.Receive("Arcana_SpellUnlocked", function()
 	local cost = 0
 
 	if Arcana.RegisteredSpells[spellId] then
-		cost = tonumber(Arcana.RegisteredSpells[spellId].knowledge_cost or 0) or 0
+		cost = tonumber(Arcana.RegisteredSpells[spellId].knowledge_cost) or 0
 	end
 
 	showUnlockAnnouncement("spell", name, -cost, spellId)
@@ -108,7 +108,7 @@ net.Receive("Arcana_SpellForgotten", function()
 	local refund = 0
 
 	if Arcana.RegisteredSpells[spellId] then
-		refund = tonumber(Arcana.RegisteredSpells[spellId].knowledge_cost or 0) or 0
+		refund = tonumber(Arcana.RegisteredSpells[spellId].knowledge_cost) or 0
 	end
 
 	showUnlockAnnouncement("forget", name, refund, spellId)

@@ -30,7 +30,7 @@ Arcana:RegisterEnchantment({
 		-- Angle accumulator to place spear origins around the player in a ring
 		state._angle = state._angle or math.Rand(0, math.pi * 2)
 
-		local num = math.max(1, tonumber(data.Num or 1) or 1)
+		local num = math.max(1, tonumber(data.Num) or 1)
 		local caster = ply
 		local forward = caster:GetAimVector()
 		local right = caster:GetRight()
