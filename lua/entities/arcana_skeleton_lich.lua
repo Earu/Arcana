@@ -121,7 +121,6 @@ function ENT:Initialize()
 		                or  nil
 
 		self._cdTable        = {}
-		self._lastTargetScan = 0
 		self:SetNWBool("Casting", false)
 		self:SetAnimState("idle")
 	else
@@ -208,26 +207,8 @@ end
 
 -- ── Target acquisition ────────────────────────────────────────────────────────
 
-local function IsEnemy(e)
-	return IsValid(e) and e:IsPlayer() and e:Alive()
-end
-
 function ENT:AcquireTarget()
-	local now = CurTime()
-	if now < (self._lastTargetScan or 0) then return self._target end
-	self._lastTargetScan = now + 0.4
-
-	local myPos = self:GetPos()
-	local nearest, bestD2 = nil, CHASE_RANGE * CHASE_RANGE
-	for _, ply in ipairs(player.GetAll()) do
-		if IsEnemy(ply) then
-			local d2 = myPos:DistToSqr(ply:GetPos())
-			if d2 < bestD2 then bestD2, nearest = d2, ply end
-		end
-	end
-
-	self._target = nearest
-	return self._target
+	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
 end
 
 -- ── Spell management ──────────────────────────────────────────────────────────

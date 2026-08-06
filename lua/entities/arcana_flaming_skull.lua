@@ -65,7 +65,6 @@ function ENT:Initialize()
 
 		self._lastThink = CurTime()
 		self._nextFireball = 0
-		self._lastTargetScan = 0
 	else
 		-- client visuals
 		self._nextFlame = 0
@@ -87,29 +86,8 @@ function ENT:SpawnFunction(ply, tr, classname)
 	return ent
 end
 
-local function IsEnemy(ply)
-	return IsValid(ply) and ply:IsPlayer() and ply:Alive()
-end
-
-function ENT:_PickTarget()
-	local now = CurTime()
-	if now < (self._lastTargetScan or 0) then return end
-	self._lastTargetScan = now + 0.4
-
-	local myPos = self:GetPos()
-	local nearest, bestD2 = nil, CHASE_RANGE * CHASE_RANGE
-
-	for _, ply in ipairs(player.GetAll()) do
-		if IsEnemy(ply) then
-			local d2 = myPos:DistToSqr(ply:GetPos())
-			if d2 < bestD2 then
-				bestD2 = d2
-				nearest = ply
-			end
-		end
-	end
-
-	self._target = nearest
+function ENT:AcquireTarget()
+	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
 end
 
 function ENT:_Chase(dt)
@@ -255,7 +233,7 @@ function ENT:Think()
 		local dt = math.Clamp(now - (self._lastThink or now), 0, 0.2)
 		self._lastThink = now
 
-		self:_PickTarget()
+		self:AcquireTarget()
 		self:_Chase(dt)
 
 		if now >= (self._nextFireball or 0) and IsValid(self._target) then
