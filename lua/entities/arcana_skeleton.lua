@@ -230,7 +230,7 @@ function ENT:SpawnFunction(ply, tr, classname)
 end
 
 function ENT:AcquireTarget()
-	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
+	return Arcana.Common.AcquireNearestEnemy(self, CHASE_RANGE, 0.4)
 end
 
 function ENT:RunBehaviour()
@@ -325,7 +325,7 @@ function ENT:TryMelee(target)
 		local hullMins = Vector(-64, -64, -64)
 		local hullMaxs = Vector(64, 64, 64)
 		for _, ent in ipairs(ents.FindInBox(center + hullMins, center + hullMaxs)) do
-			if IsValid(ent) and ent:IsPlayer() and ent:Alive() then
+			if ent ~= self and Arcana.Common.IsMonsterEnemy(ent) then
 				local startPos = IsValid(self._sword) and (self._sword:GetPos() + self:GetForward() * 6) or self:EyePos()
 				local tr = util.TraceLine({
 					start = startPos,

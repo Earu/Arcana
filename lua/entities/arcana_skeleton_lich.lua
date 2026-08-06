@@ -208,7 +208,7 @@ end
 -- ── Target acquisition ────────────────────────────────────────────────────────
 
 function ENT:AcquireTarget()
-	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
+	return Arcana.Common.AcquireNearestEnemy(self, CHASE_RANGE, 0.4)
 end
 
 -- ── Spell management ──────────────────────────────────────────────────────────

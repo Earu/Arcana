@@ -262,6 +262,7 @@ if CLIENT then
 			if curTime > flash.dieTime then
 				table.remove(Arcana.LightningFlashes, i)
 			else
+				local age = curTime - flash.startTime
 				local frac = math.Clamp(age / 0.15, 0, 1)
 				local alpha = (1 - frac) * 255
 				local size = Lerp(frac, 800, 1200) * flash.power
