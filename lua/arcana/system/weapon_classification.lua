@@ -480,7 +480,16 @@ if SERVER then
 	local CACHE_FILE = "arcana/weapon_classification_cache.json"
 	local weaponClassificationCache = {}
 	if file.Exists(CACHE_FILE, "DATA") then
-		local loaded = util.JSONToTable(file.Read(CACHE_FILE, "DATA")) or {}
+		-- Runs at module load, so a corrupt cache file must not take the whole addon down
+		-- with it. Every other on-disk JSON read in the codebase is pcall-guarded; this one
+		-- has the least room to fail loudly, since nothing has loaded yet to report through.
+		local parsed, loaded = pcall(util.JSONToTable, file.Read(CACHE_FILE, "DATA") or "")
+		if not parsed or not istable(loaded) then
+			MsgC(Color(255, 80, 80), "[Arcana] ", Color(255, 255, 255),
+				"weapon classification cache is unreadable, rebuilding it: " .. tostring(loaded) .. "\n")
+			loaded = {}
+		end
+
 		for className, v in pairs(loaded) do
 			-- Discard entries from the old string-only format; they will be re-classified.
 			if istable(v) then

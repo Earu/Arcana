@@ -26,11 +26,6 @@ local function CreateDefaultPlayerData()
 end
 
 if SERVER then
-	local function dbLogError(prefix)
-		local err = sql.LastError() or "unknown error"
-		MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), prefix .. ": " .. tostring(err) .. "\n")
-	end
-
 	local ensured = false
 	local function ensureDatabase()
 		if ensured then return ensured end
@@ -48,8 +43,7 @@ if SERVER then
 			selected_quickslot INTEGER NOT NULL DEFAULT 1,
 			last_save INTEGER NOT NULL DEFAULT 0
 		);]])
-		if ok == false then
-			dbLogError("CREATE TABLE arcane_players failed")
+		if Arcana.SQLCheck(ok, "CREATE TABLE arcane_players") == false then
 			ensured = false
 			return ensured
 		end
@@ -71,11 +65,9 @@ if SERVER then
 	end
 
 	local function deserializeUnlockedSpells(json)
-		json = json or "[]"
-		json = json:gsub("^\'", ""):gsub("\'$", "")
-		local ok, data = pcall(util.JSONToTable, json)
+		local data = Arcana.DecodeJSON(json, "unlocked_spells column", nil)
 		local map = {}
-		if ok and istable(data) then
+		if data then
 			for _, id in ipairs(data) do
 				map[tostring(id)] = true
 			end
@@ -93,11 +85,9 @@ if SERVER then
 	end
 
 	local function deserializeQuickslots(json)
-		json = json or "[]"
-		json = json:gsub("^\'", ""):gsub("\'$", "")
-		local ok, arr = pcall(util.JSONToTable, json)
+		local arr = Arcana.DecodeJSON(json, "quickspell_slots column", nil)
 		local slots = {nil, nil, nil, nil, nil, nil, nil, nil}
-		if ok and istable(arr) then
+		if arr then
 			for i = 1, 8 do
 				local v = arr[i]
 				if isstring(v) and v ~= "" then slots[i] = v end
@@ -164,22 +154,25 @@ if SERVER then
 			return merged_xp, merged_level, derived_kp, merged_unlocked, merged_quick, merged_selected
 		end
 
-		local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+		-- The merge below is what stops a partially-loaded in-memory state from erasing
+		-- stored progression, and it can only do that if it sees the stored row. A failed
+		-- read looks identical to "no row yet" once it reaches mergeWithExistingRow, so bail
+		-- rather than writing the incoming values over whatever is really there.
+		local rows = Arcana.SQLCheck(sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;"),
+			"SavePlayerDataToSQL merge read for " .. tostring(ply:SteamID64()))
+		if rows == false then return end
+
 		local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
 		local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
 		local quick = sql.SQLStr(serializeQuickslots(mquick))
 		local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
-		local ok = sql.Query(q)
-		if ok == false then
-			dbLogError("SavePlayerDataToSQL failed")
-		end
+		Arcana.SQLCheck(sql.Query(q), "SavePlayerDataToSQL for " .. tostring(ply:SteamID64()))
 	end
 
 	function Arcana:LoadPlayerDataFromSQL(ply, callback)
 		if not IsValid(ply) then return end
 		local handled = Arcana.RunHook("LoadPlayerDataFromSQL", ply, callback)
 		if handled == true then return end
-		if not ensureDatabase() then return nil end
 		local rawSid = ply:SteamID64()
 		Arcana.SaveBlockedBySteamID[rawSid] = true
 
@@ -218,9 +211,18 @@ if SERVER then
 			end)
 		end
 
-		local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+		-- A missing database is the same situation as a failed read: retry with backoff and
+		-- keep the callback alive. Returning here instead would strand every consumer of
+		-- Arcana_LoadedPlayerData, which is the whole progression, quickslot and spellcraft
+		-- chain, with no error anywhere.
+		if not ensureDatabase() then
+			scheduleRetry()
+			return
+		end
+
+		local rows = Arcana.SQLCheck(sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;"),
+			"LoadPlayerDataFromSQL for " .. tostring(rawSid))
 		if rows == false then
-			dbLogError("LoadPlayerDataFromSQL failed")
 			scheduleRetry()
 			return
 		end

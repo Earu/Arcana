@@ -89,8 +89,7 @@ if SERVER then
 				coins INTEGER NOT NULL DEFAULT 0,
 				items TEXT NOT NULL DEFAULT '{}'
 			);]])
-			if ok == false then
-				ErrorNoHalt("[Arcana] Failed to create inventory table: " .. tostring(sql.LastError()) .. "\n")
+			if Arcana.SQLCheck(ok, "CREATE TABLE arcane_inventory") == false then
 				return false
 			end
 		end
@@ -98,16 +97,25 @@ if SERVER then
 		return true
 	end
 
+	-- Returns nil when the inventory could not be read, which is NOT the same as an empty
+	-- inventory. Handing back a zeroed table on a failed read used to get cached and then
+	-- written straight back over the stored row by Inventory:Save, wiping the player's coins
+	-- and items. A new player with no row yet is the only case that legitimately reads zero.
 	local function getInventoryData(steamid)
-		if not ensureInventoryDB() then return {coins = 0, items = {}} end
-		local rows = sql.Query("SELECT * FROM arcane_inventory WHERE steamid = '" .. sql.SQLStr(steamid, true) .. "' LIMIT 1;")
+		if not ensureInventoryDB() then return nil end
+
+		local rows = Arcana.SQLCheck(
+			sql.Query("SELECT * FROM arcane_inventory WHERE steamid = '" .. sql.SQLStr(steamid, true) .. "' LIMIT 1;"),
+			"read inventory for " .. tostring(steamid))
+		if rows == false then return nil end
+
 		if rows and rows[1] then
-			local ok, items = pcall(util.JSONToTable, rows[1].items or "{}")
 			return {
 				coins = tonumber(rows[1].coins) or 0,
-				items = (ok and istable(items)) and items or {}
+				items = Arcana.DecodeJSON(rows[1].items, "inventory items for " .. tostring(steamid), {}),
 			}
 		end
+
 		return {coins = 0, items = {}}
 	end
 
@@ -116,24 +124,34 @@ if SERVER then
 		local coins = math.max(0, tonumber(data.coins) or 0)
 		local itemsJson = util.TableToJSON(data.items or {}) or "{}"
 		local sid = sql.SQLStr(steamid, true)
-		local ok = sql.Query(string.format(
+		Arcana.SQLCheck(sql.Query(string.format(
 			"INSERT OR REPLACE INTO arcane_inventory (steamid, coins, items) VALUES ('%s', %d, %s);",
 			sid, coins, sql.SQLStr(itemsJson)
-		))
-		if ok == false then
-			ErrorNoHalt("[Arcana] Failed to save inventory: " .. tostring(sql.LastError()) .. "\n")
-		end
+		)), "save inventory for " .. tostring(steamid))
 	end
 
 	Arcana.Inventory.Cache = Arcana.Inventory.Cache or {}
 
+	-- Callers mutate the table this returns, so an unreadable inventory must never be
+	-- cached: the throwaway table below absorbs the mutation and is discarded, which loses
+	-- one grant instead of persisting a zeroed inventory over the real one.
 	function Arcana.Inventory:Get(ply)
 		if not IsValid(ply) then return {coins = 0, items = {}} end
+
 		local sid = ply:SteamID64()
 		if not Arcana.Inventory.Cache[sid] then
-			Arcana.Inventory.Cache[sid] = getInventoryData(sid)
+			local loaded = getInventoryData(sid)
+			if not loaded then return {coins = 0, items = {}} end
+			Arcana.Inventory.Cache[sid] = loaded
 		end
+
 		return Arcana.Inventory.Cache[sid]
+	end
+
+	-- True only when this player's inventory is actually loaded. Spending paths check it so
+	-- a failed read cannot be mistaken for "you have nothing" and, worse, be spent against.
+	function Arcana.Inventory:IsLoaded(ply)
+		return IsValid(ply) and Arcana.Inventory.Cache[ply:SteamID64()] ~= nil
 	end
 
 	function Arcana.Inventory:Save(ply)
@@ -159,6 +177,7 @@ if SERVER then
 	function Arcana:GiveCoins(ply, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
+		if not Arcana.Inventory:IsLoaded(ply) then return false end
 		inv.coins = inv.coins + amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("CoinsGiven", ply, amount, reason)
@@ -175,6 +194,7 @@ if SERVER then
 	function Arcana:TakeCoins(ply, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
+		if not Arcana.Inventory:IsLoaded(ply) then return false end
 		if inv.coins < amount then return false end
 		inv.coins = inv.coins - amount
 		Arcana.Inventory:SyncToClient(ply)
@@ -192,6 +212,7 @@ if SERVER then
 	function Arcana:GiveItem(ply, itemClass, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
+		if not Arcana.Inventory:IsLoaded(ply) then return false end
 		inv.items[itemClass] = (inv.items[itemClass] or 0) + amount
 		Arcana.Inventory:SyncToClient(ply)
 		Arcana.RunHook("ItemGiven", ply, itemClass, amount, reason)
@@ -209,6 +230,7 @@ if SERVER then
 	function Arcana:TakeItem(ply, itemClass, amount, reason)
 		if not IsValid(ply) or amount <= 0 then return false end
 		local inv = Arcana.Inventory:Get(ply)
+		if not Arcana.Inventory:IsLoaded(ply) then return false end
 		if (inv.items[itemClass] or 0) < amount then return false end
 		inv.items[itemClass] = inv.items[itemClass] - amount
 		if inv.items[itemClass] <= 0 then
@@ -262,11 +284,9 @@ if CLIENT then
 
 	net.Receive("Arcana_InventorySync", function()
 		local coins = net.ReadUInt(32)
-		local itemsJson = net.ReadString()
-		local ok, items = pcall(util.JSONToTable, itemsJson)
 		Arcana.Inventory.LocalCache = {
 			coins = coins,
-			items = (ok and istable(items)) and items or {}
+			items = Arcana.DecodeJSON(net.ReadString(), "inventory sync payload", {}),
 		}
 	end)
 

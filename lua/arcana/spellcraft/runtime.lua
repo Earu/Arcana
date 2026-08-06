@@ -698,8 +698,9 @@ if CLIENT then
 		P.Local = {}
 		local raw = file.Read(STORE_PATH, "DATA")
 		if not raw then return end
-		local ok, arr = pcall(util.JSONToTable, raw)
-		if ok and istable(arr) then
+
+		local arr = Arcana.DecodeJSON(raw, "local crafted spell store (" .. STORE_PATH .. ")", nil)
+		if arr then
 			for _, d in ipairs(arr) do
 				if istable(d) and isstring(d.form) and isstring(d.essence) then
 					P.Local[#P.Local + 1] = {
