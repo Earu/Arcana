@@ -109,6 +109,14 @@ function Arcana:GetEntityEnchantments(wep)
 	end
 end
 
+--- True when `wep` currently has `enchId` applied.
+-- Part of the public Arcana:* surface for third-party integrations; the addon itself
+-- reads the whole map through GetEntityEnchantments.
+function Arcana:HasEntityEnchantment(wep, enchId)
+	local list = self:GetEntityEnchantments(wep)
+	return list[enchId] ~= nil
+end
+
 -- Apply/remove on a specific weapon entity instance.
 -- skipXP: if true, overrides the enchantment's grants_xp field and suppresses XP award (e.g., vault restore).
 function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)

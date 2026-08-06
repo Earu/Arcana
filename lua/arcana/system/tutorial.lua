@@ -1319,6 +1319,11 @@ function Tutorial:WrapText(text, font, maxWidth)
 	return lines
 end
 
+-- Public API to check if tutorial is active
+function Arcana:IsTutorialActive()
+	return Tutorial.active
+end
+
 -- Public API to start a tutorial sequence
 function Arcana:StartTutorialSequence(sequence)
 	return Tutorial:StartSequence(sequence)

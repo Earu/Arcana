@@ -21,6 +21,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_Enchanter_Withdraw")
 	util.AddNetworkString("Arcana_Enchanter_ApplyBatch")
 	util.AddNetworkString("Arcana_Enchanter_ParticleBurst")
+	util.AddNetworkString("Arcana_Enchanter_ManaFlow")
 
 	resource.AddFile("materials/entities/arcana_enchanter.png")
 
@@ -407,6 +408,8 @@ if SERVER then
 			wep:SetLocalAngles(ang)
 		end
 
+		self:_PulseMana()
+
 		-- Decay the receiving flag so success falls back to 5%
 		if (self._receivingUntil or 0) > 0 and CurTime() > (self._receivingUntil or 0) then
 			self._receivingUntil = 0
@@ -576,6 +579,159 @@ if CLIENT then
 		end
 
 		emitter:Finish()
+	end)
+
+	-- Mana flow visual: glyphs streaming from each feeding crystal into the bench along a
+	-- bezier arc. Driven by ENT:_PulseMana on the server.
+	local glyphParticles = {}
+
+	local GLYPH_PHRASES = {
+		"ABRAXAS DIVINE WISDOM LIGHT LIFE TRUTH COSMOS SOUL SPIRIT",
+		"BEGINNING AND END BEGINNING AND END BEGINNING AND END",
+		"BY THE ORDAINED COMMAND OF THE LORD SPIRIT AND SCRIPTURE",
+		"THE WRATH OF THE SON OF PELEUS SING O MUSE",
+		"IN THE HALLS OF CHAOS THE POWER IS ETERNAL",
+		"THE SONS OF ATREUS SENT FORTH BY THE GODS",
+		"THE SHINING TROJANS STOOD FAST IN GLORY",
+	}
+
+	local FLOW_UP = Vector(0, 0, 1)
+	local FLOW_RIGHT = Vector(1, 0, 0)
+	local FLOW_ZERO = Vector(0, 0, 0)
+	local FLOW_WHITE = Color(255, 255, 255)
+
+	local function glyphCharAt(idx)
+		local phrase = GLYPH_PHRASES[(idx % #GLYPH_PHRASES) + 1]
+		local len = (utf8 and utf8.len and utf8.len(phrase)) or #phrase
+		if len < 1 then return "*" end
+
+		local i = (idx % len) + 1
+		if utf8 and utf8.sub then return utf8.sub(phrase, i, i) end
+
+		return string.sub(phrase, i, i)
+	end
+
+	local function billboardAnglesAt(pos)
+		local ang = (EyePos() - pos):Angle()
+		ang:RotateAroundAxis(ang:Right(), -90)
+		ang:RotateAroundAxis(ang:Up(), 90)
+
+		return ang
+	end
+
+	local function randomPointOnOBBSurface(ent)
+		if not IsValid(ent) then return Vector(0, 0, 0) end
+
+		local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+		local axis = math.random(1, 3)
+		local pos = FLOW_ZERO
+		if axis == 1 then
+			pos.x = (math.random(0, 1) == 1) and maxs.x or mins.x
+			pos.y = math.Rand(mins.y, maxs.y)
+			pos.z = math.Rand(mins.z, maxs.z)
+		elseif axis == 2 then
+			pos.y = (math.random(0, 1) == 1) and maxs.y or mins.y
+			pos.x = math.Rand(mins.x, maxs.x)
+			pos.z = math.Rand(mins.z, maxs.z)
+		else
+			pos.z = (math.random(0, 1) == 1) and maxs.z or mins.z
+			pos.x = math.Rand(mins.x, maxs.x)
+			pos.y = math.Rand(mins.y, maxs.y)
+		end
+
+		return ent:LocalToWorld(pos)
+	end
+
+	local function bezierPoint(a, b, c, t)
+		local u = 1 - t
+
+		return a * (u * u) + b * (2 * u * t) + c * (t * t)
+	end
+
+	net.Receive("Arcana_Enchanter_ManaFlow", function()
+		local toEnt = net.ReadEntity()
+		local count = net.ReadUInt(8)
+		if not IsValid(toEnt) then return end
+
+		local now = CurTime()
+		for _ = 1, count do
+			local fromEnt = net.ReadEntity()
+			if IsValid(fromEnt) then
+				local fromPos = randomPointOnOBBSurface(fromEnt)
+				local toPos = toEnt:WorldSpaceCenter()
+				local dir = (toPos - fromPos)
+				local dist = dir:Length()
+
+				if dist > 2 then
+					dir:Normalize()
+
+					local right = dir:Cross(FLOW_UP)
+					if right:LengthSqr() < 0.01 then right = FLOW_RIGHT end
+					right:Normalize()
+
+					local mid = (fromPos + toPos) * 0.5
+					local curveAmt = math.Clamp(dist * 0.25, 20, 160)
+					local ctrl = mid + right * math.Rand(-curveAmt, curveAmt)
+					local baseColor = fromEnt:GetColor() or FLOW_WHITE
+					local countGlyphs = math.Clamp(math.floor(8 + dist * 0.02), 5, 50)
+
+					for gi = 1, countGlyphs do
+						local speed = math.Rand(120, 220)
+						glyphParticles[#glyphParticles + 1] = {
+							startPos = fromPos,
+							ctrlPos = ctrl,
+							endPos = toPos,
+							startTime = now + math.Rand(0, 0.7),
+							duration = dist / speed,
+							char = glyphCharAt(gi + math.floor(now * 13)),
+							baseColor = Color(baseColor.r, baseColor.g, baseColor.b, 255),
+							size = math.Rand(10, 16),
+						}
+					end
+				end
+			end
+		end
+	end)
+
+	local MAX_FLOW_RENDER_DIST = 2000 * 2000
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_Enchanter_ManaFlowDraw", function(bDrawingDepth)
+		if bDrawingDepth then return end
+
+		local eye = EyePos()
+		local now = CurTime()
+		local write = 1
+		for i = 1, #glyphParticles do
+			local p = glyphParticles[i]
+			local startT = p.startTime or 0
+			local endT = startT + (p.duration or 0)
+
+			if now >= startT and now <= endT then
+				local u = math.Clamp((now - startT) / math.max(0.001, p.duration), 0, 1)
+				local pos = bezierPoint(p.startPos, p.ctrlPos, p.endPos, u)
+
+				if eye:DistToSqr(pos) <= MAX_FLOW_RENDER_DIST then
+					local br = Lerp(u, p.baseColor.r, 255)
+					local bg = Lerp(u, p.baseColor.g, 255)
+					local bb = Lerp(u, p.baseColor.b, 255)
+					local alpha = math.floor(220 * (1 - 0.15 * u))
+					local ang = billboardAnglesAt(pos)
+
+					cam.Start3D2D(pos, ang, 0.08)
+						surface.SetFont("MagicCircle_Medium")
+						surface.SetTextColor(br, bg, bb, alpha)
+						surface.SetTextPos(0, 0)
+						surface.DrawText(p.char or "*")
+					cam.End3D2D()
+				end
+			end
+
+			if now <= endT + 0.05 then
+				glyphParticles[write] = p
+				write = write + 1
+			end
+		end
+
+		for i = write, #glyphParticles do glyphParticles[i] = nil end
 	end)
 
 	local BandCircle    = Arcana.Circle.BandCircle
@@ -1425,13 +1581,44 @@ function ENT:ComputeSuccessChance(ply)
 end
 
 if SERVER then
-	-- Receiving is duck-typed by the mana network: defining AddMana is the whole opt-in,
-	-- and any producer whose range reaches this entity will call it. See system/mana_network.lua.
-	function ENT:AddMana(_amount)
-		-- Treat any positive call as a pulse of receiving state
-		self._receivingUntil = CurTime() + 0.6
-		self._receivingMana = true
-		self:SetNWBool("Arcana_ReceivingMana", true)
-		return _amount or 0
+	local PULSE_INTERVAL = 0.5
+	local FALLBACK_CRYSTAL_RANGE = 520
+
+	-- A mana crystal within its own absorb radius feeds this bench, which is what lifts the
+	-- enchant success chance off its 5% floor. This was a general-purpose producer/consumer
+	-- network for a while; it only ever had one producer class and this one receiver, so it
+	-- is a proximity check. Broadcasts the flow visual drawn in the client section.
+	function ENT:_PulseMana()
+		local now = CurTime()
+		if now < (self._nextManaPulse or 0) then return end
+		self._nextManaPulse = now + PULSE_INTERVAL
+
+		local myPos = self:GetPos()
+		local feeding = {}
+
+		for _, crystal in ipairs(ents.FindByClass("arcana_mana_crystal")) do
+			if IsValid(crystal) then
+				local range = (crystal.GetAbsorbRadius and crystal:GetAbsorbRadius()) or FALLBACK_CRYSTAL_RANGE
+				if myPos:DistToSqr(crystal:GetPos()) <= range * range then
+					feeding[#feeding + 1] = crystal
+				end
+			end
+		end
+
+		if #feeding == 0 then return end
+
+		self._receivingUntil = now + 0.6
+		if not self._receivingMana then
+			self._receivingMana = true
+			self:SetNWBool("Arcana_ReceivingMana", true)
+		end
+
+		net.Start("Arcana_Enchanter_ManaFlow", true)
+		net.WriteEntity(self)
+		net.WriteUInt(math.min(#feeding, 255), 8)
+		for i = 1, math.min(#feeding, 255) do
+			net.WriteEntity(feeding[i])
+		end
+		net.Broadcast()
 	end
 end
