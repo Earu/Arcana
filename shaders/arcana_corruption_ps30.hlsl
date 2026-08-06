@@ -3,7 +3,7 @@
 // Corrupted-area screenspace effect.  The sphere is computed analytically per
 // pixel (no stencil silhouette): the interior gets the corruption grading
 // (desaturate/contrast/darken + refraction), and the boundary is a flame ring
-// — a hot glowing line hugging the noise-warped silhouette with tapering
+// - a hot glowing line hugging the noise-warped silhouette with tapering
 // tongues licking outward, over a darkened rim.  Drawn as a screen quad
 // inside an EXPANDED stencil sphere (world occlusion + cull only).
 //
@@ -21,13 +21,13 @@
 #define HALF_H    Constants3.w
 
 // Boundary shaping, in fractions of the sphere radius.  The stencil sphere in
-// arcana_corrupted_area.lua is expanded by STENCIL_EXPAND = 1.4 — keep
+// arcana_corrupted_area.lua is expanded by STENCIL_EXPAND = 1.4, keep
 // LICK_LEN + (EDGE_BIG + EDGE_AMP) * 0.5 below that expansion.
 #define EDGE_BIG 0.11 // low-frequency "puff" warp of the silhouette (big lobes)
 #define EDGE_AMP 0.05 // fine-detail warp on top
 #define LICK_LEN 0.18 // how far flame tongues reach outside
 
-// Flame colour: near-black with a hint of purple — the tongues read as dark
+// Flame colour: near-black with a hint of purple, the tongues read as dark
 // silhouettes licking over the sky/world
 #define FLAME_COLOR float3(0.015, 0.005, 0.02)
 
@@ -96,7 +96,7 @@ float4 main(PS_IN i) : COLOR
 
 	// Ray/sphere distance field: edge < 0 inside the silhouette, > 0 outside,
 	// in radius units.  anchor = world-stable noise coordinate on the sphere:
-	// the ray's ENTRY point when it hits (stable across the whole interior —
+	// the ray's ENTRY point when it hits (stable across the whole interior,
 	// the closest-approach point degenerates at the silhouette centre and
 	// caused radial streaks), the closest-approach point when it misses.
 	float3 oc = EYE - CENTER;
@@ -158,7 +158,7 @@ float4 main(PS_IN i) : COLOR
 	float cover = 1.0 - smoothstep(-0.06, 0.02, w);
 
 	// Flame ring: core line ON the boundary + tongues in a thin shell around
-	// it (the shell envelope keeps the interior clean — without it the tongue
+	// it (the shell envelope keeps the interior clean, without it the tongue
 	// term stays active across the whole sphere)
 	float ringCore = 1.0 - smoothstep(0.0, 0.06, abs(w));
 	// Shell reaches LICK_LEN outward AND overlaps the dome inward, so the
@@ -173,7 +173,7 @@ float4 main(PS_IN i) : COLOR
 	// $texture1, built with stencils against the real depth buffer in Lua and
 	// blurred: r = "world surface inside the sphere" coverage, g = "sphere
 	// front surface visible" coverage.  Used only to end the dome at the
-	// world intersection — no flames are drawn along it.
+	// world intersection: no flames are drawn along it.
 	float2 mask = tex2D(Tex1, i.uv).rg;
 
 	// Shape the flame alpha: solid near the core but with a soft smoky

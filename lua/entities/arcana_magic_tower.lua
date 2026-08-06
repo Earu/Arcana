@@ -143,13 +143,13 @@ if SERVER then
 	end
 
 	-- Deduct one shot's cost: coins first, health otherwise.
-	-- Gate on GetCoins rather than TakeCoins' return value — third-party TakeCoins
+	-- Gate on GetCoins rather than TakeCoins' return value: third-party TakeCoins
 	-- overrides may not return anything, which would wrongly trigger the health cost.
 	function ENT:ChargePilot(ply)
 		if not IsValid(ply) then return end
 
-		if Arcana:GetCoins(ply) >= self.CannonCost then
-			Arcana:TakeCoins(ply, self.CannonCost, "Magic Tower")
+		if Arcana.GetCoins(ply) >= self.CannonCost then
+			Arcana.TakeCoins(ply, self.CannonCost, "Magic Tower")
 			return
 		end
 
@@ -162,14 +162,14 @@ if SERVER then
 		takeDamageInfo(ply, dmg)
 	end
 
-	-- Arcane explosion at the beam's impact — damage + networked visual, all owned by
+	-- Arcane explosion at the beam's impact: damage + networked visual, all owned by
 	-- the tower (the beam only draws itself and deals the direct line hit).
 	function ENT:ArcaneExplosion(pos, normal)
 		local pilot = self:GetPilot()
 		local attacker = IsValid(pilot) and pilot or self
 
 		-- AoE excludes the tower (inflictor) and the pilot (attacker + ignoreAttacker).
-		Arcana:BlastDamage(attacker, pos, self.ImpactRadius, self.ImpactDamage, {
+		Arcana.BlastDamage(attacker, pos, self.ImpactRadius, self.ImpactDamage, {
 			inflictor      = self,
 			damageType     = bit.bor(DMG_DISSOLVE, DMG_ENERGYBEAM, DMG_BLAST),
 			ignoreAttacker = true,
@@ -212,7 +212,7 @@ if SERVER then
 			dmg:SetAttacker(ply)
 			dmg:SetInflictor(self)
 			dmg:SetDamagePosition(tr.HitPos)
-			Arcana:TakeDamageInfo(hit, dmg)
+			Arcana.TakeDamageInfo(hit, dmg)
 		end
 
 		-- Beam visual (owned by the tower for full control over thickness).
@@ -232,14 +232,14 @@ if SERVER then
 	-- Can the pilot afford one flak bullet (coins, or a little HP to spare)?
 	function ENT:CanAffordFlak(ply)
 		if not IsValid(ply) then return false end
-		return Arcana:GetCoins(ply) >= self.FlakCost or ply:Health() > self.FlakHealthCost
+		return Arcana.GetCoins(ply) >= self.FlakCost or ply:Health() > self.FlakHealthCost
 	end
 
 	-- One flak bullet's cost: coins first, otherwise a small chunk of HP.
 	function ENT:ChargeFlak(ply)
 		if not IsValid(ply) then return end
-		if Arcana:GetCoins(ply) >= self.FlakCost then
-			Arcana:TakeCoins(ply, self.FlakCost, "Magic Tower Flak")
+		if Arcana.GetCoins(ply) >= self.FlakCost then
+			Arcana.TakeCoins(ply, self.FlakCost, "Magic Tower Flak")
 			return
 		end
 
@@ -289,11 +289,11 @@ if SERVER then
 			dmg:SetAttacker(ply)
 			dmg:SetInflictor(self)
 			dmg:SetDamagePosition(tr.HitPos)
-			Arcana:TakeDamageInfo(hit, dmg)
+			Arcana.TakeDamageInfo(hit, dmg)
 		end
 
 		-- Small flak burst at the impact (excludes tower + pilot).
-		Arcana:BlastDamage(ply, tr.HitPos, self.FlakBurstRadius, self.FlakBurstDamage, {
+		Arcana.BlastDamage(ply, tr.HitPos, self.FlakBurstRadius, self.FlakBurstDamage, {
 			inflictor      = self,
 			damageType     = DMG_BLAST,
 			ignoreAttacker = true,
@@ -511,317 +511,317 @@ if CLIENT then
 	local towerTracers = {}
 	local TRACER_W     = 200
 
-    -- Hide the pilot's own viewmodel while seated in the bubble.
-    hook.Add("PreDrawViewModel", "Arcana_MagicTower_HideVM", function(vm, ply, wep)
-        local p     = LocalPlayer()
-        local tower = p:GetNW2Entity(PILOT_KEY)
-        if IsValid(tower) and tower:GetPilot() == p then return true end
-    end)
+	-- Hide the pilot's own viewmodel while seated in the bubble.
+	hook.Add("PreDrawViewModel", "Arcana_MagicTower_HideVM", function(vm, ply, wep)
+		local p     = LocalPlayer()
+		local tower = p:GetNW2Entity(PILOT_KEY)
+		if IsValid(tower) and tower:GetPilot() == p then return true end
+	end)
 
-    -- Third-person chase camera while piloting.
-    local VIEW_HULL_MIN = Vector(-8, -8, -8)
-    local VIEW_HULL_MAX = Vector(8, 8, 8)
-    hook.Add("CalcView", "Arcana_MagicTower_View", function(ply, pos, angles, fov)
-        local tower = ply:GetNW2Entity(PILOT_KEY)
-        if not IsValid(tower) or tower:GetPilot() ~= ply then return end
+	-- Third-person chase camera while piloting.
+	local VIEW_HULL_MIN = Vector(-8, -8, -8)
+	local VIEW_HULL_MAX = Vector(8, 8, 8)
+	hook.Add("CalcView", "Arcana_MagicTower_View", function(ply, pos, angles, fov)
+		local tower = ply:GetNW2Entity(PILOT_KEY)
+		if not IsValid(tower) or tower:GetPilot() ~= ply then return end
 
-        local eyeAng = ply:EyeAngles()
-        local focus  = tower:BubbleCenter()
-        local desired = focus - eyeAng:Forward() * 220 + eyeAng:Up() * 60
+		local eyeAng = ply:EyeAngles()
+		local focus  = tower:BubbleCenter()
+		local desired = focus - eyeAng:Forward() * 220 + eyeAng:Up() * 60
 
-        -- Pull the camera in if a wall is in the way.
-        local tr = util.TraceHull({
-            start  = focus,
-            endpos = desired,
-            mins   = VIEW_HULL_MIN,
-            maxs   = VIEW_HULL_MAX,
-            filter = { ply, tower },
-            mask   = MASK_SOLID,
-        })
+		-- Pull the camera in if a wall is in the way.
+		local tr = util.TraceHull({
+			start  = focus,
+			endpos = desired,
+			mins   = VIEW_HULL_MIN,
+			maxs   = VIEW_HULL_MAX,
+			filter = { ply, tower },
+			mask   = MASK_SOLID,
+		})
 
-        return {
-            origin     = tr.Hit and tr.HitPos or desired,
-            angles     = eyeAng,
-            fov        = fov,
-            drawviewer = true, -- show the pilot's (swimming) body
-        }
-    end)
+		return {
+			origin     = tr.Hit and tr.HitPos or desired,
+			angles     = eyeAng,
+			fov        = fov,
+			drawviewer = true, -- show the pilot's (swimming) body
+		}
+	end)
 
-    -- Pilot targeting HUD: a fixed screen-centre arcane reticle that always shows while
-    -- piloting, changes state (idle / target locked / charging / cooldown), and reports
-    -- what the cannon is currently aimed at.
-    hook.Add("HUDPaint", "Arcana_MagicTower_HUD", function()
-        local ply   = LocalPlayer()
-        local tower = ply:GetNW2Entity(PILOT_KEY)
-        if not IsValid(tower) or tower:GetPilot() ~= ply then return end
+	-- Pilot targeting HUD: a fixed screen-centre arcane reticle that always shows while
+	-- piloting, changes state (idle / target locked / charging / cooldown), and reports
+	-- what the cannon is currently aimed at.
+	hook.Add("HUDPaint", "Arcana_MagicTower_HUD", function()
+		local ply   = LocalPlayer()
+		local tower = ply:GetNW2Entity(PILOT_KEY)
+		if not IsValid(tower) or tower:GetPilot() ~= ply then return end
 
-        local Draw2DRing     = Arcana.Circle.Draw2DRing
-        local RT             = Arcana.Circle.RING_TYPES
-        if not Draw2DRing or not RT then return end
+		local Draw2DRing     = Arcana.Circle.Draw2DRing
+		local RT             = Arcana.Circle.RING_TYPES
+		if not Draw2DRing or not RT then return end
 
-        -- Scale the whole reticle with vertical resolution (reference 1080p).
-        local s      = math.max(0.75, ScrH() / 1080)
-        local cx, cy = ScrW() * 0.5, ScrH() * 0.5
-        local t      = CurTime()
-        local state  = tower:GetFireState()
+		-- Scale the whole reticle with vertical resolution (reference 1080p).
+		local s      = math.max(0.75, ScrH() / 1080)
+		local cx, cy = ScrW() * 0.5, ScrH() * 0.5
+		local t      = CurTime()
+		local state  = tower:GetFireState()
 
-        -- State colour: charging (warm) > cooldown (grey) > locked (red) > idle (tower).
-        local col = tower.TowerColor
+		-- State colour: charging (warm) > cooldown (grey) > locked (red) > idle (tower).
+		local col = tower.TowerColor
 
-        -- Base reticle: layered counter-rotating arcane rings, always visible.
-        Draw2DRing(RT.STAR_RING,     cx, cy, 150 * s, t * 14,  col, 255)
-        Draw2DRing(RT.PATTERN_LINES, cx, cy, 98 * s,  -t * 28, col, 220)
-        Draw2DRing(RT.SIMPLE_LINE,   cx, cy, 54 * s,  t * 55,  col, 230)
+		-- Base reticle: layered counter-rotating arcane rings, always visible.
+		Draw2DRing(RT.STAR_RING,     cx, cy, 150 * s, t * 14,  col, 255)
+		Draw2DRing(RT.PATTERN_LINES, cx, cy, 98 * s,  -t * 28, col, 220)
+		Draw2DRing(RT.SIMPLE_LINE,   cx, cy, 54 * s,  t * 55,  col, 230)
 
-        -- Windup: a thick rune circle converging + pulsing onto centre (runes stay legible).
-        if state == 1 then
-            if not tower._windupStart then tower._windupStart = t end
-            local prog = math.Clamp((t - tower._windupStart) / math.max(0.01, tower.Windup), 0, 1)
-            local r    = Lerp(prog, 300 * s, 130 * s)
-            local a    = 210 + 45 * math.sin(t * 30)
-            Draw2DRing(RT.PATTERN_LINES, cx, cy, r, t * 120, col, a)
-        else
-            tower._windupStart = nil
-        end
+		-- Windup: a thick rune circle converging + pulsing onto centre (runes stay legible).
+		if state == 1 then
+			if not tower._windupStart then tower._windupStart = t end
+			local prog = math.Clamp((t - tower._windupStart) / math.max(0.01, tower.Windup), 0, 1)
+			local r    = Lerp(prog, 300 * s, 130 * s)
+			local a    = 210 + 45 * math.sin(t * 30)
+			Draw2DRing(RT.PATTERN_LINES, cx, cy, r, t * 120, col, a)
+		else
+			tower._windupStart = nil
+		end
 
-        -- Cooldown: a ring that grows back as the winddown recovers.
-        if state == 2 then
-            if not tower._winddownStart then tower._winddownStart = t end
-            local prog = math.Clamp((t - tower._winddownStart) / math.max(0.01, tower.Winddown), 0, 1)
-            Draw2DRing(RT.SIMPLE_LINE, cx, cy, Lerp(prog, 30 * s, 54 * s), 0, col, 110 + 110 * prog)
-        else
-            tower._winddownStart = nil
-        end
-    end)
+		-- Cooldown: a ring that grows back as the winddown recovers.
+		if state == 2 then
+			if not tower._winddownStart then tower._winddownStart = t end
+			local prog = math.Clamp((t - tower._winddownStart) / math.max(0.01, tower.Winddown), 0, 1)
+			Draw2DRing(RT.SIMPLE_LINE, cx, cy, Lerp(prog, 30 * s, 54 * s), 0, col, 110 + 110 * prog)
+		else
+			tower._winddownStart = nil
+		end
+	end)
 
-    -- Big arcane beam, owned by the tower.
-    net.Receive("Arcana_MagicTower_Beam", function()
-        local s   = net.ReadVector()
-        local e   = net.ReadVector()
-        local col = net.ReadColor(false)
-        local w   = net.ReadFloat()
-        towerBeams[#towerBeams + 1] = { s = s, e = e, col = col, w = w, start = CurTime(), life = 0.35 }
-    end)
+	-- Big arcane beam, owned by the tower.
+	net.Receive("Arcana_MagicTower_Beam", function()
+		local s   = net.ReadVector()
+		local e   = net.ReadVector()
+		local col = net.ReadColor(false)
+		local w   = net.ReadFloat()
+		towerBeams[#towerBeams + 1] = { s = s, e = e, col = col, w = w, start = CurTime(), life = 0.35 }
+	end)
 
-    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Beams", function(bDrawingDepth, isSkybox)
-        if bDrawingDepth or isSkybox then return end
-        local now = CurTime()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Beams", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
+		local now = CurTime()
 
-        for i = #towerBeams, 1, -1 do
-            local b    = towerBeams[i]
-            local frac = (now - b.start) / b.life
-            if frac >= 1 then
-                table.remove(towerBeams, i)
-            else
-                local fade = 1 - frac
-                local a, c = b.s, b.e
-                local d    = c - a
-                local len  = d:Length()
-                if len >= 1 then
-                    d:Normalize()
-                    local steps = math.Clamp(math.floor(len / 48), 10, 96)
-                    local w     = b.w * 10
-                    local col   = b.col
+		for i = #towerBeams, 1, -1 do
+			local b    = towerBeams[i]
+			local frac = (now - b.start) / b.life
+			if frac >= 1 then
+				table.remove(towerBeams, i)
+			else
+				local fade = 1 - frac
+				local a, c = b.s, b.e
+				local d    = c - a
+				local len  = d:Length()
+				if len >= 1 then
+					d:Normalize()
+					local steps = math.Clamp(math.floor(len / 48), 10, 96)
+					local w     = b.w * 10
+					local col   = b.col
 
-                    render.SetMaterial(matBeam)
-                    render.StartBeam(steps + 1)
-                    for j = 0, steps do
-                        local tt = j / steps
-                        render.AddBeam(a + d * (len * tt), w * 1.8 * fade, tt * len / 256, Color(col.r, col.g, col.b, 90 * fade))
-                    end
-                    render.EndBeam()
-                    render.StartBeam(steps + 1)
-                    for j = 0, steps do
-                        local tt = j / steps
-                        render.AddBeam(a + d * (len * tt), w * fade, tt * len / 256, Color(col.r, col.g, col.b, 230 * fade))
-                    end
-                    render.EndBeam()
-                    render.StartBeam(steps + 1)
-                    for j = 0, steps do
-                        local tt = j / steps
-                        render.AddBeam(a + d * (len * tt), w * 0.45 * fade, tt * len / 256, Color(255, 255, 255, 255 * fade))
-                    end
-                    render.EndBeam()
+					render.SetMaterial(matBeam)
+					render.StartBeam(steps + 1)
+					for j = 0, steps do
+						local tt = j / steps
+						render.AddBeam(a + d * (len * tt), w * 1.8 * fade, tt * len / 256, Color(col.r, col.g, col.b, 90 * fade))
+					end
+					render.EndBeam()
+					render.StartBeam(steps + 1)
+					for j = 0, steps do
+						local tt = j / steps
+						render.AddBeam(a + d * (len * tt), w * fade, tt * len / 256, Color(col.r, col.g, col.b, 230 * fade))
+					end
+					render.EndBeam()
+					render.StartBeam(steps + 1)
+					for j = 0, steps do
+						local tt = j / steps
+						render.AddBeam(a + d * (len * tt), w * 0.45 * fade, tt * len / 256, Color(255, 255, 255, 255 * fade))
+					end
+					render.EndBeam()
 
-                    render.SetMaterial(matGlow)
-                    render.DrawSprite(a, w * 2.2 * fade, w * 2.2 * fade, Color(col.r, col.g, col.b, 200 * fade))
-                    render.DrawSprite(c, w * 2.6 * fade, w * 2.6 * fade, Color(col.r, col.g, col.b, 220 * fade))
-                end
-            end
-        end
-    end)
+					render.SetMaterial(matGlow)
+					render.DrawSprite(a, w * 2.2 * fade, w * 2.2 * fade, Color(col.r, col.g, col.b, 200 * fade))
+					render.DrawSprite(c, w * 2.6 * fade, w * 2.6 * fade, Color(col.r, col.g, col.b, 220 * fade))
+				end
+			end
+		end
+	end)
 
-    -- Magic flak tracers (secondary fire): quick bright streaks + a small impact burst.
-    net.Receive("Arcana_MagicTower_Flak", function()
-        local s   = net.ReadVector()
-        local e   = net.ReadVector()
-        local col = net.ReadColor(false)
-        towerTracers[#towerTracers + 1] = { s = s, e = e, col = col, start = CurTime(), life = 0.14 }
+	-- Magic flak tracers (secondary fire): quick bright streaks + a small impact burst.
+	net.Receive("Arcana_MagicTower_Flak", function()
+		local s   = net.ReadVector()
+		local e   = net.ReadVector()
+		local col = net.ReadColor(false)
+		towerTracers[#towerTracers + 1] = { s = s, e = e, col = col, start = CurTime(), life = 0.14 }
 
-        local emitter = ParticleEmitter(e)
-        if emitter then
-            for _ = 1, 8 do
-                local p = emitter:Add("effects/blueflare1", e)
-                if p then
-                    p:SetVelocity(VectorRand():GetNormalized() * math.Rand(60, 240))
-                    p:SetDieTime(math.Rand(0.15, 0.4))
-                    p:SetStartAlpha(255)
-                    p:SetEndAlpha(0)
-                    p:SetStartSize(math.Rand(4, 11))
-                    p:SetEndSize(0)
-                    p:SetColor(col.r, col.g, col.b)
-                    p:SetGravity(Vector(0, 0, -160))
-                    p:SetAirResistance(80)
-                end
-            end
-            local pp = emitter:Add("particle/particle_smokegrenade", e)
-            if pp then
-                pp:SetVelocity(VectorRand() * 30)
-                pp:SetDieTime(math.Rand(0.3, 0.6))
-                pp:SetStartAlpha(110)
-                pp:SetEndAlpha(0)
-                pp:SetStartSize(math.Rand(10, 20))
-                pp:SetEndSize(math.Rand(30, 55))
-                pp:SetColor(col.r, col.g, col.b)
-                pp:SetAirResistance(70)
-            end
-            emitter:Finish()
-        end
-    end)
+		local emitter = ParticleEmitter(e)
+		if emitter then
+			for _ = 1, 8 do
+				local p = emitter:Add("effects/blueflare1", e)
+				if p then
+					p:SetVelocity(VectorRand():GetNormalized() * math.Rand(60, 240))
+					p:SetDieTime(math.Rand(0.15, 0.4))
+					p:SetStartAlpha(255)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(4, 11))
+					p:SetEndSize(0)
+					p:SetColor(col.r, col.g, col.b)
+					p:SetGravity(Vector(0, 0, -160))
+					p:SetAirResistance(80)
+				end
+			end
+			local pp = emitter:Add("particle/particle_smokegrenade", e)
+			if pp then
+				pp:SetVelocity(VectorRand() * 30)
+				pp:SetDieTime(math.Rand(0.3, 0.6))
+				pp:SetStartAlpha(110)
+				pp:SetEndAlpha(0)
+				pp:SetStartSize(math.Rand(10, 20))
+				pp:SetEndSize(math.Rand(30, 55))
+				pp:SetColor(col.r, col.g, col.b)
+				pp:SetAirResistance(70)
+			end
+			emitter:Finish()
+		end
+	end)
 
-    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Tracers", function(bDrawingDepth, isSkybox)
-        if bDrawingDepth or isSkybox then return end
-        local now = CurTime()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Tracers", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
+		local now = CurTime()
 
-        for i = #towerTracers, 1, -1 do
-            local trc  = towerTracers[i]
-            local frac = (now - trc.start) / trc.life
-            if frac >= 1 then
-                table.remove(towerTracers, i)
-            else
-                local fade = 1 - frac
-                local a, c = trc.s, trc.e
-                local d    = c - a
-                local len  = d:Length()
-                if len >= 1 then
-                    local col = trc.col
-                    local uv  = len / 64
+		for i = #towerTracers, 1, -1 do
+			local trc  = towerTracers[i]
+			local frac = (now - trc.start) / trc.life
+			if frac >= 1 then
+				table.remove(towerTracers, i)
+			else
+				local fade = 1 - frac
+				local a, c = trc.s, trc.e
+				local d    = c - a
+				local len  = d:Length()
+				if len >= 1 then
+					local col = trc.col
+					local uv  = len / 64
 
-                    render.SetMaterial(matBeam)
-                    -- Colored streak
-                    render.StartBeam(2)
-                    render.AddBeam(a, TRACER_W * fade, 0, Color(col.r, col.g, col.b, 220 * fade))
-                    render.AddBeam(c, TRACER_W * fade, uv, Color(col.r, col.g, col.b, 220 * fade))
-                    render.EndBeam()
-                    -- White-hot core
-                    render.StartBeam(2)
-                    render.AddBeam(a, TRACER_W * 0.4 * fade, 0, Color(255, 255, 255, 255 * fade))
-                    render.AddBeam(c, TRACER_W * 0.4 * fade, uv, Color(255, 255, 255, 255 * fade))
-                    render.EndBeam()
+					render.SetMaterial(matBeam)
+					-- Colored streak
+					render.StartBeam(2)
+					render.AddBeam(a, TRACER_W * fade, 0, Color(col.r, col.g, col.b, 220 * fade))
+					render.AddBeam(c, TRACER_W * fade, uv, Color(col.r, col.g, col.b, 220 * fade))
+					render.EndBeam()
+					-- White-hot core
+					render.StartBeam(2)
+					render.AddBeam(a, TRACER_W * 0.4 * fade, 0, Color(255, 255, 255, 255 * fade))
+					render.AddBeam(c, TRACER_W * 0.4 * fade, uv, Color(255, 255, 255, 255 * fade))
+					render.EndBeam()
 
-                    -- Muzzle flash + impact flash
-                    render.SetMaterial(matFlare)
-                    render.DrawSprite(a, 34 * fade, 34 * fade, Color(255, 255, 255, 230 * fade))
-                    render.SetMaterial(matGlow)
-                    render.DrawSprite(c, 56 * fade, 56 * fade, Color(col.r, col.g, col.b, 230 * fade))
-                    render.SetMaterial(matFlare)
-                    render.DrawSprite(c, 26 * fade, 26 * fade, Color(255, 255, 255, 255 * fade))
-                end
-            end
-        end
-    end)
+					-- Muzzle flash + impact flash
+					render.SetMaterial(matFlare)
+					render.DrawSprite(a, 34 * fade, 34 * fade, Color(255, 255, 255, 230 * fade))
+					render.SetMaterial(matGlow)
+					render.DrawSprite(c, 56 * fade, 56 * fade, Color(col.r, col.g, col.b, 230 * fade))
+					render.SetMaterial(matFlare)
+					render.DrawSprite(c, 26 * fade, 26 * fade, Color(255, 255, 255, 255 * fade))
+				end
+			end
+		end
+	end)
 
-    -- Arcane explosion visual at the beam's impact.
-    net.Receive("Arcana_MagicTower_Impact", function()
-        local pos    = net.ReadVector()
-        local normal = net.ReadVector()
-        local col    = net.ReadColor(false)
-        local radius = net.ReadFloat()
+	-- Arcane explosion visual at the beam's impact.
+	net.Receive("Arcana_MagicTower_Impact", function()
+		local pos    = net.ReadVector()
+		local normal = net.ReadVector()
+		local col    = net.ReadColor(false)
+		local radius = net.ReadFloat()
 
-        towerImpacts[#towerImpacts + 1] = {
-            pos    = pos,
-            normal = normal,
-            col    = col,
-            radius = radius,
-            start  = CurTime(),
-            life   = 0.7,
-        }
+		towerImpacts[#towerImpacts + 1] = {
+			pos    = pos,
+			normal = normal,
+			col    = col,
+			radius = radius,
+			start  = CurTime(),
+			life   = 0.7,
+		}
 
-        local emitter = ParticleEmitter(pos)
-        if emitter then
-            for _ = 1, 60 do
-                local p = emitter:Add("effects/blueflare1", pos + VectorRand() * 12)
-                if p then
-                    p:SetVelocity(VectorRand():GetNormalized() * math.Rand(180, 720))
-                    p:SetDieTime(math.Rand(0.35, 0.9))
-                    p:SetStartAlpha(255)
-                    p:SetEndAlpha(0)
-                    p:SetStartSize(math.Rand(10, 28))
-                    p:SetEndSize(0)
-                    p:SetColor(col.r, col.g, col.b)
-                    p:SetGravity(Vector(0, 0, -140))
-                    p:SetAirResistance(60)
-                end
-            end
-            for _ = 1, 24 do
-                local p = emitter:Add("particle/particle_smokegrenade", pos + VectorRand() * 24)
-                if p then
-                    p:SetVelocity(VectorRand() * 100 + Vector(0, 0, 70))
-                    p:SetDieTime(math.Rand(0.6, 1.5))
-                    p:SetStartAlpha(120)
-                    p:SetEndAlpha(0)
-                    p:SetStartSize(math.Rand(22, 44))
-                    p:SetEndSize(math.Rand(70, 130))
-                    p:SetColor(col.r, col.g, col.b)
-                    p:SetAirResistance(80)
-                end
-            end
-            emitter:Finish()
-        end
+		local emitter = ParticleEmitter(pos)
+		if emitter then
+			for _ = 1, 60 do
+				local p = emitter:Add("effects/blueflare1", pos + VectorRand() * 12)
+				if p then
+					p:SetVelocity(VectorRand():GetNormalized() * math.Rand(180, 720))
+					p:SetDieTime(math.Rand(0.35, 0.9))
+					p:SetStartAlpha(255)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(10, 28))
+					p:SetEndSize(0)
+					p:SetColor(col.r, col.g, col.b)
+					p:SetGravity(Vector(0, 0, -140))
+					p:SetAirResistance(60)
+				end
+			end
+			for _ = 1, 24 do
+				local p = emitter:Add("particle/particle_smokegrenade", pos + VectorRand() * 24)
+				if p then
+					p:SetVelocity(VectorRand() * 100 + Vector(0, 0, 70))
+					p:SetDieTime(math.Rand(0.6, 1.5))
+					p:SetStartAlpha(120)
+					p:SetEndAlpha(0)
+					p:SetStartSize(math.Rand(22, 44))
+					p:SetEndSize(math.Rand(70, 130))
+					p:SetColor(col.r, col.g, col.b)
+					p:SetAirResistance(80)
+				end
+			end
+			emitter:Finish()
+		end
 
-        local dl = DynamicLight(util.CRC(tostring(pos) .. tostring(CurTime())) % 60000)
-        if dl then
-            dl.pos        = pos
-            dl.r          = col.r
-            dl.g          = col.g
-            dl.b          = col.b
-            dl.brightness = 6
-            dl.Decay      = 1200
-            dl.Size       = radius * 3
-            dl.DieTime    = CurTime() + 0.4
-        end
-    end)
+		local dl = DynamicLight(util.CRC(tostring(pos) .. tostring(CurTime())) % 60000)
+		if dl then
+			dl.pos        = pos
+			dl.r          = col.r
+			dl.g          = col.g
+			dl.b          = col.b
+			dl.brightness = 6
+			dl.Decay      = 1200
+			dl.Size       = radius * 3
+			dl.DieTime    = CurTime() + 0.4
+		end
+	end)
 
-    hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Impacts", function(bDrawingDepth, isSkybox)
-        if bDrawingDepth or isSkybox then return end
-        local now = CurTime()
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_MagicTower_Impacts", function(bDrawingDepth, isSkybox)
+		if bDrawingDepth or isSkybox then return end
+		local now = CurTime()
 
-        for i = #towerImpacts, 1, -1 do
-            local e    = towerImpacts[i]
-            local frac = (now - e.start) / e.life
-            if frac >= 1 then
-                table.remove(towerImpacts, i)
-            else
-                local grow  = frac
-                local alpha = 1 - frac
-                local col   = e.col
+		for i = #towerImpacts, 1, -1 do
+			local e    = towerImpacts[i]
+			local frac = (now - e.start) / e.life
+			if frac >= 1 then
+				table.remove(towerImpacts, i)
+			else
+				local grow  = frac
+				local alpha = 1 - frac
+				local col   = e.col
 
-                -- Core flash + colored glow.
-                render.SetMaterial(matFlare)
-                local coreSize = e.radius * (0.5 + grow * 1.1) * 3
-                render.DrawSprite(e.pos, coreSize, coreSize, Color(255, 255, 255, 255 * alpha))
-                render.SetMaterial(matGlow)
-                local glowSize = e.radius * (1.0 + grow * 2.4) * 3
-                render.DrawSprite(e.pos, glowSize, glowSize, Color(col.r, col.g, col.b, 220 * alpha))
+				-- Core flash + colored glow.
+				render.SetMaterial(matFlare)
+				local coreSize = e.radius * (0.5 + grow * 1.1) * 3
+				render.DrawSprite(e.pos, coreSize, coreSize, Color(255, 255, 255, 255 * alpha))
+				render.SetMaterial(matGlow)
+				local glowSize = e.radius * (1.0 + grow * 2.4) * 3
+				render.DrawSprite(e.pos, glowSize, glowSize, Color(col.r, col.g, col.b, 220 * alpha))
 
-                -- Expanding surface-aligned arcane ring.
-                render.SetMaterial(matRing)
-                local ringSize = e.radius * (0.4 + grow * 2.6) * 3
-                render.DrawQuadEasy(e.pos + e.normal * 3, e.normal, ringSize, ringSize, Color(col.r, col.g, col.b, 255 * alpha), now * 60 % 360)
-            end
-        end
-    end)
-	
+				-- Expanding surface-aligned arcane ring.
+				render.SetMaterial(matRing)
+				local ringSize = e.radius * (0.4 + grow * 2.6) * 3
+				render.DrawQuadEasy(e.pos + e.normal * 3, e.normal, ringSize, ringSize, Color(col.r, col.g, col.b, 255 * alpha), now * 60 % 360)
+			end
+		end
+	end)
+
 	function ENT:Initialize()
 		self.NextWindupPFX = 0
 		-- Model is hidden, so widen render bounds to cover the bubble, ground circle and cannon.
@@ -879,7 +879,7 @@ if CLIENT then
 			self._cannonCircle.angles = aimToCircleAngle(dir)
 		end
 
-        local t = CurTime()
+		local t = CurTime()
 		local pulse = 1 + math.sin(t * 2.5) * 0.03
 
 		-- Horizontal band spinning around the bubble's vertical center.
@@ -888,8 +888,8 @@ if CLIENT then
 			if self._bands then
 				self._bands:SetReferenceEntity(self)
 				self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = 0, y = 70, r = 35 }, 4)
-                self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = -70, y = -35, r = 0 }, 4)
-                self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = 70, y = 0, r = 70 }, 4)
+				self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = -70, y = -35, r = 0 }, 4)
+				self._bands:AddBand(self.BubbleRadius * 1.05, 10, { p = 70, y = 0, r = 70 }, 4)
 			end
 		end
 		if self._bands and self._bands.isActive then

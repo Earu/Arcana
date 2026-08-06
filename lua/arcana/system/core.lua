@@ -1,20 +1,31 @@
--- Arcana Core — bootstrap, config, spell registration, casting flow, and networking.
+-- Arcana Core: bootstrap, config, spell registration, casting flow, and networking.
 --
 -- Naming convention:
---   PascalCase  → public Arcana.* namespace members (methods, tables, API constants)
---                 e.g. Arcana:RegisterSpell, Arcana.PlayerData, Arcana.RunHook
+--   PascalCase  → public Arcana.* namespace members (functions, tables, API constants)
+--                 e.g. Arcana.RegisterSpell, Arcana.PlayerData, Arcana.RunHook
 --   camelCase   → module-private helpers and local functions
 --                 e.g. broadcastCastStart, validateCostForSpell, buildDamageInfo
 --
--- Peer modules (included by init.lua after this file):
---   arcana/persistence.lua       — Player data storage, SQL, SyncPlayerData, lifecycle hooks
---   arcana/xp.lua                — GiveXP, LevelUp, UnlockSpell, knowledge point accessors
---   arcana/enchantments_api.lua  — RegisterEnchantment, Apply/Remove, SyncWeaponEnchantNW
---   arcana/damage.lua            — BlastDamage, TakeDamageInfo, IsPotentialCheater
---   arcana/map_setup.lua         — Altar/portal spawning (server-topology-specific)
---   arcana/vfx_network.lua       — Band VFX broadcast + all cast-circle/gesture client receivers
---   arcana/quickslots.lua        — Quickslot server handlers with debounced saves
---   arcana/lifecycle.lua         — PlayerInitialSpawn/Death/Disconnect hooks
+-- Arcana is a namespace, not a class: it is never instanced, so everything on it is a plain
+-- dot function. Do not define Arcana:Method(); there is no self to receive.
+--
+-- Peer modules (included by init.lua after this file, in this order):
+--   system/persistence.lua          : Player data storage, SQL, SyncPlayerData
+--   system/xp.lua                   : GiveXP, LevelUp, UnlockSpell, knowledge point accessors
+--   system/weapon_classification.lua: Hold-type and hitscan/projectile classification
+--   system/enchantments.lua         : RegisterEnchantment, Apply/Remove, SyncWeaponEnchantNW
+--   system/damage.lua               : BlastDamage, TakeDamageInfo, IsPotentialCheater
+--   system/circles.lua              : Loads ring/magic_circle/band_circle from circles/
+--   system/quickslots.lua           : Quickslot server handlers with debounced saves
+--   system/npc_casting.lua          : NPC mages: speciality roll + crafted spell combat
+--   system/lifecycle.lua            : PlayerInitialSpawn/Death/Disconnect hooks
+--   system/environments.lua         : RegisterEnvironment, Activate/Deactivate
+--   system/scenes.lua               : Scene engine (scenes/ registers into it)
+--   system/vfx/casting.lua          : Cast-circle/gesture broadcast + client receivers
+--   system/vfx/bloom.lua            : Screenspace bloom pipeline for circles
+--
+-- Realm-only peers: system/mana_crystals.lua and system/default_inventory.lua (server),
+-- system/art_deco.lua, system/hud.lua, system/vfx/enchants.lua (client).
 --
 -- NOTE: Arcana.Circle (circles.lua) is loaded AFTER core.lua by init.lua, so file-scope local
 -- aliases like `local MagicCircle = Arcana.Circle.MagicCircle` would be nil at load time.
@@ -29,7 +40,7 @@ if file.Exists("includes/modules/metalog.lua", "LUA") then
 	require("metalog")
 end
 
-function Arcana:Print(...)
+function Arcana.Print(...)
 	if _G.metalog then
 		_G.metalog.info("Arcana", nil, ...)
 		return
@@ -49,6 +60,43 @@ end
 
 Arcana.RunHook = runHook
 
+-- Shared SQL failure reporting. sql.Query returns false (not nil) on error, and the
+-- reason is only available from sql.LastError() until the next query runs, so every
+-- caller has to check the return immediately or the diagnostic is gone. All four SQL
+-- modules (system/persistence, system/default_inventory, spellcraft/persistence,
+-- astral_vault/vault) report through here so a failure looks the same wherever it happens.
+--
+-- Returns the result unchanged so it can wrap a query inline:
+--   local rows = Arcana.SQLCheck(sql.Query(q), "read vault")
+function Arcana.SQLCheck(result, context)
+	if result ~= false then return result end
+
+	local err = sql.LastError() or "unknown error"
+	MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), tostring(context) .. ": " .. tostring(err) .. "\n")
+
+	return false
+end
+
+-- Shared decode for stored and networked JSON. Every caller here is reading a value it did
+-- not produce this session (a SQL column, an NWString, a net payload), so a malformed one is
+-- expected and must not error. It must also not pass silently: an unreadable unlocked_spells
+-- column looks exactly like a player who knows no spells, which is the same shape as data
+-- loss. SQL columns arrive quoted, so the surrounding single quotes are stripped first.
+--
+--   local ids = Arcana.DecodeJSON(row.unlocked_spells, "unlocked_spells for " .. sid, {})
+function Arcana.DecodeJSON(json, context, fallback)
+	json = tostring(json or ""):gsub("^'", ""):gsub("'$", "")
+	if json == "" then return fallback end
+
+	local ok, decoded = pcall(util.JSONToTable, json)
+	if ok and istable(decoded) then return decoded end
+
+	MsgC(Color(255, 80, 80), "[Arcana][JSON] ", Color(255, 255, 255),
+		"could not decode " .. tostring(context) .. ", falling back: " .. tostring(ok and "not a table" or decoded) .. "\n")
+
+	return fallback
+end
+
 -- Client-side stub for autocomplete and help so players see the command
 if CLIENT then
 	local function arcanaAutoComplete(cmd, stringargs)
@@ -56,7 +104,7 @@ if CLIENT then
 		local sid = IsValid(LocalPlayer()) and LocalPlayer():SteamID64() or nil
 		local out = {}
 
-		for id, sp in pairs(Arcana and Arcana.RegisteredSpells or {}) do
+		for id, sp in pairs(Arcana.RegisteredSpells or {}) do
 			-- Crafted spells register on every client (to render other players'
 			-- casts); only the local player's own belong in their autocomplete.
 			local foreignCrafted = sp.is_crafted and sp.crafted_owner ~= sid
@@ -85,7 +133,7 @@ if CLIENT then
 		local raw = string.Trim(table.concat(args or {}, " "))
 
 		if raw == "" then
-			Arcana:Print("Usage: arcana <spell id or name>")
+			Arcana.Print("Usage: arcana <spell id or name>")
 
 			return
 		end
@@ -144,16 +192,16 @@ Arcana.CATEGORIES = {
 	ENCHANTMENT = "enchantment",
 }
 
--- Persistence (player data, SQL, SyncPlayerData, SendErrorNotification) → arcana/persistence.lua
--- XP/leveling (GetXPRequiredForLevel, GiveXP, LevelUp, UnlockSpell, etc.) → arcana/xp.lua
--- Enchantment API → arcana/enchantments_api.lua
--- Damage utils → arcana/damage.lua
+-- Persistence (player data, SQL, SyncPlayerData, SendErrorNotification) → system/persistence.lua
+-- XP/leveling (GetXPRequiredForLevel, GiveXP, LevelUp, UnlockSpell, etc.) → system/xp.lua
+-- Enchantment API → system/enchantments.lua
+-- Damage utils → system/damage.lua
 
 -- Interrupt an ongoing spell cast
-function Arcana:InterruptSpell(ply, spellId)
+function Arcana.InterruptSpell(ply, spellId)
 	if not IsValid(ply) then return false end
 
-	local pdata = self:GetPlayerData(ply)
+	local pdata = Arcana.GetPlayerData(ply)
 	if not pdata then return false end
 
 	-- Check if player is actually casting this spell
@@ -221,20 +269,20 @@ local function broadcastCastStart(ply, spellId, castTime, forwardLike)
 end
 
 -- Schedule the deferred spell execution after the cast wind-up timer elapses.
-local function scheduleCastExecution(self, ply, spellId, spell, castTime, forwardLike)
+local function scheduleCastExecution(ply, spellId, spell, castTime, forwardLike)
 	local timerName = "Arcana_CastSpell_" .. ply:SteamID64() .. "_" .. spellId
 	timer.Create(timerName, castTime, 1, function()
 		if not IsValid(ply) then return end
 
 		-- Clear casting lock before final validation and execution
-		local d = self:GetPlayerData(ply)
+		local d = Arcana.GetPlayerData(ply)
 		if d then
 			d.casting_until = nil
 			d.casting_spell = nil
 		end
 
 		-- Re-check conditions at actual cast moment (player may have moved, died, etc.)
-		local ok, _ = self:CanCastSpell(ply, spellId)
+		local ok, _ = Arcana.CanCastSpell(ply, spellId)
 		if not ok then
 			net.Start("Arcana_SpellFailed", true)
 			net.WriteEntity(ply)
@@ -263,7 +311,7 @@ local function scheduleCastExecution(self, ply, spellId, spell, castTime, forwar
 			ctxSize = 30
 		end
 
-		self:CastSpell(ply, spellId, spell.has_target, Arcana.NewSpellContext({
+		Arcana.CastSpell(ply, spellId, spell.has_target, Arcana.NewSpellContext({
 			circlePos = ctxPos,
 			circleAng = ctxAng,
 			circleSize = ctxSize,
@@ -274,20 +322,20 @@ local function scheduleCastExecution(self, ply, spellId, spell, castTime, forwar
 	end)
 end
 
-function Arcana:StartCasting(ply, spellId)
+function Arcana.StartCasting(ply, spellId)
 	if not IsValid(ply) then return false end
-	local canCast, reason = self:CanCastSpell(ply, spellId)
+	local canCast, reason = Arcana.CanCastSpell(ply, spellId)
 	if not canCast then
 		if SERVER then
-			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
+			Arcana.SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
 		end
 
 		return false
 	end
 
-	local spell = self.RegisteredSpells[spellId]
+	local spell = Arcana.RegisteredSpells[spellId]
 	local castTime = math.max(0.1, spell.cast_time or 0)
-	local pdata = self:GetPlayerData(ply)
+	local pdata = Arcana.GetPlayerData(ply)
 	if pdata then
 		pdata.casting_until = CurTime() + castTime
 		pdata.casting_spell = spellId
@@ -298,17 +346,17 @@ function Arcana:StartCasting(ply, spellId)
 	if SERVER then
 		local forwardLike = spell.cast_anim == "forward" or spell.is_projectile or spell.has_target or ((spell.range or 0) > 0)
 		broadcastCastStart(ply, spellId, castTime, forwardLike)
-		scheduleCastExecution(self, ply, spellId, spell, castTime, forwardLike)
+		scheduleCastExecution(ply, spellId, spell, castTime, forwardLike)
 	end
 
 	return true
 end
 
 -- XP and Leveling System
--- GiveXP, CalculateLevel, LevelUp → arcana/xp.lua
+-- GiveXP, CalculateLevel, LevelUp → system/xp.lua
 
 -- Spell Registration API
-function Arcana:RegisterSpell(spellData)
+function Arcana.RegisterSpell(spellData)
 	if not spellData.id or not spellData.name or not spellData.cast then
 		ErrorNoHalt("Spell registration requires id, name, and cast function")
 
@@ -346,13 +394,13 @@ function Arcana:RegisterSpell(spellData)
 
 	}
 
-	self.RegisteredSpells[spell.id] = spell
+	Arcana.RegisteredSpells[spell.id] = spell
 	if CLIENT and Arcana.AddTriggerPhrase then
-		Arcana:AddTriggerPhrase(spell.name, spell.id)
+		Arcana.AddTriggerPhrase(spell.name, spell.id)
 
 		if istable(spellData.trigger_phrase_aliases) then
 			for _, phrase in ipairs(spellData.trigger_phrase_aliases) do
-				Arcana:AddTriggerPhrase(phrase, spell.id)
+				Arcana.AddTriggerPhrase(phrase, spell.id)
 			end
 		end
 	end
@@ -361,11 +409,11 @@ function Arcana:RegisterSpell(spellData)
 		spellData.on_register(spell)
 	end
 
-	self:Print("Registered spell '" .. spell.name .. "' (ID: " .. spell.id .. "')")
+	Arcana.Print("Registered spell '" .. spell.name .. "' (ID: " .. spell.id .. "')")
 	return true
 end
 
-function Arcana:RegisterRitualSpell(opts)
+function Arcana.RegisterRitualSpell(opts)
 	if not istable(opts) then
 		ErrorNoHalt("RegisterRitualSpell requires an options table\n")
 		return false
@@ -461,18 +509,18 @@ function Arcana:RegisterRitualSpell(opts)
 	end
 	-- Animation hints for casting visuals
 
-	return self:RegisterSpell({
+	return Arcana.RegisterSpell({
 		id = id,
 		name = name,
 		description = opts.description or "A powerful ritual",
-		category = opts.category or self.CATEGORIES.UTILITY,
+		category = opts.category or Arcana.CATEGORIES.UTILITY,
 		level_required = tonumber(opts.level_required) or 1,
 		knowledge_cost = tonumber(opts.knowledge_cost) or 1,
-		cooldown = tonumber(opts.cooldown) or self.Config.DEFAULT_SPELL_COOLDOWN,
-		cost_type = opts.cost_type or self.COST_TYPES.COINS,
+		cooldown = tonumber(opts.cooldown) or Arcana.Config.DEFAULT_SPELL_COOLDOWN,
+		cost_type = opts.cost_type or Arcana.COST_TYPES.COINS,
 		cost_amount = tonumber(opts.cost_amount) or 100,
 		cast_time = tonumber(opts.cast_time) or 10,
-		has_target = opts.has_target == true and true or false,
+		has_target = opts.has_target == true,
 		cast_anim = opts.cast_anim or "becon",
 		can_cast = opts.can_cast or defaultCanCast,
 		cast = ritualCast,
@@ -494,10 +542,10 @@ local function buildDamageInfo(ply, amount)
 	return dmg
 end
 
--- Pure feasibility gate — reads state, never mutates. Returns false when the cast must be blocked.
+-- Pure feasibility gate: reads state, never mutates. Returns false when the cast must be blocked.
 local function validateCostForSpell(ply, spell)
 	if spell.cost_type == Arcana.COST_TYPES.COINS then
-		if Arcana:GetCoins(ply) < spell.cost_amount then
+		if Arcana.GetCoins(ply) < spell.cost_amount then
 			-- High-cost coin spells cannot fall back to health; block early.
 			if spell.cost_amount > COIN_COST_HEALTH_FALLBACK_LIMIT then
 				return false, "Insufficient coins"
@@ -508,12 +556,12 @@ local function validateCostForSpell(ply, spell)
 end
 
 -- Spell Casting System
-function Arcana:CanCastSpell(ply, spellId)
+function Arcana.CanCastSpell(ply, spellId)
 	if not ply:Alive() then return false, "You are dead" end
-	local spell = self.RegisteredSpells[spellId]
+	local spell = Arcana.RegisteredSpells[spellId]
 	if not spell then return false, "Spell not found" end
 
-	local data = self:GetPlayerData(ply)
+	local data = Arcana.GetPlayerData(ply)
 	if not data then return false, "Player data not loaded" end
 	-- Block re-casting while a previous cast is still winding up
 	if data.casting_until and data.casting_until > CurTime() then
@@ -547,14 +595,14 @@ function Arcana:CanCastSpell(ply, spellId)
 	return true
 end
 
--- Band VFX API (SendAttachBandVFX, ClearBandVFX) → arcana/vfx_network.lua
+-- Band VFX API (SendAttachBandVFX, ClearBandVFX) → system/vfx/casting.lua
 
--- Side-effect mutator — deducts cost. Called only after validateCostForSpell has passed.
+-- Side-effect mutator: deducts cost. Called only after validateCostForSpell has passed.
 local function applyCostForSpell(ply, spell)
 	local takeDamageInfo = ply.ForceTakeDamageInfo or ply.TakeDamageInfo
 	if spell.cost_type == Arcana.COST_TYPES.COINS then
-		if Arcana:GetCoins(ply) >= spell.cost_amount then
-			Arcana:TakeCoins(ply, spell.cost_amount, "Spell: " .. spell.name)
+		if Arcana.GetCoins(ply) >= spell.cost_amount then
+			Arcana.TakeCoins(ply, spell.cost_amount, "Spell: " .. spell.name)
 		else
 			-- Affordable-range coin shortfall: fall back to health damage.
 			-- Announce it first so listeners can react if this payment proves lethal.
@@ -567,7 +615,7 @@ local function applyCostForSpell(ply, spell)
 end
 
 -- castInfo = { spellId, spell, has_target, context }
-local function handleSpellResult(self, ply, data, castInfo, success)
+local function handleSpellResult(ply, data, castInfo, success)
 	local spellId = castInfo.spellId
 	local spell = castInfo.spell
 	local has_target = castInfo.has_target
@@ -577,7 +625,7 @@ local function handleSpellResult(self, ply, data, castInfo, success)
 		local castTime = math.max(0.05, tonumber(spell.cast_time) or 0)
 		local ratio = math.Clamp(castTime / baseCast, 0.001, 2.0)
 		local xpGain = math.floor(math.max(20, (tonumber(spell.knowledge_cost) or 1) * 10) * ratio)
-		self:GiveXP(ply, xpGain, "Cast " .. spell.name)
+		Arcana.GiveXP(ply, xpGain, "Cast " .. spell.name)
 
 		if spell.on_success then
 			spell.on_success(ply, has_target, data, context)
@@ -612,20 +660,20 @@ local function handleSpellResult(self, ply, data, castInfo, success)
 	end
 end
 
-function Arcana:CastSpell(ply, spellId, has_target, context)
+function Arcana.CastSpell(ply, spellId, has_target, context)
 	if not IsValid(ply) then return false end
-	local canCast, reason = self:CanCastSpell(ply, spellId)
+	local canCast, reason = Arcana.CanCastSpell(ply, spellId)
 
 	if not canCast then
 		if SERVER then
-			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
+			Arcana.SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
 		end
 
 		return false
 	end
 
-	local spell = self.RegisteredSpells[spellId]
-	local data = self:GetPlayerData(ply)
+	local spell = Arcana.RegisteredSpells[spellId]
+	local data = Arcana.GetPlayerData(ply)
 
 	-- Cost validation was already performed by CanCastSpell; this only deducts.
 	applyCostForSpell(ply, spell)
@@ -642,23 +690,23 @@ function Arcana:CastSpell(ply, spellId, has_target, context)
 	local success = castOk and (castResult ~= false)
 
 	runHook("CastSpell", ply, spellId, has_target, data, context, success)
-	handleSpellResult(self, ply, data, castInfo, success)
+	handleSpellResult(ply, data, castInfo, success)
 
-	self:SavePlayerData(ply)
+	Arcana.SavePlayerData(ply)
 
 	if SERVER then
-		self:SyncPlayerData(ply)
+		Arcana.SyncPlayerData(ply)
 	end
 
 	return success
 end
 
 -- Knowledge System
--- CanUnlockSpell, UnlockSpell, GetLevel, GetXP, GetKnowledgePoints, HasSpellUnlocked → arcana/xp.lua
+-- CanUnlockSpell, UnlockSpell, GetLevel, GetXP, GetKnowledgePoints, HasSpellUnlocked → system/xp.lua
 
--- Networking: XPUpdate/LevelUp/UnlockSpell → arcana/xp.lua
---             FullSync/ErrorNotification → arcana/persistence.lua
---             SetQuickslot/SetSelectedQuickslot → arcana/quickslots.lua
+-- Networking: XPUpdate/LevelUp/UnlockSpell → system/xp.lua
+--             FullSync/ErrorNotification → system/persistence.lua
+--             SetQuickslot/SetSelectedQuickslot → system/quickslots.lua
 
 if SERVER then
 	util.AddNetworkString("Arcana_BeginCasting")
@@ -676,7 +724,7 @@ if SERVER then
 		if raw == "" then return nil end
 		if Arcana.RegisteredSpells[raw] then return raw end
 
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		local fallback
 		for id, sp in pairs(Arcana.RegisteredSpells) do
 			if string.lower(sp.name or "") == raw then
@@ -695,31 +743,30 @@ if SERVER then
 		local spellId = resolveSpellId(ply, raw)
 
 		if not spellId then
-			Arcana:SendErrorNotification(ply, "Unknown spell \"" .. string.Trim(raw) .. "\"")
+			Arcana.SendErrorNotification(ply, "Unknown spell \"" .. string.Trim(raw) .. "\"")
 
 			return
 		end
 
-		local canCast, reason = Arcana:CanCastSpell(ply, spellId)
+		local canCast, reason = Arcana.CanCastSpell(ply, spellId)
 
 		if not canCast then
-			Arcana:SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
+			Arcana.SendErrorNotification(ply, "Cannot cast spell \"" .. spellId .. "\": " .. reason)
 
 			return
 		end
 
-		Arcana:StartCasting(ply, spellId)
+		Arcana.StartCasting(ply, spellId)
 	end)
 end
 
--- Client-side VFX receivers (BeginCasting, SpellFailed, PlayCastGesture, BandVFX) → arcana/vfx_network.lua
--- Player lifecycle hooks (PlayerInitialSpawn, SetupMove, PlayerDeath, PlayerDisconnected) → arcana/lifecycle.lua
--- Map-specific entity spawning (altar, portal) lives in arcana/map_setup.lua
+-- Client-side VFX receivers (BeginCasting, SpellFailed, PlayCastGesture, BandVFX) → system/vfx/casting.lua
+-- Player lifecycle hooks (PlayerInitialSpawn, SetupMove, PlayerDeath, PlayerDisconnected) → system/lifecycle.lua
 
 
 -- Common position resolver for ground-targeted spells
 -- Works with both players (GetEyeTrace) and entities (util.TraceLine fallback)
-function Arcana:ResolveGroundTarget(caster, maxRange)
+function Arcana.ResolveGroundTarget(caster, maxRange)
 	if not IsValid(caster) then return nil end
 
 	maxRange = maxRange or 1000
@@ -738,6 +785,6 @@ function Arcana:ResolveGroundTarget(caster, maxRange)
 	end
 end
 
--- CreateFollowingCastCircle (CLIENT helper for ground-following cast circles) → arcana/vfx_network.lua
+-- CreateFollowingCastCircle (CLIENT helper for ground-following cast circles) → system/vfx/casting.lua
 
--- Damage utilities (BlastDamage, TakeDamageInfo, IsPotentialCheater) moved to arcana/damage.lua
+-- Damage utilities (BlastDamage, TakeDamageInfo, IsPotentialCheater) → system/damage.lua

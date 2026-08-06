@@ -7,7 +7,7 @@ if SERVER then
 end
 
 -- Meteor Storm: A divine pact granted at level 30 - call down a prolonged meteor storm while the earth ruptures
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "meteor_storm",
 	name = "Meteor Storm",
 	description = "Channel divine power to call down a devastating meteor storm while the earth ruptures beneath your enemies.",
@@ -27,7 +27,7 @@ Arcana:RegisterSpell({
 		if not SERVER then return true end
 		if not IsValid(caster) then return false end
 		local srcEnt = IsValid(ctx.casterEntity) and ctx.casterEntity or caster
-		local center, normal = Arcana:ResolveGroundTarget(srcEnt, 1500)
+		local center, normal = Arcana.ResolveGroundTarget(srcEnt, 1500)
 		center = center or (srcEnt:GetPos() + Vector(0, 0, 2))
 		normal = normal or Vector(0, 0, 1)
 		local baseRadius = 1400 -- Larger area of effect
@@ -194,13 +194,13 @@ Arcana:RegisterSpell({
 						local falloff = 1 - (dist / radius)
 						local actualDamage = damage * falloff
 
-						if ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then
+						if Arcana.Common.IsActor(ent) then
 							local dmg = DamageInfo()
 							dmg:SetDamage(actualDamage)
 							dmg:SetDamageType(bit.bor(DMG_BLAST, DMG_BURN))
 							dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 							dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-							Arcana:TakeDamageInfo(ent, dmg)
+							Arcana.TakeDamageInfo(ent, dmg)
 							-- Knockback
 							local dir = (ent:WorldSpaceCenter() - groundPos):GetNormalized()
 
@@ -306,7 +306,7 @@ Arcana:RegisterSpell({
 							for _, e in ipairs(ents.FindInSphere(trFissure.HitPos, 220)) do
 								if not IsValid(e) or e == caster or e == pillar then continue end
 
-								if e:IsPlayer() or e:IsNPC() or (e.IsNextBot and e:IsNextBot()) then
+								if Arcana.Common.IsActor(e) then
 									local dmg = DamageInfo()
 									dmg:SetDamage(isFinal and 150 or 80)
 									dmg:SetDamageType(DMG_CRUSH)
@@ -448,7 +448,6 @@ Arcana:RegisterSpell({
 })
 
 if CLIENT then
-	local matBeam = Material("effects/laser1")
 	local matGlow = Material("sprites/light_glow02_add")
 	local matRing = Material("effects/select_ring")
 	local matFlare = Material("effects/blueflare1")
@@ -991,11 +990,11 @@ if CLIENT then
 		}
 
 		-- Ground target indicator (follows aim)
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = color,
 			size = 1400,
 			intensity = 100,
-			positionResolver = function(c) return Arcana:ResolveGroundTarget(c, 1500) end
+			positionResolver = function(c) return Arcana.ResolveGroundTarget(c, 1500) end
 		})
 
 		-- PHASE 1: Initial ground circle at caster's feet (0s)

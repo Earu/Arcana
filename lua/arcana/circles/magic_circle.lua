@@ -217,7 +217,7 @@ function MagicCircle:Update(deltaTime)
 	end
 
 	-- Breakdown completion: rings are culled as they fly past breakRemoveDistance, but a
-	-- ring that can't break (band rings) would keep the circle alive forever — hence the deadline
+	-- ring that can't break (band rings) would keep the circle alive forever, hence the deadline
 	if self.isBreaking and (#self.rings <= 0 or CurTime() > (self.breakEnd or 0)) then
 		self:FinalizeDeactivate()
 		self.isActive = false
@@ -324,7 +324,7 @@ function MagicCircle:StartEvolving(duration, direction)
 	-- If the circle has already been drawn (it was showing all rings in static mode),
 	-- set _preserveVisibility so Draw always renders the full ring set. lastVisible
 	-- still starts at 2 and grows normally, so the height animation is staggered
-	-- ring-by-ring just like it is for freshly created circles — but no ring ever
+	-- ring-by-ring just like it is for freshly created circles, but no ring ever
 	-- disappears because Draw ignores lastVisible for the visibility count.
 	if self._hasBeenDrawn then
 		self._preserveVisibility = true
@@ -466,12 +466,6 @@ hook.Add("PostDrawTranslucentRenderables", "MagicCircleManager_Draw", function(b
 		MagicCircleManager:Draw()
 	end
 end)
-
--- Convenience functions (maintaining backward compatibility)
-function MagicCircle.DrawMagicCircle(pos, ang, color, intensity, size, lineWidth)
-	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth)
-	circle:Draw()
-end
 
 function MagicCircle.CreateMagicCircle(pos, ang, color, intensity, size, duration, lineWidth, seed)
 	local circle = MagicCircle.new(pos, ang, color, intensity, size, lineWidth, seed)

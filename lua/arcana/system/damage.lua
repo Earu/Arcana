@@ -1,7 +1,22 @@
--- Arcana Damage utilities — server-side.
--- Provides Arcana:BlastDamage (radius damage with ForceTakeDamageInfo support),
--- Arcana:TakeDamageInfo (invulnerability-aware damage wrapper),
--- and bad-entity tracking for Arcana:IsPotentialCheater.
+-- Arcana Damage utilities, server-side.
+-- Provides Arcana.BlastDamage (radius damage with ForceTakeDamageInfo support),
+-- Arcana.TakeDamageInfo (invulnerability-aware damage wrapper),
+-- and bad-entity tracking for Arcana.IsPotentialCheater.
+--
+-- Arcana.TakeDamageInfo is NOT a blanket replacement for ent:TakeDamageInfo, and applying
+-- it everywhere is a mistake that has been made and reverted once already.
+--
+-- For a non-player victim it is exactly ent:TakeDamageInfo plus an IsValid guard. For a
+-- player it also samples health a tick later and sets ArcanaInvulnerable when the hit landed
+-- for less than half what it asked for. That heuristic cannot tell cheating apart from the
+-- addon's own damage absorption: arcane_barrier and arcana_ward zero incoming damage,
+-- duelist_aegis calls SetDamage(0), fire_phoenix runs the caster in godmode, and any server
+-- armour or spawn protection does the same. Every one of those reads as invulnerability.
+--
+-- The flag is only consulted by the six Arcana NPCs, which withhold kill XP from a flagged
+-- player. So a false positive costs a player XP for reasons they cannot see. Widen the set of
+-- call sites only if you are willing to pay that, and prefer teaching the check about
+-- legitimate absorption first.
 
 Arcana = Arcana or {}
 
@@ -12,7 +27,7 @@ if SERVER then
 	-- @param radius    number  Blast radius in units
 	-- @param baseDamage number Maximum damage at ground zero
 	-- @param opts      table   Optional: damageType, inflictor, ignoreAttacker (bool), onChecked (function)
-	function Arcana:BlastDamage(attacker, center, radius, baseDamage, opts)
+	function Arcana.BlastDamage(attacker, center, radius, baseDamage, opts)
 		opts = opts or {}
 		attacker = IsValid(attacker) and attacker or game.GetWorld()
 		local inflictor = IsValid(opts.inflictor) and opts.inflictor or attacker
@@ -40,12 +55,12 @@ if SERVER then
 			dmg:SetAttacker(attacker)
 			dmg:SetInflictor(inflictor)
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			Arcana:TakeDamageInfo(ent, dmg, onChecked)
+			Arcana.TakeDamageInfo(ent, dmg, onChecked)
 		end
 	end
 
 	-- Wrapper that detects invulnerability
-	function Arcana:TakeDamageInfo(ent, dmginfo, onChecked)
+	function Arcana.TakeDamageInfo(ent, dmginfo, onChecked)
 		if not IsValid(ent) then return end
 		if not ent:IsPlayer() then
 			return ent:TakeDamageInfo(dmginfo)
@@ -166,7 +181,7 @@ if SERVER then
 		end
 	end)
 
-	function Arcana:IsPotentialCheater(ply)
+	function Arcana.IsPotentialCheater(ply)
 		if not IsValid(ply) then return true end
 		if ply.ArcanaInvulnerable then return true end
 		if badEntities[ply] and badEntities[ply] > 0 then return true end

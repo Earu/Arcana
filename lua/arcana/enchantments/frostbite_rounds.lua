@@ -26,7 +26,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	end
 
 	-- Apply slow via shared Frost status
-	local isActor = target:IsPlayer() or target:IsNPC() or (target.IsNextBot and target:IsNextBot())
+	local isActor =Arcana.Common.IsActor(target)
 	if isActor then
 		Arcana.Status.Frost.Apply(target, {
 			slowMult = slowMult,
@@ -45,7 +45,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	sound.Play("physics/glass/glass_impact_bullet1.wav", impact, 70, 130)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "frostbite_rounds",
 	name = "Frostbite Rounds",
 	description = "Bullets freeze the struck target with chilling slow and cold VFX.",
@@ -69,7 +69,7 @@ Arcana:RegisterEnchantment({
 			local hitEnt = tr.Entity
 			if not IsValid(hitEnt) then return end
 			-- Only actors: players, NPCs, NextBots
-			local isActor = hitEnt:IsPlayer() or hitEnt:IsNPC() or (hitEnt.IsNextBot and hitEnt:IsNextBot())
+			local isActor =Arcana.Common.IsActor(hitEnt)
 			if not isActor then return end
 
 			applyFrostbite(attacker, hitEnt, tr.HitPos)

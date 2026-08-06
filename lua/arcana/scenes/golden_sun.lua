@@ -1,4 +1,4 @@
--- Golden Sun scene — an encounter with the Golden Sun, an eldritch entity that
+-- Golden Sun scene: an encounter with the Golden Sun, an eldritch entity that
 -- speaks through a golden statue (its Avatar). Its mischief does not map to
 -- human mischief; its workings and goals are unknown. It offers coins in
 -- exchange for the midas touch (the actual midas status is not implemented
@@ -9,7 +9,7 @@
 -- standing at its center, a sun aura blazing above it, and coins endlessly raining
 -- from above, rolling across the floor and burning where they come to rest.
 --
--- Start it with: Arcana:StartGoldenSunSequence()
+-- Start it with: Arcana.StartGoldenSunSequence()
 
 if SERVER then return end
 
@@ -103,7 +103,7 @@ local BEAM_LENGTH = 400
 local BEAM_WIDTH = 12
 local BEAM_COLOR = Color(255, 210, 120, 20)
 
--- Warm grade merged into the base tutorial color modify (additive deltas) to
+-- Warm grade merged into the base scene color modify (additive deltas) to
 -- counter the nebula skybox's purple/blue cast
 local HEAT_COLOR_MOD = {
 	["$pp_colour_addr"] = 0.05,
@@ -118,8 +118,8 @@ local SUNBEAMS_DARKEN = 0.98 -- 1 = no darkening of the rest of the screen
 local SUNBEAMS_MULTIPLIER = 0.5 -- Beam brightness
 local SUNBEAMS_SIZE = 0.12
 
-local function isSceneActive(tutorial)
-	return tutorial.currentSequence and tutorial.currentSequence.id == SCENE_ID
+local function isSceneActive(scenes)
+	return scenes.currentSequence and scenes.currentSequence.id == SCENE_ID
 end
 
 -- Scene state
@@ -128,7 +128,6 @@ local statue = nil
 local goldPlate = nil
 local auraPos = nil
 local auraAng = nil
-local nextAuraEffect = 0
 local coins = nil
 local coinCenter = nil
 local coinRingMax = 1200
@@ -203,28 +202,28 @@ local function respawnCoin(coin, now)
 	coin.nextFire = nil
 end
 
-hook.Add("Arcana_Tutorial_CreateScene", "Arcana_GoldenSunScene", function(tutorial, sequence)
+hook.Add("Arcana_Scene_Create", "Arcana_GoldenSunScene", function(scenes, sequence)
 	if sequence.id ~= SCENE_ID then return end
 
 	removeSceneEntities()
 
 	-- The statue is the focus entity, so the walkable area ends up centered on
 	-- it; everything else is laid out around the scene center
-	local walkRadius = tutorial.movementRadius or 666
-	local sceneCenter = tutorial.simulatedPos * 1
+	local walkRadius = scenes.movementRadius or 666
+	local sceneCenter = scenes.simulatedPos * 1
 	sceneCenter.z = FLOOR_Z
 
 	props = {}
 
 	-- The player spawns along spawnAwayDir from the statue; face it towards them
-	local spawnDir = tutorial.spawnAwayDir or Vector(-1, 1, 0):GetNormalized()
+	local spawnDir = scenes.spawnAwayDir or Vector(-1, 1, 0):GetNormalized()
 	local statueAng = Angle(0, spawnDir:Angle().y + STATUE_YAW_OFFSET, 0)
 
 	statue = createProp(STATUE_MODEL, sceneCenter + STATUE_OFFSET * SCENE_SCALE, statueAng)
 	statue:SetMaterial(GOLD_MATERIAL)
 
-	tutorial.focusEnt = statue
-	tutorial.groundZ = GROUND_Z
+	scenes.focusEnt = statue
+	scenes.groundZ = GROUND_Z
 
 	-- Dome scaled so it encapsulates the whole walkable area, centered on the scene
 	local dome = createProp(DOME_MODEL, sceneCenter, DOME_ANGLE)
@@ -251,7 +250,7 @@ hook.Add("Arcana_Tutorial_CreateScene", "Arcana_GoldenSunScene", function(tutori
 		goldPlate:SetMaterial("!" .. getPlateMaterial():GetName())
 	end
 
-	-- The engine won't reliably simulate/draw an emitter out in the tutorial's
+	-- The engine won't reliably simulate/draw an emitter out in the scene's
 	-- fake coordinates, so it is drawn manually in the scene render hook
 	-- (same trick as soul_mode.lua)
 	sceneEmitter = ParticleEmitter(sceneCenter, false)
@@ -305,7 +304,7 @@ hook.Add("Arcana_Tutorial_CreateScene", "Arcana_GoldenSunScene", function(tutori
 	end
 end)
 
-hook.Add("Arcana_Tutorial_DestroyScene", "Arcana_GoldenSunScene", function(tutorial, sequence)
+hook.Add("Arcana_Scene_Destroy", "Arcana_GoldenSunScene", function(scenes, sequence)
 	if sequence and sequence.id ~= SCENE_ID then return end
 
 	removeSceneEntities()
@@ -320,9 +319,9 @@ end)
 -- Warp every sound played while inside the scene, soul-mode style (see
 -- soul_mode.lua's EntityEmitSound pitch treatment)
 hook.Add("EntityEmitSound", "Arcana_GoldenSunScene", function(data)
-	local tutorial = Arcana and Arcana.Tutorial
-	if not tutorial or not tutorial.active then return end
-	if not isSceneActive(tutorial) then return end
+	local scenes = Arcana.Scenes
+	if not scenes or not scenes.active then return end
+	if not isSceneActive(scenes) then return end
 
 	data.Pitch = math.Clamp(data.Pitch * 0.8, 1, 255)
 
@@ -331,8 +330,8 @@ end)
 
 -- Falling golden coins raining onto the golden floor
 local beamMat = Material("sprites/light_glow02_add")
-hook.Add("Arcana_Tutorial_DrawAmbientParticles", "Arcana_GoldenSunScene", function(tutorial, eyePos)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_DrawAmbientParticles", "Arcana_GoldenSunScene", function(scenes, eyePos)
+	if not isSceneActive(scenes) then return end
 	if not coins then return end
 
 	local now = RealTime()
@@ -424,8 +423,8 @@ hook.Add("Arcana_Tutorial_DrawAmbientParticles", "Arcana_GoldenSunScene", functi
 	end
 end)
 
-hook.Add("Arcana_Tutorial_DrawScene", "Arcana_GoldenSunScene", function(tutorial, eyePos)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_Draw", "Arcana_GoldenSunScene", function(scenes, eyePos)
+	if not isSceneActive(scenes) then return end
 
 	-- Golden base plate (this scene's floor)
 	if IsValid(goldPlate) then
@@ -467,7 +466,7 @@ hook.Add("Arcana_Tutorial_DrawScene", "Arcana_GoldenSunScene", function(tutorial
 	end
 
 	-- Fire particles: the emitter is NoDraw'd and rendered by hand here so it
-	-- simulates and draws inside the tutorial space (see soul_mode.lua)
+	-- simulates and draws inside the scenes space (see soul_mode.lua)
 	if sceneEmitter then
 		sceneEmitter:Draw()
 	end
@@ -488,16 +487,16 @@ hook.Add("Arcana_Tutorial_DrawScene", "Arcana_GoldenSunScene", function(tutorial
 end)
 
 -- Normal footsteps on the golden floor
-hook.Add("Arcana_Tutorial_Footstep", "Arcana_GoldenSunScene", function(tutorial, ply)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_Footstep", "Arcana_GoldenSunScene", function(scenes, ply)
+	if not isSceneActive(scenes) then return end
 
 	ply:EmitSound("player/footsteps/concrete" .. math.random(1, 4) .. ".wav", 75, math.random(95, 105), 0.7)
 end)
 
 -- Warm "hot" grade over the nebula's purple/blue cast, merged into the base
 -- color modify so a single DrawColorModify applies everything
-hook.Add("Arcana_Tutorial_ColorModify", "Arcana_GoldenSunScene", function(tutorial, colorMod)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_ColorModify", "Arcana_GoldenSunScene", function(scenes, colorMod)
+	if not isSceneActive(scenes) then return end
 
 	for k, v in pairs(HEAT_COLOR_MOD) do
 		colorMod[k] = (colorMod[k] or 0) + v
@@ -505,8 +504,8 @@ hook.Add("Arcana_Tutorial_ColorModify", "Arcana_GoldenSunScene", function(tutori
 end)
 
 -- Godrays radiating from the sun position
-hook.Add("Arcana_Tutorial_ScreenspaceEffects", "Arcana_GoldenSunScene", function(tutorial)
-	if not isSceneActive(tutorial) then return end
+hook.Add("Arcana_Scene_ScreenspaceEffects", "Arcana_GoldenSunScene", function(scenes)
+	if not isSceneActive(scenes) then return end
 	if not auraPos then return end
 
 	local scr = auraPos:ToScreen()
@@ -584,14 +583,14 @@ end
 -- render pass).
 local nextAura = 0
 hook.Add("Think", "Arcana_GoldenSunScene_Aura", function()
-	local tutorial = Arcana.Tutorial
-	if not tutorial or not tutorial.active then return end
-	if not isSceneActive(tutorial) then return end
+	local scenes = Arcana.Scenes
+	if not scenes or not scenes.active then return end
+	if not isSceneActive(scenes) then return end
 	if not auraPos or not auraAng then return end
 
-	-- Only while the tutorial space is actually shown
-	local phase = tutorial.phase
-	if phase ~= "tutorial" and phase ~= "fade_from_black" and
+	-- Only while the scenes space is actually shown
+	local phase = scenes.phase
+	if phase ~= "scenes" and phase ~= "fade_from_black" and
 	   phase ~= "show_panel" and phase ~= "fade_to_white" then return end
 
 	local now = SysTime()
@@ -701,7 +700,7 @@ local NODES = {
 
 -- The Golden Sun draws the newly-revived soul into its vision
 net.Receive("Arcana_Midas_StartEncounter", function()
-	Arcana:StartTutorialSequence({
+	Arcana.StartScene({
 		id = SCENE_ID,
 		nodes = NODES,
 		startNode = "START",

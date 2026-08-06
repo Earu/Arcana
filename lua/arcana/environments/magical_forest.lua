@@ -120,7 +120,7 @@ local function spawnForest(ctx)
 	table.insert(timersOut, timerName)
 
 	-- Scale forest size and density using precomputed effective radius
-	local effRadius = tonumber(ctx.effective_radius or 0) or 0
+	local effRadius = tonumber(ctx.effective_radius) or 0
 	local forestRange = math.Clamp(math.floor(effRadius * 0.9), 1500, FOREST_RANGE)
 	local densityFactor = (forestRange / FOREST_RANGE) ^ 2
 	local treeCount = math.Clamp(
@@ -266,7 +266,7 @@ end
 
 local function spawnMushroomHotspot(ctx)
 	-- Scale hotspot spread and density using precomputed effective radius
-	local effRadius = tonumber(ctx.effective_radius or 0) or 0
+	local effRadius = tonumber(ctx.effective_radius) or 0
 	local forestRange = math.Clamp(math.floor(effRadius * 0.9), 1500, FOREST_RANGE)
 	local entities = {}
 	local centerTrace = traceGrassNear(ctx.origin, forestRange) or util.TraceLine({
@@ -337,7 +337,7 @@ end
 local FAIRY_GROVE_TREE =  "models/props_foliage/oak_tree01.mdl"
 local function spawnFairyGrove(ctx)
 	-- Scale grove size using precomputed effective radius
-	local effRadius = tonumber(ctx.effective_radius or 0) or 0
+	local effRadius = tonumber(ctx.effective_radius) or 0
 	local forestRange = math.Clamp(math.floor(effRadius * 0.9), 1500, FOREST_RANGE)
 
 	local entities = {}
@@ -430,7 +430,7 @@ local function spawnGraveyard(ctx)
 	local timersOut = {}
 
 	-- Scale graveyard size using precomputed effective radius
-	local effRadius = tonumber(ctx.effective_radius or 0) or 0
+	local effRadius = tonumber(ctx.effective_radius) or 0
 	local forestRange = math.Clamp(math.floor(effRadius * 0.9), 1500, FOREST_RANGE)
 
 	local centerTrace = traceGrassNear(ctx.origin, forestRange) or util.TraceLine({

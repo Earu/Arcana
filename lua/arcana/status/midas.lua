@@ -312,7 +312,7 @@ if SERVER then
 		ply._arcanaMidasEncounterPending = true
 	end)
 
-	-- The tutorial system needs a living player, so the vision waits for respawn.
+	-- The scene system needs a living player, so the vision waits for respawn.
 	-- The "seen" flag is only set once the vision actually reaches the player, so
 	-- disconnecting between death and respawn does not burn the guaranteed first.
 	hook.Add("PlayerSpawn", "Arcana_Midas_Encounter", function(ply)
@@ -356,7 +356,7 @@ if SERVER then
 		if not accepted then return end
 
 		if Arcana.GiveCoins then
-			Arcana:GiveCoins(ply, ENCOUNTER_COIN_REWARD, "The Golden Sun's Bargain")
+			Arcana.GiveCoins(ply, ENCOUNTER_COIN_REWARD, "The Golden Sun's Bargain")
 		end
 
 		-- Striking the bargain also earns the hidden Aurum essence for crafted spells.

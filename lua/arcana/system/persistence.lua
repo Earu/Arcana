@@ -1,4 +1,4 @@
--- Arcana Persistence — player data storage, retrieval, and network sync.
+-- Arcana Persistence: player data storage, retrieval, and network sync.
 -- Covers: default data schema, SQL CRUD, in-memory GetPlayerData/SavePlayerData/LoadPlayerData,
 --         SyncPlayerData, SendErrorNotification, and related player lifecycle hooks.
 
@@ -26,11 +26,6 @@ local function CreateDefaultPlayerData()
 end
 
 if SERVER then
-	local function dbLogError(prefix)
-		local err = sql.LastError() or "unknown error"
-		MsgC(Color(255, 80, 80), "[Arcana][SQL] ", Color(255, 255, 255), prefix .. ": " .. tostring(err) .. "\n")
-	end
-
 	local ensured = false
 	local function ensureDatabase()
 		if ensured then return ensured end
@@ -48,8 +43,7 @@ if SERVER then
 			selected_quickslot INTEGER NOT NULL DEFAULT 1,
 			last_save INTEGER NOT NULL DEFAULT 0
 		);]])
-		if ok == false then
-			dbLogError("CREATE TABLE arcane_players failed")
+		if Arcana.SQLCheck(ok, "CREATE TABLE arcane_players") == false then
 			ensured = false
 			return ensured
 		end
@@ -71,11 +65,9 @@ if SERVER then
 	end
 
 	local function deserializeUnlockedSpells(json)
-		json = json or "[]"
-		json = json:gsub("^\'", ""):gsub("\'$", "")
-		local ok, data = pcall(util.JSONToTable, json)
+		local data = Arcana.DecodeJSON(json, "unlocked_spells column", nil)
 		local map = {}
-		if ok and istable(data) then
+		if data then
 			for _, id in ipairs(data) do
 				map[tostring(id)] = true
 			end
@@ -93,11 +85,9 @@ if SERVER then
 	end
 
 	local function deserializeQuickslots(json)
-		json = json or "[]"
-		json = json:gsub("^\'", ""):gsub("\'$", "")
-		local ok, arr = pcall(util.JSONToTable, json)
+		local arr = Arcana.DecodeJSON(json, "quickspell_slots column", nil)
 		local slots = {nil, nil, nil, nil, nil, nil, nil, nil}
-		if ok and istable(arr) then
+		if arr then
 			for i = 1, 8 do
 				local v = arr[i]
 				if isstring(v) and v ~= "" then slots[i] = v end
@@ -111,7 +101,7 @@ if SERVER then
 	-- loaded in-memory state can never erase spells, but that same union would instantly
 	-- resurrect a spell the player just paid to forget. xp/level keep their max() merge
 	-- either way, since forgetting never touches them.
-	function Arcana:SavePlayerDataToSQL(ply, data, authoritative)
+	function Arcana.SavePlayerDataToSQL(ply, data, authoritative)
 		local handled = Arcana.RunHook("SavePlayerDataToSQL", ply, data, authoritative)
 		if handled == true then return end
 		if not ensureDatabase() then return end
@@ -127,12 +117,12 @@ if SERVER then
 
 		-- Merge strategy: xp/level take max, unlocked_spells union, quickslots prefer incoming.
 		-- knowledge_points is fully derived from merged_level and merged_unlocked (earned - spent),
-		-- because it is a spendable value — higher is not necessarily truer, only the formula is.
+		-- because it is a spendable value: higher is not necessarily truer, only the formula is.
 		local function mergeWithExistingRow(row)
 			if not istable(row) then
 				local derived_kp = math.max(0,
-					Arcana:GetTotalEarnedKnowledgePoints(incoming_level) -
-					Arcana:GetTotalSpentKnowledgePoints(incoming_unlocked_map)
+					Arcana.GetTotalEarnedKnowledgePoints(incoming_level) -
+					Arcana.GetTotalSpentKnowledgePoints(incoming_unlocked_map)
 				)
 				return incoming_xp, incoming_level, derived_kp, incoming_unlocked_map, incoming_quickslots, incoming_selected
 			end
@@ -158,28 +148,31 @@ if SERVER then
 			end
 			local merged_selected = (incoming_selected >= 1 and incoming_selected <= 8) and incoming_selected or existing_selected
 			local derived_kp = math.max(0,
-				Arcana:GetTotalEarnedKnowledgePoints(merged_level) -
-				Arcana:GetTotalSpentKnowledgePoints(merged_unlocked)
+				Arcana.GetTotalEarnedKnowledgePoints(merged_level) -
+				Arcana.GetTotalSpentKnowledgePoints(merged_unlocked)
 			)
 			return merged_xp, merged_level, derived_kp, merged_unlocked, merged_quick, merged_selected
 		end
 
-		local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+		-- The merge below is what stops a partially-loaded in-memory state from erasing
+		-- stored progression, and it can only do that if it sees the stored row. A failed
+		-- read looks identical to "no row yet" once it reaches mergeWithExistingRow, so bail
+		-- rather than writing the incoming values over whatever is really there.
+		local rows = Arcana.SQLCheck(sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;"),
+			"SavePlayerDataToSQL merge read for " .. tostring(ply:SteamID64()))
+		if rows == false then return end
+
 		local mxp, mlevel, mkp, munlocked_map, mquick, mselected = mergeWithExistingRow(istable(rows) and rows[1] or nil)
 		local unlocked = sql.SQLStr(serializeUnlockedSpells(munlocked_map))
 		local quick = sql.SQLStr(serializeQuickslots(mquick))
 		local q = string.format("INSERT OR REPLACE INTO arcane_players (steamid, xp, level, knowledge_points, unlocked_spells, quickspell_slots, selected_quickslot, last_save) VALUES ('%s', %d, %d, %d, %s, %s, %d, %d);", steamid, mxp, mlevel, mkp, unlocked, quick, mselected, lastsave)
-		local ok = sql.Query(q)
-		if ok == false then
-			dbLogError("SavePlayerDataToSQL failed")
-		end
+		Arcana.SQLCheck(sql.Query(q), "SavePlayerDataToSQL for " .. tostring(ply:SteamID64()))
 	end
 
-	function Arcana:LoadPlayerDataFromSQL(ply, callback)
+	function Arcana.LoadPlayerDataFromSQL(ply, callback)
 		if not IsValid(ply) then return end
 		local handled = Arcana.RunHook("LoadPlayerDataFromSQL", ply, callback)
 		if handled == true then return end
-		if not ensureDatabase() then return nil end
 		local rawSid = ply:SteamID64()
 		Arcana.SaveBlockedBySteamID[rawSid] = true
 
@@ -192,12 +185,12 @@ if SERVER then
 			data.selected_quickslot = tonumber(row.selected_quickslot) or data.selected_quickslot
 			data.last_save = tonumber(row.last_save) or data.last_save
 			-- KP is fully derived from level and spells rather than trusted from storage,
-			-- because it is a spendable value — the formula is the only ground truth.
+			-- because it is a spendable value: the formula is the only ground truth.
 			-- CalculateExpectedKnowledgePoints requires data to be in Arcana.PlayerData which
 			-- it isn't yet at this point, so we call the two constituent helpers directly.
 			data.knowledge_points = math.max(0,
-				Arcana:GetTotalEarnedKnowledgePoints(data.level) -
-				Arcana:GetTotalSpentKnowledgePoints(data.unlocked_spells)
+				Arcana.GetTotalEarnedKnowledgePoints(data.level) -
+				Arcana.GetTotalSpentKnowledgePoints(data.unlocked_spells)
 			)
 			Arcana.SaveBlockedBySteamID[rawSid] = nil
 			Arcana.RetryStateBySteamID[rawSid] = nil
@@ -214,13 +207,22 @@ if SERVER then
 			timer.Create(tname, state.delay, 1, function()
 				if not IsValid(ply) then return end
 				state.delay = math.min((state.delay or 1) * 2, 60)
-				Arcana:LoadPlayerDataFromSQL(ply, callback)
+				Arcana.LoadPlayerDataFromSQL(ply, callback)
 			end)
 		end
 
-		local rows = sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;")
+		-- A missing database is the same situation as a failed read: retry with backoff and
+		-- keep the callback alive. Returning here instead would strand every consumer of
+		-- Arcana_LoadedPlayerData, which is the whole progression, quickslot and spellcraft
+		-- chain, with no error anywhere.
+		if not ensureDatabase() then
+			scheduleRetry()
+			return
+		end
+
+		local rows = Arcana.SQLCheck(sql.Query("SELECT * FROM arcane_players WHERE steamid = '" .. steamid .. "' LIMIT 1;"),
+			"LoadPlayerDataFromSQL for " .. tostring(rawSid))
 		if rows == false then
-			dbLogError("LoadPlayerDataFromSQL failed")
 			scheduleRetry()
 			return
 		end
@@ -230,7 +232,7 @@ if SERVER then
 			Arcana.RetryStateBySteamID[rawSid] = nil
 			local defaults = CreateDefaultPlayerData()
 			callback(true, defaults)
-			Arcana:SavePlayerDataToSQL(ply, defaults)
+			Arcana.SavePlayerDataToSQL(ply, defaults)
 			return
 		end
 
@@ -238,46 +240,46 @@ if SERVER then
 	end
 end
 
-function Arcana:GetPlayerData(ply)
+function Arcana.GetPlayerData(ply)
 	if not IsValid(ply) then return nil end
 	local steamid = ply:SteamID64()
-	if not self.PlayerData[steamid] then
-		self.PlayerData[steamid] = CreateDefaultPlayerData()
+	if not Arcana.PlayerData[steamid] then
+		Arcana.PlayerData[steamid] = CreateDefaultPlayerData()
 	end
-	return self.PlayerData[steamid]
+	return Arcana.PlayerData[steamid]
 end
 
 -- Pass authoritative = true to overwrite the stored spell list rather than union with
--- it. Required whenever spells are *removed* (see Arcana:ForgetSpell); harmful anywhere
+-- it. Required whenever spells are *removed* (see Arcana.ForgetSpell); harmful anywhere
 -- else, because the union is what protects a player's book from a bad in-memory state.
-function Arcana:SavePlayerData(ply, authoritative)
+function Arcana.SavePlayerData(ply, authoritative)
 	if not IsValid(ply) then return end
 	local sid = ply:SteamID64()
 	if Arcana.SaveBlockedBySteamID[sid] then return end
-	local data = self:GetPlayerData(ply)
+	local data = Arcana.GetPlayerData(ply)
 	data.last_save = os.time()
 	if SERVER then
-		self:SavePlayerDataToSQL(ply, data, authoritative)
+		Arcana.SavePlayerDataToSQL(ply, data, authoritative)
 	end
 	Arcana.RunHook("SavedPlayerData", ply, data)
 end
 
 -- Loads player data and, on the server, automatically syncs it to the client.
 -- Callers do not need to call SyncPlayerData separately after loading.
-function Arcana:LoadPlayerData(ply, callback)
+function Arcana.LoadPlayerData(ply, callback)
 	if not IsValid(ply) then return end
 	local steamid = ply:SteamID64()
 	if SERVER then
-		self:LoadPlayerDataFromSQL(ply, function(loaded, data)
-			self.PlayerData[steamid] = data
-			self:SyncPlayerData(ply)
+		Arcana.LoadPlayerDataFromSQL(ply, function(loaded, data)
+			Arcana.PlayerData[steamid] = data
+			Arcana.SyncPlayerData(ply)
 			callback(data)
 		end)
 	else
-		if not self.PlayerData[steamid] then
-			self.PlayerData[steamid] = CreateDefaultPlayerData()
+		if not Arcana.PlayerData[steamid] then
+			Arcana.PlayerData[steamid] = CreateDefaultPlayerData()
 		end
-		callback(self.PlayerData[steamid])
+		callback(Arcana.PlayerData[steamid])
 	end
 end
 
@@ -286,9 +288,9 @@ if SERVER then
 	util.AddNetworkString("Arcana_ErrorNotification")
 	util.AddNetworkString("Arcana_SpellUnlocked")
 
-	function Arcana:SyncPlayerData(ply)
+	function Arcana.SyncPlayerData(ply)
 		if not IsValid(ply) then return end
-		local data = self:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		local payload = {
 			xp = data.xp,
 			level = data.level,
@@ -305,7 +307,7 @@ if SERVER then
 		Arcana.RunHook("SyncPlayerData", ply, data)
 	end
 
-	function Arcana:SendErrorNotification(ply, msg)
+	function Arcana.SendErrorNotification(ply, msg)
 		if not IsValid(ply) then return end
 		net.Start("Arcana_ErrorNotification")
 		net.WriteString(msg)
@@ -313,12 +315,12 @@ if SERVER then
 	end
 
 end
--- Player lifecycle hooks (load on SetupMove, save on disconnect) are in arcana/lifecycle.lua
+-- Player lifecycle hooks (load on SetupMove, save on disconnect) are in system/lifecycle.lua
 
 if CLIENT then
 	net.Receive("Arcana_ErrorNotification", function()
 		local msg = net.ReadString()
-		Arcana:Print(msg)
+		Arcana.Print(msg)
 		notification.AddLegacy(msg, NOTIFY_ERROR, 5)
 	end)
 
@@ -327,7 +329,7 @@ if CLIENT then
 		if not payload then return end
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return end
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return end
 		data.xp = tonumber(payload.xp) or data.xp
 		data.level = tonumber(payload.level) or data.level

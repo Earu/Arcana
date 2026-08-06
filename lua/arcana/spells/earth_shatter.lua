@@ -1,7 +1,7 @@
 if SERVER then util.AddNetworkString("Arcana_EarthShatter_VFX") end
 
 -- Earth Shatter: Smash the ground to send a devastating seismic shockwave
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "earth_shatter",
 	name = "Earth Shatter",
 	description = "Smash the ground, fracturing earth in a wide radius and hurling foes away.",
@@ -116,7 +116,7 @@ Arcana:RegisterSpell({
 			if not IsValid(ent) then continue end
 			if ent == srcEnt then continue end
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			local to = ent:WorldSpaceCenter() - pos
 			local dist = to:Length()
 			local dir = dist > 0 and (to / dist) or Vector(0, 0, 0)
@@ -155,7 +155,6 @@ if CLIENT then
 	-- Expanding earthy rings + dust/debris
 	local matGlow = Material("sprites/light_glow02_add")
 	local matRing = Material("effects/select_ring")
-	local matBeam = Material("sprites/physbeam")
 	local bursts = {}
 
 	local function addBurst(pos, radius, life)
@@ -238,37 +237,6 @@ if CLIENT then
 
 	-- Lingering area dust: several short waves of broad smoke across the radius
 	timer.Simple(0, function() end) -- ensure timers can be scheduled safely within receive
-
-	local function spawnAreaDust(pos, radius, waves)
-		for w = 1, waves do
-			timer.Simple(0.06 * w, function()
-				local em = ParticleEmitter(pos)
-
-				if not em then return end
-
-				for i = 1, 36 do
-					local r = math.Rand(radius * 0.2, radius)
-					local a = math.Rand(0, math.pi * 2)
-					local p = pos + Vector(math.cos(a) * r, math.sin(a) * r, math.Rand(0, 12))
-					local d = em:Add("particle/particle_smokegrenade", p)
-
-					if d then
-						d:SetVelocity(VectorRand() * 70 + Vector(0, 0, math.Rand(60, 120)))
-						d:SetDieTime(math.Rand(1.2, 2.0))
-						d:SetStartAlpha(140)
-						d:SetEndAlpha(0)
-						d:SetStartSize(math.Rand(18, 30))
-						d:SetEndSize(math.Rand(60, 100))
-						d:SetColor(120, 110, 100)
-						d:SetAirResistance(80)
-						d:SetCollide(false)
-					end
-				end
-
-				em:Finish()
-			end)
-		end
-	end
 
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_EarthShatter_Render", function(bDrawingDepth, isSkybox)
 		if bDrawingDepth or isSkybox then return end

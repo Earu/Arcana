@@ -101,7 +101,7 @@ if SERVER then
 
 		self._lastNotice = message
 		self._lastNoticeAt = now
-		Arcana:SendErrorNotification(owner, "Spell Caster: " .. message)
+		Arcana.SendErrorNotification(owner, "Spell Caster: " .. message)
 	end
 
 	function ENT:GetEntityCooldown(spellId)
@@ -138,7 +138,7 @@ if SERVER then
 			return false, "Spell on cooldown (" .. spellId .. ")"
 		end
 
-		local data = Arcana:GetPlayerData(owner)
+		local data = Arcana.GetPlayerData(owner)
 
 		-- Check if owner has spell unlocked
 		if not data.unlocked_spells[spellId] then
@@ -147,7 +147,7 @@ if SERVER then
 
 		-- Check if owner can afford the spell (we'll consume resources later)
 		if spell.cost_type == Arcana.COST_TYPES.COINS then
-			local canPayWithCoins = Arcana:GetCoins(owner) >= spell.cost_amount
+			local canPayWithCoins = Arcana.GetCoins(owner) >= spell.cost_amount
 			if not canPayWithCoins and owner:Health() < spell.cost_amount then
 				return false, "Owner cannot afford " .. string.Comma(spell.cost_amount) .. " coins"
 			end
@@ -283,15 +283,15 @@ if SERVER then
 			return
 		end
 
-		local data = Arcana:GetPlayerData(owner)
+		local data = Arcana.GetPlayerData(owner)
 		local takeDamageInfo = owner.ForceTakeDamageInfo or owner.TakeDamageInfo
 
 		-- Apply costs to owner
 		if spell.cost_type == Arcana.COST_TYPES.COINS then
-			local canPayWithCoins = Arcana:GetCoins(owner) >= spell.cost_amount
+			local canPayWithCoins = Arcana.GetCoins(owner) >= spell.cost_amount
 
 			if canPayWithCoins then
-				Arcana:TakeCoins(owner, spell.cost_amount, "Spell Caster: " .. spell.name)
+				Arcana.TakeCoins(owner, spell.cost_amount, "Spell Caster: " .. spell.name)
 			else
 				-- Fallback: pay with health
 				local dmg = DamageInfo()
@@ -485,7 +485,7 @@ if CLIENT then
 		if not IsValid(owner) then owner = caster:GetNWEntity("FallbackOwner") end
 		if not IsValid(owner) then return end
 		if owner ~= ply then
-			Arcana:Print("❌ You don't own this Spell Caster")
+			Arcana.Print("❌ You don't own this Spell Caster")
 			return
 		end
 
@@ -616,23 +616,11 @@ if CLIENT then
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
 
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip:NoClipping(true)
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(scroll)
 
 		local function rebuild()
 			scroll:Clear()
-			local data = Arcana:GetPlayerData(ply)
+			local data = Arcana.GetPlayerData(ply)
 			if not data then return end
 
 			local unlocked = {}
@@ -675,7 +663,7 @@ if CLIENT then
 					draw.SimpleText(sp.name, "Arcana_AncientLarge", 12, 8, ArtDeco.Colors.textBright)
 
 					-- Cost info
-					local ca = tonumber(sp.cost_amount or 0) or 0
+					local ca = tonumber(sp.cost_amount) or 0
 					local ct = tostring(sp.cost_type or "")
 					if ct == Arcana.COST_TYPES.COINS then
 						ArtDeco.DrawCostLine("Arcana_AncientSmall", 12, 32, {

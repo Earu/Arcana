@@ -1,4 +1,4 @@
--- Golden transmutation burst — the flash, sparks and dust as matter turns to
+-- Golden transmutation burst: the flash, sparks and dust as matter turns to
 -- gold under the Midas curse. Dispatched from arcana/status/midas.lua via
 -- util.Effect("arcana_midas_gold", ed) with the origin and a size scale.
 

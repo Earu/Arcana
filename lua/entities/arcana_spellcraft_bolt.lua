@@ -57,7 +57,7 @@ if SERVER then
 		if dress.trail then
 			util.SpriteTrail(self, 0, Color(col.r, col.g, col.b, 220), true, 16, 2, 0.45, 1 / 128, dress.trail)
 		end
-		if Arcana and Arcana.Common and Arcana.Common.AddEntitySprite then
+		if Arcana.Common and Arcana.Common.AddEntitySprite then
 			for i, spr in ipairs(dress.sprites) do
 				Arcana.Common.AddEntitySprite(self, spr[1], col, spr[2], "ArcanaSB_S" .. i)
 			end
@@ -103,11 +103,11 @@ if SERVER then
 	end
 
 	local function isSolidNonTrigger(ent)
-		return Arcana and Arcana.Common and Arcana.Common.IsSolidNonTrigger(ent)
+		return Arcana.Common and Arcana.Common.IsSolidNonTrigger(ent)
 	end
 
 	local function isActorEnt(ent)
-		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+		return IsValid(ent) and Arcana.Common.IsActor(ent)
 	end
 
 	-- The caster and the machine that fired the bolt are both off limits: a
@@ -178,7 +178,7 @@ if SERVER then
 				dmg:SetAttacker(caster)
 				dmg:SetInflictor(self)
 				dmg:SetDamagePosition(ent:WorldSpaceCenter())
-				Arcana:TakeDamageInfo(ent, dmg)
+				Arcana.TakeDamageInfo(ent, dmg)
 				Arcana.Spellcraft.ApplyEssenceHit(caster, ent, self:GetPos(), sc)
 				Arcana.Spellcraft.ImpactFX(self:GetElement(), self:GetPos(), 60, 0.4)
 			end
@@ -204,7 +204,7 @@ if SERVER then
 
 		-- All detonation visuals/sounds come from the element ImpactFX,
 		-- fired by the runtime's AreaEssence.
-		if Arcana and Arcana.Spellcraft and Arcana.Spellcraft.OnBoltDetonate then
+		if Arcana.Spellcraft and Arcana.Spellcraft.OnBoltDetonate then
 			Arcana.Spellcraft.OnBoltDetonate(self, self:GetPos())
 		end
 

@@ -1,4 +1,4 @@
--- Quickslot Network — Server-side handlers for player quickslot assignment
+-- Quickslot Network: Server-side handlers for player quickslot assignment
 -- and selection, with debounced SQL saves to prevent write spam.
 -- Extracted from core.lua to isolate the quickslot networking concern.
 
@@ -18,8 +18,8 @@ if SERVER then
 			return
 		end
 		lastQuickslotSave[sid] = now
-		Arcana:SavePlayerData(ply)
-		Arcana:SyncPlayerData(ply)
+		Arcana.SavePlayerData(ply)
+		Arcana.SyncPlayerData(ply)
 	end
 
 	hook.Add("PlayerDisconnected", "Arcana_ClearQuickslotDebounce", function(ply)
@@ -30,7 +30,7 @@ if SERVER then
 	net.Receive("Arcana_SetQuickslot", function(_, ply)
 		local slotIndex = math.Clamp(net.ReadUInt(4), 1, 8)
 		local spellId = net.ReadString()
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return end
 		if not Arcana.RegisteredSpells[spellId] then return end
 		if not data.unlocked_spells[spellId] then return end
@@ -41,7 +41,7 @@ if SERVER then
 	-- Select the active quickslot
 	net.Receive("Arcana_SetSelectedQuickslot", function(_, ply)
 		local slotIndex = math.Clamp(net.ReadUInt(4), 1, 8)
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return end
 		data.selected_quickslot = slotIndex
 		debouncedQuickslotSave(ply)

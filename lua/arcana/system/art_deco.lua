@@ -204,6 +204,146 @@ if CLIENT then
 	end
 
 	-- ===========================================================================
+	-- FRAME CHROME
+	-- ===========================================================================
+
+	--- Makes a DFrame draggable by its whole header band rather than the stock strip,
+	-- which is only a few pixels tall and hard to grab.
+	-- The frame is clamped on screen while dragging, and the cursor signals the band
+	-- on hover as well as during the drag.
+	-- @param frame DFrame to make draggable
+	-- @param bandHeight Height of the grabbable band from the frame top (default: 44)
+	function ArtDeco.MakeDraggableByBand(frame, bandHeight)
+		local band = bandHeight or 44
+
+		frame:SetDraggable(false)
+
+		frame.OnMousePressed = function(pnl, code)
+			if code ~= MOUSE_LEFT then return end
+
+			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			if my <= band then
+				pnl._dragOffset = {mx, my}
+				pnl:MouseCapture(true)
+				pnl:SetCursor("sizeall")
+			end
+		end
+
+		frame.OnMouseReleased = function(pnl)
+			pnl._dragOffset = nil
+			pnl:MouseCapture(false)
+
+			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			pnl:SetCursor(my <= band and "sizeall" or "arrow")
+		end
+
+		frame.OnCursorMoved = function(pnl)
+			if pnl._dragOffset then
+				local mx, my = gui.MousePos()
+				pnl:SetPos(
+					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
+					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
+
+				return
+			end
+
+			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
+			pnl:SetCursor(my <= band and "sizeall" or "arrow")
+		end
+	end
+
+	-- ===========================================================================
+	-- SCROLLBAR
+	-- ===========================================================================
+
+	--- Applies the deco scrollbar look to a DScrollPanel's vertical bar.
+	-- The grip gets NoClipping so it can paint over the track's clipped corners
+	-- instead of being cut off by them.
+	-- @param scroll DScrollPanel (or anything with GetVBar)
+	-- @param width Bar width in pixels (default: 8)
+	-- @return the styled DVScrollBar, for callers that hide it when it is not needed
+	function ArtDeco.StyleScrollBar(scroll, width)
+		local vbar = scroll:GetVBar()
+		if not IsValid(vbar) then return nil end
+
+		vbar:SetWide(math.max(1, math.floor(width or 8)))
+
+		vbar.Paint = function(_, w, h)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
+		end
+
+		vbar.btnGrip:NoClipping(true)
+		vbar.btnGrip.Paint = function(_, w, h)
+			surface.SetDrawColor(ArtDeco.Colors.gold)
+			surface.DrawRect(0, 0, w, h)
+		end
+
+		return vbar
+	end
+
+	-- ===========================================================================
+	-- OCTAGON CLIP (STENCIL)
+	-- ===========================================================================
+
+	-- One shared table, rewritten in place. These points are handed straight to
+	-- surface.DrawPoly and never retained, so there is no reason to allocate eight
+	-- tables per panel per frame.
+	local OCTAGON_POINTS = {}
+	for i = 1, 8 do OCTAGON_POINTS[i] = {x = 0, y = 0} end
+
+	--- Returns the shared 8-point deco octagon, rewritten for these bounds.
+	-- The result is only valid until the next call; do not hold onto it.
+	-- @param corner Corner clip size (default: 12), matching DrawDecoFrame
+	function ArtDeco.OctagonPoints(x, y, w, h, corner)
+		local c = math.max(8, corner or 12)
+		local p = OCTAGON_POINTS
+		p[1].x, p[1].y = x + c, y
+		p[2].x, p[2].y = x + w - c, y
+		p[3].x, p[3].y = x + w, y + c
+		p[4].x, p[4].y = x + w, y + h - c
+		p[5].x, p[5].y = x + w - c, y + h
+		p[6].x, p[6].y = x + c, y + h
+		p[7].x, p[7].y = x, y + h - c
+		p[8].x, p[8].y = x, y + c
+
+		return p
+	end
+
+	--- Clips everything drawn until EndOctagonClip to the deco octagon.
+	-- The octagon is stamped into the stencil buffer rather than drawn, so panel
+	-- backgrounds can bleed to the edges without escaping the frame silhouette.
+	-- Always pair with ArtDeco.EndOctagonClip(); leaving the stencil enabled breaks
+	-- every panel drawn after this one.
+	-- @param corner Corner clip size (default: 12), matching DrawDecoFrame
+	function ArtDeco.BeginOctagonClip(x, y, w, h, corner)
+		local pts = ArtDeco.OctagonPoints(x, y, w, h, corner)
+
+		render.ClearStencil()
+		render.SetStencilEnable(true)
+		render.SetStencilWriteMask(0xFF)
+		render.SetStencilTestMask(0xFF)
+		render.SetStencilReferenceValue(1)
+		render.SetStencilCompareFunction(STENCIL_NEVER)
+		render.SetStencilFailOperation(STENCIL_REPLACE)
+		render.SetStencilPassOperation(STENCIL_KEEP)
+		render.SetStencilZFailOperation(STENCIL_KEEP)
+
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, 255)
+		surface.DrawPoly(pts)
+
+		render.SetStencilCompareFunction(STENCIL_EQUAL)
+		render.SetStencilFailOperation(STENCIL_KEEP)
+		render.SetStencilPassOperation(STENCIL_REPLACE)
+	end
+
+	--- Ends the clip opened by ArtDeco.BeginOctagonClip.
+	function ArtDeco.EndOctagonClip()
+		render.SetStencilEnable(false)
+	end
+
+	-- ===========================================================================
 	-- POLYGON HELPERS
 	-- ===========================================================================
 
@@ -812,7 +952,7 @@ if CLIENT then
 			surface.SetDrawColor(ArtDeco.Colors.paleGold)
 
 			-- Circle outline. DrawLine lights the pixel right/below its coordinate, so a
-			-- circle drawn about (cx, cy) rasterizes half a pixel down-right of it — which
+			-- circle drawn about (cx, cy) rasterizes half a pixel down-right of it, which
 			-- is what threw the glyph off center. Drawing it about (cx, cy) - 0.5 lands its
 			-- ink symmetric about (cx, cy), where the glyph below already is.
 			local segments = 16
@@ -923,7 +1063,7 @@ if CLIENT then
 	-- far from the geometry (the RPG's is 20 units out, most of its own radius), so a bare
 	-- SetAngles swings the model in an arc around the camera's look-at point. Offsetting
 	-- the entity by its rotated bounds center pins that center on the world origin, where
-	-- ArtDeco.FitModelPanel aims the camera — the model turns in place.
+	-- ArtDeco.FitModelPanel aims the camera, the model turns in place.
 	-- @param ent Model panel entity
 	-- @param ang Angle to spin to
 	function ArtDeco.SpinModelPanelEntity(ent, ang)
@@ -939,8 +1079,8 @@ if CLIENT then
 	end
 
 	--- Frames a model panel's camera on a model pinned at the origin by SpinModelPanelEntity.
-	-- The framing radius is yaw-invariant — the model's XY diagonal, or its height, whichever
-	-- is larger — so a long weapon keeps a constant size and never clips the panel as it turns.
+	-- The framing radius is yaw-invariant: the model's XY diagonal, or its height, whichever
+	-- is larger: so a long weapon keeps a constant size and never clips the panel as it turns.
 	-- @param panel The DModelPanel
 	-- @param fov Camera FOV (default 30)
 	-- @param dir Direction the camera sits in, from the model (default 1, 1, 0.5)

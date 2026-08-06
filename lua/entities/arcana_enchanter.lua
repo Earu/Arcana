@@ -21,6 +21,7 @@ if SERVER then
 	util.AddNetworkString("Arcana_Enchanter_Withdraw")
 	util.AddNetworkString("Arcana_Enchanter_ApplyBatch")
 	util.AddNetworkString("Arcana_Enchanter_ParticleBurst")
+	util.AddNetworkString("Arcana_Enchanter_ManaFlow")
 
 	resource.AddFile("materials/entities/arcana_enchanter.png")
 
@@ -51,11 +52,6 @@ if SERVER then
 		self._receivingUntil = 0
 		self:SetNWBool("Arcana_ReceivingMana", false)
 
-		-- Register into ManaNetwork as a consumer
-		local Arcana = _G.Arcana or {}
-		if Arcana.ManaNetwork and Arcana.ManaNetwork.RegisterConsumer then
-			Arcana.ManaNetwork:RegisterConsumer(self, {range = 700})
-		end
 	end
 
 	function ENT:SpawnFunction(ply, tr, classname)
@@ -108,7 +104,7 @@ if SERVER then
 
 		-- Capture existing enchantments on player's weapon
 		local transferIds = {}
-		local map = Arcana:GetEntityEnchantments(orig)
+		local map = Arcana.GetEntityEnchantments(orig)
 		for id, _ in pairs(map or {}) do
 			transferIds[#transferIds + 1] = id
 		end
@@ -144,7 +140,7 @@ if SERVER then
 
 		-- Re-apply enchantments to new entity and sync
 		for _, id in ipairs(transferIds) do
-			Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
+			Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, id, true)
 		end
 
 		Arcana.SyncWeaponEnchantNW(wep)
@@ -221,7 +217,7 @@ if SERVER then
 				if IsValid(newWep) then
 					local ids = ent._containedEnchantIds or {}
 				for _, id in ipairs(ids) do
-					Arcana:ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
+					Arcana.ApplyEnchantmentToWeaponEntity(ply, newWep, id, true)
 				end
 
 			Arcana.SyncWeaponEnchantNW(newWep)
@@ -247,15 +243,15 @@ if SERVER then
 
 		local wep = ent:GetContainedWeapon()
 		if not IsValid(wep) then
-			if Arcana and Arcana.SendErrorNotification then
-				Arcana:SendErrorNotification(ply, "Deposit a weapon first")
+			if Arcana.SendErrorNotification then
+				Arcana.SendErrorNotification(ply, "Deposit a weapon first")
 			end
 
 			return
 		end
 
 		-- Collect unique enchantments, drop duplicates or ones already present
-		local targetCurrent = Arcana and Arcana.GetEntityEnchantments and Arcana:GetEntityEnchantments(wep) or {}
+		local targetCurrent = Arcana.GetEntityEnchantments and Arcana.GetEntityEnchantments(wep) or {}
 		local selected = {}
 		for _, id in ipairs(list) do
 			if not targetCurrent[id] then
@@ -287,7 +283,7 @@ if SERVER then
 		-- Validate applicability and aggregate costs
 		local enchs = {}
 		for _, id in ipairs(idsOrdered) do
-			local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
+			local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 
 			if e then
 				table.insert(enchs, {
@@ -302,9 +298,9 @@ if SERVER then
 				local callOk, allowed, reason = pcall(it.ench.can_apply, ply, wep)
 
 				if not callOk or allowed == false then
-					if Arcana and Arcana.SendErrorNotification then
+					if Arcana.SendErrorNotification then
 						local msg = callOk and tostring(reason or "weapon not eligible") or tostring(allowed)
-						Arcana:SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. msg)
+						Arcana.SendErrorNotification(ply, "Cannot apply '" .. tostring(it.id) .. "': " .. msg)
 					end
 
 					return
@@ -315,11 +311,11 @@ if SERVER then
 		local sumCoins = 0
 		local itemTotals = {}
 		for _, it in ipairs(enchs) do
-			sumCoins = sumCoins + (tonumber(it.ench.cost_coins or 0) or 0)
+			sumCoins = sumCoins + (tonumber(it.ench.cost_coins) or 0)
 
 			for _, it2 in ipairs(it.ench.cost_items or {}) do
 				local name = tostring(it2.name or "")
-				local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+				local amt = math.max(1, math.floor(tonumber(it2.amount) or 1))
 
 				if name ~= "" then
 					itemTotals[name] = (itemTotals[name] or 0) + amt
@@ -327,21 +323,21 @@ if SERVER then
 			end
 		end
 
-		local coins = Arcana:GetCoins(ply)
+		local coins = Arcana.GetCoins(ply)
 		if coins < sumCoins then
-			if Arcana and Arcana.SendErrorNotification then
-				Arcana:SendErrorNotification(ply, "Insufficient coins")
+			if Arcana.SendErrorNotification then
+				Arcana.SendErrorNotification(ply, "Insufficient coins")
 			end
 
 			return
 		end
 
 		for name, amt in pairs(itemTotals) do
-			local have = Arcana:GetItemCount(ply, name)
+			local have = Arcana.GetItemCount(ply, name)
 
 			if have < amt then
-				if Arcana and Arcana.SendErrorNotification then
-					Arcana:SendErrorNotification(ply, "Missing item: " .. tostring(name))
+				if Arcana.SendErrorNotification then
+					Arcana.SendErrorNotification(ply, "Missing item: " .. tostring(name))
 				end
 
 				return
@@ -351,17 +347,17 @@ if SERVER then
 
 		-- Deduct currency/items up front
 		if sumCoins > 0 then
-			Arcana:TakeCoins(ply, sumCoins)
+			Arcana.TakeCoins(ply, sumCoins)
 		end
 		for name, amt in pairs(itemTotals) do
-			Arcana:TakeItem(ply, name, amt)
+			Arcana.TakeItem(ply, name, amt)
 		end
 
 		local chance = ent:ComputeSuccessChance(ply)
 		local successes = 0
 		for _, it in ipairs(enchs) do
 			if math.Rand(0, 1) <= chance then
-				Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
+				Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, it.id)
 				successes = successes + 1
 			end
 		end
@@ -374,7 +370,7 @@ if SERVER then
 
 		-- Refresh stored enchantment IDs snapshot on the contained weapon
 		if IsValid(wep) then
-			local cur = Arcana:GetEntityEnchantments(wep)
+			local cur = Arcana.GetEntityEnchantments(wep)
 			local arr = {}
 			for id, _ in pairs(cur or {}) do arr[#arr + 1] = id end
 			ent._containedEnchantIds = arr
@@ -411,6 +407,8 @@ if SERVER then
 			local ang = Angle(base.p + sp.p * t, base.y + sp.y * t, base.r + sp.r * t)
 			wep:SetLocalAngles(ang)
 		end
+
+		self:_PulseMana()
 
 		-- Decay the receiving flag so success falls back to 5%
 		if (self._receivingUntil or 0) > 0 and CurTime() > (self._receivingUntil or 0) then
@@ -583,6 +581,159 @@ if CLIENT then
 		emitter:Finish()
 	end)
 
+	-- Mana flow visual: glyphs streaming from each feeding crystal into the bench along a
+	-- bezier arc. Driven by ENT:_PulseMana on the server.
+	local glyphParticles = {}
+
+	local GLYPH_PHRASES = {
+		"ABRAXAS DIVINE WISDOM LIGHT LIFE TRUTH COSMOS SOUL SPIRIT",
+		"BEGINNING AND END BEGINNING AND END BEGINNING AND END",
+		"BY THE ORDAINED COMMAND OF THE LORD SPIRIT AND SCRIPTURE",
+		"THE WRATH OF THE SON OF PELEUS SING O MUSE",
+		"IN THE HALLS OF CHAOS THE POWER IS ETERNAL",
+		"THE SONS OF ATREUS SENT FORTH BY THE GODS",
+		"THE SHINING TROJANS STOOD FAST IN GLORY",
+	}
+
+	local FLOW_UP = Vector(0, 0, 1)
+	local FLOW_RIGHT = Vector(1, 0, 0)
+	local FLOW_ZERO = Vector(0, 0, 0)
+	local FLOW_WHITE = Color(255, 255, 255)
+
+	local function glyphCharAt(idx)
+		local phrase = GLYPH_PHRASES[(idx % #GLYPH_PHRASES) + 1]
+		local len = (utf8 and utf8.len and utf8.len(phrase)) or #phrase
+		if len < 1 then return "*" end
+
+		local i = (idx % len) + 1
+		if utf8 and utf8.sub then return utf8.sub(phrase, i, i) end
+
+		return string.sub(phrase, i, i)
+	end
+
+	local function billboardAnglesAt(pos)
+		local ang = (EyePos() - pos):Angle()
+		ang:RotateAroundAxis(ang:Right(), -90)
+		ang:RotateAroundAxis(ang:Up(), 90)
+
+		return ang
+	end
+
+	local function randomPointOnOBBSurface(ent)
+		if not IsValid(ent) then return Vector(0, 0, 0) end
+
+		local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+		local axis = math.random(1, 3)
+		local pos = FLOW_ZERO
+		if axis == 1 then
+			pos.x = (math.random(0, 1) == 1) and maxs.x or mins.x
+			pos.y = math.Rand(mins.y, maxs.y)
+			pos.z = math.Rand(mins.z, maxs.z)
+		elseif axis == 2 then
+			pos.y = (math.random(0, 1) == 1) and maxs.y or mins.y
+			pos.x = math.Rand(mins.x, maxs.x)
+			pos.z = math.Rand(mins.z, maxs.z)
+		else
+			pos.z = (math.random(0, 1) == 1) and maxs.z or mins.z
+			pos.x = math.Rand(mins.x, maxs.x)
+			pos.y = math.Rand(mins.y, maxs.y)
+		end
+
+		return ent:LocalToWorld(pos)
+	end
+
+	local function bezierPoint(a, b, c, t)
+		local u = 1 - t
+
+		return a * (u * u) + b * (2 * u * t) + c * (t * t)
+	end
+
+	net.Receive("Arcana_Enchanter_ManaFlow", function()
+		local toEnt = net.ReadEntity()
+		local count = net.ReadUInt(8)
+		if not IsValid(toEnt) then return end
+
+		local now = CurTime()
+		for _ = 1, count do
+			local fromEnt = net.ReadEntity()
+			if IsValid(fromEnt) then
+				local fromPos = randomPointOnOBBSurface(fromEnt)
+				local toPos = toEnt:WorldSpaceCenter()
+				local dir = (toPos - fromPos)
+				local dist = dir:Length()
+
+				if dist > 2 then
+					dir:Normalize()
+
+					local right = dir:Cross(FLOW_UP)
+					if right:LengthSqr() < 0.01 then right = FLOW_RIGHT end
+					right:Normalize()
+
+					local mid = (fromPos + toPos) * 0.5
+					local curveAmt = math.Clamp(dist * 0.25, 20, 160)
+					local ctrl = mid + right * math.Rand(-curveAmt, curveAmt)
+					local baseColor = fromEnt:GetColor() or FLOW_WHITE
+					local countGlyphs = math.Clamp(math.floor(8 + dist * 0.02), 5, 50)
+
+					for gi = 1, countGlyphs do
+						local speed = math.Rand(120, 220)
+						glyphParticles[#glyphParticles + 1] = {
+							startPos = fromPos,
+							ctrlPos = ctrl,
+							endPos = toPos,
+							startTime = now + math.Rand(0, 0.7),
+							duration = dist / speed,
+							char = glyphCharAt(gi + math.floor(now * 13)),
+							baseColor = Color(baseColor.r, baseColor.g, baseColor.b, 255),
+							size = math.Rand(10, 16),
+						}
+					end
+				end
+			end
+		end
+	end)
+
+	local MAX_FLOW_RENDER_DIST = 2000 * 2000
+	hook.Add("PostDrawOpaqueRenderables", "Arcana_Enchanter_ManaFlowDraw", function(bDrawingDepth)
+		if bDrawingDepth then return end
+
+		local eye = EyePos()
+		local now = CurTime()
+		local write = 1
+		for i = 1, #glyphParticles do
+			local p = glyphParticles[i]
+			local startT = p.startTime or 0
+			local endT = startT + (p.duration or 0)
+
+			if now >= startT and now <= endT then
+				local u = math.Clamp((now - startT) / math.max(0.001, p.duration), 0, 1)
+				local pos = bezierPoint(p.startPos, p.ctrlPos, p.endPos, u)
+
+				if eye:DistToSqr(pos) <= MAX_FLOW_RENDER_DIST then
+					local br = Lerp(u, p.baseColor.r, 255)
+					local bg = Lerp(u, p.baseColor.g, 255)
+					local bb = Lerp(u, p.baseColor.b, 255)
+					local alpha = math.floor(220 * (1 - 0.15 * u))
+					local ang = billboardAnglesAt(pos)
+
+					cam.Start3D2D(pos, ang, 0.08)
+						surface.SetFont("MagicCircle_Medium")
+						surface.SetTextColor(br, bg, bb, alpha)
+						surface.SetTextPos(0, 0)
+						surface.DrawText(p.char or "*")
+					cam.End3D2D()
+				end
+			end
+
+			if now <= endT + 0.05 then
+				glyphParticles[write] = p
+				write = write + 1
+			end
+		end
+
+		for i = write, #glyphParticles do glyphParticles[i] = nil end
+	end)
+
 	local BandCircle    = Arcana.Circle.BandCircle
 	local RING_TYPES    = Arcana.Circle.RING_TYPES
 	local Draw2DRing    = Arcana.Circle.Draw2DRing
@@ -656,7 +807,7 @@ if CLIENT then
 	end
 
 	local function getEnchantmentsList()
-		return Arcana and Arcana.RegisteredEnchantments or {}
+		return Arcana.RegisteredEnchantments or {}
 	end
 
 	local HL2_MODELS = {
@@ -806,42 +957,15 @@ if CLIENT then
 	end
 
 	-- Themed background, in the family of the other stations: dark brass
-	-- plate with concentric rings radiating out from the magic circle —
-	-- the enchantment rippling through the bench — and faint runes sinking
+	-- plate with concentric rings radiating out from the magic circle,
+	-- the enchantment rippling through the bench: and faint runes sinking
 	-- slowly down into the weapon.
 	local function drawEnchanterBackground(w, h, seed)
 		-- Clip everything to the art-deco octagon using the stencil buffer.
 		local x, y = 6, 6
 		local ww, hh = w - 12, h - 12
 		local corner = 14
-		local pts = {
-			{x = x + corner, y = y},
-			{x = x + ww - corner, y = y},
-			{x = x + ww, y = y + corner},
-			{x = x + ww, y = y + hh - corner},
-			{x = x + ww - corner, y = y + hh},
-			{x = x + corner, y = y + hh},
-			{x = x, y = y + hh - corner},
-			{x = x, y = y + corner},
-		}
-
-		render.ClearStencil()
-		render.SetStencilEnable(true)
-		render.SetStencilWriteMask(0xFF)
-		render.SetStencilTestMask(0xFF)
-		render.SetStencilReferenceValue(1)
-		render.SetStencilCompareFunction(STENCIL_NEVER)
-		render.SetStencilFailOperation(STENCIL_REPLACE)
-		render.SetStencilPassOperation(STENCIL_KEEP)
-		render.SetStencilZFailOperation(STENCIL_KEEP)
-
-		draw.NoTexture()
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawPoly(pts)
-
-		render.SetStencilCompareFunction(STENCIL_EQUAL)
-		render.SetStencilFailOperation(STENCIL_KEEP)
-		render.SetStencilPassOperation(STENCIL_REPLACE)
+		ArtDeco.BeginOctagonClip(x, y, ww, hh, corner)
 
 		-- Dark brass base, translucent enough for the blur to breathe through.
 		surface.SetDrawColor(30, 23, 13, 205)
@@ -884,7 +1008,7 @@ if CLIENT then
 		-- caller this frame (world VFX included) repeat the same sequence
 		math.randomseed(SysTime())
 
-		render.SetStencilEnable(false)
+		ArtDeco.EndOctagonClip()
 	end
 
 	local function OpenEnchanterMenu(machine)
@@ -897,37 +1021,7 @@ if CLIENT then
 		frame:MakePopup()
 		local bgSeed = math.random(1, 10 ^ 9)
 
-		-- Draggable by the whole header band (the stock strip is too thin).
-		-- The cursor signals the band on hover and the drag while it lasts.
-		frame:SetDraggable(false)
-		frame.OnMousePressed = function(pnl, code)
-			if code ~= MOUSE_LEFT then return end
-			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			if my <= 44 then
-				pnl._dragOffset = {mx, my}
-				pnl:MouseCapture(true)
-				pnl:SetCursor("sizeall")
-			end
-		end
-		frame.OnMouseReleased = function(pnl)
-			pnl._dragOffset = nil
-			pnl:MouseCapture(false)
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
-		frame.OnCursorMoved = function(pnl)
-			if pnl._dragOffset then
-				local mx, my = gui.MousePos()
-				pnl:SetPos(
-					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
-					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
-
-				return
-			end
-
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
+		ArtDeco.MakeDraggableByBand(frame, 44)
 
 		-- Screen-space blur behind frame (like grimoire)
 		hook.Add("HUDPaint", frame, function()
@@ -971,12 +1065,12 @@ if CLIENT then
 			needCoins, needShards = 0, 0
 			for id, on in pairs(selected) do
 				if on then
-					local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
+					local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 					if e then
-						needCoins = needCoins + (tonumber(e.cost_coins or 0) or 0)
+						needCoins = needCoins + (tonumber(e.cost_coins) or 0)
 						for _, it in ipairs(e.cost_items or {}) do
 							local name = tostring(it.name or "")
-							local amt = math.max(1, math.floor(tonumber(it.amount or 1) or 1))
+							local amt = math.max(1, math.floor(tonumber(it.amount) or 1))
 							if name == "mana_crystal_shard" then
 								needShards = needShards + amt
 							end
@@ -1031,8 +1125,8 @@ if CLIENT then
 			-- name, have / need, each line in its own color.
 			local infoY = cy + radius + 36
 			if needCoins > 0 or needShards > 0 then
-				local haveCoins = Arcana:GetCoins(ply)
-				local haveShards = Arcana:GetItemCount(ply, "mana_crystal_shard")
+				local haveCoins = Arcana.GetCoins(ply)
+				local haveShards = Arcana.GetItemCount(ply, "mana_crystal_shard")
 				ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, {
 					{text = string.Comma(haveCoins) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
 				}, TEXT_ALIGN_CENTER)
@@ -1075,7 +1169,7 @@ if CLIENT then
 			-- Count 0 (a plain weapon, or one whose enchantments were just stripped)
 			-- draws nothing and releases the bands, so this needs no guard
 			local col = (LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or _circleCol
-			Arcana:RenderEnchantBandsForEntity(ent, self._enchantCount or 0, col, self._bandStyle or "axis", {isMelee = self._bandIsMelee})
+			Arcana.RenderEnchantBandsForEntity(ent, self._enchantCount or 0, col, self._bandStyle or "axis", {isMelee = self._bandIsMelee})
 		end
 
 		local nameLabel = vgui.Create("DLabel", left)
@@ -1236,7 +1330,7 @@ if CLIENT then
 			modelPanel:SetModel(model)
 			nameLabel:SetText(nice)
 			ArtDeco.FitModelPanel(modelPanel, PREVIEW_FOV, nil, modelPanel._fitPadding)
-			modelPanel._bandStyle, modelPanel._bandIsMelee = Arcana:GetEnchantBandPreviewInfo(cls)
+			modelPanel._bandStyle, modelPanel._bandIsMelee = Arcana.GetEnchantBandPreviewInfo(cls)
 		end
 
 		-- Position the model and name inside left panel (centered in the circle)
@@ -1303,18 +1397,7 @@ if CLIENT then
 		local scroll = vgui.Create("DScrollPanel", right)
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(scroll)
 
 		rebuild = function()
 			scroll:Clear()
@@ -1414,14 +1497,14 @@ if CLIENT then
 
 					-- Cost amounts with currency icons under the name
 					local costSegs = {}
-					local coinAmt = tonumber(ench.cost_coins or 0) or 0
+					local coinAmt = tonumber(ench.cost_coins) or 0
 					if coinAmt > 0 then
 						costSegs[#costSegs + 1] = {text = string.Comma(coinAmt), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.textDim}
 					end
 
 					for _, it2 in ipairs(ench.cost_items or {}) do
 						local name = tostring(it2.name or "item")
-						local amt = math.max(1, math.floor(tonumber(it2.amount or 1) or 1))
+						local amt = math.max(1, math.floor(tonumber(it2.amount) or 1))
 						if name == "mana_crystal_shard" then
 							costSegs[#costSegs + 1] = {text = string.Comma(amt), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.textDim}
 						else
@@ -1489,7 +1572,7 @@ function ENT:ComputeSuccessChance(ply)
 	end
 
 	-- Scale from base (25%) up to 80% at max Arcana level
-	local playerLevel = Arcana:GetLevel(ply) or 0
+	local playerLevel = Arcana.GetLevel(ply) or 0
 	local maxLevel = ((Arcana.Config and Arcana.Config.MAX_LEVEL) or 100) / 1.75
 	local t = math.Clamp(playerLevel / math.max(1, maxLevel), 0, 1)
 	local maxCap = 0.80
@@ -1498,12 +1581,44 @@ function ENT:ComputeSuccessChance(ply)
 end
 
 if SERVER then
-	-- Called by ManaNetwork to signal mana receive
-	function ENT:AddMana(_amount)
-		-- Treat any positive call as a pulse of receiving state
-		self._receivingUntil = CurTime() + 0.6
-		self._receivingMana = true
-		self:SetNWBool("Arcana_ReceivingMana", true)
-		return _amount or 0
+	local PULSE_INTERVAL = 0.5
+	local FALLBACK_CRYSTAL_RANGE = 520
+
+	-- A mana crystal within its own absorb radius feeds this bench, which is what lifts the
+	-- enchant success chance off its 5% floor. This was a general-purpose producer/consumer
+	-- network for a while; it only ever had one producer class and this one receiver, so it
+	-- is a proximity check. Broadcasts the flow visual drawn in the client section.
+	function ENT:_PulseMana()
+		local now = CurTime()
+		if now < (self._nextManaPulse or 0) then return end
+		self._nextManaPulse = now + PULSE_INTERVAL
+
+		local myPos = self:GetPos()
+		local feeding = {}
+
+		for _, crystal in ipairs(ents.FindByClass("arcana_mana_crystal")) do
+			if IsValid(crystal) then
+				local range = (crystal.GetAbsorbRadius and crystal:GetAbsorbRadius()) or FALLBACK_CRYSTAL_RANGE
+				if myPos:DistToSqr(crystal:GetPos()) <= range * range then
+					feeding[#feeding + 1] = crystal
+				end
+			end
+		end
+
+		if #feeding == 0 then return end
+
+		self._receivingUntil = now + 0.6
+		if not self._receivingMana then
+			self._receivingMana = true
+			self:SetNWBool("Arcana_ReceivingMana", true)
+		end
+
+		net.Start("Arcana_Enchanter_ManaFlow", true)
+		net.WriteEntity(self)
+		net.WriteUInt(math.min(#feeding, 255), 8)
+		for i = 1, math.min(#feeding, 255) do
+			net.WriteEntity(feeding[i])
+		end
+		net.Broadcast()
 	end
 end

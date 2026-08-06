@@ -108,7 +108,7 @@ local function startBeamPhase(caster)
 					if checked[ent] then continue end
 					checked[ent] = true
 					if not IsValid(ent) or ent == caster then continue end
-					if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+					if not Arcana.Common.IsActor(ent) then continue end
 
 					local actualDist = distToBeamLine(ent:WorldSpaceCenter(), beamOrigin, currentDir)
 					if actualDist > currentRadius then continue end
@@ -118,7 +118,7 @@ local function startBeamPhase(caster)
 					dmg:SetDamageType(DMG_DISSOLVE)
 					dmg:SetAttacker(caster)
 					dmg:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg)
+					Arcana.TakeDamageInfo(ent, dmg)
 
 					-- Deeply freeze anything that survives
 					if IsValid(ent) then
@@ -154,14 +154,14 @@ local function startBeamPhase(caster)
 
 				for _, ent in ipairs(ents.FindInSphere(impactPos, novaRadius)) do
 					if not IsValid(ent) or ent == caster then continue end
-					if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+					if not Arcana.Common.IsActor(ent) then continue end
 
 					local dmg2 = DamageInfo()
 					dmg2:SetDamage(BEAM_DMG_TICK * 3)
 					dmg2:SetDamageType(DMG_DISSOLVE)
 					dmg2:SetAttacker(caster)
 					dmg2:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg2)
+					Arcana.TakeDamageInfo(ent, dmg2)
 
 					if IsValid(ent) then
 						Arcana.Status.Frost.Apply(ent, { slowMult = 0.5, duration = 4, vfxTag = "oblivion_nova" })
@@ -205,14 +205,14 @@ local function startBeamPhase(caster)
 		-- Initial blast: massive damage + deep freeze on every entity in radius
 		for _, ent in ipairs(ents.FindInSphere(impactPos, blastRadius)) do
 			if not IsValid(ent) or ent == caster then continue end
-			if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+			if not Arcana.Common.IsActor(ent) then continue end
 
 			local dmg = DamageInfo()
 			dmg:SetDamage(BEAM_DMG_TICK * 10)
 			dmg:SetDamageType(DMG_DISSOLVE)
 			dmg:SetAttacker(caster)
 			dmg:SetInflictor(caster)
-			Arcana:TakeDamageInfo(ent, dmg)
+			Arcana.TakeDamageInfo(ent, dmg)
 
 			if IsValid(ent) then
 				Arcana.Status.Frost.Apply(ent, {
@@ -229,13 +229,13 @@ local function startBeamPhase(caster)
 				if not IsValid(caster) then return end
 				for _, ent in ipairs(ents.FindInSphere(impactPos, blastRadius)) do
 					if not IsValid(ent) or ent == caster then continue end
-					if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+					if not Arcana.Common.IsActor(ent) then continue end
 					local dmg2 = DamageInfo()
 					dmg2:SetDamage(dotDamage)
 					dmg2:SetDamageType(DMG_DISSOLVE)
 					dmg2:SetAttacker(caster)
 					dmg2:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg2)
+					Arcana.TakeDamageInfo(ent, dmg2)
 				end
 			end)
 		end
@@ -259,7 +259,7 @@ local function startBeamPhase(caster)
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "ice_oblivion_ray",
 	name = "Oblivion Ray",
 	description = "Channel the frozen void into a devastating beam of oblivion. Obliterates all in its path and deeply freezes anything that dares survive.",
@@ -342,14 +342,14 @@ if CLIENT then
 	end
 
 	-- Fades all circles/bands stored in castingData for a caster (cast phase + beam phase).
-	-- With shatter set, the circles break apart instead — used when the cast is cut short.
+	-- With shatter set, the circles break apart instead, used when the cast is cut short.
 	local function fadeAllCastingCircles(caster, fadeDur, shatter)
 		local d = castingData[caster]
 		if not d then return end
 		fadeDur = fadeDur or 0.5
 
 		if shatter then
-			Arcana:BreakdownCastCircles(fadeDur, d.barrelCircles, d.muzzleSatellites, d.bandCircles, d.beamBandCircles)
+			Arcana.BreakdownCastCircles(fadeDur, d.barrelCircles, d.muzzleSatellites, d.bandCircles, d.beamBandCircles)
 			return
 		end
 
@@ -740,7 +740,7 @@ if CLIENT then
 			Arcana.Common.ScreenShake(caster:EyePos(), 7, 115, 1.5, 750)
 		end)
 
-		-- Safety cleanup for cast failure / timeout (skip if beam phase is active —
+		-- Safety cleanup for cast failure / timeout (skip if beam phase is active,
 		-- BeamEnd handles cleanup in that case)
 		timer.Simple(castTime + 2, function()
 			local d2 = castingData[caster]
@@ -770,7 +770,7 @@ if CLIENT then
 		local duration   = net.ReadFloat()
 
 		-- Transition circles to beam phase: keep tracking aim, suppress casting-phase arcs.
-		-- The Think hook remains running — it will now also drive the beam direction/origin.
+		-- The Think hook remains running: it will now also drive the beam direction/origin.
 		if IsValid(caster) and castingData[caster] then
 			castingData[caster].beamPhase   = true
 			castingData[caster].arcStarted  = false  -- beam-origin arcs come from the render hook
@@ -843,12 +843,14 @@ if CLIENT then
 	end)
 
 	net.Receive("Arcana_IceOblivionRay_BeamTick", function()
-		local origin   = net.ReadVector()
-		local dir      = net.ReadVector()
+		-- Origin and direction are driven client-side in the Think hook for instant visual
+		-- response, so they are read and dropped. They still have to be read: the two floats
+		-- after them would decode garbage otherwise.
+		net.ReadVector()
+		net.ReadVector()
 		local radius   = net.ReadFloat()
 		local progress = net.ReadFloat()
 		if not activeBeam then return end
-		-- Direction and origin are driven client-side in the Think hook for instant visual response.
 		-- Only sync the server-authoritative values that can't be derived locally.
 		activeBeam.radius   = radius
 		activeBeam.progress = progress

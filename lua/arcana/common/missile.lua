@@ -16,7 +16,7 @@ if SERVER then
 		local maxRange = 1600
 		for _, ent in ipairs(ents.FindInSphere(origin + aim * (maxRange * 0.6), maxRange)) do
 			if not IsValid(ent) or ent == caster then continue end
-			if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then continue end
+			if not Arcana.Common.IsActor(ent) then continue end
 			if not ent:IsNextBot() and ent:Health() <= 0 then continue end
 			local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
 			local d = dir:Dot(aim)
@@ -35,7 +35,6 @@ if SERVER then
 	--   - count: number of missiles (default 3)
 	--   - delay: delay between each missile spawn (default 0.06)
 	function Arcana.Common.LaunchMissiles(caster, origin, aim, options)
-		if not SERVER then return end
 		if not IsValid(caster) then return end
 		if not isvector(origin) or not isvector(aim) then return end
 

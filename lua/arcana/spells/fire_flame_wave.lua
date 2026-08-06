@@ -1,5 +1,5 @@
 -- Flame Wave: A sweeping cone of fire that ignites and damages enemies
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "flame_wave",
 	name = "Flame Wave",
 	description = "Unleash a sweeping cone of flame, burning enemies ahead.",

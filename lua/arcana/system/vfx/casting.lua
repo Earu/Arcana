@@ -1,4 +1,4 @@
--- VFX Network — Server-side broadcast helpers and client-side VFX receivers
+-- VFX Network: Server-side broadcast helpers and client-side VFX receivers
 -- for spell cast circles, band circles, gestures, and cast failure visuals.
 -- Extracted from core.lua so core can stay focused on spell registration and casting flow.
 
@@ -6,7 +6,7 @@ local Arcana = Arcana
 
 -- ── Server-side band VFX broadcast API ──────────────────────────────────────
 if SERVER then
-	function Arcana:SendAttachBandVFX(ent, color, size, duration, bandConfigs, tag)
+	function Arcana.SendAttachBandVFX(ent, color, size, duration, bandConfigs, tag)
 		if not IsValid(ent) then return end
 		net.Start("Arcana_AttachBandVFX", true)
 		net.WriteEntity(ent)
@@ -30,7 +30,7 @@ if SERVER then
 		net.Broadcast()
 	end
 
-	function Arcana:ClearBandVFX(ent, tag)
+	function Arcana.ClearBandVFX(ent, tag)
 		if not IsValid(ent) then return end
 		net.Start("Arcana_ClearBandVFX", true)
 		net.WriteEntity(ent)
@@ -326,7 +326,7 @@ if CLIENT then
 
 	-- Tear down casting circles by shattering them: MagicCircles fling their rings outward,
 	-- BandCircles fade (they have no rings to eject). Use when a cast is cut short.
-	function Arcana:BreakdownCastCircles(duration, ...)
+	function Arcana.BreakdownCastCircles(duration, ...)
 		local d = math.max(0.1, tonumber(duration) or 0.1)
 
 		forEachCastCircle(function(circle)
@@ -339,7 +339,7 @@ if CLIENT then
 	end
 
 	-- Tear down casting circles by fading them out. Use when a cast completed normally.
-	function Arcana:FadeCastCircles(duration, ...)
+	function Arcana.FadeCastCircles(duration, ...)
 		local d = math.max(0.05, tonumber(duration) or 0.3)
 
 		forEachCastCircle(function(circle)
@@ -351,8 +351,8 @@ if CLIENT then
 
 	-- Create a ground-following magic circle during spell casting.
 	-- Used by spells that want custom casting circle visuals tracking the caster's aim.
-	-- options.positionResolver: function(caster) -> Vector|nil — defaults to Arcana:ResolveGroundTarget
-	function Arcana:CreateFollowingCastCircle(caster, spellId, castTime, options)
+	-- options.positionResolver: function(caster) -> Vector|nil, defaults to Arcana.ResolveGroundTarget
+	function Arcana.CreateFollowingCastCircle(caster, spellId, castTime, options)
 		if not IsValid(caster) then return false end
 		if not (Arcana.Circle and Arcana.Circle.MagicCircle) then return false end
 
@@ -361,7 +361,7 @@ if CLIENT then
 		local size = opts.size or 100
 		local intensity = opts.intensity or 4
 		local positionResolver = opts.positionResolver or function(c)
-			return Arcana:ResolveGroundTarget(c)
+			return Arcana.ResolveGroundTarget(c)
 		end
 
 		local pos = positionResolver(caster)

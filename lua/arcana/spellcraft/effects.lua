@@ -1,4 +1,4 @@
--- Spellcraft — element effects. Crafted spells must LOOK like their element,
+-- Spellcraft: element effects. Crafted spells must LOOK like their element,
 -- not like tinted generic particles: a fire bolt is a fireball, a lightning
 -- beam crackles with arcs. Palettes and sounds are lifted from the authored
 -- element spells (arcana_fireball, ring_of_fire, lightning_strike/orb,

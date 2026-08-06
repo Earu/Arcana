@@ -1,7 +1,7 @@
 if SERVER then util.AddNetworkString("Arcana_WindBlast") end
 
 -- Wind Blast: A powerful radial burst that pushes everything away from the caster
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "wind_blast",
 	name = "Wind Blast",
 	description = "Emit a powerful shock of wind, hurling nearby foes and objects away.",
@@ -58,7 +58,7 @@ Arcana:RegisterSpell({
 
 			-- Reduced falloff so the push feels impactful at range
 			local falloff = 0.75 + 0.25 * (1 - math.Clamp(dist / radius, 0, 1))
-			if ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then
+			if Arcana.Common.IsActor(ent) then
 				-- Deal damage
 				local dmg = DamageInfo()
 				dmg:SetDamage(baseDamage * falloff)

@@ -112,8 +112,8 @@ if SERVER then
 				killer = self._lastHurtBy
 			end
 
-			if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
-				Arcana:GiveXP(killer, WISP_XP, "Wisp destroyed")
+			if IsValid(killer) and killer:IsPlayer() and not Arcana.IsPotentialCheater(killer) then
+				Arcana.GiveXP(killer, WISP_XP, "Wisp destroyed")
 			end
 
 			SafeRemoveEntityDelayed(self, 0.1)
@@ -244,7 +244,7 @@ if SERVER then
 			dmg:SetDamageType(DMG_ENERGYBEAM)
 			dmg:SetAttacker(self)
 			dmg:SetInflictor(self)
-			Arcana:TakeDamageInfo(tr.Entity, dmg)
+			Arcana.TakeDamageInfo(tr.Entity, dmg)
 		end
 
 		-- Tesla sparks along the path (short-lived)
@@ -308,7 +308,6 @@ end
 if CLIENT then
 	local SPRITE_MAT = Material("sprites/light_glow02_add")
 
-	local COL_PURPLE = Color(180, 180, 180)
 	local COL_DEEPBLUE = Color(97, 97, 97)
 
 	surface.CreateFont("Arcana_WispGlyph", {
@@ -331,12 +330,6 @@ if CLIENT then
 
 	function ENT:Initialize()
 		self._glyphChar = pickGlyph()
-		self._jxAmp = math.random(2, 5)
-		self._jyAmp = math.random(2, 4)
-		self._jxW = math.Rand(8, 16)
-		self._jyW = math.Rand(9, 18)
-		self._jxP = math.Rand(0, math.pi * 2)
-		self._jyP = math.Rand(0, math.pi * 2)
 		-- mini glyphs cloud
 		self._miniGlyphs = {}
 		self._miniSpawnRate = 6 -- per second
@@ -372,9 +365,6 @@ if CLIENT then
 
 		ang:RotateAroundAxis(ang:Right(), -90)
 		ang:RotateAroundAxis(ang:Up(), 90)
-		local jx = (self._jxAmp or 3) * math.sin(t * (self._jxW or 12) + (self._jxP or 0))
-		local jy = (self._jyAmp or 3) * math.cos(t * (self._jyW or 14) + (self._jyP or 0))
-
 		cam.IgnoreZ(true)
 		cam.Start3D2D(self:GetPos(), ang, 0.12)
 			surface.SetFont("Arcana_WispGlyph")

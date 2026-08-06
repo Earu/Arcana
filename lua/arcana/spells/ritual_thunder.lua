@@ -1,4 +1,4 @@
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_of_thunder",
 	name = "Ritual: Thunder",
 	description = "A ritual that summons a thunder cloud.",

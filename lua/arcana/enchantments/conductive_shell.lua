@@ -47,7 +47,7 @@ local function zapNearestTarget(proj, attacker)
 	for _, ent in ipairs(ents.FindInSphere(pos, ZAP_RADIUS)) do
 		if not IsValid(ent) then continue end
 		if ent == attacker or ent == proj then continue end
-		if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then continue end
+		if not Arcana.Common.IsActor(ent) then continue end
 		if ent:IsPlayer() and not ent:Alive() then continue end
 		if ent:IsNPC() and ent:Health() <= 0 then continue end
 
@@ -97,7 +97,7 @@ local function augmentProjectile(proj, owner)
 	net.Broadcast()
 
 	-- Band rings identical to the lightning orb spell
-	Arcana:SendAttachBandVFX(proj, Color(170, 210, 255, 255), 14, 6, {
+	Arcana.SendAttachBandVFX(proj, Color(170, 210, 255, 255), 14, 6, {
 		{ radius = 15, height = 4, spin = { p = 0,      y = 80 * 50, r = 60 * 50 }, lineWidth = 2 },
 		{ radius = 13, height = 3, spin = { p = 60 * 50, y = -45 * 50, r = 0    }, lineWidth = 2 },
 	})
@@ -134,7 +134,7 @@ local function augmentProjectile(proj, owner)
 	end)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "conductive_shell",
 	name = "Conductive Shell",
 	description = "Your projectile crackles with electricity in flight, zapping the nearest enemy every 0.1s. On detonation it fully discharges into a chained lightning burst.",
@@ -167,7 +167,7 @@ if CLIENT then
 	end)
 
 	-- Stop emitting particles for a projectile that has detonated (either via removal
-	-- or velocity timeout — the entity may still be valid in the latter case).
+	-- or velocity timeout: the entity may still be valid in the latter case).
 	net.Receive("Arcana_ConductiveShell_Untrack", function()
 		local ent = net.ReadEntity()
 		local data = trackedEntities[ent]

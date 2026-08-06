@@ -1,4 +1,4 @@
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_of_purification",
 	name = "Ritual: Purification",
 	description = "Perform a ritual to cleanse corruption in the area.",

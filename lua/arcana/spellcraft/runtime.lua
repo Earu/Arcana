@@ -1,4 +1,4 @@
--- Spellcraft — runtime. One generic interpreter drives every crafted spell.
+-- Spellcraft: runtime. One generic interpreter drives every crafted spell.
 --
 -- SHARED : BuildSpellData (turns a compiled crafted spell into an Arcana spell),
 --          net-string strings used by both realms.
@@ -102,7 +102,7 @@ end
 ----------------------------------------------------------------------
 if SERVER then
 	local function isActor(ent)
-		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+		return IsValid(ent) and Arcana.Common.IsActor(ent)
 	end
 
 	-- Alive() is a player method; NPC mages answer on health. Prop casters (spell
@@ -116,7 +116,7 @@ if SERVER then
 	end
 
 	-- Key for per-caster records (self auras). Players keep their SteamID64 so a record
-	-- survives their entity churn; anything else — NPC mages, spell casters — is keyed
+	-- survives their entity churn; anything else, NPC mages, spell casters, is keyed
 	-- by entity index.
 	local function casterKey(ent)
 		if not IsValid(ent) then return nil end
@@ -140,7 +140,7 @@ if SERVER then
 				target.ArcanaAurumBrander = IsValid(caster) and caster or nil
 
 				-- The brand must read on the victim: golden rings while it lasts.
-				Arcana:SendAttachBandVFX(target, Color(255, 210, 90, 255), 26, 4, {
+				Arcana.SendAttachBandVFX(target, Color(255, 210, 90, 255), 26, 4, {
 					{ radius = 20, height = 6, spin = { p = 0, y = 40, r = 0 }, lineWidth = 2 },
 				}, "spellcraft_aurum")
 
@@ -181,7 +181,7 @@ if SERVER then
 				dmg:SetDamageType(DMG_POISON)
 				dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 				dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-				Arcana:TakeDamageInfo(target, dmg)
+				Arcana.TakeDamageInfo(target, dmg)
 			end)
 		end
 
@@ -219,7 +219,7 @@ if SERVER then
 		-- (amplification happens in the EntityTakeDamage hook below).
 		if compiled.curse then
 			target.ArcanaCurseUntil = CurTime() + 8
-			Arcana:SendAttachBandVFX(target, Color(120, 60, 160, 255), 24, 8, {
+			Arcana.SendAttachBandVFX(target, Color(120, 60, 160, 255), 24, 8, {
 				{ radius = 18, height = 5, spin = { p = 0, y = -50, r = 0 }, lineWidth = 2 },
 			}, "spellcraft_curse")
 		end
@@ -246,7 +246,7 @@ if SERVER then
 		if compiled.rider == "poison" then immediate = immediate * 0.4 end
 
 		if immediate > 0 then
-			Arcana:BlastDamage(caster, pos, radius, immediate, {
+			Arcana.BlastDamage(caster, pos, radius, immediate, {
 				damageType = compiled.damageType,
 				ignoreAttacker = true,
 				inflictor = inflictor,
@@ -322,7 +322,7 @@ if SERVER then
 					dmg:SetDamageType(compiled.damageType)
 					dmg:SetAttacker(caster)
 					dmg:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg)
+					Arcana.TakeDamageInfo(ent, dmg)
 				end
 			end
 		end)
@@ -339,7 +339,7 @@ if SERVER then
 		local aimer = IsValid(srcEnt) and srcEnt or caster
 		local origin, aim
 
-		if aimer:IsPlayer() or aimer:IsNPC() or (aimer.IsNextBot and aimer:IsNextBot()) then
+		if Arcana.Common.IsActor(aimer) then
 			origin = aimer:EyePos()
 			aim = aimer:GetAimVector()
 		else
@@ -473,7 +473,7 @@ if SERVER then
 						dmg:SetAttacker(caster)
 						dmg:SetInflictor(caster)
 						dmg:SetDamagePosition(tpos)
-						Arcana:TakeDamageInfo(ent, dmg)
+						Arcana.TakeDamageInfo(ent, dmg)
 						P.ApplyEssenceHit(caster, ent, tpos, compiled)
 
 						forks = forks + 1
@@ -579,7 +579,7 @@ if SERVER then
 
 		local attacker = dmginfo:GetAttacker()
 		if not IsValid(attacker) or attacker == target then return end
-		if not (attacker:IsPlayer() or attacker:IsNPC() or (attacker.IsNextBot and attacker:IsNextBot())) then return end
+		if not Arcana.Common.IsActor(attacker) then return end
 
 		local now = CurTime()
 		if (aura.thornsCD[attacker] or 0) > now then return end
@@ -597,7 +597,7 @@ if SERVER then
 			dmg:SetAttacker(credit)
 			dmg:SetInflictor(target)
 			dmg:SetDamagePosition(attacker:WorldSpaceCenter())
-			Arcana:TakeDamageInfo(attacker, dmg)
+			Arcana.TakeDamageInfo(attacker, dmg)
 		end
 		P.ApplyEssenceHit(credit, attacker, target:WorldSpaceCenter(), aura.compiled)
 	end)
@@ -698,8 +698,9 @@ if CLIENT then
 		P.Local = {}
 		local raw = file.Read(STORE_PATH, "DATA")
 		if not raw then return end
-		local ok, arr = pcall(util.JSONToTable, raw)
-		if ok and istable(arr) then
+
+		local arr = Arcana.DecodeJSON(raw, "local crafted spell store (" .. STORE_PATH .. ")", nil)
+		if arr then
 			for _, d in ipairs(arr) do
 				if istable(d) and isstring(d.form) and isstring(d.essence) then
 					P.Local[#P.Local + 1] = {
@@ -750,7 +751,7 @@ if CLIENT then
 		local ply = LocalPlayer()
 		local level = 0
 		if IsValid(ply) then
-			local d = Arcana:GetPlayerData(ply)
+			local d = Arcana.GetPlayerData(ply)
 			level = d and d.level or 0
 		end
 		return {
@@ -772,7 +773,7 @@ if CLIENT then
 			-- FullSync predates registration, so mirror the unlock into local data.
 			local ply = LocalPlayer()
 			if IsValid(ply) and sid64 == ply:SteamID64() then
-				local data = Arcana:GetPlayerData(ply)
+				local data = Arcana.GetPlayerData(ply)
 				if data then data.unlocked_spells[spell.id] = true end
 			end
 		end
@@ -829,7 +830,7 @@ if CLIENT then
 		local ply = LocalPlayer()
 		if IsValid(ply) and sid64 == ply:SteamID64() then
 			P.RemoveLocal(slot)
-			local data = Arcana:GetPlayerData(ply)
+			local data = Arcana.GetPlayerData(ply)
 			if data then data.unlocked_spells[id] = nil end
 		end
 		hook.Run("Arcana_Spellcraft_StateChanged")
