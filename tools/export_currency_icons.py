@@ -89,7 +89,7 @@ def render_coin(canvas: int) -> Image.Image:
     seam = canvas // 16
     rim = canvas // 24
 
-    # Back coin, up-left: solid — at chip size any inner detail on it merges
+    # Back coin, up-left: solid, at chip size any inner detail on it merges
     # with the front coin's rim into a cross-like glyph.
     _circle(draw, canvas * 0.36, canvas * 0.36, canvas * 0.30, fill=255)
 

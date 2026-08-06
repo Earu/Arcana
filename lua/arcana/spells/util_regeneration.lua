@@ -1,4 +1,4 @@
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "regeneration",
 	name = "Regeneration",
 	description = "Gradually heal over time.",
@@ -31,7 +31,7 @@ Arcana:RegisterSpell({
 
 		-- Subtle VFX band
 		local r = math.max(caster:OBBMaxs():Unpack()) * 0.5
-		Arcana:SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
+		Arcana.SendAttachBandVFX(caster, Color(120, 255, 140, 255), 32, duration, {
 			{
 				radius = r * 0.9,
 				height = 3,

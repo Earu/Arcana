@@ -102,8 +102,8 @@ if SERVER then
 				killer = self._lastHurtBy
 			end
 
-			if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
-				Arcana:GiveXP(killer, HEAVY_WISP_XP, "Heavy wisp destroyed")
+			if IsValid(killer) and killer:IsPlayer() and not Arcana.IsPotentialCheater(killer) then
+				Arcana.GiveXP(killer, HEAVY_WISP_XP, "Heavy wisp destroyed")
 			end
 
 			SafeRemoveEntityDelayed(self, 0.1)
@@ -119,7 +119,7 @@ if SERVER then
 			if not IsValid(ent) then continue end
 			if ent:IsPlayer() and not ent:Alive() then continue end
 
-			local isTarget = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isTarget =Arcana.Common.IsActor(ent)
 			if not isTarget then continue end
 
 			local d2 = center:DistToSqr(ent:GetPos())

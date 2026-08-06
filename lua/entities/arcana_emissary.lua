@@ -1,4 +1,4 @@
--- The Emissary — a stone bench that carries prayers to the gods. Players
+-- The Emissary: a stone bench that carries prayers to the gods. Players
 -- compose crafted spells here (Form + Essence + Clauses), buy essences, and
 -- activate spells carried from other servers.
 
@@ -228,18 +228,18 @@ if CLIENT then
 		return benchGlowMat
 	end
 
-	-- Reuse the tutorial's Elysion skybox wholesale (materials, face layout,
+	-- Reuse the scene system's Elysion skybox wholesale (materials, face layout,
 	-- UV rotations) so the cube connects exactly like it does in the scenes
 	local function getSkyFaces()
-		local Tutorial = Arcana.Tutorial
-		if not Tutorial then return end
+		local Scenes = Arcana.Scenes
+		if not Scenes then return end
 
-		if not Tutorial.cubeFaces then
-			Tutorial:InitializeSkybox()
-			Tutorial:CreateCubeMesh()
+		if not Scenes.cubeFaces then
+			Scenes:InitializeSkybox()
+			Scenes:CreateCubeMesh()
 		end
 
-		return Tutorial.cubeFaces
+		return Scenes.cubeFaces
 	end
 
 	local function drawAbyssSky(eyePos)
@@ -1077,7 +1077,7 @@ if CLIENT then
 
 			-- The floating glyphs get their own capture on the tight profile.
 			-- They shared the bench's full-fat bloom for a while, and the
-			-- quarter-res glow fog — sized for the bench's engraved planes —
+			-- quarter-res glow fog: sized for the bench's engraved planes,
 			-- swallowed each glyph in a blob several times its size.
 			local anyShelfRune = false
 

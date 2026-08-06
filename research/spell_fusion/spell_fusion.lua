@@ -38,7 +38,7 @@ local Fusion          = Arcana.Fusion
 local _hookCallbacks  = {}   -- [event][name] = fn
 local _dispatchers    = {}   -- [event] = true
 local _netListeners   = {}   -- [id] = fn
-local _registeredIds  = {}   -- [fusionId] = true  — tracked so CleanupAll can unregister them
+local _registeredIds  = {}   -- [fusionId] = true: tracked so CleanupAll can unregister them
 
 -- Hook dispatcher: routes hook.Add/Remove calls from generated code through a
 -- single real GMod hook per event. Return values are propagated so hooks like
@@ -58,7 +58,7 @@ local _sandboxHook = setmetatable({
 				if not ok then
 					-- Log and remove the offending callback so it doesn't spam every frame.
 					Arcana:Print(string.format(
-						"[Fusion] Hook error in '%s' / '%s': %s — callback removed",
+						"[Fusion] Hook error in '%s' / '%s': %s, callback removed",
 						event, tostring(cbName), tostring(ret)))
 					cbs[cbName] = nil
 				elseif ret ~= nil then
@@ -82,7 +82,7 @@ Fusion.Broadcast = function(id, writeCallback)
 	net.WriteString(id)
 	local ok, err = pcall(writeCallback)
 	if not ok then
-		-- Abort the message — do not broadcast a half-written net buffer.
+		-- Abort the message: do not broadcast a half-written net buffer.
 		net.Abort()
 		Arcana:Print("[Fusion] Broadcast write error ('" .. tostring(id) .. "'): " .. tostring(err))
 		return
@@ -124,7 +124,7 @@ function Fusion.CleanupAll()
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Sandbox — blacklist approach
+-- Sandbox: blacklist approach
 -- Inherits all of _G; dangerous globals/sub-table entries are blocked via
 -- __index metamethods that return nil or a helpful no-op.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ local function _FindEntitySources(spellSources)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- System prompt — Arcana context + Fusion API only (LLM already knows GLua)
+-- System prompt: Arcana context + Fusion API only (LLM already knows GLua)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 local _SYSTEM_PROMPT
@@ -249,27 +249,27 @@ Your output will be compiled and executed at runtime inside a sandboxed GLua env
 - is_projectile (bool): uses forward-aim gesture
 - has_target (bool): spell aims at a target point or entity
 - cast_anim (string): "forward" or "becon"
-- cast(caster, has_target, data, ctx): REQUIRED — returns true on success, false on failure
+- cast(caster, has_target, data, ctx): REQUIRED, returns true on success, false on failure
 - can_cast(caster, has_target, data): optional, return false to block the cast
 - on_success / on_failure: optional callbacks
 
 ## SpellContext (ctx)
 ctx.circlePos (Vector), ctx.circleAng (Angle), ctx.circleSize (number),
-ctx.forwardLike (Vector — normalised aim direction), ctx.castTime (number), ctx.casterEntity (Entity)
+ctx.forwardLike (Vector, normalised aim direction), ctx.castTime (number), ctx.casterEntity (Entity)
 
-## Arcana helper APIs (custom — not standard GMod)
+## Arcana helper APIs (custom, not standard GMod)
 - Arcana:BlastDamage(attacker, center, radius, baseDamage, opts)
     opts: damageType, ignoreAttacker (bool)
 - Arcana:SendAttachBandVFX(ent, color, size, duration, bandConfigs, tag)
     bandConfigs: array of { radius, height, spin = { p, y, r }, lineWidth }
 - Arcana:ClearBandVFX(ent, tag)
 - Arcana.Common.LaunchProjectile(ent, caster, direction)
-- Arcana.Common.LaunchMissiles(caster, origin, aim, opts) — opts: count, delay
+- Arcana.Common.LaunchMissiles(caster, origin, aim, opts), opts: count, delay
 - Arcana.Common.ApplyLightningChain(attacker, hitPos, opts)
     opts: baseDamage, blastRadius, chainRadius, chainDamage, maxChains, chainDelay, spawnTesla, onChain
 - Arcana.Common.LightningImpactVFX(pos, normal, opts)
 - Arcana.Common.SpawnTeslaBurst(pos, opts)
-- Arcana.Status.Frost.Apply(ent, opts) — opts: slowMult, duration
+- Arcana.Status.Frost.Apply(ent, opts), opts: slowMult, duration
 
 ## Arcana entity classes (ents.Create)
 arcana_fireball, arcana_missile, arcana_ice_bolt,
@@ -279,9 +279,9 @@ arcana_corrupted_wisp_heavy, arcana_flaming_skull, arcana_soul, arcana_fairy,
 arcana_skeleton, arcana_brazier, arcana_magical_mushroom, arcana_mana_crystal
 All projectile entities: :LaunchTowards(dir), :SetSpellOwner(caster)
 
-## Customising entity behaviour (instance-only — CRITICAL)
+## Customising entity behaviour (instance-only, CRITICAL)
 You may override methods on a spawned entity INSTANCE to change its behaviour.
-NEVER touch the SENT class table — that would affect every future spawn of that class globally.
+NEVER touch the SENT class table: that would affect every future spawn of that class globally.
 
   -- CORRECT: override on the instance after ents.Create
   local ent = ents.Create("arcana_fireball")
@@ -293,7 +293,7 @@ NEVER touch the SENT class table — that would affect every future spawn of tha
   ent:Spawn()
   ent:Activate()
 
-  -- WRONG — do not do any of these:
+  -- WRONG: do not do any of these:
   scripted_ents.Get("arcana_fireball").Think = function() ... end  -- modifies the class globally
   ENT.Think = function() ... end                                    -- same problem
 
@@ -309,7 +309,7 @@ hook.Add("Arcana_BeginCastingVisuals", uniqueName, function(caster, spellId, cas
     return true                                -- suppresses the default circle
 end)
 
-## Net API (util.AddNetworkString is NOT available — use these wrappers instead)
+## Net API (util.AddNetworkString is NOT available, use these wrappers instead)
 -- SERVER: broadcast data to all clients
 Fusion.Broadcast("myEventId", function()
     net.WriteFloat(value)
@@ -323,19 +323,19 @@ Fusion.Listen("myEventId", function()
     -- populate local render tables, fire DynamicLight, ParticleEmitter, etc.
 end)
 
-hook.Add / hook.Remove work normally — all registered hooks are tracked and
+hook.Add / hook.Remove work normally, all registered hooks are tracked and
 cleaned up by the framework automatically when a new fusion is generated.
 
-## Cleanup closure (MANDATORY — must be the last thing in the file)
+## Cleanup closure (MANDATORY, must be the last thing in the file)
 Fusion.Cleanup["FUSION_ID"] = function()
     Arcana.RegisteredSpells["FUSION_ID"] = nil
     -- Clear module-level render tables via closure (e.g. bursts = nil, spikes = nil)
     -- timer.Remove any named timers you created
-    -- Do NOT call hook.Remove or Fusion.Listen here — the framework handles them
+    -- Do NOT call hook.Remove or Fusion.Listen here, the framework handles them
 end
 
 ## Constraints
-- Output raw Lua ONLY — no markdown fences, no prose, no explanations
+- Output raw Lua ONLY: no markdown fences, no prose, no explanations
 - Do NOT use: util.AddNetworkString, net.Start, net.Broadcast, net.Receive,
   RunConsoleCommand, HTTP, concommand.Add, CompileString, RunString,
   file.Write, file.Delete, game.ConsoleCommand, game.CleanUpMap
@@ -354,7 +354,7 @@ local function _BuildJudgeSystemPrompt()
 	if _JUDGE_SYSTEM_PROMPT then return _JUDGE_SYSTEM_PROMPT end
 	_JUDGE_SYSTEM_PROMPT = [[You are a code review agent for a Garry's Mod magic spell written in GLua.
 Evaluate the provided Lua code and respond with ONLY a valid JSON object.
-No prose, no markdown fences, no explanation — just the raw JSON.
+No prose, no markdown fences, no explanation, just the raw JSON.
 Score each criterion from 0 to 10.]]
 	return _JUDGE_SYSTEM_PROMPT
 end
@@ -375,12 +375,12 @@ Respond with ONLY this JSON (no markdown fences):
 
 Scoring guide:
 - security (0-10): deduct for RunConsoleCommand, HTTP, concommand.Add, file.Write/Delete,
-  net.Start/Broadcast/Receive, game.ConsoleCommand — below 8 hard-fails
+  net.Start/Broadcast/Receive, game.ConsoleCommand, below 8 hard-fails
 - correctness (0-10): correct spell id, uses Fusion.Broadcast/Listen for networking,
   has Fusion.Cleanup closure, cast() returns true/false
 - quality (0-10): IsValid guards on all entity accesses, no obvious runtime errors, clean structure
 - creativity (0-10): how novel, visually interesting, and fun the result is as a standalone spell
-- fusion (0-10, hard-fails below 6): how faithfully BOTH component spells are combined —
+- fusion (0-10, hard-fails below 6): how faithfully BOTH component spells are combined,
     10: every component spell's core mechanic AND visual theme is clearly present and intertwined
      7: all mechanics present but one visual theme is weak or colour-only
      4: one component spell's mechanic is superficial (e.g. just a size change, just a recolour)
@@ -406,10 +406,10 @@ local function _BuildUserMessage(sources, entitySources, fusionId)
 	end
 	table.insert(parts, string.format([[The fusion spell id must be exactly %q.
 
-TASK — TRUE FUSION:
+TASK: TRUE FUSION:
 Study every component spell above and extract two things from each:
-  1. Core mechanic — what does it do? (e.g. "spawns a ring of fire around the caster", "launches a fast piercing spear")
-  2. Visual theme   — what does it look/sound like? (e.g. "orange/red fire ring", "cyan arcane bolt with trails")
+  1. Core mechanic, what does it do? (e.g. "spawns a ring of fire around the caster", "launches a fast piercing spear")
+  2. Visual theme, what does it look/sound like? (e.g. "orange/red fire ring", "cyan arcane bolt with trails")
 
 The output spell MUST incorporate BOTH the mechanic AND the visual theme from EVERY component spell simultaneously.
 The player must immediately recognise all parent spells in the result.
@@ -421,10 +421,10 @@ Example: ring_of_fire + arcane_spear → ring of arcane spears orbiting/firing o
 
 Rules:
 - DO NOT just recolour one spell and call it done.
-- DO NOT ignore any component spell's core mechanic — every mechanic must be present.
+- DO NOT ignore any component spell's core mechanic: every mechanic must be present.
 - The cast function must implement the hybrid mechanic using Arcana APIs from the source files.
 - Client visuals must blend both spells' colour palettes, particle styles, and light colours.
-- The cast function and all client visuals must be entirely original — do not delegate to parent cast functions.
+- The cast function and all client visuals must be entirely original, do not delegate to parent cast functions.
 
 Output raw Lua only.]], fusionId))
 	return table.concat(parts, "\n\n")
@@ -451,7 +451,7 @@ local function _callAnthropic(model, system, messages, maxTokens, thinkingBudget
 	HTTP({
 		method  = "POST",
 		url     = "https://api.anthropic.com/v1/messages",
-		timeout = 300,  -- 5 minutes — thinking + large code generation can be slow
+		timeout = 300,  -- 5 minutes, thinking + large code generation can be slow
 		headers = {
 			["x-api-key"]         = API_KEY,
 			["anthropic-version"] = "2023-06-01",
@@ -538,8 +538,8 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 
 if SERVER then
-	-- onSuccess(fusionId) — called when the spell passes all gates and executes successfully
-	-- onFail(reason)     — called on any unrecoverable failure (no sources, max attempts, HTTP error, runtime error)
+	-- onSuccess(fusionId): called when the spell passes all gates and executes successfully
+	-- onFail(reason): called on any unrecoverable failure (no sources, max attempts, HTTP error, runtime error)
 	function Fusion.Combine(spellIds, onSuccess, onFail)
 		-- Gather component spell sources
 		local sources = {}
@@ -587,7 +587,7 @@ if SERVER then
 				if isstring(chunk) then
 					local syntaxErr = chunk
 					Arcana:Print(string.format(
-						"[Fusion] Attempt %d — syntax error: %s",
+						"[Fusion] Attempt %d: syntax error: %s",
 						attempt, syntaxErr))
 
 					table.insert(messages, { role = "assistant", content = rawText })
@@ -611,7 +611,7 @@ if SERVER then
 							local verdict = util.JSONToTable(_stripFences(judgeRaw))
 
 						if not verdict then
-							Arcana:Print("[Fusion] Judge returned unparseable JSON — skipping gate.")
+							Arcana:Print("[Fusion] Judge returned unparseable JSON, skipping gate.")
 							local ok = _executeChunk(chunk, fusionId, code)
 							if ok then
 								if onSuccess then onSuccess(fusionId) end
@@ -637,14 +637,14 @@ if SERVER then
 							local reasons = {}
 							if overall  < SCORE_PASS   then table.insert(reasons, string.format("overall %.1f < %.1f", overall, SCORE_PASS)) end
 							if security < SECURITY_MIN then table.insert(reasons, string.format("security %d < %d", security, SECURITY_MIN)) end
-							if fusion   < FUSION_MIN   then table.insert(reasons, string.format("fusion %d < %d — not all component mechanics are present", fusion, FUSION_MIN)) end
+							if fusion   < FUSION_MIN   then table.insert(reasons, string.format("fusion %d < %d, not all component mechanics are present", fusion, FUSION_MIN)) end
 							local feedback = tostring(verdict.feedback or "No feedback provided.")
-							Arcana:Print("[Fusion] Rejected (" .. table.concat(reasons, ", ") .. ") — " .. feedback)
+							Arcana:Print("[Fusion] Rejected (" .. table.concat(reasons, ", ") .. "), " .. feedback)
 
 						table.insert(messages, { role = "assistant", content = rawText })
 							local retryMsg = "A code reviewer rejected your spell (" .. table.concat(reasons, "; ") .. "):\n" .. feedback
 							if fusion < FUSION_MIN then
-								retryMsg = retryMsg .. "\n\nCRITICAL: The fusion score is too low. Every component spell's core mechanic must be clearly and actively present in the result — not just cosmetically. Rewrite the cast logic so both mechanics are genuinely combined."
+								retryMsg = retryMsg .. "\n\nCRITICAL: The fusion score is too low. Every component spell's core mechanic must be clearly and actively present in the result, not just cosmetically. Rewrite the cast logic so both mechanics are genuinely combined."
 							end
 							retryMsg = retryMsg .. "\nOutput the corrected raw Lua only."
 							table.insert(messages, { role = "user", content = retryMsg })
@@ -659,9 +659,9 @@ if SERVER then
 							if onFail then onFail("Runtime error during execution of " .. fusionId) end
 						end
 					end,
-					-- Judge HTTP error — skip gate rather than block indefinitely
+					-- Judge HTTP error: skip gate rather than block indefinitely
 					function(err)
-						Arcana:Print("[Fusion] Judge HTTP error: " .. tostring(err) .. " — skipping gate.")
+						Arcana:Print("[Fusion] Judge HTTP error: " .. tostring(err) .. ", skipping gate.")
 						local ok = _executeChunk(chunk, fusionId, code)
 						if ok then
 							if onSuccess then onSuccess(fusionId) end
@@ -709,7 +709,7 @@ if CLIENT then
 		end)
 	end)
 
-	-- Multiplexed S2C data stream — dispatch to the registered Fusion.Listen callback
+	-- Multiplexed S2C data stream: dispatch to the registered Fusion.Listen callback
 	net.Receive("Arcana_FusionS2C", function()
 		local id = net.ReadString()
 		local cb = _netListeners[id]
@@ -723,16 +723,16 @@ if CLIENT then
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Dev trigger — fires once on server map load
+-- Dev trigger: fires once on server map load
 -- ─────────────────────────────────────────────────────────────────────────────
 
 if SERVER then
 	Fusion.Combine(SPELL_IDS,
 		function(fusionId)
-			Arcana:Print("[Fusion] SUCCESS — spell ready: " .. fusionId)
+			Arcana:Print("[Fusion] SUCCESS, spell ready: " .. fusionId)
 		end,
 		function(reason)
-			Arcana:Print("[Fusion] FAILED — " .. reason)
+			Arcana:Print("[Fusion] FAILED, " .. reason)
 		end
 	)
 end

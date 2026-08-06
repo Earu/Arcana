@@ -611,7 +611,7 @@ if CLIENT then
 	-- Client menu
 	local function BuildEligibleSpellList(ply)
 		if not Arcana or not IsValid(ply) then return {}, {} end
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return {}, {} end
 		local regularSpells = {}
 		local rituals = {}
@@ -660,7 +660,7 @@ if CLIENT then
 	-- Emissary, so neither appears here.
 	local function BuildForgettableSpellList(ply)
 		if not Arcana or not IsValid(ply) then return {}, {} end
-		local data = Arcana:GetPlayerData(ply)
+		local data = Arcana.GetPlayerData(ply)
 		if not data then return {}, {} end
 		local regularSpells = {}
 		local rituals = {}
@@ -715,34 +715,7 @@ if CLIENT then
 		local x, y = 6, 6
 		local ww, hh = w - 12, h - 12
 		local corner = 14
-		local pts = {
-			{x = x + corner, y = y},
-			{x = x + ww - corner, y = y},
-			{x = x + ww, y = y + corner},
-			{x = x + ww, y = y + hh - corner},
-			{x = x + ww - corner, y = y + hh},
-			{x = x + corner, y = y + hh},
-			{x = x, y = y + hh - corner},
-			{x = x, y = y + corner},
-		}
-
-		render.ClearStencil()
-		render.SetStencilEnable(true)
-		render.SetStencilWriteMask(0xFF)
-		render.SetStencilTestMask(0xFF)
-		render.SetStencilReferenceValue(1)
-		render.SetStencilCompareFunction(STENCIL_NEVER)
-		render.SetStencilFailOperation(STENCIL_REPLACE)
-		render.SetStencilPassOperation(STENCIL_KEEP)
-		render.SetStencilZFailOperation(STENCIL_KEEP)
-
-		draw.NoTexture()
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawPoly(pts)
-
-		render.SetStencilCompareFunction(STENCIL_EQUAL)
-		render.SetStencilFailOperation(STENCIL_KEEP)
-		render.SetStencilPassOperation(STENCIL_REPLACE)
+		ArtDeco.BeginOctagonClip(x, y, ww, hh, corner)
 
 		-- Cold mossy stone base, distinct from the vault's night sky and the
 		-- Emissary's warm sanctum.
@@ -752,7 +725,7 @@ if CLIENT then
 		local t = CurTime()
 
 		-- Three pattern rings spinning in the bottom-right corner at different
-		-- speeds and directions — the altar's own motif, not a full magic circle.
+		-- speeds and directions: the altar's own motif, not a full magic circle.
 		local base = math.min(ww, hh)
 		local dim = Color(226, 200, 132)
 		Arcana.Circle.Draw2DPatternRing(2, x + ww * 0.94, y + hh * 0.96, base * 0.36, t * 3, dim, 140)
@@ -780,7 +753,7 @@ if CLIENT then
 		-- caller this frame (world VFX included) repeat the same sequence
 		math.randomseed(SysTime())
 
-		render.SetStencilEnable(false)
+		ArtDeco.EndOctagonClip()
 	end
 
 	local function OpenAltarMenu(altar)
@@ -819,7 +792,7 @@ if CLIENT then
 			draw.SimpleText(cost .. " KP", "Arcana_AncientSmall", w * 0.5, h * 0.5 + 9, enabled and ArtDeco.Colors.paleGold or ArtDeco.Colors.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 
-		-- Forget buttons echo the unlock button's shape — label above, price below — so
+		-- Forget buttons echo the unlock button's shape: label above, price below, so
 		-- the two tabs read as one station. A spell still inside its grace window is
 		-- free, and says so in green rather than quoting a price.
 		local BTN_FREE = Color(150, 214, 140, 255)
@@ -851,37 +824,7 @@ if CLIENT then
 		frame._arcanaTooltips = {}
 		local bgSeed = math.random(1, 10 ^ 9)
 
-		-- Draggable by the whole header band (the stock strip is too thin).
-		-- The cursor signals the band on hover and the drag while it lasts.
-		frame:SetDraggable(false)
-		frame.OnMousePressed = function(pnl, code)
-			if code ~= MOUSE_LEFT then return end
-			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			if my <= 44 then
-				pnl._dragOffset = {mx, my}
-				pnl:MouseCapture(true)
-				pnl:SetCursor("sizeall")
-			end
-		end
-		frame.OnMouseReleased = function(pnl)
-			pnl._dragOffset = nil
-			pnl:MouseCapture(false)
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
-		frame.OnCursorMoved = function(pnl)
-			if pnl._dragOffset then
-				local mx, my = gui.MousePos()
-				pnl:SetPos(
-					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
-					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
-
-				return
-			end
-
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
+		ArtDeco.MakeDraggableByBand(frame, 44)
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
@@ -902,7 +845,7 @@ if CLIENT then
 			local titleRight = ArtDeco.DrawTitle("Arcana_DecoTitle", "ALTAR", bandTop, bandBottom, ArtDeco.Colors.paleGold)
 
 			-- Level and Knowledge Points chips (XP progression hidden by request)
-			local data = Arcana:GetPlayerData(ply)
+			local data = Arcana.GetPlayerData(ply)
 
 			if data then
 				local gap = 14
@@ -1043,19 +986,7 @@ if CLIENT then
 		local scroll = vgui.Create("DScrollPanel", listPanel)
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip:NoClipping(true)
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(scroll)
 
 		local function rebuildLearn()
 			local regularSpells, rituals = BuildEligibleSpellList(ply)
@@ -1100,7 +1031,7 @@ if CLIENT then
 
 				-- Determine affordability live from current data
 				local function updateEnabled()
-					local d = Arcana:GetPlayerData(ply)
+					local d = Arcana.GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
 					btn:SetEnabled(curKP >= cost)
@@ -1113,7 +1044,7 @@ if CLIENT then
 				end
 
 				function btn:DoClick()
-					local d = Arcana:GetPlayerData(ply)
+					local d = Arcana.GetPlayerData(ply)
 					local curKP = (d and d.knowledge_points) or 0
 					local cost = sp.knowledge_cost or 1
 
@@ -1197,7 +1128,7 @@ if CLIENT then
 
 					-- Determine affordability live from current data
 					local function updateEnabled()
-						local d = Arcana:GetPlayerData(ply)
+						local d = Arcana.GetPlayerData(ply)
 						local curKP = (d and d.knowledge_points) or 0
 						local cost = sp.knowledge_cost or 1
 						btn:SetEnabled(curKP >= cost)
@@ -1210,7 +1141,7 @@ if CLIENT then
 					end
 
 					function btn:DoClick()
-						local d = Arcana:GetPlayerData(ply)
+						local d = Arcana.GetPlayerData(ply)
 						local curKP = (d and d.knowledge_points) or 0
 						local cost = sp.knowledge_cost or 1
 
@@ -1293,9 +1224,9 @@ if CLIENT then
 				-- button still has to quote what the spell costs, and CanForgetSpell refuses
 				-- (broke, casting, a third-party hook) before it can vouch for anything.
 				local function refreshPrice()
-					local ok = Arcana:CanForgetSpell(ply, item.id)
-					isFree = Arcana:IsForgetFree(ply, item.id)
-					coins, shards = Arcana:GetForgetCost(item.id)
+					local ok = Arcana.CanForgetSpell(ply, item.id)
+					isFree = Arcana.IsForgetFree(ply, item.id)
+					coins, shards = Arcana.GetForgetCost(item.id)
 					btn:SetEnabled(ok == true)
 				end
 
@@ -1312,7 +1243,7 @@ if CLIENT then
 				end
 
 				function btn:DoClick()
-					local ok, reason = Arcana:CanForgetSpell(ply, item.id)
+					local ok, reason = Arcana.CanForgetSpell(ply, item.id)
 
 					if not ok then
 						surface.PlaySound("buttons/button8.wav")
@@ -1376,10 +1307,10 @@ if CLIENT then
 
 		rebuild()
 		-- Live-rebuild when KP changes while the menu is open
-		local lastKP = (Arcana:GetPlayerData(ply) and Arcana:GetPlayerData(ply).knowledge_points) or 0
+		local lastKP = Arcana.GetKnowledgePoints(ply)
 
 		function frame:Think()
-			local d = Arcana:GetPlayerData(ply)
+			local d = Arcana.GetPlayerData(ply)
 			local kp = (d and d.knowledge_points) or 0
 
 			if kp ~= lastKP then
@@ -1427,7 +1358,7 @@ if CLIENT then
 	function ENT:DrawGlyphParticles()
 		if not self._glyphParticles then return end
 
-		local bloom = Arcana and Arcana.Bloom
+		local bloom = Arcana.Bloom
 
 		if bloom and bloom.ProcessBloom then
 			-- Two passes. The bloom only ever sees a faint copy, which becomes the halo; putting

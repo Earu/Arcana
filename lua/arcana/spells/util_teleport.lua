@@ -96,7 +96,7 @@ local function findSafeTeleportDestination(ply)
 	return newpos
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "teleport",
 	name = "Teleport",
 	description = "Teleport to your aim point within range, finding a safe landing spot.",
@@ -159,7 +159,7 @@ if CLIENT then
 	hook.Add("Arcana_BeginCastingVisuals", "Arcana_Teleport_Circle", function(caster, spellId, castTime, _forwardLike)
 		if spellId ~= "teleport" then return end
 
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(140, 200, 255, 255),
 			size = 18,
 			intensity = 3,
@@ -167,7 +167,7 @@ if CLIENT then
 				if c:IsPlayer() then
 					return findSafeTeleportDestination(c)
 				else
-					return Arcana:ResolveGroundTarget(c, 1000)
+					return Arcana.ResolveGroundTarget(c, 1000)
 				end
 			end
 		})

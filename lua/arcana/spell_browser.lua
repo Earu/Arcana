@@ -42,7 +42,6 @@ local function OpenSpellBrowser()
 	-- Palette
 	local gold = Color(198, 160, 74)
 	local paleGold = Color(222, 198, 120)
-	local textBright = Color(236, 230, 220)
 	local headerDark = Color(32, 24, 18, 245)
 	local rowDark1 = Color(30, 24, 20, 180)
 	local rowDark2 = Color(36, 30, 26, 180)

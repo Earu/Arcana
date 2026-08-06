@@ -109,7 +109,7 @@ if SERVER then
 		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
 			if #targets >= (self.OrbMaxTargetsPerTick or 6) then break end
 			local isValidTarget = IsValid(ent) and ent ~= self and ent ~= owner
-			isValidTarget = isValidTarget and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+			isValidTarget = isValidTarget and Arcana.Common.IsActor(ent)
 			isValidTarget = isValidTarget and (not ent:IsPlayer() or ent:Alive())
 			isValidTarget = isValidTarget and (not ent:IsNPC() or ent:Health() > 0)
 
@@ -178,7 +178,7 @@ if SERVER then
 		self._detonated = true
 		local owner = self:GetSpellOwner() or self
 		local pos = self:GetPos()
-		Arcana:BlastDamage(IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, { inflictor = self, damageType = bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), ignoreAttacker = true })
+		Arcana.BlastDamage(IsValid(owner) and owner or self, pos, self.OrbExplodeRadius or 220, self.OrbExplodeDamage or 85, { inflictor = self, damageType = bit.bor(DMG_SHOCK, DMG_ENERGYBEAM), ignoreAttacker = true })
 
 		local ed = EffectData()
 		ed:SetOrigin(pos)

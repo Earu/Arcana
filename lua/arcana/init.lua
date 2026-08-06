@@ -26,9 +26,8 @@ if SERVER then
 	AddCSLuaFile("arcana/system/npc_casting.lua")
 	AddCSLuaFile("arcana/system/lifecycle.lua")
 	AddCSLuaFile("arcana/system/hud.lua")
-	AddCSLuaFile("arcana/system/mana_network.lua")
 	AddCSLuaFile("arcana/system/mana_crystals.lua")
-	AddCSLuaFile("arcana/system/tutorial.lua")
+	AddCSLuaFile("arcana/system/scenes.lua")
 	AddCSLuaFile("arcana/system/default_inventory.lua")
 
 	AddCSLuaFile("arcana/system/vfx/casting.lua")
@@ -66,8 +65,7 @@ include("arcana/system/quickslots.lua")
 include("arcana/system/npc_casting.lua")
 include("arcana/system/lifecycle.lua")
 include("arcana/system/environments.lua")
-include("arcana/system/mana_network.lua")
-include("arcana/system/tutorial.lua")
+include("arcana/system/scenes.lua")
 
 include("arcana/system/vfx/casting.lua")
 include("arcana/system/vfx/bloom.lua")
@@ -85,7 +83,7 @@ includePath("arcana/common")
 -- rely on it only at call time.
 includePath("arcana/spellcraft")
 
--- Tutorial scenes (must load after arcana/system/tutorial.lua)
+-- Scene definitions (must load after arcana/system/scenes.lua)
 includePath("arcana/scenes")
 
 if SERVER then

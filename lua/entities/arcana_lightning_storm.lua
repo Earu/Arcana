@@ -256,7 +256,7 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 		dmgInfo:SetAttacker(IsValid(owner) and owner or self)
 		dmgInfo:SetInflictor(self)
 		targetEnt:Ignite(1, damageRadius)
-		Arcana:TakeDamageInfo(targetEnt, dmgInfo)
+		Arcana.TakeDamageInfo(targetEnt, dmgInfo)
 
 		-- Apply force if it's a physics object
 		local phys = targetEnt:GetPhysicsObject()
@@ -280,7 +280,7 @@ function ENT:DamageSurroundingEntities(strikePos, targetEnt)
 				dmgInfo:SetDamageType(DMG_DISSOLVE)
 				dmgInfo:SetAttacker(IsValid(owner) and owner or self)
 				dmgInfo:SetInflictor(self)
-				Arcana:TakeDamageInfo(ent, dmgInfo)
+				Arcana.TakeDamageInfo(ent, dmgInfo)
 			end
 
 			-- Apply force to physics objects

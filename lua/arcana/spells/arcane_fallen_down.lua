@@ -103,7 +103,6 @@ local function startBeamPhase(caster, targetPos)
 	-- Initial MASSIVE screen shake
 	Arcana.Common.ScreenShake(targetPos, 30, 150, 3.0, MAX_BEAM_RADIUS * 2)
 	local startTime = CurTime()
-	local endTime = startTime + BEAM_DURATION
 	-- Damage tick rate
 	local damageTickRate = 0.1
 	local damageTicks = math.floor(BEAM_DURATION / damageTickRate)
@@ -127,7 +126,7 @@ local function startBeamPhase(caster, targetPos)
 			for _, ent in ipairs(ents.FindInSphere(targetPos, currentRadius)) do
 				if not IsValid(ent) then continue end
 				if ent == caster then continue end
-				local isLiving = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+				local isLiving =Arcana.Common.IsActor(ent)
 
 				if isLiving then
 					-- Obliterate living things with GODLY damage - 1 million per tick
@@ -136,7 +135,7 @@ local function startBeamPhase(caster, targetPos)
 					dmg:SetDamageType(DMG_DISSOLVE)
 					dmg:SetAttacker(caster)
 					dmg:SetInflictor(caster)
-					Arcana:TakeDamageInfo(ent, dmg)
+					Arcana.TakeDamageInfo(ent, dmg)
 				else
 					-- Ignite everything else
 					if ent:IsOnFire() == false then
@@ -202,7 +201,7 @@ local function startBeamPhase(caster, targetPos)
 
 		Arcana.Common.ScreenShake(targetPos, 40, 200, 4.0, MAX_BEAM_RADIUS * 2.5)
 		-- Final damage wave
-		Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS, 200, { damageType = bit.bor(DMG_BLAST, DMG_DISSOLVE), ignoreAttacker = true })
+		Arcana.BlastDamage(caster, targetPos, MAX_BEAM_RADIUS, 200, { damageType = bit.bor(DMG_BLAST, DMG_DISSOLVE), ignoreAttacker = true })
 		-- Broadcast final impact wave
 		net.Start("Arcana_FallenDown_ImpactWave", true)
 		net.WriteVector(targetPos)
@@ -257,7 +256,7 @@ local function startBeamPhase(caster, targetPos)
 								dmg:SetDamageType(DMG_CRUSH)
 								dmg:SetAttacker(caster)
 								dmg:SetInflictor(caster)
-								Arcana:TakeDamageInfo(ent, dmg)
+								Arcana.TakeDamageInfo(ent, dmg)
 							end
 						end
 					end
@@ -293,7 +292,7 @@ local function startBeamPhase(caster, targetPos)
 				end)
 
 				-- Final pull damage
-				Arcana:BlastDamage(caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, { damageType = bit.bor(DMG_CRUSH, DMG_BLAST), ignoreAttacker = true })
+				Arcana.BlastDamage(caster, targetPos, MAX_BEAM_RADIUS * 1.2, 100000, { damageType = bit.bor(DMG_CRUSH, DMG_BLAST), ignoreAttacker = true })
 				Arcana.Common.ScreenShake(targetPos, 50, 255, 2.0, MAX_BEAM_RADIUS * 2.5)
 				-- Broadcast collapse visuals
 				net.Start("Arcana_FallenDown_VacuumCollapse", true)
@@ -305,7 +304,7 @@ local function startBeamPhase(caster, targetPos)
 	end)
 end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "fallen_down",
 	on_register = function()
 		if not SERVER then return end
@@ -333,7 +332,7 @@ Arcana:RegisterSpell({
 		-- (cast function is called AFTER the 60-second charge time)
 		if SERVER then
 			-- Re-check target position at moment of cast completion
-			local finalTarget = Arcana:ResolveGroundTarget(caster, 2000)
+			local finalTarget = Arcana.ResolveGroundTarget(caster, 2000)
 
 			if not finalTarget then
 				cleanupChargingState(caster, true) -- Stop BGM on targeting failure
@@ -353,7 +352,6 @@ Arcana:RegisterSpell({
 if CLIENT then
 	local matBeam = Material("effects/laser1")
 	local matGlow = Material("sprites/light_glow02_add")
-	local matFlare = Material("effects/blueflare1")
 	local matRing = Material("effects/select_ring")
 	-- Active beams being rendered
 	local activeBeams = {}
@@ -394,7 +392,6 @@ if CLIENT then
 	local terminalNextCharTime = 0
 	local terminalCharDelay = 0.015 -- 15ms per character (faster)
 	local terminalLineDelay = 0.2 -- 200ms between lines (faster)
-	local currentlyTypingLine = nil -- Track which line is currently being typed
 	local phase1Complete = false -- Track when Phase 1 terminal is done
 	local phase1CompleteTime = 0 -- When Phase 1 completed
 	local transitionDuration = 1.5 -- 1.5 second transition with noise
@@ -1601,12 +1598,12 @@ if CLIENT then
 			auraParticles = {}
 		end)
 
-		Arcana:CreateFollowingCastCircle(caster, spellId, castTime, {
+		Arcana.CreateFollowingCastCircle(caster, spellId, castTime, {
 			color = Color(170, 220, 255, 255), -- Bright blue-white/cyan matching the spell's theme
 			size = MAX_BEAM_RADIUS, -- 2000 - shows the full impact radius
 			intensity = 150,
 			positionResolver = function(c)
-				return Arcana:ResolveGroundTarget(c, 1000)
+				return Arcana.ResolveGroundTarget(c, 1000)
 			end
 		})
 

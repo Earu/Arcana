@@ -46,7 +46,7 @@ local function fireThunderLine(attacker, wep, baseDamage)
 	for i = 1, steps do
 		local p = start + dir * (i * spacing)
 		for _, ent in ipairs(ents.FindInSphere(p, radius + 8)) do
-			if IsValid(ent) and ent ~= attacker and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then
+			if IsValid(ent) and ent ~= attacker and Arcana.Common.IsActor(ent) then
 				-- Ensure the entity lies roughly in front within the segment range
 				local toEnt = ent:WorldSpaceCenter() - start
 				local proj = toEnt:Dot(dir)
@@ -121,7 +121,7 @@ local function detachHook(ply, wep, state)
 	state._hookId = nil
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "thundering_reach",
 	name = "Thundering Reach",
 	description = "Unleash a line of thunder on melee swing, damaging foes ahead.",

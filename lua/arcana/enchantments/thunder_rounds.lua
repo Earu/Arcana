@@ -24,7 +24,7 @@ local function applyLightningDamage(attacker, hitPos)
 	})
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "thunder_rounds",
 	name = "Thunder Rounds",
 	description = "Each bullet impact calls a lightning AoE, chaining to nearby foes.",

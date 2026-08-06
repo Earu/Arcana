@@ -7,7 +7,7 @@ local ACCEPTABLE_SURFACE_TYPES = {
 
 local FOREST_LIFETIME = 60 * 20
 
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_magical_forest",
 	name = "Ritual: Magical Forest",
 	description = "Summons a dense magical forest.",
@@ -47,19 +47,19 @@ Arcana:RegisterRitualSpell({
 
 		local Envs = Arcana.Environments
 		if Envs:IsActive() then
-			Arcana:SendErrorNotification(activatingPly, "Ritual failed: Another environment is already active.")
+			Arcana.SendErrorNotification(activatingPly, "Ritual failed: Another environment is already active.")
 			return
 		end
 
 		local lockLeft = Arcana.Environments:GetLockRemaining("magical_forest")
 		if lockLeft > 0 then
-			Arcana:SendErrorNotification(activatingPly, "Ritual failed: The forest can't be summoned again for another " .. string.NiceTime(lockLeft) .. ".")
+			Arcana.SendErrorNotification(activatingPly, "Ritual failed: The forest can't be summoned again for another " .. string.NiceTime(lockLeft) .. ".")
 			return
 		end
 
 		local ok, reason = Envs:Start("magical_forest", selfEnt:GetPos(), activatingPly)
 		if not ok then
-			Arcana:SendErrorNotification(activatingPly, "Ritual failed: " .. tostring(reason))
+			Arcana.SendErrorNotification(activatingPly, "Ritual failed: " .. tostring(reason))
 			return
 		end
 

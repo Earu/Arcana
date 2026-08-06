@@ -8,7 +8,7 @@ if Arcana then
 		[MAT_SNOW] = true,
 	}
 
-	Arcana:RegisterRitualSpell({
+	Arcana.RegisterRitualSpell({
 		id = "ritual_magical_mushroom",
 		name = "Ritual: Magical Mushroom",
 		description = "Summons a magical mushroom.",
@@ -45,7 +45,7 @@ if Arcana then
 
 				SafeRemoveEntityDelayed(mushroom, COOLDOWN_TIME)
 			else
-				Arcana:SendErrorNotification(activatingPly, "Ritual failed: Mushroom was not summoned")
+				Arcana.SendErrorNotification(activatingPly, "Ritual failed: Mushroom was not summoned")
 				return
 			end
 

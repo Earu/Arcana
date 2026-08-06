@@ -1,4 +1,4 @@
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "stone_volley",
 	name = "Stone Volley",
 	description = "Summon pebbles above and launch them forward.",

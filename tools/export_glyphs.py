@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Arcana Glyph PNG Exporter
-Renders each of the 8 Pulsian runic glyphs (A–H) to a square PNG where the
+Renders each of the 8 Pulsian runic glyphs (A-H) to a square PNG where the
 glyph fills a configurable fraction of the canvas (~85 % by default).
 
 Requirements:  pip install Pillow
 
-Output (default): <addon_root>/lua/arcana/tools/glyph_exports/glyph_<charcode>.png
+Output (default): tools/glyph_exports/glyph_<charcode>.png
 
 Usage:
     python export_glyphs.py
@@ -26,8 +26,7 @@ CANVAS_SIZE = 1024               # output PNG size in pixels (square)
 FILL_RATIO  = 0.85               # glyph fills this fraction of the canvas edge
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-# Addon root is 3 levels up from lua/arcana/tools/
-_ADDON_ROOT = (_SCRIPT_DIR / "../../..").resolve()
+_ADDON_ROOT = _SCRIPT_DIR.parent
 FONT_PATH   = _ADDON_ROOT / "resource" / "fonts" / "pulsian.ttf"
 
 # ── Core rendering ─────────────────────────────────────────────────────────────
@@ -78,7 +77,7 @@ def render_glyph(char: str, font_path: Path, canvas: int, fill: float) -> Image.
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Export Arcana rune glyphs (A–H) to PNG using the Pulsian font."
+        description="Export Arcana rune glyphs (A-H) to PNG using the Pulsian font."
     )
     parser.add_argument(
         "--output", "-o",
@@ -131,7 +130,7 @@ def main() -> None:
         except Exception as exc:
             print(f"  [SKIP] '{ch}': {exc}", file=sys.stderr)
 
-    print(f"\nDone — {len(args.glyphs)} file(s) written to {output_dir.resolve()}")
+    print(f"\nDone, {len(args.glyphs)} file(s) written to {output_dir.resolve()}")
 
 
 if __name__ == "__main__":

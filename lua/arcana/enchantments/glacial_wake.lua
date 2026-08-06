@@ -22,7 +22,7 @@ local function fireWake(owner, impactPos, path)
 			if ent == owner then continue end
 			seenEnts[ent] = true
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			if not isActor then continue end
 
 			local dmg = DamageInfo()
@@ -56,7 +56,7 @@ local function fireWake(owner, impactPos, path)
 	net.Broadcast()
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "glacial_wake",
 	name = "Glacial Wake",
 	description = "Your projectile leaves a frost scar through the air. On impact the entire flight path erupts with ice, chilling and slowing every entity it passed near.",
@@ -98,7 +98,7 @@ if CLIENT then
 	local activeWakes = {}
 
 	-- Build a single-kink angular fracture path between two world positions.
-	-- Called ONCE per segment and stored — ice is frozen, the geometry never shifts.
+	-- Called ONCE per segment and stored: ice is frozen, the geometry never shifts.
 	local function buildCrackSegment(a, b)
 		local dir = b - a
 		local len = dir:Length()
@@ -143,7 +143,7 @@ if CLIENT then
 				for _ = 1, 4 do
 					local sp = emitter:Add("effects/blueflare1", pos + VectorRand() * 10)
 					if sp then
-						-- Almost no velocity — they drift rather than fly
+						-- Almost no velocity: they drift rather than fly
 						sp:SetVelocity(VectorRand() * 8 + Vector(0, 0, 3 + math.random(0, 5)))
 						sp:SetDieTime(2.0 + math.Rand(0, 1.5))
 						sp:SetStartAlpha(140 + math.floor(tNorm * 40))
@@ -151,7 +151,7 @@ if CLIENT then
 						sp:SetStartSize(3 + math.random(0, 2))
 						sp:SetEndSize(1)
 						sp:SetColor(215, 238, 255)
-						sp:SetGravity(Vector(0, 0, -6))  -- barely any — they float
+						sp:SetGravity(Vector(0, 0, -6))  -- barely any, they float
 						sp:SetAirResistance(25)
 						sp:SetRoll(math.Rand(0, 360))
 						sp:SetRollDelta(math.Rand(-1.5, 1.5))
@@ -208,7 +208,7 @@ if CLIENT then
 			points[i] = net.ReadVector()
 		end
 
-		-- Pre-build all crack geometry (locked in place — ice fractures don't animate)
+		-- Pre-build all crack geometry (locked in place, ice fractures don't animate)
 		local arcs = {}
 		for i = 1, #points - 1 do
 			arcs[i] = buildCrackSegment(points[i], points[i + 1])
@@ -235,11 +235,11 @@ if CLIENT then
 		local hazeWidth  = 10 + tNorm * 8
 
 		render.SetMaterial(crackMat)
-		-- Atmospheric ice-blue haze — wide, nearly transparent
+		-- Atmospheric ice-blue haze: wide, nearly transparent
 		for i = 1, #segPts - 1 do
 			render.DrawBeam(segPts[i], segPts[i + 1], hazeWidth, 0, 1, Color(190, 220, 255, hazeA))
 		end
-		-- Bright frosted crack — thin, white-dominant
+		-- Bright frosted crack: thin, white-dominant
 		for i = 1, #segPts - 1 do
 			render.DrawBeam(segPts[i], segPts[i + 1], 2.2, 0, 1, Color(230, 245, 255, crackA))
 		end
@@ -275,7 +275,7 @@ if CLIENT then
 
 			render.SetMaterial(glowMat)
 
-			-- Large glow at impact point — lingers longest, cold white-blue
+			-- Large glow at impact point: lingers longest, cold white-blue
 			local impAlpha = math.Clamp(1 - (elapsed - halfDur) / halfDur, 0, 1)
 			if impAlpha > 0.01 then
 				local sz = 100 * impAlpha

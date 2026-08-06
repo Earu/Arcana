@@ -120,10 +120,10 @@ local function sourceHasScriptedCreate(source)
 end
 
 -- Recursively inspects `func`'s source using a caller-supplied match function.
--- `weapon`  – the SWEP table being analysed (used to resolve self:Method calls)
--- `visited` – set of "file:line" keys already examined (cycle guard)
--- `depth`   – current recursion depth
--- `matchFn` – function(source: string): bool called on each function body
+-- `weapon`: the SWEP table being analysed (used to resolve self:Method calls)
+-- `visited`: set of "file:line" keys already examined (cycle guard)
+-- `depth`: current recursion depth
+-- `matchFn`: function(source: string): bool called on each function body
 local function checkForMatch(func, weapon, visited, depth, matchFn)
 	if depth > MAX_DEPTH then return false end
 

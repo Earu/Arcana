@@ -1,6 +1,6 @@
 -- Arcana Missiles Rounds: On firearm shot, launch three homing arcane missiles toward your aim
 -- Adapted from spells/arcane_missiles.lua
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "seeking_salvo",
 	name = "Seeking Salvo",
 	description = "On shot, launches three homing arcane missiles toward your aim.",

@@ -1,7 +1,20 @@
+-- Arcana Attachment Debug Overlay: developer one-shot tool.
+-- Labels every attachment point on the held weapon (or its viewmodel) with a marker and its name.
+--
+-- Viewmodel attachment positions come back in viewmodel FOV space, so they land in the wrong
+-- place if fed straight to Vector:ToScreen(). projectViewModelToWorldPos() unformats them into
+-- world FOV space first, which is why the markers track the model instead of drifting with FOV.
+--
+-- Usage (client realm only):
+--   lua_openscript_cl arcana/tools/debug_attachments.lua
+--   arcana_debug_attachments 1    -- show the overlay
+--   arcana_debug_attachments 0    -- hide it (default)
 if SERVER then return end
 
 local SQUARE_SIZE = 4
 local FONT_NAME = "Arcana_DebugAttach"
+
+local enabled = CreateClientConVar("arcana_debug_attachments", "0", false, false, "Draw attachment point markers on the held weapon")
 
 surface.CreateFont(FONT_NAME, {
 	font = "Consolas",
@@ -73,6 +86,8 @@ local function collectAttachments(ent)
 end
 
 hook.Add("HUDPaint", "Arcana_DebugAttachments", function()
+	if not enabled:GetBool() then return end
+
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not ply:Alive() then return end
 

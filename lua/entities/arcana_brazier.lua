@@ -67,10 +67,12 @@ if SERVER then
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
 
+		-- Motion stays enabled: the brazier hovers, and PhysicsSimulate below drives it with
+		-- ComputeShadowControl. Freezing the physics object here leaves it sitting on the
+		-- ground with the motion controller unable to move it.
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:Wake()
-			phys:EnableMotion(false)
 		end
 
 		-- Start motion controller for floating

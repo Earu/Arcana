@@ -1,4 +1,4 @@
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "arcane_spear",
 	name = "Arcane Spear",
 	description = "Project a powerful lance of arcane energy that deals massive damage.",

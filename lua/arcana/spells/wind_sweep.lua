@@ -1,6 +1,6 @@
 if SERVER then util.AddNetworkString("Arcana_WindSweep") end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "wind_sweep",
 	name = "Wind Sweep",
 	description = "Unleash a violent gust pushing foes away.",
@@ -33,11 +33,11 @@ Arcana:RegisterSpell({
 		net.Broadcast()
 
 		for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
-			if ent ~= srcEnt and IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
+			if ent ~= srcEnt and IsValid(ent) and (Arcana.Common.IsActor(ent) or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
 				local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
 
 				if dir:Dot(forward) >= cone then
-					if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
+					if Arcana.Common.IsActor(ent) then
 						-- Deal damage
 						local dmg = DamageInfo()
 						dmg:SetDamage(baseDamage)
@@ -77,9 +77,6 @@ Arcana:RegisterSpell({
 -- Network string registered in arcana/init.lua
 
 if CLIENT then
-	local matGlow = Material("sprites/light_glow02_add")
-	local matBeam = Material("effects/laser1")
-	local matSmoke = Material("particle/particle_smokegrenade")
 
 	net.Receive("Arcana_WindSweep", function()
 		local origin = net.ReadVector()

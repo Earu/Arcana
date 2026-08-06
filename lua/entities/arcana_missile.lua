@@ -41,7 +41,7 @@ if SERVER then
 			phys:EnableGravity(false)
 		end
 
-		Arcana:SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
+		Arcana.SendAttachBandVFX(self, ARCANE_COLOR, 14, self.MaxLifetime, {
 			{
 				radius = 10,
 				height = 3,
@@ -108,7 +108,7 @@ if SERVER then
 		if ent == owner then return end
 
 		-- Only damage players, NPCs, or NextBots
-		if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then return end
+		if not Arcana.Common.IsActor(ent) then return end
 
 		local dmg = DamageInfo()
 		dmg:SetDamage(self.MissileDamage or 45)

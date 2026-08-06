@@ -51,7 +51,7 @@ local STANDOFF_DIST = 550
 local XP_REWARD     = 150
 local FOOTSTEP_MIN_SPEED = 60
 
--- Spell definitions — cast times are 3× their player counterparts, cooldowns are halved
+-- Spell definitions: cast times are 3× their player counterparts, cooldowns are halved
 local SPELLS = {
 	lightning_strike = { castTime = 3.0, cooldown = 7.0 },
 	lightning_orb    = { castTime = 3.6, cooldown = 11.0 },
@@ -121,7 +121,6 @@ function ENT:Initialize()
 		                or  nil
 
 		self._cdTable        = {}
-		self._lastTargetScan = 0
 		self:SetNWBool("Casting", false)
 		self:SetAnimState("idle")
 	else
@@ -208,26 +207,8 @@ end
 
 -- ── Target acquisition ────────────────────────────────────────────────────────
 
-local function IsEnemy(e)
-	return IsValid(e) and e:IsPlayer() and e:Alive()
-end
-
 function ENT:AcquireTarget()
-	local now = CurTime()
-	if now < (self._lastTargetScan or 0) then return self._target end
-	self._lastTargetScan = now + 0.4
-
-	local myPos = self:GetPos()
-	local nearest, bestD2 = nil, CHASE_RANGE * CHASE_RANGE
-	for _, ply in ipairs(player.GetAll()) do
-		if IsEnemy(ply) then
-			local d2 = myPos:DistToSqr(ply:GetPos())
-			if d2 < bestD2 then bestD2, nearest = d2, ply end
-		end
-	end
-
-	self._target = nearest
-	return self._target
+	return Arcana.Common.AcquireNearestPlayer(self, CHASE_RANGE, 0.4)
 end
 
 -- ── Spell management ──────────────────────────────────────────────────────────
@@ -242,7 +223,7 @@ function ENT:_NextSpell()
 	end
 end
 
--- Called inside the RunBehaviour coroutine — yields internally for the cast duration
+-- Called inside the RunBehaviour coroutine: yields internally for the cast duration
 function ENT:_DoCast(spellId, tgt)
 	-- Snapshot where the player is standing RIGHT NOW so they can dodge during the cast
 	local strikePos = (spellId == "lightning_strike" and IsValid(tgt)) and tgt:GetPos() or nil
@@ -286,7 +267,7 @@ function ENT:_DoCast(spellId, tgt)
 	self:SetAnimState("idle") -- back to normal holdtype
 end
 
--- targetPos is snapshotted at cast-start (feet position), not live — players can dodge by moving
+-- targetPos is snapshotted at cast-start (feet position), not live, players can dodge by moving
 function ENT:_FireLightningStrike(targetPos)
 	local strikes = {
 		{ delay = 0.00, offset = Vector(0, 0, 0),                                   power = 1.0 },
@@ -337,7 +318,7 @@ function ENT:_FireLightningStrike(targetPos)
 					end,
 				})
 			else
-				Arcana:BlastDamage(self, pos, 60, 10, { damageType = DMG_SHOCK })
+				Arcana.BlastDamage(self, pos, 60, 10, { damageType = DMG_SHOCK })
 			end
 		end)
 	end
@@ -457,8 +438,8 @@ end
 function ENT:OnKilled(dmginfo)
 	local killer = dmginfo:GetAttacker()
 	if not (IsValid(killer) and killer:IsPlayer()) then killer = self._lastHurtBy end
-	if IsValid(killer) and killer:IsPlayer() and not Arcana:IsPotentialCheater(killer) then
-		Arcana:GiveXP(killer, XP_REWARD, "Lich defeated")
+	if IsValid(killer) and killer:IsPlayer() and not Arcana.IsPotentialCheater(killer) then
+		Arcana.GiveXP(killer, XP_REWARD, "Lich defeated")
 	end
 
 	self:EmitSound("arcana/skeleton/death.ogg", 75, math.random(80, 95), 1)
@@ -498,7 +479,7 @@ function ENT:OnRemove()
 	end
 end
 
--- ── Think (client visuals only — nextbot calls this automatically) ────────────
+-- ── Think (client visuals only, nextbot calls this automatically) ────────────
 
 local DRAW_DISTANCE = 2000 * 2000
 

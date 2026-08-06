@@ -21,7 +21,7 @@ local function syncWeaponEnchantNW(wep)
 	end
 end
 -- Enchantment API
--- RegisterEnchantment(def) — registers an enchantment with the following fields:
+-- RegisterEnchantment(def): registers an enchantment with the following fields:
 --   id (string): unique identifier
 --   name (string): display name
 --   description (string): tooltip text
@@ -32,7 +32,7 @@ end
 --   remove(ply, wep, state): remove runtime behavior when enchantment is stripped
 --   on_projectile_fired(ply, wep, proj, state): optional; called automatically by the system
 --     whenever a player fires a projectile from this enchanted weapon. Ownership is resolved
---     via Arcana.WeaponClassification.ResolveProjectileOwner — no manual OnEntityCreated hook needed.
+--     via Arcana.WeaponClassification.ResolveProjectileOwner, no manual OnEntityCreated hook needed.
 --   on_shot_fired(ply, wep, data, state): optional; called automatically by the system whenever
 --     a player shoots this enchanted HITSCAN weapon, whether it fires real bullets (relayed from
 --     EntityFireBullets) or not (synthesized trace shot, data.ArcanaSynthesized == true). data is
@@ -40,7 +40,7 @@ end
 --   max_stacks (number, default 1): max simultaneous applications
 --   grants_xp (bool, default true): whether a successful apply awards XP via GiveXP.
 --     Set to false for system-applied enchantments (e.g., vault restore) that should not grant XP.
-function Arcana:RegisterEnchantment(def)
+function Arcana.RegisterEnchantment(def)
 	if not istable(def) then
 		ErrorNoHalt("RegisterEnchantment requires a table definition\n")
 		return false
@@ -59,11 +59,11 @@ function Arcana:RegisterEnchantment(def)
 		name = name,
 		description = def.description or "Mystic modification to a weapon",
 		-- Requirements/costs
-		cost_coins = tonumber(def.cost_coins or 0) or 0,
+		cost_coins = tonumber(def.cost_coins) or 0,
 		cost_items = istable(def.cost_items) and def.cost_items or { -- array of {name="mana_crystal_shard", amount=5}
 			{name = "mana_crystal_shard", amount = 1}
 		},
-		-- Applicability: return (bool, reason) — reason is a human-readable string on failure, matching can_cast contract
+		-- Applicability: return (bool, reason), reason is a human-readable string on failure, matching can_cast contract
 		can_apply = def.can_apply, -- function(ply, wep) -> (bool, reason?)
 		on_projectile_fired = def.on_projectile_fired, -- function(ply, wep, proj, state)
 		on_shot_fired = def.on_shot_fired, -- function(ply, wep, data, state)
@@ -71,17 +71,17 @@ function Arcana:RegisterEnchantment(def)
 		apply = def.apply,   -- function(ply, wep, state)
 		remove = def.remove, -- function(ply, wep, state)
 		-- Optional: maximum stacks or config
-		max_stacks = tonumber(def.max_stacks or 1) or 1,
+		max_stacks = tonumber(def.max_stacks) or 1,
 		-- Whether a successful apply grants XP (default true); set false for system-applied enchantments
 		grants_xp = def.grants_xp ~= false,
 	}
 
 	Arcana.RegisteredEnchantments[id] = ench
-	Arcana:Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
+	Arcana.Print("Registered enchantment '" .. name .. "' (ID: " .. id .. ")")
 	return true
 end
 
-function Arcana:GetEntityEnchantments(wep)
+function Arcana.GetEntityEnchantments(wep)
 	if not IsValid(wep) then return {} end
 
 	if SERVER then
@@ -96,9 +96,9 @@ function Arcana:GetEntityEnchantments(wep)
 		wep.ArcanaEnchantmentsNextUpdate = CurTime() + 0.5
 
 		local appliedSet = {}
-		local json = wep:GetNWString("Arcana_EnchantIds", "[]")
-		local ok, arr = pcall(util.JSONToTable, json)
-		if ok and istable(arr) then
+		local arr = Arcana.DecodeJSON(wep:GetNWString("Arcana_EnchantIds", "[]"),
+			"Arcana_EnchantIds on " .. tostring(wep), nil)
+		if arr then
 			for _, id in ipairs(arr) do
 				appliedSet[id] = true
 			end
@@ -109,14 +109,17 @@ function Arcana:GetEntityEnchantments(wep)
 	end
 end
 
-function Arcana:HasEntityEnchantment(wep, enchId)
-	local list = self:GetEntityEnchantments(wep)
+--- True when `wep` currently has `enchId` applied.
+-- Part of the public Arcana.* surface for third-party integrations; the addon itself
+-- reads the whole map through GetEntityEnchantments.
+function Arcana.HasEntityEnchantment(wep, enchId)
+	local list = Arcana.GetEntityEnchantments(wep)
 	return list[enchId] ~= nil
 end
 
 -- Apply/remove on a specific weapon entity instance.
 -- skipXP: if true, overrides the enchantment's grants_xp field and suppresses XP award (e.g., vault restore).
-function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
+function Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 
@@ -150,8 +153,8 @@ function Arcana:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, skipXP)
 
 	-- Award XP if allowed by both the enchantment definition and the call site
 	if SERVER and not skipXP and ench.grants_xp then
-		local amount = tonumber(self.Config.XP_PER_ENCHANT_SUCCESS) or 20
-		self:GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
+		local amount = tonumber(Arcana.Config.XP_PER_ENCHANT_SUCCESS) or 20
+		Arcana.GiveXP(ply, amount, "Enchantment: " .. (ench.name or enchId))
 	end
 
 	Arcana.RunHook("AppliedEnchantment", ply, wep, enchId)
@@ -161,11 +164,11 @@ end
 -- Restores an enchantment to a weapon without awarding XP.
 -- Use for system operations (e.g. vault restore) where XP should not be granted.
 -- Semantically distinct from ApplyEnchantmentToWeaponEntity which awards XP by default.
-function Arcana:RestoreEnchantmentToWeaponEntity(ply, wep, enchId)
-	return self:ApplyEnchantmentToWeaponEntity(ply, wep, enchId, true)
+function Arcana.RestoreEnchantmentToWeaponEntity(ply, wep, enchId)
+	return Arcana.ApplyEnchantmentToWeaponEntity(ply, wep, enchId, true)
 end
 
-function Arcana:RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
+function Arcana.RemoveEnchantmentFromWeaponEntity(ply, wep, enchId)
 	if not IsValid(ply) then return false, "Invalid player" end
 	if not IsValid(wep) then return false, "Invalid weapon" end
 

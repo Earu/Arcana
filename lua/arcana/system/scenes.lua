@@ -1,6 +1,6 @@
 local _shaderOk, _shaderErr = pcall(require, "shader_to_gma")
 if not _shaderOk then
-	MsgC(Color(255, 200, 0), "[Arcana] ", Color(200, 200, 200), "Optional dependency 'shader_to_gma' not found — tutorial crystal shaders will be disabled. " .. tostring(_shaderErr) .. "\n")
+	MsgC(Color(255, 200, 0), "[Arcana] ", Color(200, 200, 200), "Optional dependency 'shader_to_gma' not found, scene crystal shaders will be disabled. " .. tostring(_shaderErr) .. "\n")
 end
 
 if SERVER then
@@ -18,21 +18,21 @@ if SERVER then
 	return
 end -- This is a CLIENT-only module
 
-local Tutorial = {}
-Arcana.Tutorial = Tutorial
+local Scenes = {}
+Arcana.Scenes = Scenes
 
--- Tutorial state
-Tutorial.active = false
-Tutorial.phase = "none" -- none, fade_to_black, tutorial, fade_to_white
-Tutorial.fadeProgress = 0
-Tutorial.fadeStart = 0
-Tutorial.fadeOutDuration = 2.5  -- Fade out (2.0s fade + 0.5s hold at peak)
-Tutorial.fadeInDuration = 1.5   -- Fade in (0.5s hold at peak + 1.0s fade)
-Tutorial.fadeOutTime = 2.0      -- Time spent actually fading out
-Tutorial.fadeInTime = 1.0       -- Time spent actually fading in
+-- Scene state
+Scenes.active = false
+Scenes.phase = "none" -- none, fade_to_black, scene, fade_to_white
+Scenes.fadeProgress = 0
+Scenes.fadeStart = 0
+Scenes.fadeOutDuration = 2.5  -- Fade out (2.0s fade + 0.5s hold at peak)
+Scenes.fadeInDuration = 1.5   -- Fade in (0.5s hold at peak + 1.0s fade)
+Scenes.fadeOutTime = 2.0      -- Time spent actually fading out
+Scenes.fadeInTime = 1.0       -- Time spent actually fading in
 
 -- Space environment
-Tutorial.skyboxTextures = {
+Scenes.skyboxTextures = {
 	RIGHT = "arcana/skybox/nebula/right",
 	LEFT = "arcana/skybox/nebula/left",
 	UP = "arcana/skybox/nebula/up",
@@ -43,7 +43,7 @@ Tutorial.skyboxTextures = {
 
 -- Skybox face rotations (in degrees: 0, 90, 180, 270, or any angle)
 -- Adjust these values to rotate texture coordinates for each face
-Tutorial.skyboxRotations = {
+Scenes.skyboxRotations = {
 	RIGHT = 0,
 	LEFT = 180,
 	UP = 90,
@@ -52,35 +52,35 @@ Tutorial.skyboxRotations = {
 	BACK = 0
 }
 
--- Tutorial objects
--- focusEnt is set by the active scene (Arcana_Tutorial_CreateScene hook); it anchors
+-- Scene objects
+-- focusEnt is set by the active scene (Arcana_Scene_Create hook); it anchors
 -- player spawn positioning, the initial look-at, voice playback and panel triggering.
-Tutorial.focusEnt = nil
+Scenes.focusEnt = nil
 -- Direction from the focus entity towards the player spawn point; scenes can read
 -- this (e.g. to make their focus entity face the player when the scene fades in)
-Tutorial.spawnAwayDir = Vector(-1, 1, 0):GetNormalized()
-Tutorial.cubeModel = nil
+Scenes.spawnAwayDir = Vector(-1, 1, 0):GetNormalized()
+Scenes.cubeModel = nil
 
 -- Player state backup
-Tutorial.backupPos = nil
-Tutorial.backupAng = nil
-Tutorial.backupVel = nil
-Tutorial.simulatedPos = Vector(0, 0, 0)
-Tutorial.simulatedAng = Angle(0, 0, 0)
-Tutorial.simulatedVel = Vector(0, 0, 0)
+Scenes.backupPos = nil
+Scenes.backupAng = nil
+Scenes.backupVel = nil
+Scenes.simulatedPos = Vector(0, 0, 0)
+Scenes.simulatedAng = Angle(0, 0, 0)
+Scenes.simulatedVel = Vector(0, 0, 0)
 
 -- Interaction
-Tutorial.interactionDistance = 100
-Tutorial.showingPanel = false
-Tutorial.currentSequence = nil
-Tutorial.currentNode = nil
-Tutorial.currentVoiceSound = nil
+Scenes.interactionDistance = 100
+Scenes.showingPanel = false
+Scenes.currentSequence = nil
+Scenes.currentNode = nil
+Scenes.currentVoiceSound = nil
 
 -- Greek text morphing
-Tutorial.morphProgress = 0
-Tutorial.morphDuration = 1.0
-Tutorial.greekText = ""
-Tutorial.finalText = ""
+Scenes.morphProgress = 0
+Scenes.morphDuration = 1.0
+Scenes.greekText = ""
+Scenes.finalText = ""
 
 --[[
 	Sequence format (Conversation Tree):
@@ -106,22 +106,22 @@ Tutorial.finalText = ""
 		onComplete = function() end
 	}
 
-	Scene hooks (fired via Arcana.RunHook, receive the Tutorial table):
-		Arcana_Tutorial_CreateScene(tutorial, sequence)
-			Create scene ClientsideModels and set tutorial.focusEnt.
-			Optionally set tutorial.groundZ to control the height the player
+	Scene hooks (fired via Arcana.RunHook, receive the Scenes table):
+		Arcana_Scene_Create(scenes, sequence)
+			Create scene ClientsideModels and set scenes.focusEnt.
+			Optionally set scenes.groundZ to control the height the player
 			walks at (defaults to the focus entity's z).
-		Arcana_Tutorial_DrawScene(tutorial, eyePos)
+		Arcana_Scene_Draw(scenes, eyePos)
 			Draw the scene objects (models, floor/water, glows, effects).
-		Arcana_Tutorial_DrawAmbientParticles(tutorial, eyePos)
+		Arcana_Scene_DrawAmbientParticles(scenes, eyePos)
 			Draw the ambient particle field.
-		Arcana_Tutorial_Footstep(tutorial, ply)
+		Arcana_Scene_Footstep(scenes, ply)
 			Play a footstep sound (fired while the player is moving).
-		Arcana_Tutorial_ColorModify(tutorial, colorMod)
+		Arcana_Scene_ColorModify(scenes, colorMod)
 			Mutate the base DrawColorModify table before it is applied.
-		Arcana_Tutorial_ScreenspaceEffects(tutorial)
+		Arcana_Scene_ScreenspaceEffects(scenes)
 			Layer scene-specific post-processing on top of the base grade.
-		Arcana_Tutorial_DestroyScene(tutorial, sequence)
+		Arcana_Scene_Destroy(scenes, sequence)
 			Remove scene entities and clear scene state.
 	Hook implementations must guard on sequence/currentSequence id.
 ]]
@@ -142,7 +142,7 @@ local function RotateUV(u, v, rotation)
 end
 
 -- Initialize skybox textures
-function Tutorial:InitializeSkybox()
+function Scenes:InitializeSkybox()
 	-- Create materials dynamically for each skybox face
 	local faces = {"right", "left", "up", "down", "front", "back"}
 	self.skyboxMaterials = {}
@@ -159,7 +159,7 @@ function Tutorial:InitializeSkybox()
 end
 
 -- Create the cube mesh
-function Tutorial:CreateCubeMesh()
+function Scenes:CreateCubeMesh()
 	local cubeSize = 2000 -- Half-size for cube centered at origin
 	self.cubeSize = cubeSize -- Store for movement constraint (1/3 = ~833 units)
 	self.movementRadius = cubeSize / 3 -- Player can move 1/3 of cube size
@@ -242,8 +242,8 @@ function Tutorial:CreateCubeMesh()
 	}
 end
 
--- Start ambient music for tutorial
-function Tutorial:StartAmbientMusic()
+-- Start ambient music for the active scene
+function Scenes:StartAmbientMusic()
 	-- Create looping sound patch
 	self.ambientSound = CreateSound(LocalPlayer(), "arcana/altar_ambient_stereo.ogg")
 	if self.ambientSound then
@@ -254,8 +254,8 @@ function Tutorial:StartAmbientMusic()
 	end
 end
 
--- Update ambient music volume based on tutorial phase
-function Tutorial:UpdateAmbientMusic(dt)
+-- Update ambient music volume based on scene phase
+function Scenes:UpdateAmbientMusic(dt)
 	if not self.ambientSound then return end
 
 	-- Ensure sound is playing (restart if stopped)
@@ -267,7 +267,7 @@ function Tutorial:UpdateAmbientMusic(dt)
 	local targetVolume = 0
 	if self.phase == "fade_from_black" then
 		targetVolume = self.fadeProgress -- Fade in with visual
-	elseif self.phase == "tutorial" then
+	elseif self.phase == "scene" then
 		targetVolume = 1.0
 	elseif self.phase == "show_panel" then
 		targetVolume = 1.0 -- Keep playing during panel
@@ -296,15 +296,15 @@ function Tutorial:UpdateAmbientMusic(dt)
 end
 
 -- Stop ambient music
-function Tutorial:StopAmbientMusic()
+function Scenes:StopAmbientMusic()
 	if self.ambientSound then
 		self.ambientSound:Stop()
 		self.ambientSound = nil
 	end
 end
 
--- Start a tutorial sequence
-function Tutorial:StartSequence(sequence)
+-- Start a scene
+function Scenes:StartSequence(sequence)
 	if self.active then return false end
 
 	local ply = LocalPlayer()
@@ -336,7 +336,7 @@ function Tutorial:StartSequence(sequence)
 	-- (scenes may also set groundZ to control the height the player walks at)
 	self.focusEnt = nil
 	self.groundZ = nil
-	Arcana.RunHook("Tutorial_CreateScene", self, sequence)
+	Arcana.RunHook("Scene_Create", self, sequence)
 
 	-- Start ambient music (will fade in)
 	self:StartAmbientMusic()
@@ -359,66 +359,66 @@ function Tutorial:StartSequence(sequence)
 	self.currentNode = sequence.startNode or "start"
 
 	local function shouldHide()
-		return self.phase == "tutorial" or self.phase == "fade_from_black" or self.phase == "fade_to_white" or self.phase == "show_panel"
+		return self.phase == "scene" or self.phase == "fade_from_black" or self.phase == "fade_to_white" or self.phase == "show_panel"
 	end
 
 	-- Hook for rendering
-	hook.Add("PreDrawOpaqueRenderables", "Arcana_TutorialRender", function()
-		self:RenderTutorial()
+	hook.Add("PreDrawOpaqueRenderables", "Arcana_SceneRender", function()
+		self:RenderScene()
 		if shouldHide() then return true end
 	end)
 
-	hook.Add("PreDrawSkyBox", "Arcana_TutorialSkybox", function()
-		if shouldHide() then return true end -- Don't render skybox during tutorial
+	hook.Add("PreDrawSkyBox", "Arcana_SceneSkybox", function()
+		if shouldHide() then return true end -- Don't render the skybox during a scene
 	end)
 
-	hook.Add("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent", function()
+	hook.Add("PreDrawTranslucentRenderables", "Arcana_SceneTranslucent", function()
 		-- Sequences with allowTranslucents keep this pass so particle effects
-		-- (util.Effect) can render inside the tutorial space; the trade-off is
+		-- (util.Effect) can render inside the scene space; the trade-off is
 		-- that the real map's translucent surfaces may render too.
 		if sequence.allowTranslucents then return end
 		if shouldHide() then return true end
 	end)
 
-	hook.Add("PreDrawViewModel", "Arcana_TutorialViewModels", function()
+	hook.Add("PreDrawViewModel", "Arcana_SceneViewModels", function()
 		if shouldHide() then return true end
 	end)
 
-	hook.Add("ShouldDrawLocalPlayer", "Arcana_TutorialShouldDrawLocalPlayer", function()
+	hook.Add("ShouldDrawLocalPlayer", "Arcana_SceneShouldDrawLocalPlayer", function()
 		if shouldHide() then return false end
 	end)
 
-	hook.Add("CalcView", "Arcana_TutorialView", function(ply, pos, angles, fov)
+	hook.Add("CalcView", "Arcana_SceneView", function(ply, pos, angles, fov)
 		return self:ModifyView(ply, pos, angles, fov)
 	end)
 
-	hook.Add("HUDPaint", "Arcana_TutorialHUD", function()
-		self:DrawTutorialHUD()
+	hook.Add("HUDPaint", "Arcana_SceneHUD", function()
+		self:DrawSceneHUD()
 	end)
 
-	hook.Add("RenderScreenspaceEffects", "Arcana_TutorialScreenspace", function()
+	hook.Add("RenderScreenspaceEffects", "Arcana_SceneScreenspace", function()
 		self:RenderScreenspaceEffects()
 	end)
 
-	hook.Add("Think", "Arcana_TutorialThink", function()
+	hook.Add("Think", "Arcana_SceneThink", function()
 		self:Think()
 	end)
 
-	-- Block non-movement binds during the tutorial
-	hook.Add("PlayerBindPress", "Arcana_TutorialInput", function(ply, bind, pressed)
-		if self.active and self.phase == "tutorial" then
+	-- Block non-movement binds during the scene
+	hook.Add("PlayerBindPress", "Arcana_SceneInput", function(ply, bind, pressed)
+		if self.active and self.phase == "scene" then
 			return self:HandleInput(bind, pressed)
 		end
 	end)
 
 	-- Read movement intent from the usercmd, then freeze the real player
 	self.inputForward, self.inputSide = 0, 0
-	hook.Add("CreateMove", "Arcana_TutorialCreateMove", function(cmd)
+	hook.Add("CreateMove", "Arcana_SceneCreateMove", function(cmd)
 		self:HandleCreateMove(cmd)
 	end)
 
-	-- Suppress default footstep sounds during tutorial
-	hook.Add("PlayerFootstep", "Arcana_TutorialFootstep", function(ply, pos, foot, sound, volume, filter)
+	-- Suppress default footstep sounds during the scene
+	hook.Add("PlayerFootstep", "Arcana_SceneFootstep", function(ply, pos, foot, sound, volume, filter)
 		if self.active then
 			return true -- Suppress default footsteps
 		end
@@ -432,8 +432,8 @@ function Tutorial:StartSequence(sequence)
 	return true
 end
 
--- Handle input during tutorial
-function Tutorial:HandleInput(bind, pressed)
+-- Handle input during a scene
+function Scenes:HandleInput(bind, pressed)
 	-- Allow camera movement
 	if string.find(bind, "+left") or string.find(bind, "+right") or
 	   string.find(bind, "+lookup") or string.find(bind, "+lookdown") then
@@ -453,8 +453,8 @@ end
 
 -- Capture movement intent from the usercmd, then zero it out so the real
 -- player stays put; respects rebinds, multiple binds and analog input
-function Tutorial:HandleCreateMove(cmd)
-	if not self.active or self.phase ~= "tutorial" then
+function Scenes:HandleCreateMove(cmd)
+	if not self.active or self.phase ~= "scene" then
 		self.inputForward, self.inputSide = 0, 0
 		return
 	end
@@ -471,8 +471,8 @@ function Tutorial:HandleCreateMove(cmd)
 end
 
 -- Update movement based on key states (called in Think)
-function Tutorial:UpdateMovement()
-	if not self.active or self.phase ~= "tutorial" then return end
+function Scenes:UpdateMovement()
+	if not self.active or self.phase ~= "scene" then return end
 
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return end
@@ -509,7 +509,7 @@ function Tutorial:UpdateMovement()
 end
 
 -- Play footstep sounds; the actual sound is provided by the active scene
-function Tutorial:PlayFootsteps()
+function Scenes:PlayFootsteps()
 	if not self.isMoving then return end
 
 	local now = CurTime()
@@ -518,12 +518,12 @@ function Tutorial:PlayFootsteps()
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return end
 
-	Arcana.RunHook("Tutorial_Footstep", self, ply)
+	Arcana.RunHook("Scene_Footstep", self, ply)
 	self.nextFootstep = now + 0.45 -- Slightly slower footstep interval
 end
 
 -- Show the teaching panel
-function Tutorial:ShowTeachingPanel()
+function Scenes:ShowTeachingPanel()
 	self.showingPanel = true
 	self.fadeProgress = 0
 	self.fadeStart = CurTime()
@@ -531,7 +531,7 @@ function Tutorial:ShowTeachingPanel()
 	-- Get current node data
 	local nodeData = self:GetCurrentNodeData()
 	if not nodeData then
-		ErrorNoHalt("[Arcana Tutorial] Invalid node data!\n")
+		ErrorNoHalt("[Arcana Scenes] Invalid node data!\n")
 		return
 	end
 
@@ -560,7 +560,7 @@ function Tutorial:ShowTeachingPanel()
 end
 
 -- Get current node data from conversation tree
-function Tutorial:GetCurrentNodeData()
+function Scenes:GetCurrentNodeData()
 	if not self.currentSequence or not self.currentSequence.nodes then return nil end
 
 	local nodeId = self.currentNode or self.currentSequence.startNode
@@ -568,7 +568,7 @@ function Tutorial:GetCurrentNodeData()
 end
 
 -- Play voice for current node
-function Tutorial:PlayNodeVoice(nodeData)
+function Scenes:PlayNodeVoice(nodeData)
 	-- Stop any currently playing voice
 	self:StopNodeVoice()
 
@@ -592,14 +592,14 @@ function Tutorial:PlayNodeVoice(nodeData)
 				-- Lower ambient music while voice is playing
 				self.voicePlaying = true
 			else
-				ErrorNoHalt("[Arcana Tutorial] Failed to play voice: " .. tostring(errorName) .. "\n")
+				ErrorNoHalt("[Arcana Scenes] Failed to play voice: " .. tostring(errorName) .. "\n")
 			end
 		end)
 	end
 end
 
 -- Stop any playing voice
-function Tutorial:StopNodeVoice()
+function Scenes:StopNodeVoice()
 	if self.currentVoiceSound and IsValid(self.currentVoiceSound) then
 		self.currentVoiceSound:Stop()
 		self.currentVoiceSound = nil
@@ -608,7 +608,7 @@ function Tutorial:StopNodeVoice()
 end
 
 -- Create choice buttons (list style with art deco outline on hover)
-function Tutorial:CreateChoiceButtons(choices)
+function Scenes:CreateChoiceButtons(choices)
 	-- Remove any existing buttons
 	if self.choiceButtons then
 		for _, btn in ipairs(self.choiceButtons) do
@@ -709,7 +709,7 @@ function Tutorial:CreateChoiceButtons(choices)
 end
 
 -- Handle choice selection
-function Tutorial:OnChoiceSelected(choice)
+function Scenes:OnChoiceSelected(choice)
 	-- Let the sequence react to this specific choice (e.g. record a decision)
 	if choice.onSelect then
 		choice.onSelect(self, choice)
@@ -744,7 +744,7 @@ function Tutorial:OnChoiceSelected(choice)
 	-- Get new node data
 	local nodeData = self:GetCurrentNodeData()
 	if not nodeData then
-		ErrorNoHalt("[Arcana Tutorial] Invalid node: " .. tostring(choice.next) .. "\n")
+		ErrorNoHalt("[Arcana Scenes] Invalid node: " .. tostring(choice.next) .. "\n")
 		return
 	end
 
@@ -770,7 +770,7 @@ function Tutorial:OnChoiceSelected(choice)
 end
 
 -- Close teaching panel and transition back
-function Tutorial:CloseTeachingPanel()
+function Scenes:CloseTeachingPanel()
 	self.showingPanel = false
 	self.phase = "fade_to_white"
 	self.fadeProgress = 0
@@ -800,13 +800,13 @@ function Tutorial:CloseTeachingPanel()
 	end
 end
 
--- End tutorial and return to normal
-function Tutorial:EndSequence()
+-- End the scene and return to normal
+function Scenes:EndSequence()
 	self.active = false
 	self.phase = "none"
 
 	-- Let the scene remove its entities and state
-	Arcana.RunHook("Tutorial_DestroyScene", self, self.currentSequence)
+	Arcana.RunHook("Scene_Destroy", self, self.currentSequence)
 	self.focusEnt = nil
 
 	-- Stop voice
@@ -826,31 +826,31 @@ function Tutorial:EndSequence()
 	self:StopAmbientMusic()
 
 	-- Remove hooks
-	hook.Remove("PreDrawOpaqueRenderables", "Arcana_TutorialRender")
-	hook.Remove("PreDrawSkyBox", "Arcana_TutorialSkybox")
-	hook.Remove("PreDrawTranslucentRenderables", "Arcana_TutorialTranslucent")
-	hook.Remove("PreDrawViewModel", "Arcana_TutorialViewModels")
-	hook.Remove("ShouldDrawLocalPlayer", "Arcana_TutorialShouldDrawLocalPlayer")
-	hook.Remove("CalcView", "Arcana_TutorialView")
-	hook.Remove("HUDPaint", "Arcana_TutorialHUD")
-	hook.Remove("RenderScreenspaceEffects", "Arcana_TutorialScreenspace")
-	hook.Remove("Think", "Arcana_TutorialThink")
-	hook.Remove("PlayerBindPress", "Arcana_TutorialInput")
-	hook.Remove("CreateMove", "Arcana_TutorialCreateMove")
-	hook.Remove("PlayerFootstep", "Arcana_TutorialFootstep")
+	hook.Remove("PreDrawOpaqueRenderables", "Arcana_SceneRender")
+	hook.Remove("PreDrawSkyBox", "Arcana_SceneSkybox")
+	hook.Remove("PreDrawTranslucentRenderables", "Arcana_SceneTranslucent")
+	hook.Remove("PreDrawViewModel", "Arcana_SceneViewModels")
+	hook.Remove("ShouldDrawLocalPlayer", "Arcana_SceneShouldDrawLocalPlayer")
+	hook.Remove("CalcView", "Arcana_SceneView")
+	hook.Remove("HUDPaint", "Arcana_SceneHUD")
+	hook.Remove("RenderScreenspaceEffects", "Arcana_SceneScreenspace")
+	hook.Remove("Think", "Arcana_SceneThink")
+	hook.Remove("PlayerBindPress", "Arcana_SceneInput")
+	hook.Remove("CreateMove", "Arcana_SceneCreateMove")
+	hook.Remove("PlayerFootstep", "Arcana_SceneFootstep")
 
 	self.currentSequence = nil
 	self.currentNode = nil
 end
 
 -- Think hook
-function Tutorial:Think()
+function Scenes:Think()
 	if not self.active then return end
 
 	local ply = LocalPlayer()
 	if not IsValid(ply) then return end
 
-	-- Check if player died during tutorial
+	-- Check if player died during the scene
 	if not ply:Alive() and self.phase ~= "fade_to_white" and self.phase ~= "fade_from_white" then
 		-- Close any open panels
 		if self.showingPanel then
@@ -885,7 +885,7 @@ function Tutorial:Think()
 	if self.phase == "fade_to_black" then
 		self.fadeProgress = math.Clamp((now - self.fadeStart) / self.fadeOutDuration, 0, 1)
 		if self.fadeProgress >= 1 then
-			-- While screen is fully black, initialize tutorial view and start fade in
+			-- While the screen is fully black, initialize the scene view and start fade in
 			self.phase = "fade_from_black"
 			self.fadeProgress = 0
 			self.fadeStart = now
@@ -904,7 +904,7 @@ function Tutorial:Think()
 	elseif self.phase == "fade_from_black" then
 		self.fadeProgress = math.Clamp((now - self.fadeStart) / self.fadeInDuration, 0, 1)
 		if self.fadeProgress >= 1 then
-			self.phase = "tutorial"
+			self.phase = "scene"
 		end
 	elseif self.phase == "fade_to_white" then
 		self.fadeProgress = math.Clamp((now - self.fadeStart) / self.fadeOutDuration, 0, 1)
@@ -927,7 +927,7 @@ function Tutorial:Think()
 	end
 
 	-- Update simulated position
-	if self.phase == "tutorial" then
+	if self.phase == "scene" then
 		-- Update simulated angles from actual view (allow free camera)
 		self.simulatedAng = ply:EyeAngles()
 
@@ -1009,13 +1009,13 @@ function Tutorial:Think()
 end
 
 -- Modify camera view
-function Tutorial:ModifyView(ply, pos, angles, fov)
+function Scenes:ModifyView(ply, pos, angles, fov)
 	if not self.active then return end
 	if self.phase == "none" then return end
 
-	-- Keep the view override active during tutorial, panel, and fade in/from phases
+	-- Keep the view override active during the scene, panel, and fade in/from phases
 	-- Don't override during fade_to_black (still in normal world) or fade_from_white (returning to normal)
-	if self.phase == "tutorial" or self.phase == "fade_from_black" or
+	if self.phase == "scene" or self.phase == "fade_from_black" or
 	   self.phase == "show_panel" or self.phase == "fade_to_white" then
 		local view = {
 			origin = self.simulatedPos + Vector(0, 0, 64), -- Eye height
@@ -1030,30 +1030,29 @@ function Tutorial:ModifyView(ply, pos, angles, fov)
 	end
 end
 
--- Render the tutorial environment
-function Tutorial:RenderTutorial()
+-- Render the scene environment
+function Scenes:RenderScene()
 	if not self.active then return end
-	-- Only render tutorial space during fade_from_black, tutorial, show_panel, and fade_to_white
+	-- Only render scene space during fade_from_black, scene, show_panel, and fade_to_white
 	-- Don't render during fade_to_black (still in normal world) or fade_from_white (back to normal)
-	if self.phase ~= "tutorial" and self.phase ~= "fade_from_black" and
+	if self.phase ~= "scene" and self.phase ~= "fade_from_black" and
 	   self.phase ~= "show_panel" and self.phase ~= "fade_to_white" then return end
 
 	-- Set up rendering from simulated position
 	local eyePos = self.simulatedPos + Vector(0, 0, 64)
-	local eyeAng = self.simulatedAng
 
 	-- Draw skybox cube
 	self:DrawSkyboxCube(eyePos)
 
 	-- Draw the active scene's ambient particle field
-	Arcana.RunHook("Tutorial_DrawAmbientParticles", self, eyePos)
+	Arcana.RunHook("Scene_DrawAmbientParticles", self, eyePos)
 
 	-- Draw the active scene's objects (including its floor/water, if any)
-	Arcana.RunHook("Tutorial_DrawScene", self, eyePos)
+	Arcana.RunHook("Scene_Draw", self, eyePos)
 end
 
 -- Draw the skybox cube
-function Tutorial:DrawSkyboxCube(eyePos)
+function Scenes:DrawSkyboxCube(eyePos)
 	if not self.cubeFaces then return end
 
 	-- Forcefully clear any world rendering artifacts
@@ -1092,10 +1091,10 @@ function Tutorial:DrawSkyboxCube(eyePos)
 end
 
 -- Render screenspace post-processing effects
-function Tutorial:RenderScreenspaceEffects()
+function Scenes:RenderScreenspaceEffects()
 	if not self.active then return end
-	-- Only apply effects during tutorial space phases
-	if self.phase ~= "tutorial" and self.phase ~= "fade_from_black" and
+	-- Only apply effects during scene space phases
+	if self.phase ~= "scene" and self.phase ~= "fade_from_black" and
 	   self.phase ~= "show_panel" and self.phase ~= "fade_to_white" then return end
 
 	-- Color modification for enhanced saturation and vibrancy
@@ -1113,7 +1112,7 @@ function Tutorial:RenderScreenspaceEffects()
 
 	-- Let the active scene adjust the grade (mutate the table in-place);
 	-- a single DrawColorModify call applies the combined result
-	Arcana.RunHook("Tutorial_ColorModify", self, colorMod)
+	Arcana.RunHook("Scene_ColorModify", self, colorMod)
 
 	DrawColorModify(colorMod)
 
@@ -1121,11 +1120,11 @@ function Tutorial:RenderScreenspaceEffects()
 	DrawBloom(0.65, 1.15, 2, 2, 1, 1, 1, 1, 1)
 
 	-- Let the active scene layer its own grading on top
-	Arcana.RunHook("Tutorial_ScreenspaceEffects", self)
+	Arcana.RunHook("Scene_ScreenspaceEffects", self)
 end
 
 -- Draw HUD overlay
-function Tutorial:DrawTutorialHUD()
+function Scenes:DrawSceneHUD()
 	if not self.active then return end
 
 	local scrW, scrH = ScrW(), ScrH()
@@ -1134,23 +1133,23 @@ function Tutorial:DrawTutorialHUD()
 	if self.phase == "fade_to_black" then
 		-- Fade out to black: fade for 2.0s, hold at peak for 0.5s
 		local elapsed = CurTime() - self.fadeStart
-		local fadeProgress = math.Clamp(elapsed / Tutorial.fadeOutTime, 0, 1)
+		local fadeProgress = math.Clamp(elapsed / Scenes.fadeOutTime, 0, 1)
 		local alpha = math.floor(255 * fadeProgress)
 		surface.SetDrawColor(0, 0, 0, alpha)
 		surface.DrawRect(0, 0, scrW, scrH)
 	elseif self.phase == "fade_from_black" then
 		-- Fade in from black: hold at peak for 0.5s, then fade for 1.0s
 		local elapsed = CurTime() - self.fadeStart
-		local holdTime = Tutorial.fadeInDuration - Tutorial.fadeInTime
+		local holdTime = Scenes.fadeInDuration - Scenes.fadeInTime
 		local alpha = 255
 		if elapsed > holdTime then
-			local fadeProgress = math.Clamp((elapsed - holdTime) / Tutorial.fadeInTime, 0, 1)
+			local fadeProgress = math.Clamp((elapsed - holdTime) / Scenes.fadeInTime, 0, 1)
 			alpha = math.floor(255 * (1 - fadeProgress))
 		end
 		surface.SetDrawColor(0, 0, 0, alpha)
 		surface.DrawRect(0, 0, scrW, scrH)
 	elseif self.phase == "show_panel" then
-		-- Draw teaching panel directly on tutorial scene
+		-- Draw teaching panel directly on the scene
 		if self.showingPanel then
 			self:DrawTeachingPanel(scrW, scrH)
 		end
@@ -1162,17 +1161,17 @@ function Tutorial:DrawTutorialHUD()
 
 		-- Fade out to white: fade for 2.0s, hold at peak for 0.5s
 		local elapsed = CurTime() - self.fadeStart
-		local fadeProgress = math.Clamp(elapsed / Tutorial.fadeOutTime, 0, 1)
+		local fadeProgress = math.Clamp(elapsed / Scenes.fadeOutTime, 0, 1)
 		local alpha = math.floor(255 * fadeProgress)
 		surface.SetDrawColor(255, 255, 255, alpha)
 		surface.DrawRect(0, 0, scrW, scrH)
 	elseif self.phase == "fade_from_white" then
 		-- Fade in from white: hold at peak for 0.5s, then fade for 1.0s
 		local elapsed = CurTime() - self.fadeStart
-		local holdTime = Tutorial.fadeInDuration - Tutorial.fadeInTime
+		local holdTime = Scenes.fadeInDuration - Scenes.fadeInTime
 		local alpha = 255
 		if elapsed > holdTime then
-			local fadeProgress = math.Clamp((elapsed - holdTime) / Tutorial.fadeInTime, 0, 1)
+			local fadeProgress = math.Clamp((elapsed - holdTime) / Scenes.fadeInTime, 0, 1)
 			alpha = math.floor(255 * (1 - fadeProgress))
 		end
 		surface.SetDrawColor(255, 255, 255, alpha)
@@ -1181,7 +1180,7 @@ function Tutorial:DrawTutorialHUD()
 end
 
 -- Draw the teaching panel with morphing text
-function Tutorial:DrawTeachingPanel(scrW, scrH)
+function Scenes:DrawTeachingPanel(scrW, scrH)
 	-- Darken the entire screen
 	surface.SetDrawColor(0, 0, 0, 200)
 	surface.DrawRect(0, 0, scrW, scrH)
@@ -1292,7 +1291,7 @@ function Tutorial:DrawTeachingPanel(scrW, scrH)
 end
 
 --- Wrap text to fit within a specified width
-function Tutorial:WrapText(text, font, maxWidth)
+function Scenes:WrapText(text, font, maxWidth)
 	surface.SetFont(font)
 
 	local words = string.Explode(" ", text)
@@ -1320,12 +1319,12 @@ function Tutorial:WrapText(text, font, maxWidth)
 	return lines
 end
 
--- Public API to start a tutorial sequence
-function Arcana:StartTutorialSequence(sequence)
-	return Tutorial:StartSequence(sequence)
+-- Public API: is a scene running
+function Arcana.IsSceneActive()
+	return Scenes.active
 end
 
--- Public API to check if tutorial is active
-function Arcana:IsTutorialActive()
-	return Tutorial.active
+-- Public API: start a scene
+function Arcana.StartScene(sequence)
+	return Scenes:StartSequence(sequence)
 end

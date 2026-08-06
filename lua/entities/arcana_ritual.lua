@@ -121,9 +121,9 @@ if SERVER then
 		if self:GetIsActivated() and self._replenishable then
 			local replenishCost = self:GetReplenishCost()
 
-			if replenishCost > 0 and Arcana:GetCoins(ply) < replenishCost then
-				if Arcana and Arcana.SendErrorNotification then
-					Arcana:SendErrorNotification(ply, "Insufficient coins to replenish ritual")
+			if replenishCost > 0 and Arcana.GetCoins(ply) < replenishCost then
+				if Arcana.SendErrorNotification then
+					Arcana.SendErrorNotification(ply, "Insufficient coins to replenish ritual")
 				end
 
 				self:EmitSound("buttons/button8.wav", 60, 110)
@@ -132,7 +132,7 @@ if SERVER then
 			end
 
 			if replenishCost > 0 then
-				Arcana:TakeCoins(ply, replenishCost, "Replenish ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
+				Arcana.TakeCoins(ply, replenishCost, "Replenish ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
 			end
 
 			-- Extend lifetime by one full period, capped at 3x the configured lifetime from now
@@ -155,7 +155,7 @@ if SERVER then
 		local missing = {}
 
 		if self._coinCost > 0 then
-			local haveCoins = Arcana:GetCoins(ply)
+			local haveCoins = Arcana.GetCoins(ply)
 
 			if haveCoins < self._coinCost then
 				missing[#missing + 1] = tostring(self._coinCost - haveCoins) .. " coins"
@@ -164,7 +164,7 @@ if SERVER then
 
 		for itemName, amt in pairs(self._requirements or {}) do
 			local need = amt or 1
-			local have = Arcana:GetItemCount(ply, itemName)
+			local have = Arcana.GetItemCount(ply, itemName)
 
 			if have < need then
 				local info = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(itemName)
@@ -174,8 +174,8 @@ if SERVER then
 		end
 
 		if #missing > 0 then
-			if Arcana and Arcana.SendErrorNotification then
-				Arcana:SendErrorNotification(ply, "Missing: " .. table.concat(missing, ", "))
+			if Arcana.SendErrorNotification then
+				Arcana.SendErrorNotification(ply, "Missing: " .. table.concat(missing, ", "))
 			end
 
 			self:EmitSound("buttons/button8.wav", 60, 110)
@@ -185,11 +185,11 @@ if SERVER then
 
 		-- Consume from the player who activated
 		if self._coinCost > 0 then
-			Arcana:TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
+			Arcana.TakeCoins(ply, self._coinCost, "Ritual: " .. (self:GetRitualId() or ""):gsub("%_", " "))
 		end
 
 		for itemName, amt in pairs(self._requirements or {}) do
-			Arcana:TakeItem(ply, itemName, amt)
+			Arcana.TakeItem(ply, itemName, amt)
 		end
 
 		-- Tell clients to evolve the circle then finalise the entity
@@ -200,7 +200,7 @@ if SERVER then
 		net.Broadcast()
 
 		-- Report magic use at ritual activation
-		if Arcana and Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
+		if Arcana.ManaCrystals and Arcana.ManaCrystals.ReportMagicUse then
 			local pos = self:GetPos()
 			local rid = self.GetRitualId and self:GetRitualId() or "ritual"
 			Arcana.ManaCrystals:ReportMagicUse(ply, pos, rid, {isRitual = true})
@@ -230,17 +230,17 @@ if SERVER then
 		-- config: { id, owner, coin_cost, items = {name=amt}, on_activate = function(self) end, lifetime,
 		--           replenishable, replenish_cost, on_replenish }
 		self._requirements = shallowCopy(config.items or {})
-		self._coinCost = tonumber(config.coin_cost or 0) or 0
+		self._coinCost = tonumber(config.coin_cost) or 0
 		self._owner = IsValid(config.owner) and config.owner or nil
 		self._onActivate = isfunction(config.on_activate) and config.on_activate or nil
 		self._onReplenish = isfunction(config.on_replenish) and config.on_replenish or nil
-		self._lifetime = math.max(1, tonumber(config.lifetime or 300) or 300)
+		self._lifetime = math.max(1, tonumber(config.lifetime) or 300)
 		self._replenishable = config.replenishable == true
 		self:SetRitualId(tostring(config.id or ""))
 		self:SetExpireAt(CurTime() + self._lifetime)
 		self:SetIsReplenishable(self._replenishable)
 		self:SetIsActivated(false)
-		self:SetReplenishCost(math.Clamp(tonumber(config.replenish_cost or 0) or 0, 0, 2147483647))
+		self:SetReplenishCost(math.Clamp(tonumber(config.replenish_cost) or 0, 0, 2147483647))
 		self:SetTotalLifetime(self._lifetime)
 		self:_Sync()
 	end
@@ -629,7 +629,7 @@ if CLIENT then
 
 		if isActivated and replenishable then
 			local replenishCost = ent:GetReplenishCost()
-			local haveCoins = Arcana:GetCoins(lp) or 0
+			local haveCoins = Arcana.GetCoins(lp) or 0
 			local canAfford = haveCoins >= replenishCost
 			if not canAfford then reqMet = false end
 
@@ -645,7 +645,7 @@ if CLIENT then
 		else
 			-- Coins requirement
 			local needCoins = data.coins or 0
-			local haveCoins = Arcana:GetCoins(lp) or 0
+			local haveCoins = Arcana.GetCoins(lp) or 0
 			local coinsOk = haveCoins >= needCoins
 			if not coinsOk then reqMet = false end
 
@@ -663,7 +663,7 @@ if CLIENT then
 				for name, amt in pairs(items) do
 					local info = _G.msitems and _G.msitems.GetInventoryInfo and _G.msitems.GetInventoryInfo(name)
 					local cleanName = (info and info.name) or name
-					local have = Arcana:GetItemCount(lp, name) or 0
+					local have = Arcana.GetItemCount(lp, name) or 0
 					local itemOk = have >= amt
 					if not itemOk then reqMet = false end
 

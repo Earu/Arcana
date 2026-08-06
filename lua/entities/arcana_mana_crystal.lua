@@ -123,11 +123,6 @@ if SERVER then
 		-- Initialize health based on current scale
 		self:_OnScaleChanged(self:GetCrystalScale())
 
-		-- Register as producer in ManaNetwork
-		local Arcana = _G.Arcana or {}
-		if Arcana.ManaNetwork and Arcana.ManaNetwork.RegisterProducer then
-			Arcana.ManaNetwork:RegisterProducer(self, {range = self:GetAbsorbRadius() or 520})
-		end
 	end
 
 	-- Spawn a shard entity with optional amount and outward impulse
@@ -232,14 +227,6 @@ if SERVER then
 		local target = self._minScale + (self._maxScale - self._minScale) * frac
 		self:SetCrystalScale(target)
 		self:EmitSound("buttons/blip1.wav", 55, 140)
-	end
-
-	-- Register into the ManaNetwork on spawn
-	function ENT:OnRemove()
-		local Arcana = _G.Arcana or {}
-		if Arcana.ManaNetwork and Arcana.ManaNetwork.UnregisterNode then
-			Arcana.ManaNetwork:UnregisterNode(self)
-		end
 	end
 
 	function ENT:Think()
@@ -409,7 +396,7 @@ if CLIENT then
 				end
 
 				-- draw refractive passes with distance-based fade
-				local PASSES = 4 -- try 3–6
+				local PASSES = 4 -- try 3-6
 				local baseDisp = 0.5 * (0.6 + 0.4 * fade)
 				local perPassOpacity = (1 / PASSES) * fade * spawnFade
 

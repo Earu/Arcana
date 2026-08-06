@@ -17,10 +17,10 @@ if SERVER then
 	-- so the starter grant has to stay on the player branch.
 	hook.Add("WeaponEquip", "Arcana_GiveStarterSpell", function(wep, ply)
 		if wep:GetClass() == "grimoire" and IsValid(ply) and ply:IsPlayer() then
-			local data = Arcana:GetPlayerData(ply)
+			local data = Arcana.GetPlayerData(ply)
 
 			if data and table.IsEmpty(data.unlocked_spells) then
-				Arcana:UnlockSpell(ply, "fireball", true)
+				Arcana.UnlockSpell(ply, "fireball", true)
 			end
 		end
 	end)
@@ -123,7 +123,7 @@ end
 -- An NPC given a grimoire becomes an Arcana mage: Arcana.NPC rolls its elemental
 -- speciality, generates its spellbook out of the spellcraft catalog, and drives the
 -- casting from its own think loop. The engine-facing plumbing here only shapes the
--- NPC's posture — advertising a ranged attack so the AI keeps its distance and faces
+-- NPC's posture: advertising a ranged attack so the AI keeps its distance and faces
 -- its enemy instead of closing in to club it.
 
 local function isNPCOwner(ent)
@@ -138,7 +138,7 @@ function SWEP:SetupNPCOwner(npc)
 	self:SetHoldType("smg")
 	self._ArcanaNPCOwner = npc
 
-	if Arcana and Arcana.NPC then
+	if Arcana.NPC then
 		Arcana.NPC.Register(npc, self)
 	end
 end
@@ -154,7 +154,7 @@ function SWEP:OwnerChanged()
 	local current = self:GetOwner()
 	if previous == current then return end
 
-	if IsValid(previous) and Arcana and Arcana.NPC then
+	if IsValid(previous) and Arcana.NPC then
 		Arcana.NPC.Unregister(previous)
 	end
 
@@ -164,7 +164,7 @@ end
 function SWEP:OnRemove()
 	if not SERVER then return end
 
-	if IsValid(self._ArcanaNPCOwner) and Arcana and Arcana.NPC then
+	if IsValid(self._ArcanaNPCOwner) and Arcana.NPC then
 		Arcana.NPC.Unregister(self._ArcanaNPCOwner)
 	end
 end
@@ -193,7 +193,7 @@ function SWEP:NPCShoot_Primary()
 	local owner = self:GetOwner()
 	if not isNPCOwner(owner) then return end
 
-	if Arcana and Arcana.NPC then
+	if Arcana.NPC then
 		Arcana.NPC.TryCast(owner)
 	end
 end
@@ -204,7 +204,7 @@ function SWEP:PrimaryAttack()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 	-- Resolve selected spell from quickslot if present
 	local selectedSpellId = self.SelectedSpell
-	local pdata = Arcana:GetPlayerData(owner)
+	local pdata = Arcana.GetPlayerData(owner)
 
 	if pdata then
 		local qsIndex = math.Clamp(pdata.selected_quickslot or 1, 1, 8)
@@ -214,7 +214,7 @@ function SWEP:PrimaryAttack()
 
 	if not selectedSpellId then
 		if CLIENT and IsFirstTimePredicted() then
-			Arcana:Print("❌ No spell selected!")
+			Arcana.Print("❌ No spell selected!")
 		end
 
 		return
@@ -225,15 +225,15 @@ function SWEP:PrimaryAttack()
 
 	if not spell then
 		if CLIENT and IsFirstTimePredicted() then
-			Arcana:Print("❌ Unknown spell: " .. tostring(selectedSpellId))
+			Arcana.Print("❌ Unknown spell: " .. tostring(selectedSpellId))
 		end
 
 		return
 	end
 
-	if not Arcana:HasSpellUnlocked(owner, selectedSpellId) then
+	if not Arcana.HasSpellUnlocked(owner, selectedSpellId) then
 		if CLIENT and IsFirstTimePredicted() then
-			Arcana:Print("❌ Spell not unlocked: " .. spell.name)
+			Arcana.Print("❌ Spell not unlocked: " .. spell.name)
 		end
 
 		return
@@ -241,7 +241,7 @@ function SWEP:PrimaryAttack()
 
 	-- Begin casting (server schedules execution after cast time)
 	if SERVER then
-		Arcana:StartCasting(owner, selectedSpellId)
+		Arcana.StartCasting(owner, selectedSpellId)
 		local castTime = math.max(0.1, spell.cast_time or 0)
 		-- Only gate firing by cast time; actual per-spell cooldowns are enforced in Arcana core
 		self:SetNextPrimaryFire(CurTime() + castTime)
@@ -276,7 +276,7 @@ end
 function SWEP:Think()
 end
 
--- Viewmodel offset table – tune these to taste in-game.
+-- Viewmodel offset table: tune these to taste in-game.
 -- pos: forward / right / up offset from the eye origin (world units).
 -- ang: pitch / yaw / roll applied after the base eye angle.
 -- scale: uniform scale applied to the viewmodel entity.
@@ -331,7 +331,7 @@ SWEP.WorldModelOffset = {
 -- "anim_attachment_RH" is nothing but a fixed transform of the right hand bone: measured
 -- identical to five decimals on every ValveBiped playermodel that ships it (kleiner, male_07,
 -- alyx, combine_soldier). Plenty of custom playermodels omit the attachment entirely though,
--- so reading it directly meant those models anchored on the raw bone instead — a frame rolled
+-- so reading it directly meant those models anchored on the raw bone instead, a frame rolled
 -- a half turn away from the one WorldModelOffset is tuned against, which is what made the book
 -- sit at the wrong angle on them. Rebuilding the attachment from the bone gives every
 -- playermodel the same convention whether or not the attachment exists.
@@ -420,7 +420,7 @@ function SWEP:GetAvailableSpells()
 	local availableSpells = {}
 
 	for spellId, spell in pairs(Arcana.RegisteredSpells) do
-		if Arcana:HasSpellUnlocked(owner, spellId) then
+		if Arcana.HasSpellUnlocked(owner, spellId) then
 			table.insert(availableSpells, {
 				id = spellId,
 				spell = spell
@@ -472,7 +472,7 @@ if CLIENT then
 	-- for other cost types. y is the top edge.
 	local function drawSpellCost(sp, font, x, y, col, align)
 		local ct = tostring(sp.cost_type or "")
-		local ca = tonumber(sp.cost_amount or 0) or 0
+		local ca = tonumber(sp.cost_amount) or 0
 		local seg
 		if ct == Arcana.COST_TYPES.COINS then
 			seg = {text = string.Comma(ca), icon = ArtDeco.Icons.coin, color = col}
@@ -520,7 +520,7 @@ if CLIENT then
 	function SWEP:GetSelectedFromQuickslot()
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return nil end
-		local data = Arcana:GetPlayerData(owner)
+		local data = Arcana.GetPlayerData(owner)
 		local index = math.Clamp(data.selected_quickslot or 1, 1, 8)
 
 		return data.quickspell_slots[index]
@@ -539,7 +539,7 @@ if CLIENT then
 		local cx, cy = scrW * 0.5, scrH * 0.5
 		local radius = RadialConfig.hud.outerRadius
 		local rInner = radius - RadialConfig.hud.innerGap
-		local data = Arcana:GetPlayerData(owner)
+		local data = Arcana.GetPlayerData(owner)
 		if not data then return end
 
 		-- Ensure cursor is enabled while radial is open
@@ -627,7 +627,7 @@ if CLIENT then
 		if not input.IsKeyDown(KEY_R) and self.RadialOpen then
 			if self.RadialHoverSlot then
 				-- Update locally for instant feedback
-				local pdata = Arcana:GetPlayerData(owner)
+				local pdata = Arcana.GetPlayerData(owner)
 				pdata.selected_quickslot = self.RadialHoverSlot
 				net.Start("Arcana_SetSelectedQuickslot")
 				net.WriteUInt(self.RadialHoverSlot, 4)
@@ -678,7 +678,7 @@ if CLIENT then
 			local bandTop = 6 + 1
 			local titleRight = ArtDeco.DrawTitle("Arcana_DecoTitle", string.upper("Grimoire"), bandTop, BAR_Y, ArtDeco.Colors.paleGold)
 
-			local data = Arcana and IsValid(owner) and Arcana:GetPlayerData(owner) or nil
+			local data = Arcana and IsValid(owner) and Arcana.GetPlayerData(owner) or nil
 
 			if data then
 				local barX = BAR_X
@@ -700,8 +700,8 @@ if CLIENT then
 					xpLabel = "MAX."
 				else
 					-- Normal XP progression
-					local totalForCurrent = Arcana:GetTotalXPForLevel(data.level)
-					local neededForNext = Arcana:GetXPRequiredForLevel(data.level)
+					local totalForCurrent = Arcana.GetTotalXPForLevel(data.level)
+					local neededForNext = Arcana.GetXPRequiredForLevel(data.level)
 					local xpInto = math.max(0, (data.xp or 0) - totalForCurrent)
 					progress = neededForNext > 0 and math.Clamp(xpInto / neededForNext, 0, 1) or 1
 					xpLabel = string.Comma(xpInto) .. " / " .. string.Comma(neededForNext) .. " XP"
@@ -774,7 +774,7 @@ if CLIENT then
 			local maxR = math.min(contentW, contentH) * 0.5 - RadialConfig.menu.numberOffset - 6
 			local radius = math.min(RadialConfig.menu.outerRadius, math.max(80, math.floor(maxR)))
 			local rInner = radius - RadialConfig.menu.innerGap
-			local pdata = Arcana:GetPlayerData(owner)
+			local pdata = Arcana.GetPlayerData(owner)
 			local mx, my = pnl:LocalCursorPos()
 			local ang = (math.deg(math.atan2(my - cy, mx - cx)) + 360) % 360
 			local hoverSlot = math.floor(ang / 45) % 8 + 1
@@ -846,14 +846,14 @@ if CLIENT then
 
 			if mc == MOUSE_LEFT then
 				-- Select the quickslot
-				local pdata = Arcana:GetPlayerData(owner)
+				local pdata = Arcana.GetPlayerData(owner)
 				pdata.selected_quickslot = slotIndex
 				net.Start("Arcana_SetSelectedQuickslot")
 				net.WriteUInt(slotIndex, 4)
 				net.SendToServer()
 			elseif mc == MOUSE_RIGHT then
 				-- Remove spell from the quickslot
-				local pdata = Arcana:GetPlayerData(owner)
+				local pdata = Arcana.GetPlayerData(owner)
 				pdata.quickspell_slots[slotIndex] = nil
 				net.Start("Arcana_SetQuickslot")
 				net.WriteUInt(slotIndex, 4)
@@ -867,7 +867,7 @@ if CLIENT then
 			if dropped and panels and panels[1] and panels[1].SpellId then
 				local sid = panels[1].SpellId
 				local slotIndex = pnl._hoverSlot or 1
-				local pdata2 = Arcana:GetPlayerData(owner)
+				local pdata2 = Arcana.GetPlayerData(owner)
 				pdata2.quickspell_slots[slotIndex] = sid
 				net.Start("Arcana_SetQuickslot")
 				net.WriteUInt(slotIndex, 4)
@@ -891,19 +891,7 @@ if CLIENT then
 		local listScroll = vgui.Create("DScrollPanel", middle)
 		listScroll:Dock(FILL)
 		listScroll:DockMargin(12, 28, 12, 12)
-		local vbar = listScroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip:NoClipping(true)
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(listScroll)
 
 		-- Separate spells into categories: regular, divine pacts, and rituals
 		local regularSpells = {}
@@ -911,7 +899,7 @@ if CLIENT then
 		local rituals = {}
 
 		for sid, sp in pairs(Arcana.RegisteredSpells) do
-			if Arcana:HasSpellUnlocked(owner, sid) then
+			if Arcana.HasSpellUnlocked(owner, sid) then
 				local item = {
 					id = sid,
 					spell = sp
@@ -1016,7 +1004,7 @@ if CLIENT then
 
 			-- Reflect cooldown state in button text/enabled
 			castBtn.Think = function(pnl)
-				local data = Arcana and Arcana:GetPlayerData(owner) or nil
+				local data = Arcana and Arcana.GetPlayerData(owner) or nil
 				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 				if cd and cd > CurTime() then
@@ -1187,7 +1175,7 @@ if CLIENT then
 				end
 
 			castBtn.Think = function(pnl)
-				local data = Arcana and Arcana:GetPlayerData(owner) or nil
+				local data = Arcana and Arcana.GetPlayerData(owner) or nil
 				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 				if cd and cd > CurTime() then
@@ -1319,7 +1307,7 @@ if CLIENT then
 				end
 
 			castBtn.Think = function(pnl)
-				local data = Arcana and Arcana:GetPlayerData(owner) or nil
+				local data = Arcana and Arcana.GetPlayerData(owner) or nil
 				local cd = data and data.spell_cooldowns and data.spell_cooldowns[item.id] or 0
 
 				if cd and cd > CurTime() then

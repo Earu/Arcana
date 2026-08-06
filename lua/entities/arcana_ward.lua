@@ -158,7 +158,7 @@ if SERVER then
 			if not IsValid(ply) then continue end
 			if self:IsAllowed(ply) then continue end
 
-			local pdata = Arcana:GetPlayerData(ply)
+			local pdata = Arcana.GetPlayerData(ply)
 			if not pdata or not pdata.casting_spell then continue end
 
 			local spellId = pdata.casting_spell
@@ -171,7 +171,7 @@ if SERVER then
 
 			local eyeDir = ply:GetAimVector()
 			if RaySphereIntersect(eyePos, eyeDir, center, radius) then
-				Arcana:InterruptSpell(ply, spellId)
+				Arcana.InterruptSpell(ply, spellId)
 				self:_TriggerFlash()
 			end
 		end
@@ -398,7 +398,7 @@ if CLIENT then
 	end
 
 	function ENT:Think()
-		-- Lazy band creation — deferred so BandCircle is guaranteed to be loaded
+		-- Lazy band creation: deferred so BandCircle is guaranteed to be loaded
 		if not self._bands then
 			local BandCircle = Arcana.Circle.BandCircle
 			if BandCircle then

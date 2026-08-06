@@ -1,7 +1,7 @@
 -- Ring of Fire: A rapidly expanding ring that scorches and ignites nearby foes
 if SERVER then util.AddNetworkString("Arcana_RingOfFire_VFX") end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "ring_of_fire",
 	name = "Ring of Fire",
 	description = "Summon a blazing ring that rapidly expands, scorching and igniting foes around you.",
@@ -72,7 +72,7 @@ Arcana:RegisterSpell({
 					processed[ent] = true
 
 					-- Actors take light burn damage and ignite briefly
-					local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+					local isActor =Arcana.Common.IsActor(ent)
 					local pushDir = (c - origin):GetNormalized()
 					if isActor then
 						local dmg = DamageInfo()

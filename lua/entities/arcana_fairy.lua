@@ -151,12 +151,12 @@ if CLIENT then
 		self.light.DieTime = 9999999
 
 		self.flap = CreateSound(self, "arcana/fairy/flap.wav")
-        self.float = CreateSound(self, "arcana/fairy/float.wav")
+		self.float = CreateSound(self, "arcana/fairy/float.wav")
 
-        self.flap:Play()
-        self.float:Play()
+		self.flap:Play()
+		self.float:Play()
 
-        self.flap:ChangeVolume(0.2)
+		self.flap:ChangeVolume(0.2)
 
 		-- randomize the fairy hue
 		self:SetFairyHue(tonumber(util.CRC(self:EntIndex()))%360)
@@ -252,12 +252,12 @@ if CLIENT then
 			self.flap:ChangeVolume(0.2)
 		end
 
-	    local length = self:GetVelocity():Length()
+		local length = self:GetVelocity():Length()
 
-        self.float:ChangePitch(length/50+100)
-        self.float:ChangeVolume(length/100)
+		self.float:ChangePitch(length/50+100)
+		self.float:ChangeVolume(length/100)
 
-        self.flap:ChangePitch((length/50+100) + self.SizePulse * 20)
+		self.flap:ChangePitch((length/50+100) + self.SizePulse * 20)
 		self.flap:ChangeVolume(0.1+(length/100))
 
 		self:CalcSoundQueue()
@@ -282,8 +282,6 @@ if CLIENT then
 	local blur = Material("sprites/heatwave")
 
 	local eye_hurt = Material("sprites/key_12")
-	local eye_idle = Material("icon16/tick.png")
-	local eye_happy = Material("icon16/error.png")
 	local eye_heart = Material("icon16/heart.png")
 
 	function ENT:DrawSprites()
@@ -360,7 +358,6 @@ if CLIENT then
 			self.next_particle = CurTime() + 0.1
 
 			local particle = self.Emitter:Add("particle/fire", self:GetPos() + (VectorRandSphere() * self.Size * 4 * math.random()))
-			local mult = math.Clamp((self:GetVelocity():Length() * 0.1), 0, 1)
 
 			particle:SetDieTime(math.Rand(0.5, 2)*self.SizePulse*5)
 			particle:SetColor(self.Color.r, self.Color.g, self.Color.b)
@@ -445,10 +442,10 @@ if CLIENT then
 	end
 
 	function ENT:OnRemove()
-        SafeRemoveEntity(self.leftwing)
-        SafeRemoveEntity(self.rightwing)
-        SafeRemoveEntity(self.bleftwing)
-        SafeRemoveEntity(self.brightwing)
+		SafeRemoveEntity(self.leftwing)
+		SafeRemoveEntity(self.rightwing)
+		SafeRemoveEntity(self.bleftwing)
+		SafeRemoveEntity(self.brightwing)
 
 		self.flap:Stop()
 		self.float:Stop()
@@ -505,7 +502,7 @@ if SERVER then
 		if not IsValid(ply) or not ply:IsPlayer() then return end
 		if not self:GetNWBool("Arcana_FairyVendor", false) then return end
 
-		local have = Arcana:GetItemCount(ply, "solidified_spores")
+		local have = Arcana.GetItemCount(ply, "solidified_spores")
 		local price = self:GetNWInt("Arcana_FairyVendorPrice", 250)
 
 		net.Start("Arcana_FairyVendor_Open")
@@ -524,7 +521,7 @@ if SERVER then
 		if not ent:GetNWBool("Arcana_FairyVendor", false) then return end
 		if qty <= 0 then return end
 
-		local have = Arcana:GetItemCount(ply, "solidified_spores")
+		local have = Arcana.GetItemCount(ply, "solidified_spores")
 		if have <= 0 or qty > have then
 			ply:ChatPrint("You don't have enough spores to exchange.")
 			return
@@ -534,8 +531,8 @@ if SERVER then
 		local coins = math.min(1e6, math.max(1, qty * price)) -- cap at 1 million coins, min 1 coin
 
 		-- consume and payout
-		Arcana:TakeItem(ply, "solidified_spores", qty, "Fairy Vendor Exchange")
-		Arcana:GiveCoins(ply, coins, "Fairy Vendor Exchange")
+		Arcana.TakeItem(ply, "solidified_spores", qty, "Fairy Vendor Exchange")
+		Arcana.GiveCoins(ply, coins, "Fairy Vendor Exchange")
 		ent:EmitSound("buttons/button14.wav", 60, 120)
 
 		ply:ChatPrint("Exchanged " .. tostring(qty) .. " spores for " .. tostring(coins) .. " coins.")
@@ -623,160 +620,160 @@ if SERVER then
 end
 
 if CLIENT then
-    net.Receive("Arcana_FairyVendor_Open", function()
-        local ent = net.ReadEntity()
-        local have = net.ReadUInt(32) or 0
-        local price = net.ReadUInt(32) or 0
-        if not IsValid(ent) then return end
+	net.Receive("Arcana_FairyVendor_Open", function()
+		local ent = net.ReadEntity()
+		local have = net.ReadUInt(32) or 0
+		local price = net.ReadUInt(32) or 0
+		if not IsValid(ent) then return end
 
-        local frame = vgui.Create("DFrame")
-        frame:SetSize(520, 260)
-        frame:Center()
-        frame:SetTitle("")
-        frame:MakePopup()
+		local frame = vgui.Create("DFrame")
+		frame:SetSize(520, 260)
+		frame:Center()
+		frame:SetTitle("")
+		frame:MakePopup()
 
-        hook.Add("HUDPaint", frame, function()
-            local x, y = frame:LocalToScreen(0, 0)
-            ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
-        end)
+		hook.Add("HUDPaint", frame, function()
+			local x, y = frame:LocalToScreen(0, 0)
+			ArtDeco.DrawBlurRect(x + 6, y + 6, frame:GetWide() - 12, frame:GetTall() - 12, 4, 8)
+		end)
 
-        -- Declared here so the title can measure the band down to the content's frame.
-        local content
+		-- Declared here so the title can measure the band down to the content's frame.
+		local content
 
-        frame.Paint = function(pnl, w, h)
-            ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
-            ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
+		frame.Paint = function(pnl, w, h)
+			ArtDeco.FillDecoPanel(6, 6, w - 12, h - 12, ArtDeco.Colors.decoBg, 14)
+			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 
-            -- The title centers in the band between the frame's top line and the
-            -- content panel's frame below it.
-            local bandTop = 6 + 1
-            local bandBottom = IsValid(content) and content:GetY() or (bandTop + 38)
-            ArtDeco.DrawTitle("Arcana_DecoTitle", "FAE MARKET", bandTop, bandBottom, ArtDeco.Colors.paleGold)
-        end
+			-- The title centers in the band between the frame's top line and the
+			-- content panel's frame below it.
+			local bandTop = 6 + 1
+			local bandBottom = IsValid(content) and content:GetY() or (bandTop + 38)
+			ArtDeco.DrawTitle("Arcana_DecoTitle", "FAE MARKET", bandTop, bandBottom, ArtDeco.Colors.paleGold)
+		end
 
-        if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
-        if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
-        ArtDeco.StyleCloseButton(frame)
+		if IsValid(frame.btnMinim) then frame.btnMinim:Hide() end
+		if IsValid(frame.btnMaxim) then frame.btnMaxim:Hide() end
+		ArtDeco.StyleCloseButton(frame)
 
-        content = vgui.Create("DPanel", frame)
-        content:Dock(FILL)
-        content:DockMargin(12, 12, 12, 12)
-        content.Paint = function(pnl, w, h)
-            ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 10)
-            ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 10)
-        end
+		content = vgui.Create("DPanel", frame)
+		content:Dock(FILL)
+		content:DockMargin(12, 12, 12, 12)
+		content.Paint = function(pnl, w, h)
+			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 10)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 10)
+		end
 
-        local label = vgui.Create("DLabel", content)
-        label:Dock(TOP)
-        label:DockMargin(12, 10, 12, 6)
-        label:SetFont("Arcana_Ancient")
-        label:SetTextColor(ArtDeco.Colors.textBright)
-        label:SetWrap(true)
-        label:SetText("How many mushroom spores do you want to exchange (you have " .. tostring(have) .. ")?")
+		local label = vgui.Create("DLabel", content)
+		label:Dock(TOP)
+		label:DockMargin(12, 10, 12, 6)
+		label:SetFont("Arcana_Ancient")
+		label:SetTextColor(ArtDeco.Colors.textBright)
+		label:SetWrap(true)
+		label:SetText("How many mushroom spores do you want to exchange (you have " .. tostring(have) .. ")?")
 
-        -- Entry row with a MAX button on the right
-        local entryRow = vgui.Create("DPanel", content)
-        entryRow:Dock(TOP)
-        entryRow:DockMargin(12, 2, 12, 6)
-        entryRow:SetTall(32)
-        entryRow.Paint = nil
+		-- Entry row with a MAX button on the right
+		local entryRow = vgui.Create("DPanel", content)
+		entryRow:Dock(TOP)
+		entryRow:DockMargin(12, 2, 12, 6)
+		entryRow:SetTall(32)
+		entryRow.Paint = nil
 
-        local entry = vgui.Create("DTextEntry", entryRow)
-        entry:Dock(FILL)
-        entry:DockMargin(0, 0, 8, 0)
-        entry:SetNumeric(true)
-        entry:SetUpdateOnType(true)
-        entry:SetText("0")
-        entry:SetTall(28)
+		local entry = vgui.Create("DTextEntry", entryRow)
+		entry:Dock(FILL)
+		entry:DockMargin(0, 0, 8, 0)
+		entry:SetNumeric(true)
+		entry:SetUpdateOnType(true)
+		entry:SetText("0")
+		entry:SetTall(28)
 
-        local maxBtn = vgui.Create("DButton", entryRow)
-        maxBtn:Dock(RIGHT)
-        maxBtn:SetWide(100)
-        maxBtn:SetText("")
+		local maxBtn = vgui.Create("DButton", entryRow)
+		maxBtn:Dock(RIGHT)
+		maxBtn:SetWide(100)
+		maxBtn:SetText("")
 
-        local priceLbl = vgui.Create("DPanel", content)
-        priceLbl:Dock(TOP)
-        priceLbl:DockMargin(12, 2, 12, 8)
-        priceLbl:SetTall(36)
-        priceLbl:SetPaintBackground(false)
-        priceLbl:SetMouseInputEnabled(false)
-        priceLbl.Paint = function(pnl, w, h)
-            ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 0, {
-                {text = "Price per spore:", color = ArtDeco.Colors.paleGold},
-                {text = string.Comma(price), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-            })
-            ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 18, {
-                {text = "You will receive:", color = ArtDeco.Colors.paleGold},
-                {text = string.Comma(pnl._receive or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-            })
-        end
-        local function refreshPrice()
-            local n = tonumber(entry:GetText()) or 0
-            n = math.Clamp(math.floor(n), 0, have)
-            priceLbl._receive = n * price
-        end
-        function entry:OnValueChange() refreshPrice() end
-        refreshPrice()
+		local priceLbl = vgui.Create("DPanel", content)
+		priceLbl:Dock(TOP)
+		priceLbl:DockMargin(12, 2, 12, 8)
+		priceLbl:SetTall(36)
+		priceLbl:SetPaintBackground(false)
+		priceLbl:SetMouseInputEnabled(false)
+		priceLbl.Paint = function(pnl, w, h)
+			ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 0, {
+				{text = "Price per spore:", color = ArtDeco.Colors.paleGold},
+				{text = string.Comma(price), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+			})
+			ArtDeco.DrawCostLine("Arcana_AncientSmall", 0, 18, {
+				{text = "You will receive:", color = ArtDeco.Colors.paleGold},
+				{text = string.Comma(pnl._receive or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+			})
+		end
+		local function refreshPrice()
+			local n = tonumber(entry:GetText()) or 0
+			n = math.Clamp(math.floor(n), 0, have)
+			priceLbl._receive = n * price
+		end
+		function entry:OnValueChange() refreshPrice() end
+		refreshPrice()
 
-        -- Ensure wrapped labels expand properly
-        function content:PerformLayout(w, h)
-            if IsValid(label) then
-                label:SetWide(w - 24)
-                label:SizeToContentsY()
-            end
-        end
+		-- Ensure wrapped labels expand properly
+		function content:PerformLayout(w, h)
+			if IsValid(label) then
+				label:SetWide(w - 24)
+				label:SizeToContentsY()
+			end
+		end
 
-        local buttons = vgui.Create("DPanel", content)
-        buttons:Dock(BOTTOM)
-        buttons:SetTall(52)
-        buttons:DockMargin(12, 8, 12, 10)
-        buttons.Paint = nil
+		local buttons = vgui.Create("DPanel", content)
+		buttons:Dock(BOTTOM)
+		buttons:SetTall(52)
+		buttons:DockMargin(12, 8, 12, 10)
+		buttons.Paint = nil
 
-        local confirm = vgui.Create("DButton", buttons)
-        confirm:SetText("")
-        confirm:SetTall(40)
-        local cancel = vgui.Create("DButton", buttons)
-        cancel:SetText("")
-        cancel:SetTall(40)
+		local confirm = vgui.Create("DButton", buttons)
+		confirm:SetText("")
+		confirm:SetTall(40)
+		local cancel = vgui.Create("DButton", buttons)
+		cancel:SetText("")
+		cancel:SetTall(40)
 
-        buttons.PerformLayout = function(pnl, w, h)
-            local gap = 10
-            local bw = math.floor((w - gap) * 0.5)
-            confirm:SetSize(bw, confirm:GetTall())
-            confirm:SetPos(0, math.floor((h - confirm:GetTall()) * 0.5))
-            cancel:SetSize(w - bw - gap, cancel:GetTall())
-            cancel:SetPos(bw + gap, math.floor((h - cancel:GetTall()) * 0.5))
-        end
+		buttons.PerformLayout = function(pnl, w, h)
+			local gap = 10
+			local bw = math.floor((w - gap) * 0.5)
+			confirm:SetSize(bw, confirm:GetTall())
+			confirm:SetPos(0, math.floor((h - confirm:GetTall()) * 0.5))
+			cancel:SetSize(w - bw - gap, cancel:GetTall())
+			cancel:SetPos(bw + gap, math.floor((h - cancel:GetTall()) * 0.5))
+		end
 
-        local function paintBtn(pnl, w, h, label, enabled)
-            local hovered = pnl:IsHovered() and enabled
-            local bg = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
-            ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
-            ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and ArtDeco.Colors.gold or Color(140, 120, 90, 255), 8)
-            draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, enabled and ArtDeco.Colors.textBright or Color(200, 190, 170, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
+		local function paintBtn(pnl, w, h, label, enabled)
+			local hovered = pnl:IsHovered() and enabled
+			local bg = hovered and Color(58, 44, 32, 235) or Color(46, 36, 26, 235)
+			ArtDeco.FillDecoPanel(0, 0, w, h, bg, 8)
+			ArtDeco.DrawDecoFrame(0, 0, w, h, enabled and ArtDeco.Colors.gold or Color(140, 120, 90, 255), 8)
+			draw.SimpleText(label, "Arcana_AncientLarge", w * 0.5, h * 0.5, enabled and ArtDeco.Colors.textBright or Color(200, 190, 170, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
 
-        maxBtn.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "MAX", true) end
-        maxBtn.DoClick = function()
-            local n = math.Clamp(have, 0, have)
-            entry:SetText(tostring(n))
-            if entry.OnValueChange then entry:OnValueChange() end
-        end
+		maxBtn.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "MAX", true) end
+		maxBtn.DoClick = function()
+			local n = math.Clamp(have, 0, have)
+			entry:SetText(tostring(n))
+			if entry.OnValueChange then entry:OnValueChange() end
+		end
 
-        confirm.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "Confirm", true) end
-        cancel.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "Cancel", true) end
+		confirm.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "Confirm", true) end
+		cancel.Paint = function(pnl, w, h) paintBtn(pnl, w, h, "Cancel", true) end
 
-        confirm.DoClick = function()
-            local n = math.max(1, tonumber(entry:GetText()) or 0)
-            net.Start("Arcana_FairyVendor_Confirm")
-            net.WriteEntity(ent)
-            net.WriteUInt(n, 32)
-            net.SendToServer()
-            frame:Close()
-        end
+		confirm.DoClick = function()
+			local n = math.max(1, tonumber(entry:GetText()) or 0)
+			net.Start("Arcana_FairyVendor_Confirm")
+			net.WriteEntity(ent)
+			net.WriteUInt(n, 32)
+			net.SendToServer()
+			frame:Close()
+		end
 
-        cancel.DoClick = function()
-            frame:Close()
-        end
-    end)
+		cancel.DoClick = function()
+			frame:Close()
+		end
+	end)
 end

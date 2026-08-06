@@ -51,7 +51,7 @@ local function spawnCloud(attacker, pos)
 
 		for _, ent in ipairs(ents.FindInSphere(marker:GetPos(), CLOUD_RADIUS)) do
 			if not IsValid(ent) or ent == attacker then continue end
-			if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then continue end
+			if not Arcana.Common.IsActor(ent) then continue end
 			if ent:IsPlayer() and not ent:Alive() then continue end
 			if ent:IsNPC() and ent:Health() <= 0 then continue end
 
@@ -81,7 +81,7 @@ local function spawnCloud(attacker, pos)
 	end)
 end
 
-Arcana:RegisterEnchantment({
+Arcana.RegisterEnchantment({
 	id = "spore_seeding",
 	name = "Spore Seeding",
 	description = "On impact, your projectile bursts into a lingering spore cloud. Enemies inside are poisoned each tick, and any player who lingers is overcome with disorienting hallucinations.",

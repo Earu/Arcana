@@ -12,7 +12,7 @@
 #
 # A dedicated wine prefix (~/.cache/arcana-shadercompile, override with
 # ARCANA_SHADER_WINEPREFIX) is used, and Microsoft's native d3dcompiler_47.dll
-# is installed into it via winetricks on first run — with it, output bytecode
+# is installed into it via winetricks on first run: with it, output bytecode
 # is byte-identical to the old Windows pipeline.  Without it, wine's builtin
 # HLSL compiler is used, which works but produces different bytecode.
 

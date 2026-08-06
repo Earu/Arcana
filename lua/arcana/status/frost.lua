@@ -17,14 +17,14 @@ function Frost.Apply(target, options)
 	local vfxTag = options.vfxTag or "frost_slow"
 	local sendClientFX = options.sendClientFX ~= false -- default true
 
-	local isActor = target:IsPlayer() or target:IsNPC() or (target.IsNextBot and target:IsNextBot())
+	local isActor =Arcana.Common.IsActor(target)
 	if not isActor then return end
 
 	local untilTime = CurTime() + duration
 	target.ArcanaFrostSlowUntil = math.max(target.ArcanaFrostSlowUntil or 0, untilTime)
 
 	-- Visual band
-	Arcana:SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
+	Arcana.SendAttachBandVFX(target, Color(170, 220, 255, 255), 24, 0.8, {
 		{
 			radius = 18,
 			height = 6,
@@ -91,7 +91,7 @@ function Frost.Apply(target, options)
 			-- cleanup
 			target._ArcanaNPCGroundClamp = nil
 			target._ArcanaLocoClamp = nil
-			Arcana:ClearBandVFX(target, vfxTag)
+			Arcana.ClearBandVFX(target, vfxTag)
 			timer.Remove(timerId)
 
 			return

@@ -1,6 +1,6 @@
 if SERVER then util.AddNetworkString("Arcana_FrostNovaBurst") end
 
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "frost_nova",
 	name = "Frost Nova",
 	description = "Release a burst of freezing air around you, damaging and slowing nearby foes.",
@@ -26,7 +26,7 @@ Arcana:RegisterSpell({
 		local slowDuration = 3.5
 
 		-- VFX: bands around caster
-		Arcana:SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
+		Arcana.SendAttachBandVFX(srcEnt, Color(170, 220, 255, 255), radius * 0.7, 0.8, {
 			{
 				radius = radius * 0.35,
 				height = 18,
@@ -54,7 +54,7 @@ Arcana:RegisterSpell({
 			if not IsValid(ent) then continue end
 			if ent == caster then continue end
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			if not isActor then continue end
 
 			-- Deal damage
@@ -111,7 +111,6 @@ if CLIENT then
 	local matBeam = Material("sprites/physbeam")
 	local bursts = {}
 	local iceSpikes = {}
-	local frostOverlayMat = Material("particle/particle_smokegrenade")
 
 	hook.Add("PostDrawTranslucentRenderables", "Arcana_FrostNova_Render", function(bDrawingDepth, isSkybox)
 		if bDrawingDepth or isSkybox then return end

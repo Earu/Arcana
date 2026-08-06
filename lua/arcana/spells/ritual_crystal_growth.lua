@@ -1,4 +1,4 @@
-Arcana:RegisterRitualSpell({
+Arcana.RegisterRitualSpell({
 	id = "ritual_of_crystal_growth",
 	name = "Ritual: Crystal Growth",
 	description = "A ritual that manifests a large mana crystal from concentrated arcane energy.",
@@ -31,7 +31,7 @@ Arcana:RegisterRitualSpell({
 
 		local crystal = ents.Create("arcana_mana_crystal")
 		if not IsValid(crystal) then
-			Arcana:SendErrorNotification(ply, "Failed to create mana crystal.")
+			Arcana.SendErrorNotification(ply, "Failed to create mana crystal.")
 			return
 		end
 

@@ -1,10 +1,10 @@
--- Astral Vault UI — client-side panel, slot cards, galaxy background renderer.
--- Server-side persistence, SQL schema, and net.Receive handlers live in astral_vault.lua.
+-- Astral Vault UI: client-side panel, slot cards, galaxy background renderer.
+-- Server-side persistence, SQL schema, and net.Receive handlers live in vault.lua.
 if not CLIENT then return end
 
 local Arcana = Arcana
 
--- Cost constants come from astral_vault_config.lua (loaded before this file via init.lua).
+-- Cost constants come from config.lua (loaded before this file via init.lua).
 local VAULT_CFG = Arcana.VaultConfig
 
 local HL2_MODELS = {
@@ -42,34 +42,7 @@ local function drawGalaxyBackground(pnl, w, h, starSeed)
 	local x, y = 6, 6
 	local ww, hh = w - 12, h - 12
 	local c = 14
-	local pts = {
-		{x = x + c, y = y},
-		{x = x + ww - c, y = y},
-		{x = x + ww, y = y + c},
-		{x = x + ww, y = y + hh - c},
-		{x = x + ww - c, y = y + hh},
-		{x = x + c, y = y + hh},
-		{x = x, y = y + hh - c},
-		{x = x, y = y + c},
-	}
-
-	render.ClearStencil()
-	render.SetStencilEnable(true)
-	render.SetStencilWriteMask(0xFF)
-	render.SetStencilTestMask(0xFF)
-	render.SetStencilReferenceValue(1)
-	render.SetStencilCompareFunction(STENCIL_NEVER)
-	render.SetStencilFailOperation(STENCIL_REPLACE)
-	render.SetStencilPassOperation(STENCIL_KEEP)
-	render.SetStencilZFailOperation(STENCIL_KEEP)
-
-	draw.NoTexture()
-	surface.SetDrawColor(255, 255, 255, 255)
-	surface.DrawPoly(pts)
-
-	render.SetStencilCompareFunction(STENCIL_EQUAL)
-	render.SetStencilFailOperation(STENCIL_KEEP)
-	render.SetStencilPassOperation(STENCIL_REPLACE)
+	ArtDeco.BeginOctagonClip(x, y, ww, hh, c)
 
 	-- Background base
 	surface.SetDrawColor(8, 10, 22, 240)
@@ -101,7 +74,7 @@ local function drawGalaxyBackground(pnl, w, h, starSeed)
 		if i % 9 == 0 then surface.DrawRect(sx, sy, 2, 1) end
 	end
 
-	render.SetStencilEnable(false)
+	ArtDeco.EndOctagonClip()
 end
 
 -- Global-ish state for live refresh
@@ -173,7 +146,7 @@ end
 local function getEnchantDisplayList(ids)
 	local out = {}
 	for _, id in ipairs(ids or {}) do
-		local e = Arcana and Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
+		local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
 		out[#out + 1] = (e and e.name) or tostring(id)
 	end
 	table.sort(out)
@@ -251,8 +224,8 @@ local function openVault(items)
 			ArtDeco.FitModelPanel(self, MODEL_FOV, MODEL_DIR)
 		end
 		function model:PostDrawModel(ent)
-			if Arcana and Arcana.RenderEnchantBandsForEntity then
-				Arcana:RenderEnchantBandsForEntity(ent, self._EnchantCount or 3,
+			if Arcana.RenderEnchantBandsForEntity then
+				Arcana.RenderEnchantBandsForEntity(ent, self._EnchantCount or 3,
 					(LocalPlayer().GetWeaponColor and LocalPlayer():GetWeaponColor():ToColor()) or COLOR_GOLD,
 					self._BandStyle or "axis", {isMelee = self._BandIsMelee})
 			end
@@ -265,7 +238,7 @@ local function openVault(items)
 			model:SetModel((swep and (swep.WorldModel or swep.ViewModel)) or HL2_MODELS[cls] or "models/weapons/w_pistol.mdl")
 			ArtDeco.FitModelPanel(model, MODEL_FOV, MODEL_DIR)
 			model._EnchantCount = math.max(1, #(it.enchant_ids or {}))
-			model._BandStyle, model._BandIsMelee = Arcana:GetEnchantBandPreviewInfo(cls)
+			model._BandStyle, model._BandIsMelee = Arcana.GetEnchantBandPreviewInfo(cls)
 		else
 			model:SetVisible(false)
 		end
@@ -274,7 +247,7 @@ local function openVault(items)
 
 	-- Below the model: the weapon class as a fancy centered heading with
 	-- flanking strokes, a wide diamond divider, then the enchantments as
-	-- tarot captions — a pale-gold numeral over the name in small caps,
+	-- tarot captions: a pale-gold numeral over the name in small caps,
 	-- slim diamond dividers between them.
 	local ROMAN = {"I", "II", "III", "IV", "V"}
 	local COLOR_SEP = Color(160, 130, 60, 180)
@@ -374,10 +347,10 @@ local function openVault(items)
 				local needShards = tonumber(VAULT_CFG.SUMMON_SHARDS) or 0
 				draw.SimpleText("Summon weapon", "Arcana_AncientSmall", w * 0.5, 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
 				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, 27, {
-					{text = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+					{text = string.Comma(Arcana.GetCoins(lp)) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
 				}, TEXT_ALIGN_CENTER)
 				ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, 45, {
-					{text = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+					{text = string.Comma(Arcana.GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
 				}, TEXT_ALIGN_CENTER)
 			end
 			pnl._hint = tip
@@ -444,8 +417,8 @@ local function openVault(items)
 		summon.Think = function(pnl)
 			if not it then pnl:SetEnabled(false) return end
 			local lp = LocalPlayer()
-			pnl:SetEnabled(Arcana:GetCoins(lp) >= (tonumber(VAULT_CFG.SUMMON_COINS) or 0)
-				and Arcana:GetItemCount(lp, "mana_crystal_shard") >= (tonumber(VAULT_CFG.SUMMON_SHARDS) or 0))
+			pnl:SetEnabled(Arcana.GetCoins(lp) >= (tonumber(VAULT_CFG.SUMMON_COINS) or 0)
+				and Arcana.GetItemCount(lp, "mana_crystal_shard") >= (tonumber(VAULT_CFG.SUMMON_SHARDS) or 0))
 		end
 		if it then
 			summon.DoClick = function()
@@ -487,7 +460,7 @@ local function openVault(items)
 	end
 
 	-- Tarot-style luxury frame: gold outline, an inner brass frame, and
-	-- gilded corners — the band between the outlines filled at the corner
+	-- gilded corners: the band between the outlines filled at the corner
 	-- cut, extended by a wing along each edge that tapers with a slant
 	-- toward the outer outline.
 	local TAROT_CORNER_MIRRORS = {{0, 0}, {1, 0}, {1, 1}, {0, 1}}
@@ -649,8 +622,8 @@ local function openVault(items)
 		-- around a small diamond, matching the summon hint.
 		local lp = LocalPlayer()
 		ArtDeco.DrawCostLine("Arcana_AncientSmall", w * 0.5, h * 0.5 + 2, {
-			{text = string.Comma(Arcana:GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-			{text = string.Comma(Arcana:GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
+			{text = string.Comma(Arcana.GetCoins(lp)) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_COINS) or 0), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
+			{text = string.Comma(Arcana.GetItemCount(lp, "mana_crystal_shard")) .. " / " .. string.Comma(tonumber(VAULT_CFG.STORE_SHARDS) or 0), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
 		}, TEXT_ALIGN_CENTER, true)
 	end
 	-- Enable/disable imprint based on weapon presence, vault space and affordability
@@ -659,8 +632,8 @@ local function openVault(items)
 		local hasWeapon = IsValid(lp) and IsValid(lp:GetActiveWeapon())
 		local items = VAULT.items or {}
 		local hasRoom = (#items) < (tonumber(VAULT_CFG.MAX_SLOTS) or 0)
-		local haveCoins = Arcana:GetCoins(lp)
-		local haveShards = Arcana:GetItemCount(lp, "mana_crystal_shard")
+		local haveCoins = Arcana.GetCoins(lp)
+		local haveShards = Arcana.GetItemCount(lp, "mana_crystal_shard")
 		local needCoins = tonumber(VAULT_CFG.STORE_COINS) or 0
 		local needShards = tonumber(VAULT_CFG.STORE_SHARDS) or 0
 		local ok = hasWeapon and hasRoom and (haveCoins >= needCoins) and (haveShards >= needShards)

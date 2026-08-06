@@ -1,5 +1,5 @@
 -- Freeze: Launch a fast ice bolt that applies Frost status on hit
-Arcana:RegisterSpell({
+Arcana.RegisterSpell({
 	id = "freeze",
 	name = "Freeze",
 	description = "Launch a fast ice bolt that chills and slows the first target it hits.",
