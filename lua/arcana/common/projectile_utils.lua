@@ -4,6 +4,9 @@
 Arcana = Arcana or {}
 Arcana.Common = Arcana.Common or {}
 
+-- ambient/energy/ ships zap1-3 and zap5-9; there is no zap4.wav.
+local ZAP_IDS = { 1, 2, 3, 5, 6, 7, 8, 9 }
+
 if SERVER then
 	--- Returns true when an entity is solid and not a trigger volume.
 	-- Used by projectile collision handlers to decide whether to detonate.
@@ -144,7 +147,7 @@ if SERVER then
 			opts.shakeDur or 0.35,
 			(opts.shakeRadius or 600) * power
 		)
-		sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", pos, opts.soundLvl or 95, 100)
+		sound.Play("ambient/energy/zap" .. ZAP_IDS[math.random(#ZAP_IDS)] .. ".wav", pos, opts.soundLvl or 95, 100)
 	end
 
 	--- Creates a point_tesla entity for brief lightning visual feedback.

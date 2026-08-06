@@ -114,7 +114,7 @@ Arcana.RegisterSpell({
 
 				local rpos = caster:WorldSpaceCenter()
 				-- The "bang": a low concussive boom at the release.
-				sound.Play("ambient/wind/wind_roar1.wav", rpos, 90, 150)
+				sound.Play("ambient/wind/wind_hit2.wav", rpos, 90, 150)
 				sound.Play("ambient/wind/wind_hit1.wav", rpos, 85, 70)
 
 				net.Start("Arcana_WindDash", true)
@@ -145,7 +145,7 @@ Arcana.RegisterSpell({
 			caster.ArcanaWindDashDived  = true
 			caster.ArcanaWindDashLast   = CurTime() + 0.1
 
-			sound.Play("ambient/wind/wind_roar1.wav", startPos, 85, 80)
+			sound.Play("ambient/wind/wind_hit2.wav", startPos, 85, 80)
 			timer.Simple(0.05, function()
 				if IsValid(caster) then
 					sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", startPos, 80, 75)
@@ -159,7 +159,7 @@ Arcana.RegisterSpell({
 			caster.ArcanaWindDashDived   = false
 			caster.ArcanaWindDashLast    = CurTime() + 0.1
 
-			sound.Play("ambient/wind/wind_roar1.wav", startPos, 85, 140)
+			sound.Play("ambient/wind/wind_hit2.wav", startPos, 85, 140)
 			sound.Play("ambient/wind/wind_snippet" .. math.random(1, 5) .. ".wav", startPos, 80, 120)
 			timer.Simple(0.05, function()
 				if IsValid(caster) then

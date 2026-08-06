@@ -43,7 +43,7 @@ local function spawnCloud(attacker, pos)
 	net.WriteFloat(CLOUD_RADIUS)
 	net.Broadcast()
 
-	sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(1, 8) .. ".wav", pos, 75, 75)
+	sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(2, 8) .. ".wav", pos, 75, 75)
 
 	local tid = "Arcana_SporeCloud_" .. marker:EntIndex()
 	timer.Create(tid, TICK_INTERVAL, TICK_COUNT, function()

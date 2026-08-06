@@ -14,6 +14,9 @@ local P = Arcana.Spellcraft
 
 P.ID_PREFIX = "spellcraft_"
 
+-- physics/metal/ ships metal_solid_impact_hard 1, 4 and 5; 2 and 3 do not exist.
+local METAL_CLANG_IDS = { 1, 4, 5 }
+
 function P.SpellId(sid64, slot)
 	return P.ID_PREFIX .. tostring(sid64) .. "_" .. tostring(slot)
 end
@@ -639,7 +642,7 @@ if SERVER then
 		ply:Extinguish()
 		ply:SetMaterial(GOLD_MATERIAL)
 		ply:SetColor(GOLD_TINT)
-		ply:EmitSound("physics/metal/metal_solid_impact_hard" .. math.random(1, 3) .. ".wav", 75, 90)
+		ply:EmitSound("physics/metal/metal_solid_impact_hard" .. METAL_CLANG_IDS[math.random(#METAL_CLANG_IDS)] .. ".wav", 75, 90)
 		P.ImpactFX("aurum", ply:WorldSpaceCenter(), 60, 0.6)
 
 		timer.Simple(SEIZE_DURATION, function()

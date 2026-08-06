@@ -1,5 +1,8 @@
 if SERVER then util.AddNetworkString("Arcana_Blackhole_Climax") end
 
+-- ambient/energy/ ships zap1-3 and zap5-9; there is no zap4.wav.
+local ZAP_IDS = { 1, 2, 3, 5, 6, 7, 8, 9 }
+
 -- Server-side dark star tracking for vaporization (file-scope so on_register closures can access it)
 local darkStarServerData = {}
 
@@ -97,7 +100,7 @@ local function registerBlackholeServerHooks(spell)
 							util.Effect("cball_explode", ed, true, true)
 
 							-- Sound effect
-							sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", ent:GetPos(), 80, 150)
+							sound.Play("ambient/energy/zap" .. ZAP_IDS[math.random(#ZAP_IDS)] .. ".wav", ent:GetPos(), 80, 150)
 							sound.Play("ambient/energy/weld" .. math.random(1, 2) .. ".wav", ent:GetPos(), 75, 80)
 						end
 					end
@@ -187,9 +190,9 @@ Arcana.RegisterSpell({
 
 		-- Stage 3: Building tension (0.5s)
 		timer.Simple(0.5, function()
-			sound.Play("ambient/energy/newspark" .. (math.random(0, 11) == 0 and "0" or math.random(1, 11)) .. ".wav", targetPos, 115, 60)
+			sound.Play(string.format("ambient/energy/newspark%02d.wav", math.random(1, 11)), targetPos, 115, 60)
 			sound.Play("ambient/machines/thumper_hit.wav", targetPos, 112, 90)
-			sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", targetPos, 110, 120)
+			sound.Play("ambient/energy/zap" .. ZAP_IDS[math.random(#ZAP_IDS)] .. ".wav", targetPos, 110, 120)
 		end)
 
 		-- Stage 4: Critical point (0.7s)
@@ -202,7 +205,7 @@ Arcana.RegisterSpell({
 
 		-- Stage 4.5: Lightning arcs moment (0.8s)
 		timer.Simple(0.8, function()
-			sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", targetPos, 122, 100)
+			sound.Play("ambient/energy/zap" .. ZAP_IDS[math.random(#ZAP_IDS)] .. ".wav", targetPos, 122, 100)
 			sound.Play("ambient/energy/spark" .. math.random(1, 6) .. ".wav", targetPos, 118, 90)
 			sound.Play("ambient/machines/thumper_hit.wav", targetPos, 115, 85)
 		end)
@@ -212,7 +215,7 @@ Arcana.RegisterSpell({
 			sound.Play("ambient/energy/whiteflash.wav", targetPos, 130, 70)
 			sound.Play("weapons/physcannon/energy_sing_explosion2.wav", targetPos, 125, 35)
 			sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", targetPos, 125, 80)
-			sound.Play("ambient/levels/citadel/strange_talk" .. math.random(1, 11) .. ".wav", targetPos, 120, 50)
+			sound.Play("ambient/levels/citadel/strange_talk" .. math.random(3, 11) .. ".wav", targetPos, 120, 50)
 			sound.Play("ambient/machines/thumper_shutdown1.wav", targetPos, 120, 70)
 		end)
 
@@ -227,14 +230,14 @@ Arcana.RegisterSpell({
 			sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", targetPos, 130, 50)
 			sound.Play("weapons/physcannon/physcannon_claws_close.wav", targetPos, 125, 30)
 			sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", targetPos, 128, 70)
-			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 6) .. ".wav", targetPos, 125, 85)
-			sound.Play("ambient/energy/zap" .. math.random(1, 9) .. ".wav", targetPos, 122, 110)
+			sound.Play("ambient/atmosphere/thunder" .. math.random(1, 4) .. ".wav", targetPos, 125, 85)
+			sound.Play("ambient/energy/zap" .. ZAP_IDS[math.random(#ZAP_IDS)] .. ".wav", targetPos, 122, 110)
 			sound.Play("physics/concrete/concrete_break" .. math.random(2, 3) .. ".wav", targetPos, 120, 50)
 		end)
 
 		-- Impact aftershock (1.15s)
 		timer.Simple(1.15, function()
-			sound.Play("ambient/levels/citadel/citadel_hit" .. math.random(1, 6) .. ".wav", targetPos, 125, 60)
+			sound.Play("ambient/atmosphere/hole_hit" .. math.random(1, 5) .. ".wav", targetPos, 125, 60)
 			sound.Play("ambient/machines/thumper_dust.wav", targetPos, 120, 80)
 		end)
 
@@ -1523,7 +1526,6 @@ if CLIENT then
 				caster:StopSound("ambient/atmosphere/hole_hit3.wav")
 				caster:StopSound("ambient/atmosphere/hole_hit4.wav")
 				caster:StopSound("ambient/atmosphere/hole_hit5.wav")
-				caster:StopSound("ambient/levels/citadel/portal_close1.wav")
 				caster:StopSound("weapons/physcannon/energy_sing_explosion2.wav")
 				caster:StopSound("weapons/physcannon/physcannon_charge.wav")
 				caster:StopSound("ambient/energy/weld1.wav")
@@ -1573,7 +1575,6 @@ if CLIENT then
 			caster:StopSound("ambient/atmosphere/hole_hit3.wav")
 			caster:StopSound("ambient/atmosphere/hole_hit4.wav")
 			caster:StopSound("ambient/atmosphere/hole_hit5.wav")
-			caster:StopSound("ambient/levels/citadel/portal_close1.wav")
 			caster:StopSound("weapons/physcannon/energy_sing_explosion2.wav")
 			caster:StopSound("weapons/physcannon/physcannon_charge.wav")
 			caster:StopSound("ambient/energy/weld1.wav")

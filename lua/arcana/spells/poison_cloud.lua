@@ -102,7 +102,7 @@ Arcana.RegisterSpell({
 		net.Broadcast()
 
 		-- Toxic cloud spawn sounds
-		sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(1, 8) .. ".wav", pos, 75, 90)
+		sound.Play("ambient/levels/canals/toxic_slime_gurgle" .. math.random(2, 8) .. ".wav", pos, 75, 90)
 		sound.Play("ambient/atmosphere/cave_hit" .. math.random(1, 6) .. ".wav", pos, 70, 70)
 		timer.Simple(0.1, function()
 			sound.Play("npc/barnacle/barnacle_gulp" .. math.random(1, 2) .. ".wav", pos, 70, 70)

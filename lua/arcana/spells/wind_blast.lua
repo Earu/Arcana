@@ -35,7 +35,7 @@ Arcana.RegisterSpell({
 		net.Broadcast()
 
 		-- Powerful radial blast sounds
-		sound.Play("ambient/wind/wind_roar1.wav", origin, 100, 90)
+		sound.Play("ambient/wind/wind_hit2.wav", origin, 100, 90)
 		sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", origin, 95, 130)
 		sound.Play("physics/concrete/boulder_impact_hard" .. math.random(1, 4) .. ".wav", origin, 90, 50)
 		timer.Simple(0.05, function()

@@ -255,7 +255,7 @@ if SERVER then
 		end
 
 		self:SetCharging(true)
-		self:EmitSound("physics/stone/stone_box_impact_hard2.wav", 72, math.random(90, 110), 1)
+		self:EmitSound("physics/concrete/rock_impact_hard2.wav", 72, math.random(90, 110), 1)
 
 		-- The swarm's skulls visually converge on a point LUNGE_DISTANCE ahead of the
 		-- controller's origin (see SkullState). Damage and the impact FX must use that
@@ -315,7 +315,7 @@ if SERVER then
 	function ENT:OnInjured(dmginfo)
 		local atk = dmginfo:GetAttacker()
 		if IsValid(atk) and atk:IsPlayer() then self._lastHurtBy = atk end
-		self:EmitSound("physics/stone/stone_box_impact_hard" .. math.random(1, 3) .. ".wav", 62, math.random(95, 110), 1)
+		self:EmitSound("physics/concrete/rock_impact_hard" .. math.random(1, 3) .. ".wav", 62, math.random(95, 110), 1)
 	end
 
 	function ENT:OnKilled(dmginfo)
@@ -362,7 +362,7 @@ if SERVER then
 			if now >= self._nextClick then
 				local interval   = self:GetCharging() and 0.07 or math.Clamp(0.28 * (CHASE_SPEED / math.max(speed, 1)), 0.1, 0.35)
 				self._nextClick  = now + interval
-				self:EmitSound("physics/stone/stone_box_impact_hard" .. math.random(1, 3) .. ".wav", 52, math.random(105, 130), 0.6)
+				self:EmitSound("physics/concrete/rock_impact_hard" .. math.random(1, 3) .. ".wav", 52, math.random(105, 130), 0.6)
 			end
 		end
 
@@ -504,7 +504,7 @@ if CLIENT then
 		if speed > 30 and not isStunned and now >= self._nextRattle then
 			local interval   = isCharging and 0.06 or math.Clamp(0.25 * (CHASE_SPEED / math.max(speed, 1)), 0.08, 0.3)
 			self._nextRattle = now + interval
-			self:EmitSound("physics/stone/stone_box_impact_hard" .. math.random(1, 3) .. ".wav", 48, math.random(110, 135), 0.5)
+			self:EmitSound("physics/concrete/rock_impact_hard" .. math.random(1, 3) .. ".wav", 48, math.random(110, 135), 0.5)
 		end
 
 		-- Group dynamic light: a pulsing purple glow that flares while charging
