@@ -12,7 +12,7 @@ local function applyFrostbite(attacker, target, hitPos)
 	dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 	dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 	dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
-	Arcana.TakeDamageInfo(target, dmg)
+	target:TakeDamageInfo(dmg)
 
 	-- Light knockback away from impact/caster
 	local pushDir = (pos - ((IsValid(attacker) and attacker:WorldSpaceCenter()) or (hitPos or pos))):GetNormalized()

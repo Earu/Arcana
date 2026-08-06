@@ -108,7 +108,7 @@ function SWEP:SecondaryAttack()
                 dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
                 dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
                 dmg:SetInflictor(IsValid(owner) and owner or game.GetWorld())
-                Arcana.TakeDamageInfo(ent, dmg)
+                ent:TakeDamageInfo(dmg)
                 if ent.Ignite then ent:Ignite(igniteTime, 0) end
             else
                 local phys = ent:GetPhysicsObject()

@@ -109,7 +109,7 @@ local function spawnVortex(owner, pos)
 				dmg:SetAttacker(owner)
 				dmg:SetInflictor(owner)
 				dmg:SetDamagePosition(ent:WorldSpaceCenter())
-				Arcana.TakeDamageInfo(ent, dmg)
+				ent:TakeDamageInfo(dmg)
 			end
 		end
 	end)

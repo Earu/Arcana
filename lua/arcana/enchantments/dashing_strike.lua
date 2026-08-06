@@ -26,7 +26,7 @@ local function attachHook(ply, wep, state)
 					dmg:SetAttacker(ply)
 					dmg:SetInflictor(IsValid(wep) and wep or ply)
 					dmg:SetDamagePosition(ent:WorldSpaceCenter())
-					Arcana.TakeDamageInfo(ent, dmg)
+					ent:TakeDamageInfo(dmg)
 				end
 			end
 			if ply.LagCompensation then ply:LagCompensation(false) end

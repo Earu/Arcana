@@ -140,7 +140,7 @@ local function persistPurchase(ply)
 	}
 
 	if not writeSpellcraftState(ply, state) then
-		Arcana.SendErrorNotification(ply, "Purchase could not be saved, contact an admin")
+		Arcana.SendErrorNotification(ply, "Purchase could not be saved")
 		return false
 	end
 

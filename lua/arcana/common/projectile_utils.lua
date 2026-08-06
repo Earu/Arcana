@@ -117,7 +117,7 @@ if SERVER then
 				dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 				dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
 				dmg:SetDamagePosition(tpos)
-				Arcana.TakeDamageInfo(tgt, dmg)
+				tgt:TakeDamageInfo(dmg)
 				if isfunction(onChain) then onChain(tgt, tpos, i) end
 			end)
 		end

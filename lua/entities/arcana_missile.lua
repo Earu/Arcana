@@ -115,7 +115,7 @@ if SERVER then
 		dmg:SetDamageType(bit.bor(DMG_ENERGYBEAM, DMG_DISSOLVE))
 		dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 		dmg:SetInflictor(self)
-		Arcana.TakeDamageInfo(ent, dmg)
+		ent:TakeDamageInfo(dmg)
 
 		-- Enhanced impact effects
 		local pos = self:GetPos()

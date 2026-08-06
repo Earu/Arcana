@@ -149,7 +149,7 @@ if SERVER then
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
 			dmg:SetAttacker(IsValid(owner) and owner or self)
 			dmg:SetInflictor(self)
-			Arcana.TakeDamageInfo(tgt, dmg)
+			tgt:TakeDamageInfo(dmg)
 
 			-- Send visual lightning arc to client
 			net.Start("Arcana_LightningOrbZap", true)

@@ -88,7 +88,7 @@ local function registerBlackholeServerHooks(spell)
 							dmgInfo:SetInflictor(caster)
 							dmgInfo:SetDamageType(DMG_DISSOLVE)
 							dmgInfo:SetDamagePosition(data.pos)
-							Arcana.TakeDamageInfo(ent, dmgInfo)
+							ent:TakeDamageInfo(dmgInfo)
 
 							-- Vaporization effect
 							local ed = EffectData()
