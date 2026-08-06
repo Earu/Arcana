@@ -715,34 +715,7 @@ if CLIENT then
 		local x, y = 6, 6
 		local ww, hh = w - 12, h - 12
 		local corner = 14
-		local pts = {
-			{x = x + corner, y = y},
-			{x = x + ww - corner, y = y},
-			{x = x + ww, y = y + corner},
-			{x = x + ww, y = y + hh - corner},
-			{x = x + ww - corner, y = y + hh},
-			{x = x + corner, y = y + hh},
-			{x = x, y = y + hh - corner},
-			{x = x, y = y + corner},
-		}
-
-		render.ClearStencil()
-		render.SetStencilEnable(true)
-		render.SetStencilWriteMask(0xFF)
-		render.SetStencilTestMask(0xFF)
-		render.SetStencilReferenceValue(1)
-		render.SetStencilCompareFunction(STENCIL_NEVER)
-		render.SetStencilFailOperation(STENCIL_REPLACE)
-		render.SetStencilPassOperation(STENCIL_KEEP)
-		render.SetStencilZFailOperation(STENCIL_KEEP)
-
-		draw.NoTexture()
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawPoly(pts)
-
-		render.SetStencilCompareFunction(STENCIL_EQUAL)
-		render.SetStencilFailOperation(STENCIL_KEEP)
-		render.SetStencilPassOperation(STENCIL_REPLACE)
+		ArtDeco.BeginOctagonClip(x, y, ww, hh, corner)
 
 		-- Cold mossy stone base, distinct from the vault's night sky and the
 		-- Emissary's warm sanctum.
@@ -780,7 +753,7 @@ if CLIENT then
 		-- caller this frame (world VFX included) repeat the same sequence
 		math.randomseed(SysTime())
 
-		render.SetStencilEnable(false)
+		ArtDeco.EndOctagonClip()
 	end
 
 	local function OpenAltarMenu(altar)
@@ -851,37 +824,7 @@ if CLIENT then
 		frame._arcanaTooltips = {}
 		local bgSeed = math.random(1, 10 ^ 9)
 
-		-- Draggable by the whole header band (the stock strip is too thin).
-		-- The cursor signals the band on hover and the drag while it lasts.
-		frame:SetDraggable(false)
-		frame.OnMousePressed = function(pnl, code)
-			if code ~= MOUSE_LEFT then return end
-			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			if my <= 44 then
-				pnl._dragOffset = {mx, my}
-				pnl:MouseCapture(true)
-				pnl:SetCursor("sizeall")
-			end
-		end
-		frame.OnMouseReleased = function(pnl)
-			pnl._dragOffset = nil
-			pnl:MouseCapture(false)
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
-		frame.OnCursorMoved = function(pnl)
-			if pnl._dragOffset then
-				local mx, my = gui.MousePos()
-				pnl:SetPos(
-					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
-					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
-
-				return
-			end
-
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
+		ArtDeco.MakeDraggableByBand(frame, 44)
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)
@@ -1043,19 +986,7 @@ if CLIENT then
 		local scroll = vgui.Create("DScrollPanel", listPanel)
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip:NoClipping(true)
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(scroll)
 
 		local function rebuildLearn()
 			local regularSpells, rituals = BuildEligibleSpellList(ply)

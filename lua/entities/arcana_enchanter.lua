@@ -51,11 +51,6 @@ if SERVER then
 		self._receivingUntil = 0
 		self:SetNWBool("Arcana_ReceivingMana", false)
 
-		-- Register into ManaNetwork as a consumer
-		local Arcana = _G.Arcana or {}
-		if Arcana.ManaNetwork and Arcana.ManaNetwork.RegisterConsumer then
-			Arcana.ManaNetwork:RegisterConsumer(self, {range = 700})
-		end
 	end
 
 	function ENT:SpawnFunction(ply, tr, classname)
@@ -814,34 +809,7 @@ if CLIENT then
 		local x, y = 6, 6
 		local ww, hh = w - 12, h - 12
 		local corner = 14
-		local pts = {
-			{x = x + corner, y = y},
-			{x = x + ww - corner, y = y},
-			{x = x + ww, y = y + corner},
-			{x = x + ww, y = y + hh - corner},
-			{x = x + ww - corner, y = y + hh},
-			{x = x + corner, y = y + hh},
-			{x = x, y = y + hh - corner},
-			{x = x, y = y + corner},
-		}
-
-		render.ClearStencil()
-		render.SetStencilEnable(true)
-		render.SetStencilWriteMask(0xFF)
-		render.SetStencilTestMask(0xFF)
-		render.SetStencilReferenceValue(1)
-		render.SetStencilCompareFunction(STENCIL_NEVER)
-		render.SetStencilFailOperation(STENCIL_REPLACE)
-		render.SetStencilPassOperation(STENCIL_KEEP)
-		render.SetStencilZFailOperation(STENCIL_KEEP)
-
-		draw.NoTexture()
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawPoly(pts)
-
-		render.SetStencilCompareFunction(STENCIL_EQUAL)
-		render.SetStencilFailOperation(STENCIL_KEEP)
-		render.SetStencilPassOperation(STENCIL_REPLACE)
+		ArtDeco.BeginOctagonClip(x, y, ww, hh, corner)
 
 		-- Dark brass base, translucent enough for the blur to breathe through.
 		surface.SetDrawColor(30, 23, 13, 205)
@@ -884,7 +852,7 @@ if CLIENT then
 		-- caller this frame (world VFX included) repeat the same sequence
 		math.randomseed(SysTime())
 
-		render.SetStencilEnable(false)
+		ArtDeco.EndOctagonClip()
 	end
 
 	local function OpenEnchanterMenu(machine)
@@ -897,37 +865,7 @@ if CLIENT then
 		frame:MakePopup()
 		local bgSeed = math.random(1, 10 ^ 9)
 
-		-- Draggable by the whole header band (the stock strip is too thin).
-		-- The cursor signals the band on hover and the drag while it lasts.
-		frame:SetDraggable(false)
-		frame.OnMousePressed = function(pnl, code)
-			if code ~= MOUSE_LEFT then return end
-			local mx, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			if my <= 44 then
-				pnl._dragOffset = {mx, my}
-				pnl:MouseCapture(true)
-				pnl:SetCursor("sizeall")
-			end
-		end
-		frame.OnMouseReleased = function(pnl)
-			pnl._dragOffset = nil
-			pnl:MouseCapture(false)
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
-		frame.OnCursorMoved = function(pnl)
-			if pnl._dragOffset then
-				local mx, my = gui.MousePos()
-				pnl:SetPos(
-					math.Clamp(mx - pnl._dragOffset[1], 0, ScrW() - pnl:GetWide()),
-					math.Clamp(my - pnl._dragOffset[2], 0, ScrH() - pnl:GetTall()))
-
-				return
-			end
-
-			local _, my = pnl:ScreenToLocal(gui.MouseX(), gui.MouseY())
-			pnl:SetCursor(my <= 44 and "sizeall" or "arrow")
-		end
+		ArtDeco.MakeDraggableByBand(frame, 44)
 
 		-- Screen-space blur behind frame (like grimoire)
 		hook.Add("HUDPaint", frame, function()
@@ -1303,18 +1241,7 @@ if CLIENT then
 		local scroll = vgui.Create("DScrollPanel", right)
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(scroll)
 
 		rebuild = function()
 			scroll:Clear()
@@ -1498,7 +1425,8 @@ function ENT:ComputeSuccessChance(ply)
 end
 
 if SERVER then
-	-- Called by ManaNetwork to signal mana receive
+	-- Receiving is duck-typed by the mana network: defining AddMana is the whole opt-in,
+	-- and any producer whose range reaches this entity will call it. See system/mana_network.lua.
 	function ENT:AddMana(_amount)
 		-- Treat any positive call as a pulse of receiving state
 		self._receivingUntil = CurTime() + 0.6

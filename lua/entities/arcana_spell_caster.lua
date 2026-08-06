@@ -616,19 +616,7 @@ if CLIENT then
 		scroll:Dock(FILL)
 		scroll:DockMargin(12, 36, 12, 12)
 
-		local vbar = scroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip:NoClipping(true)
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(scroll)
 
 		local function rebuild()
 			scroll:Clear()
