@@ -42,34 +42,7 @@ local function drawGalaxyBackground(pnl, w, h, starSeed)
 	local x, y = 6, 6
 	local ww, hh = w - 12, h - 12
 	local c = 14
-	local pts = {
-		{x = x + c, y = y},
-		{x = x + ww - c, y = y},
-		{x = x + ww, y = y + c},
-		{x = x + ww, y = y + hh - c},
-		{x = x + ww - c, y = y + hh},
-		{x = x + c, y = y + hh},
-		{x = x, y = y + hh - c},
-		{x = x, y = y + c},
-	}
-
-	render.ClearStencil()
-	render.SetStencilEnable(true)
-	render.SetStencilWriteMask(0xFF)
-	render.SetStencilTestMask(0xFF)
-	render.SetStencilReferenceValue(1)
-	render.SetStencilCompareFunction(STENCIL_NEVER)
-	render.SetStencilFailOperation(STENCIL_REPLACE)
-	render.SetStencilPassOperation(STENCIL_KEEP)
-	render.SetStencilZFailOperation(STENCIL_KEEP)
-
-	draw.NoTexture()
-	surface.SetDrawColor(255, 255, 255, 255)
-	surface.DrawPoly(pts)
-
-	render.SetStencilCompareFunction(STENCIL_EQUAL)
-	render.SetStencilFailOperation(STENCIL_KEEP)
-	render.SetStencilPassOperation(STENCIL_REPLACE)
+	ArtDeco.BeginOctagonClip(x, y, ww, hh, c)
 
 	-- Background base
 	surface.SetDrawColor(8, 10, 22, 240)
@@ -101,7 +74,7 @@ local function drawGalaxyBackground(pnl, w, h, starSeed)
 		if i % 9 == 0 then surface.DrawRect(sx, sy, 2, 1) end
 	end
 
-	render.SetStencilEnable(false)
+	ArtDeco.EndOctagonClip()
 end
 
 -- Global-ish state for live refresh

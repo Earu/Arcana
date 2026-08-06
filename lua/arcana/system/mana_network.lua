@@ -1,3 +1,11 @@
+-- Mana Network: producers periodically push mana to nearby receivers and broadcast the
+-- flow visual.
+--
+-- Receiving is duck-typed, not registered. Any entity within a producer's range that
+-- implements ENT:AddMana(amount) gets pulsed. There is deliberately no consumer registry:
+-- the one used to exist, was never read by the pulse, and silently ignored the range its
+-- callers passed. If receiving ever needs to be opt-in, make the pulse walk the registry
+-- rather than adding a registry the pulse ignores.
 local Arcana = _G.Arcana or {}
 
 if SERVER then
@@ -12,7 +20,6 @@ if SERVER then
 	}
 
 	MN._producers = MN._producers or {} -- array of { ent=Entity, range=number }
-	MN._consumers = MN._consumers or {} -- optional; not used in pulse logic but kept for API compatibility
 	MN._nodes = MN._nodes or {} -- map for quick unregister lookup
 
 	local function addProducer(ent, range)
@@ -36,35 +43,16 @@ if SERVER then
 		return addProducer(ent, range)
 	end
 
-	function MN:RegisterConsumer(ent, opts)
-		if not IsValid(ent) then return nil end
-
-		opts = opts or {}
-		local range = tonumber(opts.range or MN.Config.defaultRange) or MN.Config.defaultRange
-		local rec = {ent = ent, range = range}
-		MN._nodes[ent] = rec
-		MN._consumers[#MN._consumers + 1] = rec
-		ent:CallOnRemove("Arcana_MN_Unregister", function(e)
-			MN:UnregisterNode(e)
-		end)
-
-		return rec
-	end
-
 	function MN:UnregisterNode(ent)
 		local rec = MN._nodes[ent]
 		if not rec then return end
 
 		MN._nodes[ent] = nil
-
-		-- remove from producers
 		table.RemoveByValue(MN._producers, rec)
-
-		-- remove from consumers
-		table.RemoveByValue(MN._consumers, rec)
 	end
 
-	-- Periodic pulse: each producer pings nearby entities that implement AddMana, and we broadcast simple flow visuals
+	-- Periodic pulse: each producer pings nearby entities that implement AddMana, and we
+	-- broadcast simple flow visuals. Range is the producer's reach; receivers do not get a say.
 	local function doPulse()
 		if not MN._producers or #MN._producers == 0 then return end
 
@@ -84,7 +72,7 @@ if SERVER then
 				if target ~= ent and target.AddMana then
 					local succ, err = pcall(target.AddMana, target, 1)
 					if not succ then
-						ErrorNoHalt(err)
+						ErrorNoHalt("[Arcana] mana network AddMana failed on " .. tostring(target) .. ": " .. tostring(err) .. "\n")
 					end
 
 					local list = flows[target]

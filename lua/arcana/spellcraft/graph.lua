@@ -140,22 +140,6 @@ local function strokeStar(r, g, b, a)
 	end
 end
 
-local OCTA_POLY = {}
-for i = 1, 8 do OCTA_POLY[i] = { x = 0, y = 0 } end
-
-local function setOctagon(x, y, w, h, corner)
-	local p = OCTA_POLY
-	p[1].x, p[1].y = x + corner, y
-	p[2].x, p[2].y = x + w - corner, y
-	p[3].x, p[3].y = x + w, y + corner
-	p[4].x, p[4].y = x + w, y + h - corner
-	p[5].x, p[5].y = x + w - corner, y + h
-	p[6].x, p[6].y = x + corner, y + h
-	p[7].x, p[7].y = x, y + h - corner
-	p[8].x, p[8].y = x, y + corner
-	return p
-end
-
 -- Applies a fade to a shared palette colour without allocating or, worse,
 -- mutating the palette entry itself. The result is consumed immediately.
 local DIM_LABEL = Color(140, 128, 108)
@@ -1376,25 +1360,7 @@ function Graph.CreateCanvas(parent, ctx)
 		end
 
 		-- Clip everything to the art-deco octagon using the stencil buffer.
-		local pts = setOctagon(1, 1, w - 2, h - 2, 12)
-
-		render.ClearStencil()
-		render.SetStencilEnable(true)
-		render.SetStencilWriteMask(0xFF)
-		render.SetStencilTestMask(0xFF)
-		render.SetStencilReferenceValue(1)
-		render.SetStencilCompareFunction(STENCIL_NEVER)
-		render.SetStencilFailOperation(STENCIL_REPLACE)
-		render.SetStencilPassOperation(STENCIL_KEEP)
-		render.SetStencilZFailOperation(STENCIL_KEEP)
-
-		draw.NoTexture()
-		surface.SetDrawColor(255, 255, 255, 255)
-		surface.DrawPoly(pts)
-
-		render.SetStencilCompareFunction(STENCIL_EQUAL)
-		render.SetStencilFailOperation(STENCIL_KEEP)
-		render.SetStencilPassOperation(STENCIL_REPLACE)
+		ArtDeco.BeginOctagonClip(1, 1, w - 2, h - 2, 12)
 
 		surface.SetDrawColor(6, 7, 14, 255)
 		surface.DrawRect(1, 1, w - 2, h - 2)
@@ -1410,7 +1376,7 @@ function Graph.CreateCanvas(parent, ctx)
 		end
 		if hoverNode then drawNode(hoverNode, w, h) end
 
-		render.SetStencilEnable(false)
+		ArtDeco.EndOctagonClip()
 
 		ArtDeco.DrawDecoFrame(0, 0, w, h, frameCol, 12)
 

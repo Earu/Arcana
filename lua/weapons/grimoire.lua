@@ -891,19 +891,7 @@ if CLIENT then
 		local listScroll = vgui.Create("DScrollPanel", middle)
 		listScroll:Dock(FILL)
 		listScroll:DockMargin(12, 28, 12, 12)
-		local vbar = listScroll:GetVBar()
-		vbar:SetWide(8)
-
-		vbar.Paint = function(pnl, w, h)
-			ArtDeco.FillDecoPanel(0, 0, w, h, ArtDeco.Colors.decoPanel, 8)
-			ArtDeco.DrawDecoFrame(0, 0, w, h, ArtDeco.Colors.gold, 8)
-		end
-
-		vbar.btnGrip:NoClipping(true)
-		vbar.btnGrip.Paint = function(pnl, w, h)
-			surface.SetDrawColor(ArtDeco.Colors.gold)
-			surface.DrawRect(0, 0, w, h)
-		end
+		ArtDeco.StyleScrollBar(listScroll)
 
 		-- Separate spells into categories: regular, divine pacts, and rituals
 		local regularSpells = {}
