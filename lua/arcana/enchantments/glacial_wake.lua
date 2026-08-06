@@ -22,7 +22,7 @@ local function fireWake(owner, impactPos, path)
 			if ent == owner then continue end
 			seenEnts[ent] = true
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			if not isActor then continue end
 
 			local dmg = DamageInfo()
@@ -31,7 +31,7 @@ local function fireWake(owner, impactPos, path)
 			dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
 			dmg:SetInflictor(IsValid(owner) and owner or game.GetWorld())
 			dmg:SetDamagePosition(ent:WorldSpaceCenter())
-			ent:TakeDamageInfo(dmg)
+			Arcana:TakeDamageInfo(ent, dmg)
 
 			Arcana.Status.Frost.Apply(ent, {
 				slowMult     = 0.45,

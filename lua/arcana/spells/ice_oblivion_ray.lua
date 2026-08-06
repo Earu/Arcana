@@ -108,7 +108,7 @@ local function startBeamPhase(caster)
 					if checked[ent] then continue end
 					checked[ent] = true
 					if not IsValid(ent) or ent == caster then continue end
-					if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+					if not Arcana.Common.IsActor(ent) then continue end
 
 					local actualDist = distToBeamLine(ent:WorldSpaceCenter(), beamOrigin, currentDir)
 					if actualDist > currentRadius then continue end
@@ -154,7 +154,7 @@ local function startBeamPhase(caster)
 
 				for _, ent in ipairs(ents.FindInSphere(impactPos, novaRadius)) do
 					if not IsValid(ent) or ent == caster then continue end
-					if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+					if not Arcana.Common.IsActor(ent) then continue end
 
 					local dmg2 = DamageInfo()
 					dmg2:SetDamage(BEAM_DMG_TICK * 3)
@@ -205,7 +205,7 @@ local function startBeamPhase(caster)
 		-- Initial blast: massive damage + deep freeze on every entity in radius
 		for _, ent in ipairs(ents.FindInSphere(impactPos, blastRadius)) do
 			if not IsValid(ent) or ent == caster then continue end
-			if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+			if not Arcana.Common.IsActor(ent) then continue end
 
 			local dmg = DamageInfo()
 			dmg:SetDamage(BEAM_DMG_TICK * 10)
@@ -229,7 +229,7 @@ local function startBeamPhase(caster)
 				if not IsValid(caster) then return end
 				for _, ent in ipairs(ents.FindInSphere(impactPos, blastRadius)) do
 					if not IsValid(ent) or ent == caster then continue end
-					if not (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())) then continue end
+					if not Arcana.Common.IsActor(ent) then continue end
 					local dmg2 = DamageInfo()
 					dmg2:SetDamage(dotDamage)
 					dmg2:SetDamageType(DMG_DISSOLVE)

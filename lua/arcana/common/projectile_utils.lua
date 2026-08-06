@@ -93,7 +93,7 @@ if SERVER then
 		local candidates = {}
 		for _, ent in ipairs(ents.FindInSphere(hitPos, chainRadius)) do
 			if ent == attacker then continue end
-			if IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
+			if IsValid(ent) and Arcana.Common.IsActor(ent) and ent:Health() > 0 and ent:VisibleVec(hitPos) then
 				table.insert(candidates, ent)
 			end
 		end
@@ -117,7 +117,7 @@ if SERVER then
 				dmg:SetAttacker(IsValid(attacker) and attacker or game.GetWorld())
 				dmg:SetInflictor(IsValid(attacker) and attacker or game.GetWorld())
 				dmg:SetDamagePosition(tpos)
-				tgt:TakeDamageInfo(dmg)
+				Arcana:TakeDamageInfo(tgt, dmg)
 				if isfunction(onChain) then onChain(tgt, tpos, i) end
 			end)
 		end

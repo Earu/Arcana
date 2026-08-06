@@ -33,18 +33,18 @@ Arcana:RegisterSpell({
 		net.Broadcast()
 
 		for _, ent in ipairs(ents.FindInSphere(origin, radius)) do
-			if ent ~= srcEnt and IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
+			if ent ~= srcEnt and IsValid(ent) and (Arcana.Common.IsActor(ent) or ent:GetMoveType() == MOVETYPE_VPHYSICS) then
 				local dir = (ent:WorldSpaceCenter() - origin):GetNormalized()
 
 				if dir:Dot(forward) >= cone then
-					if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
+					if Arcana.Common.IsActor(ent) then
 						-- Deal damage
 						local dmg = DamageInfo()
 						dmg:SetDamage(baseDamage)
 						dmg:SetDamageType(DMG_SONIC)
 						dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 						dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-						ent:TakeDamageInfo(dmg)
+						Arcana:TakeDamageInfo(ent, dmg)
 
 						ent:SetVelocity(forward * strength + Vector(0, 0, 120))
 						ent:SetGroundEntity(NULL)

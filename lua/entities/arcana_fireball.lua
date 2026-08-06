@@ -91,7 +91,7 @@ if SERVER then
 		Arcana:BlastDamage(IsValid(owner) and owner or self, pos, self.FireballRadius, self.FireballDamage, { inflictor = self, damageType = DMG_BLAST, ignoreAttacker = true })
 
 		for _, v in ipairs(ents.FindInSphere(pos, self.FireballRadius)) do
-			if IsValid(v) and (v:IsPlayer() or v:IsNPC() or v:IsNextBot()) and v ~= owner then
+			if IsValid(v) and Arcana.Common.IsActor(v) and v ~= owner then
 				v:Ignite(self.FireballIgniteTime)
 			end
 		end

@@ -49,7 +49,7 @@ Arcana:RegisterSpell({
 					dmg:SetDamageType(DMG_CLUB)
 					dmg:SetAttacker(IsValid(ent._ArcanaStoneOwner) and ent._ArcanaStoneOwner or game.GetWorld())
 					dmg:SetInflictor(ent)
-					hitEnt:TakeDamageInfo(dmg)
+					Arcana:TakeDamageInfo(hitEnt, dmg)
 				end
 			end)
 

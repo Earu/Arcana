@@ -1,7 +1,16 @@
--- Arcana Damage utilities — server-side.
+-- Arcana Damage utilities, server-side.
 -- Provides Arcana:BlastDamage (radius damage with ForceTakeDamageInfo support),
 -- Arcana:TakeDamageInfo (invulnerability-aware damage wrapper),
 -- and bad-entity tracking for Arcana:IsPotentialCheater.
+--
+-- ALL damage the addon deals must go through Arcana:TakeDamageInfo(ent, dmg), not
+-- ent:TakeDamageInfo(dmg). The wrapper is where the invulnerability check lives: it
+-- samples the victim's health a tick later and flags ArcanaInvulnerable when a hit
+-- lands for far less than it should. Every direct call is a hole in that check, since
+-- a cheater simply avoids the spells that happen to use the wrapper.
+--
+-- The exception is an entity taking damage itself (self:TakeDamageInfo inside
+-- OnTraceAttack and similar), which is the receive path, not damage we are dealing.
 
 Arcana = Arcana or {}
 

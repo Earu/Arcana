@@ -109,7 +109,7 @@ if SERVER then
 		for _, ent in ipairs(ents.FindInSphere(center, radius)) do
 			if #targets >= (self.OrbMaxTargetsPerTick or 6) then break end
 			local isValidTarget = IsValid(ent) and ent ~= self and ent ~= owner
-			isValidTarget = isValidTarget and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+			isValidTarget = isValidTarget and Arcana.Common.IsActor(ent)
 			isValidTarget = isValidTarget and (not ent:IsPlayer() or ent:Alive())
 			isValidTarget = isValidTarget and (not ent:IsNPC() or ent:Health() > 0)
 
@@ -149,7 +149,7 @@ if SERVER then
 			dmg:SetDamageType(bit.bor(DMG_SHOCK, DMG_ENERGYBEAM))
 			dmg:SetAttacker(IsValid(owner) and owner or self)
 			dmg:SetInflictor(self)
-			tgt:TakeDamageInfo(dmg)
+			Arcana:TakeDamageInfo(tgt, dmg)
 
 			-- Send visual lightning arc to client
 			net.Start("Arcana_LightningOrbZap", true)

@@ -102,7 +102,7 @@ end
 ----------------------------------------------------------------------
 if SERVER then
 	local function isActor(ent)
-		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+		return IsValid(ent) and Arcana.Common.IsActor(ent)
 	end
 
 	-- Alive() is a player method; NPC mages answer on health. Prop casters (spell
@@ -339,7 +339,7 @@ if SERVER then
 		local aimer = IsValid(srcEnt) and srcEnt or caster
 		local origin, aim
 
-		if aimer:IsPlayer() or aimer:IsNPC() or (aimer.IsNextBot and aimer:IsNextBot()) then
+		if Arcana.Common.IsActor(aimer) then
 			origin = aimer:EyePos()
 			aim = aimer:GetAimVector()
 		else
@@ -579,7 +579,7 @@ if SERVER then
 
 		local attacker = dmginfo:GetAttacker()
 		if not IsValid(attacker) or attacker == target then return end
-		if not (attacker:IsPlayer() or attacker:IsNPC() or (attacker.IsNextBot and attacker:IsNextBot())) then return end
+		if not Arcana.Common.IsActor(attacker) then return end
 
 		local now = CurTime()
 		if (aura.thornsCD[attacker] or 0) > now then return end

@@ -119,13 +119,13 @@ Arcana:RegisterSpell({
 			for _, ent in ipairs(ents.FindInSphere(cloud:GetPos(), radius)) do
 				if not IsValid(ent) or ent == caster then continue end
 
-				if ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot() then
+				if Arcana.Common.IsActor(ent) then
 					local dmg = DamageInfo()
 					dmg:SetDamage(perTickDamage)
 					dmg:SetDamageType(DMG_POISON)
 					dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 					dmg:SetInflictor(IsValid(caster) and caster or game.GetWorld())
-					ent:TakeDamageInfo(dmg)
+					Arcana:TakeDamageInfo(ent, dmg)
 
 					if ent:IsPlayer() then
 						applyOrRefreshPoisonSlow(ent, slowRefresh)

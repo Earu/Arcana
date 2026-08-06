@@ -126,7 +126,7 @@ local function startBeamPhase(caster, targetPos)
 			for _, ent in ipairs(ents.FindInSphere(targetPos, currentRadius)) do
 				if not IsValid(ent) then continue end
 				if ent == caster then continue end
-				local isLiving = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+				local isLiving =Arcana.Common.IsActor(ent)
 
 				if isLiving then
 					-- Obliterate living things with GODLY damage - 1 million per tick

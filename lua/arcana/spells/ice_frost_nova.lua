@@ -54,7 +54,7 @@ Arcana:RegisterSpell({
 			if not IsValid(ent) then continue end
 			if ent == caster then continue end
 
-			local isActor = ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot())
+			local isActor =Arcana.Common.IsActor(ent)
 			if not isActor then continue end
 
 			-- Deal damage
@@ -63,7 +63,7 @@ Arcana:RegisterSpell({
 			dmg:SetDamageType(bit.bor(DMG_GENERIC, DMG_SONIC))
 			dmg:SetAttacker(IsValid(caster) and caster or game.GetWorld())
 			dmg:SetInflictor(IsValid(srcEnt) and srcEnt or game.GetWorld())
-			ent:TakeDamageInfo(dmg)
+			Arcana:TakeDamageInfo(ent, dmg)
 
 			-- Knockback
 			local pushDir = (ent:WorldSpaceCenter() - pos):GetNormalized()

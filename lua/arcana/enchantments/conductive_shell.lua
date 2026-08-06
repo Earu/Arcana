@@ -47,7 +47,7 @@ local function zapNearestTarget(proj, attacker)
 	for _, ent in ipairs(ents.FindInSphere(pos, ZAP_RADIUS)) do
 		if not IsValid(ent) then continue end
 		if ent == attacker or ent == proj then continue end
-		if not (ent:IsPlayer() or ent:IsNPC() or ent:IsNextBot()) then continue end
+		if not Arcana.Common.IsActor(ent) then continue end
 		if ent:IsPlayer() and not ent:Alive() then continue end
 		if ent:IsNPC() and ent:Health() <= 0 then continue end
 
@@ -76,7 +76,7 @@ local function zapNearestTarget(proj, attacker)
 	dmg:SetAttacker(attacker)
 	dmg:SetInflictor(attacker)
 	dmg:SetDamagePosition(tpos)
-	best:TakeDamageInfo(dmg)
+	Arcana:TakeDamageInfo(best, dmg)
 
 	-- Arc visual: reuses arcana_lightning_orb's existing client-side jagged beam renderer
 	net.Start("Arcana_LightningOrbZap", true)

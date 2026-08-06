@@ -102,13 +102,13 @@ function SWEP:SecondaryAttack()
             if dist > maxRange then continue end
             local dir = toTarget:GetNormalized()
             if dir:Dot(forward) < cosHalfAngle then continue end
-            if ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()) then
+            if Arcana.Common.IsActor(ent) then
                 local dmg = DamageInfo()
                 dmg:SetDamage(baseDamage)
                 dmg:SetDamageType(bit.bor(DMG_BURN, DMG_SLOWBURN))
                 dmg:SetAttacker(IsValid(owner) and owner or game.GetWorld())
                 dmg:SetInflictor(IsValid(owner) and owner or game.GetWorld())
-                ent:TakeDamageInfo(dmg)
+                Arcana:TakeDamageInfo(ent, dmg)
                 if ent.Ignite then ent:Ignite(igniteTime, 0) end
             else
                 local phys = ent:GetPhysicsObject()

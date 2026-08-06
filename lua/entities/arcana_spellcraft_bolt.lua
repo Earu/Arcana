@@ -107,7 +107,7 @@ if SERVER then
 	end
 
 	local function isActorEnt(ent)
-		return IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or (ent.IsNextBot and ent:IsNextBot()))
+		return IsValid(ent) and Arcana.Common.IsActor(ent)
 	end
 
 	-- The caster and the machine that fired the bolt are both off limits: a
