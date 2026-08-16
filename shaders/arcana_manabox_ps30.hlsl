@@ -21,7 +21,8 @@
 #define FILL         Constants1.y    // 0..1, how charged the box is
 #define ACTIVE       Constants1.z    // 0 = dormant gray stone box, 1 = panel live
 #define FROST        Constants1.w    // surface scatter amount
-#define TINT         Constants2.rgb  // glass colour (Lua lerps dark gray -> panel blue)
+#define TINT         Constants2.rgb  // glass colour (Lua lerps dark gray -> panel gold)
+#define SCENE_LIGHT  Constants3.rgb  // world light sampled at the box (gamma space)
 #define EDGE_GAIN    Constants3.w
 
 struct PS_IN
@@ -101,8 +102,8 @@ float4 main(PS_IN i) : COLOR
 	// the panes much faster than the caustic wash underneath
 	float fil = pow(1.0 - abs(frac(cw * 2.0 - tA * 2.2) * 2.0 - 1.0), 9.0) * ACTIVE;
 
-	// Interior light: neutral when dormant, the panel's hologram white-blue live
-	float3 core = lerp(float3(0.8, 0.8, 0.8), float3(0.8, 0.92, 1.08), ACTIVE);
+	// Interior light: neutral when dormant, the panel's gold-white live
+	float3 core = lerp(float3(0.8, 0.8, 0.8), float3(1.08, 0.96, 0.72), ACTIVE);
 
 	// Frost scatters the ray a little, so the interior bands wobble instead of
 	// projecting like a clean lens
@@ -171,8 +172,10 @@ float4 main(PS_IN i) : COLOR
 	float glassA = saturate(0.40 + 0.42 * fres + 0.5 * border + 0.3 * inner + 0.12 * ripple + 0.25 * seam + 0.35 * caustic + 0.4 * fil) * backFade;
 
 	// Dormant the box is a near-opaque dark slab (TINT is dark gray then):
-	// frozen frost relief, a hint of rim light, none of the live translucency
-	float3 idleCol = TINT * (0.75 + 0.3 * ripple) + TINT * fres * 0.5;
+	// frozen frost relief, a hint of rim light, none of the live translucency.
+	// It is lit geometry, not a light source: the sampled world light decides
+	// how bright the slab reads, so a dark room leaves it dark
+	float3 idleCol = (TINT * (0.75 + 0.3 * ripple) + TINT * fres * 0.5) * SCENE_LIGHT;
 
 	float3 col = lerp(idleCol, glassCol, ACTIVE);
 	float alpha = lerp(0.94 * backFade, glassA, ACTIVE) * i.color.a;

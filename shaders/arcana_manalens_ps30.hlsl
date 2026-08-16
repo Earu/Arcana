@@ -2,7 +2,7 @@
 
 // Mana sight lens, projected as a holographic panel from the siphon hand.
 // The panel's four projected screen corners come from Lua; inside that quad
-// the scene is regraded as a dark blueprint (near-black blue base, etched
+// the scene is regraded as a dark brass etching (near-black umber base, etched
 // bright line work on edges, grain, scanlines); outside is untouched.  The
 // panel's gold deco edges and labels are drawn over this in Lua.
 //
@@ -13,14 +13,14 @@
 #define RAMP   Constants0.y
 #define ASPECT Constants0.z
 
-// Blueprint palette: near-black navy paper, the etched line work carries the
+// Brass-plate palette: near-black umber paper, the etched line work carries the
 // image.  A dark highlight ceiling keeps flat fields (the skybox) dark, which
 // doubles as the lens's limited-vision look without touching engine fog.
-#define INK       float3(0.008, 0.015, 0.045)
-#define HILITE    float3(0.07, 0.11, 0.22)
-#define EDGE_COL  float3(0.55, 0.75, 1.00)
+#define INK       float3(0.030, 0.021, 0.008)
+#define HILITE    float3(0.21, 0.16, 0.07)
+#define EDGE_COL  float3(1.00, 0.88, 0.52)
 #define EDGE_STR  0.85
-#define GLOW_COL  float3(0.25, 0.50, 1.00)
+#define GLOW_COL  float3(0.95, 0.72, 0.28)
 #define GRAIN     0.05
 
 struct PS_IN { float2 uv : TEXCOORD0; };
@@ -120,7 +120,7 @@ float4 main(PS_IN i) : COLOR
 	float g = hash2(i.uv / max(texel, 1e-6) * 0.5 + frac(TIME * 7.31) * 61.7);
 	graded += (g - 0.5) * GRAIN * (1.0 - t * 0.6);
 
-	// Soft blue glow hugging the inside of the panel edge
+	// Soft gold glow hugging the inside of the panel edge
 	float glow = 1.0 - smoothstep(0.0, 0.02, inside);
 	graded += GLOW_COL * glow * glow * 0.35;
 

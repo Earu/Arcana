@@ -401,7 +401,9 @@ function SWEP:Reload()
 end
 
 if CLIENT then
-	local COLOR_MANA = Color(150, 120, 255)
+	-- Art deco gold, like the altar's magic circle: the whole apparatus
+	-- (cube, panel, halos, arrow) speaks the station palette
+	local COLOR_MANA = Color(226, 192, 110)
 	local OUTLINE_COL = Color(0, 0, 0, 220)
 	local GRAIN_MAT = Material("sprites/light_glow02_add")
 	local BEAM_MAT = Material("trails/laser")
@@ -456,8 +458,8 @@ if CLIENT then
 	-- Volumetric gas for concentrations: one raymarched screen pass per source.
 	local CLOUD_SHADER = "arcana_manacloud_ps30"
 
-	-- Near-white cyan for the elements that must pop inside the panel
-	local COLOR_GHOST = Color(215, 185, 255)
+	-- Near-white warm gold for the elements that must pop inside the panel
+	local COLOR_GHOST = Color(255, 238, 190)
 
 	local cloudMat
 	WaitForShaderMounted({CLOUD_SHADER, "arcana_passthrough_vs30"}, function(available)
@@ -775,12 +777,20 @@ if CLIENT then
 		})
 	end)
 
+	-- The panel retracts into the palm on shutdown instead of vanishing;
+	-- while RealTime() < panelClosingUntil the whole panel path keeps running
+	-- with a reversed ramp
+	local IRIS_OUT_TIME = 0.28
+	local panelClosingUntil = 0
+
 	local sightOnSince = 0
 	local wasSightOn = false
 	local panelAng, panelLastYaw, panelRoll
 
 
-	local function computePanelCorners()
+	-- rampOverride: raw 0..1 fraction driving the materialize/retract state
+	-- (the shutdown path feeds the reversed iris through it)
+	local function computePanelCorners(rampOverride)
 		local ea = EyeAngles()
 		local ep = EyePos()
 
@@ -795,7 +805,7 @@ if CLIENT then
 		panelLastYaw = ea.y
 		panelRoll = Lerp(math.Clamp(FrameTime() * 12, 0, 1), panelRoll or 0, math.Clamp(dyaw * 4, -9, 9))
 
-		local ramp = math.Clamp((RealTime() - sightOnSince) / IRIS_TIME, 0, 1)
+		local ramp = rampOverride or math.Clamp((RealTime() - sightOnSince) / IRIS_TIME, 0, 1)
 		ramp = ramp * ramp * (3 - 2 * ramp)
 
 		-- Materializes out of the palm and grows into place
@@ -923,8 +933,9 @@ if CLIENT then
 		end
 	end
 
-	-- Hologram-blue dressing, matching the lens's own line work and edge glow
-	local FRAME_COL = Color(150, 195, 255)
+	-- Pale gold dressing (the altar band circle's colour), matching the lens's
+	-- brass line work and edge glow
+	local FRAME_COL = Color(222, 198, 120)
 
 	-- The band-circle glyph strips: linear, horizontally tileable textures
 	-- (they wrap around cylinders in 3D), perfect as flat scrolling tickers
@@ -1089,7 +1100,7 @@ if CLIENT then
 	-- points at the closest mana source.  The bugbait mesh is hidden via bone
 	-- collapse and the box takes its place at the hand bone.
 	local CUBE_GLASS = Material("models/props_c17/frostedglass_01a")
-	local CUBE_TINT = Color(140, 235, 225)
+	local CUBE_TINT = Color(222, 198, 120)
 	local CUBE_HALF = 1.6
 
 	-- Stone gray, matching the shader path's rails
@@ -1260,7 +1271,7 @@ if CLIENT then
 	end)
 
 	-- Dormant the box is a dark gray slab; live it takes the holo panel's own
-	-- hologram blue (FRAME_COL), so box and panel read as one apparatus
+	-- pale gold (FRAME_COL), so box and panel read as one apparatus
 	local BOX_IDLE_TINT = Color(52, 54, 58)
 
 	local BOX_SCALE = Vector(1, 1, 1)
@@ -1286,7 +1297,13 @@ if CLIENT then
 			end
 		end
 
-		local active = Lerp(math.Clamp(FrameTime() * 5, 0, 1), wep._boxActive or 0, awake and 1 or 0)
+		-- Waking is paced to the wrist ceremony: full brightness lands exactly
+		-- as the band ring appears (3 * GLYPH_STEP + BAND_DELAY = ~1s).
+		-- Going dormant is quicker, matching the poof.
+		local target = awake and 1 or 0
+		local prev = wep._boxActive or 0
+		local step = FrameTime() / (target > prev and 1.0 or 0.3)
+		local active = prev < target and math.min(target, prev + step) or math.max(target, prev - step)
 		wep._boxActive = active
 		glow = glow * (0.2 + 0.8 * active)
 
@@ -1320,6 +1337,14 @@ if CLIENT then
 		mat:SetFloat("$c1_x", glow)
 		mat:SetFloat("$c1_y", fill)
 		mat:SetFloat("$c1_z", active)
+
+		-- Dormant the box is lit geometry, not a light source: sample the
+		-- world light where it sits (linear -> gamma, the abyss-cap pattern)
+		-- so the slab tracks the room's lighting
+		local light = render.ComputeLighting(center, ang:Up())
+		mat:SetFloat("$c3_x", math.Clamp(math.pow(math.max(light.x, 0), 0.4545), 0.03, 1))
+		mat:SetFloat("$c3_y", math.Clamp(math.pow(math.max(light.y, 0), 0.4545), 0.03, 1))
+		mat:SetFloat("$c3_z", math.Clamp(math.pow(math.max(light.z, 0), 0.4545), 0.03, 1))
 		mat:SetFloat("$c2_x", Lerp(active, BOX_IDLE_TINT.r, FRAME_COL.r) / 255)
 		mat:SetFloat("$c2_y", Lerp(active, BOX_IDLE_TINT.g, FRAME_COL.g) / 255)
 		mat:SetFloat("$c2_z", Lerp(active, BOX_IDLE_TINT.b, FRAME_COL.b) / 255)
@@ -1419,6 +1444,250 @@ if CLIENT then
 		render.DrawSprite(center, 3.2 * pulse, 3.2 * pulse, ColorAlpha(COLOR_MANA, 60))
 	end
 
+	-- ------------------------------------------------------------------------
+	-- SIGHT TRANSITION
+	-- Turning sight on kindles four glyphs around the wrist one after another,
+	-- each with a chime (the emissary's shelf ceremony, worn small); once all
+	-- four stand, a spinning band ring takes their place at the same radius
+	-- and colour.  Turning sight off poofs a puff of brass dust off the cube.
+	-- ------------------------------------------------------------------------
+	local GLYPH_CODES = {65, 66, 67, 68, 69, 70, 71, 72}
+	local GLYPH_STEP = 0.22 -- seconds between glyph appearances
+	local GLYPH_IN = 0.15 -- each glyph's kindle time
+	local GLYPH_FADE = 0.25 -- fade as the band replaces them
+	local BAND_DELAY = 0.35 -- hold after the 4th glyph before the band
+	local WRIST_BACK = 5.5 -- wrist centre, back from the palm along the forearm
+	local WRIST_RING_R = 3.0 -- hugging the forearm
+
+	local SIPHON_GLYPH_MATS = {}
+	for _, code in ipairs(GLYPH_CODES) do
+		SIPHON_GLYPH_MATS[code] = CreateMaterial("arcana_siphon_glyph_" .. code, "UnlitGeneric", {
+			["$basetexture"] = "arcana/glyphs/glyph_" .. code,
+			["$translucent"] = 1,
+			["$vertexalpha"] = 1,
+			["$vertexcolor"] = 1,
+		})
+	end
+
+	local function wristFrame(palmPos, palmAng)
+		local pos = palmPos - palmAng:Forward() * WRIST_BACK
+		-- Band rings wrap their angles' Up axis: point it along the forearm
+		local ang = palmAng:Forward():Angle()
+		ang:RotateAroundAxis(ang:Right(), 90)
+
+		return pos, ang
+	end
+
+	-- The four glyph anchors around the wrist, shared by the sequence and the
+	-- band handoff so the ring truly replaces them in place
+	local function glyphAnchor(wristPos, palmAng, i)
+		local theta = math.rad((i - 1) * 90 + 45)
+		local radial = palmAng:Right() * math.cos(theta) + palmAng:Up() * math.sin(theta)
+
+		return wristPos + radial * WRIST_RING_R, radial
+	end
+
+	local function drawWristGlyphs(wep, wristPos, palmAng, now, alphaScale)
+		local seq = wep._glyphSeq
+		if not seq then return end
+
+		local fadeMul = 1
+		if seq.fadeAt then
+			fadeMul = 1 - math.Clamp((now - seq.fadeAt) / GLYPH_FADE, 0, 1)
+			if fadeMul <= 0 then return end
+		end
+
+		for i = 1, 4 do
+			local t = now - (seq.startedAt + (i - 1) * GLYPH_STEP)
+			if t < 0 then continue end
+
+			local a = math.Clamp(t / GLYPH_IN, 0, 1)
+			a = a * a * (3 - 2 * a)
+
+			local pos, radial = glyphAnchor(wristPos, palmAng, i)
+			local size = 2.1 * (0.6 + 0.4 * a)
+			local mat = SIPHON_GLYPH_MATS[seq.codes[i]]
+			if mat then
+				render.SetMaterial(mat)
+				render.DrawQuadEasy(pos, radial, size, size, ColorAlpha(FRAME_COL, 255 * a * fadeMul * alphaScale), 0)
+			end
+		end
+	end
+
+	-- Same faint-copy-into-bloom-then-crisp pattern as the panel dressing
+	local function drawWristGlyphsBloomed(wep, wristPos, palmAng, now)
+		if not wep._glyphSeq then return end
+
+		local bloom = Arcana.Bloom
+		if bloom and bloom.ProcessBloom then
+			bloom.ProcessBloom(function()
+				drawWristGlyphs(wep, wristPos, palmAng, now, FRAME_BLOOM_ALPHA)
+			end)
+			bloom.RenderBloom(0.35, true)
+			-- RT pushes reset the vm depth-range hack (see the panel notes)
+			render.DepthRange(0, 0.1)
+		end
+
+		drawWristGlyphs(wep, wristPos, palmAng, now, 1)
+	end
+
+	-- Advances the sequence clock: chimes each glyph in as it appears, then
+	-- hands over to the band ring
+	local function updateSightTransition(wep, wristPos, bandAng, now)
+		local seq = wep._glyphSeq
+		if not seq then return end
+
+		if not seq.fadeAt then
+			local visible = math.Clamp(math.floor((now - seq.startedAt) / GLYPH_STEP) + 1, 0, 4)
+			while (seq.played or 0) < visible do
+				seq.played = (seq.played or 0) + 1
+				LocalPlayer():EmitSound("arcana/arcane_" .. math.random(1, 3) .. ".ogg", 60, 96 + seq.played * 6, 0.5)
+			end
+
+			-- All four stand: the band ring takes their place
+			if now >= seq.startedAt + 3 * GLYPH_STEP + BAND_DELAY then
+				local BandCircle = Arcana.Circle and Arcana.Circle.BandCircle
+				if BandCircle and BandCircle.Create then
+					local bc = BandCircle.Create(wristPos, bandAng, FRAME_COL, WRIST_RING_R, 0)
+					if bc then
+						bc:SetDrawnManually(true)
+						bc:AddBand(WRIST_RING_R, 1.9, {p = 0, y = 120, r = 0}, 2)
+						bc:StartEvolving(0.35)
+						wep._wristBand = bc
+					end
+				end
+
+				-- The lens panel waits for the ceremony: it only materializes
+				-- once the band has taken over (see the PreDrawHUD gate)
+				wep._panelReady = true
+				seq.fadeAt = now
+			end
+		elseif now > seq.fadeAt + GLYPH_FADE then
+			wep._glyphSeq = nil
+		end
+	end
+
+	-- The off-poof: brass dust puffing off the cube, simulated right here in
+	-- vm space so it stays glued to the hand
+	-- Two size classes: quick bright dust and slower billowing puffs, under a
+	-- brief core flash where the cube exhales
+	local POOF_COUNT = 34
+
+	local function spawnPoof(wep, center, palmAng, now)
+		local parts = {born = now, center = center}
+
+		for i = 1, POOF_COUNT do
+			local dir = VectorRand()
+			dir:Normalize()
+
+			local puff = i % 3 == 0
+			parts[#parts + 1] = {
+				pos = center + dir * math.Rand(0.2, 1.4),
+				vel = dir * (puff and math.Rand(4, 10) or math.Rand(9, 24)) + palmAng:Up() * math.Rand(0, 5),
+				born = now + math.Rand(0, 0.06),
+				life = puff and math.Rand(0.7, 1.1) or math.Rand(0.35, 0.7),
+				size = puff and math.Rand(1.8, 3.0) or math.Rand(0.7, 1.4),
+				grow = puff and 2.4 or 1.4,
+				alpha = puff and 120 or 220,
+			}
+		end
+
+		wep._poof = parts
+	end
+
+	-- The band ring is drawn from the panel pass (PreDrawHUD), AFTER the lens
+	-- has graded the frame, so it reads as apparatus over the hologram rather
+	-- than scenery under it.  It renders through a camera replicating the
+	-- engine's vm projection (the enchant-ring pattern), anchored on the wrist
+	-- frame the hands pass cached this frame.
+	local function drawWristBand(wep)
+		local bc = wep._wristBand
+		if not bc then return end
+
+		if not (bc.IsActive and bc:IsActive()) then
+			wep._wristBand = nil
+			return
+		end
+
+		-- No fresh wrist frame (thirdperson, vm hidden): nothing to anchor to
+		if RealTime() - (wep._wristFrameAt or 0) > 0.1 then return end
+
+		bc.position = wep._wristPos
+		bc.angles = wep._bandAng
+
+		local view = render.GetViewSetup()
+		local vmFov = view.fovviewmodel or view.fovviewmodel_unscaled or 54
+		local vmZNear = view.znearviewmodel or 1
+		local vmZFar = view.zfarviewmodel or view.zfar or 28000
+
+		-- vm depth range so the band z-tests against the arm already in the
+		-- buffer instead of raw world depth
+		local function bandCam()
+			cam.Start3D(view.origin, view.angles, vmFov, 0, 0, ScrW(), ScrH(), vmZNear, vmZFar)
+			render.DepthRange(0, 0.1)
+		end
+
+		-- Faint copy feeds the bloom, crisp bands on top (panel pattern)
+		local bloom = Arcana.Bloom
+		if bloom and bloom.ProcessBloom then
+			local col = bc.color
+			bc.color = ColorAlpha(col, (col.a or 255) * FRAME_BLOOM_ALPHA)
+			bloom.ProcessBloom(function()
+				bandCam()
+				bc:Draw()
+				cam.End3D()
+			end)
+			bc.color = col
+			bloom.RenderBloom(0.35, true)
+		end
+
+		bandCam()
+		bc:Draw()
+		cam.End3D()
+		render.DepthRange(0, 1)
+	end
+
+	local POOF_BRIGHT = Color(255, 228, 165)
+	local POOF_FLASH_TIME = 0.18
+
+	local function drawPoof(wep, now)
+		local parts = wep._poof
+		if not parts then return end
+
+		local dt = FrameTime()
+		local alive = false
+		render.SetMaterial(GRAIN_MAT)
+
+		-- Core flash where the cube exhaled
+		local flashAge = now - (parts.born or now)
+		if flashAge < POOF_FLASH_TIME then
+			local f = 1 - flashAge / POOF_FLASH_TIME
+			render.DrawSprite(parts.center, 5 * f, 5 * f, ColorAlpha(POOF_BRIGHT, 230 * f))
+			alive = true
+		end
+
+		for _, p in ipairs(parts) do
+			local age = now - p.born
+			if age >= 0 and age < p.life then
+				alive = true
+				p.vel = p.vel * (1 - math.min(dt * 3.5, 0.5))
+				p.pos = p.pos + p.vel * dt
+
+				local frac = age / p.life
+				local col = frac < 0.4 and POOF_BRIGHT or FRAME_COL
+				local size = p.size * (1 + frac * (p.grow or 1.6))
+				render.DrawSprite(p.pos, size, size, ColorAlpha(col, (p.alpha or 220) * (1 - frac)))
+			elseif age < 0 then
+				-- Not born yet (staggered burst): keep the system alive
+				alive = true
+			end
+		end
+
+		if not alive then
+			wep._poof = nil
+		end
+	end
+
 	-- PostDrawPlayerHands, NOT PostDrawViewModel: the hands entity renders
 	-- after the viewmodel pass, so anything drawn from the vm hook gets painted
 	-- over by the hand (it writes no depth for the hand to test against).
@@ -1445,11 +1714,14 @@ if CLIENT then
 		local center = palmPos - palmAng:Forward() * 0.3 - palmAng:Right() * 0.5 + palmAng:Up() * (CUBE_HALF + 2.4)
 
 		local sightOn = wep.GetSightActive and wep:GetSightActive() or false
+		-- The hand mask must persist through the shutdown iris, or the
+		-- retracting panel grades the hand for its last fraction of a second
+		local maskOn = sightOn or RealTime() < panelClosingUntil
 
 		-- While sight is on, everything drawn here also stamps stencil bit 8
 		-- (the hand layer), which the lens and panel layers exclude: the hand,
 		-- cube and arrow render on top of the hologram untouched
-		if sightOn then
+		if maskOn then
 			render.SetStencilEnable(true)
 			render.SetStencilTestMask(255)
 			render.SetStencilWriteMask(8)
@@ -1495,9 +1767,70 @@ if CLIENT then
 			drawCube(center, palmAng, CUBE_HALF)
 		end
 
-		if sightOn then
+		if maskOn then
 			render.SetStencilEnable(false)
 		end
+
+		-- Sight toggle transitions.  Everything below runs with the stencil
+		-- dropped: the glyph bloom would otherwise stamp the hand bit across
+		-- the whole frame and kill the panel (see the panel notes above).
+		local now = RealTime()
+
+		if wep._sightWas == nil then
+			wep._sightWas = sightOn
+		elseif sightOn ~= wep._sightWas then
+			wep._sightWas = sightOn
+
+			if sightOn then
+				-- Four distinct glyphs per activation
+				local pool = {65, 66, 67, 68, 69, 70, 71, 72}
+				local codes = {}
+				for i = 1, 4 do
+					codes[i] = table.remove(pool, math.random(#pool))
+				end
+
+				wep._glyphSeq = {startedAt = now, codes = codes, played = 0}
+			else
+				-- Shutdown ceremony, in stages: the band collapses onto the
+				-- wrist with a low chime while the panel irises back into the
+				-- palm; the poof punctuates the moment the panel lands
+				wep._glyphSeq = nil
+				wep._panelReady = nil
+				wep._poofAt = now + IRIS_OUT_TIME
+				LocalPlayer():EmitSound("arcana/arcane_" .. math.random(1, 3) .. ".ogg", 60, 72, 0.4)
+
+				if wep._wristBand then
+					wep._wristBand:SetScale(0, 0.3)
+					wep._wristBand:Remove()
+				end
+			end
+
+			if sightOn and wep._wristBand then
+				-- Re-activation while the old band still lingers: drop it, the
+				-- fresh ceremony brings its own
+				wep._wristBand:Remove()
+				wep._wristBand = nil
+			end
+		end
+
+		-- The delayed poof: fires as the retracting panel reaches the palm
+		if wep._poofAt and now >= wep._poofAt then
+			wep._poofAt = nil
+			spawnPoof(wep, center, palmAng, now)
+			LocalPlayer():EmitSound("ambient/wind/wind_hit1.wav", 55, 135, 0.35)
+		end
+
+		local wristPos, bandAng = wristFrame(palmPos, palmAng)
+		updateSightTransition(wep, wristPos, bandAng, now)
+		drawWristGlyphsBloomed(wep, wristPos, palmAng, now)
+
+		-- The band ring itself is drawn from the panel pass (drawWristBand),
+		-- over the lens; this pass just publishes the wrist frame it anchors to
+		wep._wristPos = wristPos
+		wep._bandAng = bandAng
+		wep._wristFrameAt = now
+
+		drawPoof(wep, now)
 	end)
 
 	-- PreDrawHUD, not RenderScreenspaceEffects: the crystal's dispersion pass
@@ -1510,21 +1843,41 @@ if CLIENT then
 			return
 		end
 
-		local isOn = wep.GetSightActive and wep:GetSightActive() or false
+		-- The panel waits for the wrist ceremony: sight counts as "on" here
+		-- only once the band ring has replaced the glyphs, so the lens
+		-- materializes out of the finished ritual (edge detection below then
+		-- starts the iris at that moment)
+		local isOn = (wep.GetSightActive and wep:GetSightActive() or false) and wep._panelReady == true
 
 		if isOn and not wasSightOn then
 			sightOnSince = RealTime()
 			panelAng = nil
 			panelRoll = 0
+		elseif not isOn and wasSightOn then
+			-- Shutdown: the panel retracts into the palm before letting go
+			panelClosingUntil = RealTime() + IRIS_OUT_TIME
 		end
 		wasSightOn = isOn
 
+		-- While closing, the whole panel path below keeps running with the
+		-- iris reversed, shrinking the window back into the hand
+		local closingFrac
 		if not isOn then
-			-- Sight off: only the extraction visuals, in full colour
+			local remain = panelClosingUntil - RealTime()
+			if remain > 0 then
+				closingFrac = remain / IRIS_OUT_TIME
+			end
+		end
+
+		if not isOn and not closingFrac then
+			-- Sight off (or the wrist ceremony still running): only the
+			-- extraction visuals, in full colour, plus whatever the band ring
+			-- is doing (fading out, or growing in before the panel opens)
 			cam.Start3D()
 			drawSiphonGas(wep)
 			wep:_DrawSiphonMotes()
 			cam.End3D()
+			drawWristBand(wep)
 			return
 		end
 
@@ -1533,7 +1886,7 @@ if CLIENT then
 		local ply = LocalPlayer()
 		if IsValid(ply) and ply:ShouldDrawLocalPlayer() then return end
 
-		local corners, ramp = computePanelCorners()
+		local corners, ramp = computePanelCorners(closingFrac)
 		local uv = projectCorners(corners)
 
 		if uv then
@@ -1583,6 +1936,9 @@ if CLIENT then
 		if uv then
 			drawPanelFrame(uv, ramp, wep)
 		end
+
+		-- Last: the wrist band draws over everything the panel put up
+		drawWristBand(wep)
 	end)
 
 	-- ========================================================================
@@ -1702,14 +2058,29 @@ if CLIENT then
 		end
 	end
 
+	function SWEP:_ClearSightTransition()
+		if self._wristBand then
+			self._wristBand:Remove()
+			self._wristBand = nil
+		end
+
+		self._glyphSeq = nil
+		self._poof = nil
+		self._poofAt = nil
+		self._sightWas = nil
+		self._panelReady = nil
+	end
+
 	function SWEP:OnRemove()
 		self:_StopSightSound()
+		self:_ClearSightTransition()
 		restoreViewModelMaterials()
 	end
 
 	function SWEP:Holster()
 		self:_StopSightSound()
 		self._siphonMotes = nil
+		self:_ClearSightTransition()
 		restoreViewModelMaterials()
 		return true
 	end
