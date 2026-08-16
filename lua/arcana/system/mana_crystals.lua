@@ -32,6 +32,13 @@ if SERVER then
 		corruptionDestructionBase = 0.05,       -- very light base corruption per destroyed crystal
 		corruptionDestructionSizeFactor = 0.35, -- additional corruption scaled by crystal size (0..1)
 		corruptionDestructionEscalation = 0.06, -- per-region escalation per successive destruction (linear)
+
+		-- Natural mana spots: places where mana concentrated before any player cast a
+		-- spell, so mana dust gathering (and the economy built on it) works on a fresh map
+		naturalSpotCount = 8,             -- natural spots seeded per map
+		naturalSpotCapacity = 70,         -- max stored intensity of a natural spot
+		naturalSpotRegenPerSecond = 0.15, -- refill rate (empty to full in ~8 minutes)
+		naturalSpotMinSpacing = 3000,     -- minimum distance between natural spots
 	}
 
 	M.hotspots = M.hotspots or {}
@@ -203,6 +210,140 @@ if SERVER then
 		end
 	end
 
+	-- Picks a random walkable ground position for a natural spot. The first downward
+	-- trace from the top of the world bounds hits the OUTSIDE of the skybox ceiling
+	-- (out of world), so the column is walked downward, restarting just below each
+	-- out-of-world hit, until an in-world floor is found. Restarted traces may begin
+	-- inside a brush: StartSolid is fine, only AllSolid means solid all the way down.
+	local function tryFindNaturalSpotPos()
+		local world = game.GetWorld()
+		if not world or not world.GetModelBounds then return nil end
+
+		local mins, maxs = world:GetModelBounds()
+		local x = math.Rand(mins.x, maxs.x)
+		local y = math.Rand(mins.y, maxs.y)
+
+		local z = maxs.z
+		for _ = 1, 8 do
+			local tr = util.TraceLine({
+				start = Vector(x, y, z),
+				endpos = Vector(x, y, mins.z),
+				mask = MASK_SOLID_BRUSHONLY,
+			})
+
+			if not tr.Hit or tr.AllSolid then return nil end
+
+			local pos = tr.HitPos + vector_up * 8
+			if tr.HitNormal.z >= 0.7 and util.IsInWorld(pos) then
+				return pos
+			end
+
+			if tr.HitPos.z <= mins.z + 1 then return nil end
+			z = tr.HitPos.z - 1
+		end
+
+		return nil
+	end
+
+	-- Fallback sampling anchored on player spawn points: always lands in reachable play
+	-- space, unlike blind world-bounds sampling which can fail on odd geometry.
+	local SPAWN_CLASSES = {"info_player_start", "info_player_deathmatch", "info_player_terrorist", "info_player_counterterrorist", "info_player_combine", "info_player_rebel", "gmod_player_start"}
+
+	local function tryFindSpawnAreaPos()
+		local spawns = {}
+		for _, cls in ipairs(SPAWN_CLASSES) do
+			for _, e in ipairs(ents.FindByClass(cls)) do
+				if IsValid(e) then
+					spawns[#spawns + 1] = e
+				end
+			end
+		end
+
+		if #spawns == 0 then return nil end
+
+		local base = spawns[math.random(#spawns)]:GetPos()
+		local offset = VectorRand() * math.Rand(150, 1200)
+		offset.z = 0
+		local probe = base + offset
+		local tr = util.TraceLine({
+			start = probe + Vector(0, 0, 128),
+			endpos = probe - Vector(0, 0, 4096),
+			mask = MASK_SOLID_BRUSHONLY,
+		})
+
+		if not tr.Hit or tr.AllSolid then return nil end
+		if tr.HitNormal.z < 0.7 then return nil end
+
+		local pos = tr.HitPos + vector_up * 8
+		if not util.IsInWorld(pos) then return nil end
+
+		return pos
+	end
+
+	-- Tops the map up to the configured number of natural spots. They are ordinary
+	-- hotspots as far as the siphon is concerned, but never decay and refill over time.
+	-- Placement must always end with at least one spot on the map: the dust economy has
+	-- no other bootstrap. Spacing relaxes by half each pass so small maps still fit
+	-- their spots, and the last resort anchors a spot near a player spawn.
+	function M:EnsureNaturalSpots()
+		local cfg = self.Config
+		local want = cfg.naturalSpotCount or 8
+		local have = 0
+		for i = 1, #self.hotspots do
+			if self.hotspots[i].natural then have = have + 1 end
+		end
+		if have >= want then return end
+
+		local function addSpot(pos)
+			local now = CurTime()
+			table.insert(self.hotspots, {
+				pos = pos,
+				value = cfg.naturalSpotCapacity or 70,
+				natural = true,
+				touched = now,
+				_lastIncrease = now,
+			})
+			have = have + 1
+		end
+
+		local function isTooClose(pos, spacing)
+			for i = 1, #self.hotspots do
+				local h = self.hotspots[i]
+				if h.natural and h.pos:DistToSqr(pos) < spacing * spacing then
+					return true
+				end
+			end
+
+			return false
+		end
+
+		local baseSpacing = cfg.naturalSpotMinSpacing or 3000
+		for _, spacingMul in ipairs({1, 0.5, 0.25}) do
+			local spacing = baseSpacing * spacingMul
+			local attempts = (want - have) * 50
+			while have < want and attempts > 0 do
+				attempts = attempts - 1
+				local pos = tryFindNaturalSpotPos()
+				if pos and not isTooClose(pos, spacing) then
+					addSpot(pos)
+				end
+			end
+
+			if have >= want then return end
+		end
+
+		-- World sampling failed outright: fall back to spawn-area placement with only a
+		-- light spacing requirement, so the map is never left without a single source
+		local attempts = (want - have) * 20
+		while have < want and attempts > 0 do
+			attempts = attempts - 1
+			local pos = tryFindSpawnAreaPos()
+			if pos and not isTooClose(pos, 500) then
+				addSpot(pos)
+			end
+		end
+	end
+
 	-- Hash a world position into a region key (grid-based for stability)
 	local function regionKey(pos, size)
 		size = size or (M.Config and M.Config.regionRadius or 900)
@@ -310,10 +451,10 @@ if SERVER then
 			end
 		end
 
-		-- Hotspots: pos, value
+		-- Hotspots: pos, value, natural flag (natural spots keep their place across restarts)
 		for i = 1, #self.hotspots do
 			local h = self.hotspots[i]
-			state.hotspots[#state.hotspots + 1] = {pos = encodeVector(h.pos), value = tonumber(h.value) or 0}
+			state.hotspots[#state.hotspots + 1] = {pos = encodeVector(h.pos), value = tonumber(h.value) or 0, natural = h.natural and true or nil}
 		end
 
 		-- Corruption areas: center, intensity
@@ -390,7 +531,7 @@ if SERVER then
 			local pos = decodeVector(h.pos or {})
 			local value = tonumber(h.value) or 0
 			local now = CurTime()
-			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, touched = now, _lastIncrease = now}
+			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, natural = h.natural and true or nil, touched = now, _lastIncrease = now}
 		end
 
 		-- Restore crystals
@@ -410,11 +551,23 @@ if SERVER then
 	hook.Add("InitPostEntity", "Arcana_Mana_LoadState", function()
 		if not Arcana or not Arcana.ManaCrystals then return end
 		Arcana.ManaCrystals:LoadState()
+		-- Runs whether or not a save existed: fresh maps get their natural spots, and
+		-- maps saved before natural spots existed get topped up to the configured count.
+		Arcana.ManaCrystals:EnsureNaturalSpots()
 	end)
 
 	timer.Create("Arcana_ManaEnvironment_Autosave", 60, 0, function()
 		if not Arcana or not Arcana.ManaCrystals then return end
 		Arcana.ManaCrystals:SaveState()
+	end)
+
+	-- Periodic top-up of natural spots. The InitPostEntity seeding alone is not enough:
+	-- it never re-fires on a live server after a file reload, and a placement pass can
+	-- come up short on difficult geometry. This timer makes the map converge to always
+	-- having sources. Cheap no-op once the configured count exists.
+	timer.Create("Arcana_ManaEnvironment_NaturalSpots", 60, 0, function()
+		if not Arcana or not Arcana.ManaCrystals then return end
+		Arcana.ManaCrystals:EnsureNaturalSpots()
 	end)
 
 	-- Hotspot decay timer (similar to corruption decay)
@@ -427,6 +580,14 @@ if SERVER then
 
 		for i = #Arcana.ManaCrystals.hotspots, 1, -1 do
 			local h = Arcana.ManaCrystals.hotspots[i]
+
+			if h.natural then
+				-- Natural spots never decay or trim; they slowly refill after being siphoned
+				local cap = cfg.naturalSpotCapacity or 70
+				h.value = math.min(cap, (h.value or 0) + (cfg.naturalSpotRegenPerSecond or 0.15))
+				continue
+			end
+
 			local timeSinceIncrease = now - (h._lastIncrease or h.touched or now)
 
 			-- Only decay if grace period has passed since last magic use
