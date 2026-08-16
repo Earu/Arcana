@@ -20,8 +20,8 @@
 #define HALF_H   Constants3.w
 
 #define STEPS 16
-#define CLOUD_COL  float3(0.74, 0.62, 1.00)
-#define CORE_COL   float3(0.97, 0.93, 1.00)
+#define CLOUD_COL  float3(1.00, 0.80, 0.42)
+#define CORE_COL   float3(1.05, 0.97, 0.78)
 
 struct PS_IN { float2 uv : TEXCOORD0; };
 
@@ -194,18 +194,18 @@ float4 main(PS_IN i) : COLOR
 	refr.b = tex2D(TexBase, i.uv + warpUV * 0.85).b;
 	screenCol = lerp(screenCol, refr, cover);
 
-	// Iridescent body: deep violet veils, pale core, a brighter orchid shimmer
-	// on the thin edges (the colour of mana dust), and glowing threads inside
+	// Iridescent body: brass veils, pale gold core, a brighter champagne
+	// shimmer on the thin edges (the colour of mana dust), and glowing threads
 	float rim = saturate(acc * 4.0) * (1.0 - saturate(acc * 1.6));
 	float3 cloudCol = lerp(CLOUD_COL, CORE_COL, glow);
-	cloudCol = lerp(cloudCol, float3(0.90, 0.72, 1.00), rim * 0.85);
-	cloudCol += float3(0.93, 0.85, 1.00) * filaments * 0.9;
+	cloudCol = lerp(cloudCol, float3(1.00, 0.86, 0.55), rim * 0.85);
+	cloudCol += float3(1.00, 0.93, 0.70) * filaments * 0.9;
 
 	float3 col = lerp(screenCol, cloudCol, alpha);
 
 	// Emission: the gas is a light source, not just fog: dense cores and
 	// filaments push past what plain blending can reach
-	col += cloudCol * glow * 0.55 + float3(0.80, 0.68, 1.00) * filaments * 0.35;
+	col += cloudCol * glow * 0.55 + float3(0.95, 0.80, 0.48) * filaments * 0.35;
 
 	return float4(col, 1.0);
 }

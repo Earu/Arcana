@@ -21,7 +21,7 @@
 #define RIGHT_S Constants2.xyz
 #define FWD     Constants3.xyz
 
-#define GHOST float3(0.88, 0.76, 1.00)
+#define GHOST float3(1.00, 0.87, 0.52)
 
 struct PS_IN { float2 uv : TEXCOORD0; };
 
@@ -86,8 +86,8 @@ float4 main(PS_IN i) : COLOR
 	float n1 = noise3(wp * 1.4 + drift);
 	float veins = pow(saturate(1.0 - abs(n1 * 2.0 - 1.0) * 1.4), 3.0);
 
-	float3 outCol = GHOST * (0.42 + 0.36 * l) * PULSE;
-	outCol += float3(1.00, 0.92, 1.00) * veins * 1.15;
+	float3 outCol = GHOST * (0.62 + 0.46 * l) * PULSE;
+	outCol += float3(1.00, 0.94, 0.76) * veins * 1.35;
 
 	return float4(outCol, 1.0);
 }
