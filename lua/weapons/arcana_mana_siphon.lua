@@ -97,7 +97,13 @@ function SWEP:SecondaryAttack()
 
 	local active = not self:GetSightActive()
 	self:SetSightActive(active)
-	self:EmitSound(active and "buttons/combine_button1.wav" or "buttons/combine_button2.wav", 60, active and 130 or 100, 0.7)
+
+	-- Ethereal, not mechanical: a soft energy bloom, pitched up waking and
+	-- down going dormant, with a chime shimmer as the panel materializes
+	self:EmitSound("ambient/energy/whiteflash.wav", 60, active and 145 or 85, 0.55)
+	if active then
+		self:EmitSound("ambient/levels/canals/windchime2.wav", 60, 125, 0.45)
+	end
 end
 
 if SERVER then
@@ -1084,9 +1090,10 @@ if CLIENT then
 	-- collapse and the box takes its place at the hand bone.
 	local CUBE_GLASS = Material("models/props_c17/frostedglass_01a")
 	local CUBE_TINT = Color(140, 235, 225)
-	local CUBE_HALF = 1.3
+	local CUBE_HALF = 1.6
 
-	local CUBE_FRAME_COL = Color(168, 132, 104)
+	-- Stone gray, matching the shader path's rails
+	local CUBE_FRAME_COL = Color(122, 118, 112)
 	local CUBE_FRAME_T = 0.05
 
 	local function quadBoth(a, b, c, d, col)
@@ -1170,63 +1177,41 @@ if CLIENT then
 	-- same local space.  The model matrix carries it to the palm at the right
 	-- size, so one mesh serves both the viewmodel and the world model.
 	-- ------------------------------------------------------------------------
-	local RAIL_T = 0.045
 	local boxMesh
 
 	-- Faces are wound clockwise as seen from outside (Source's front winding);
 	-- the desired normal decides which way the pair of tangents goes.
-	local function addQuad(c, u, v, n, isGlass)
+	local function addQuad(c, u, v, n)
 		if u:Cross(v):Dot(n) < 0 then
 			u, v = v, u
 		end
 
 		local p = {c - u + v, c + u + v, c + u - v, c - u - v}
 		local uvs = {{0, 1}, {1, 1}, {1, 0}, {0, 0}}
-		local g = isGlass and 255 or 0
 
 		for _, idx in ipairs({1, 2, 3, 1, 3, 4}) do
 			mesh.Position(p[idx])
 			mesh.Normal(n)
 			mesh.TexCoord(0, uvs[idx][1], uvs[idx][2])
-			mesh.Color(255, g, 255, 255)
+			mesh.Color(255, 255, 255, 255)
 			mesh.AdvanceVertex()
 		end
 	end
 
+	-- Six glass panes and nothing else: the shader's pane borders and inner
+	-- cavity seams draw the edges themselves
 	local function getBoxMesh()
 		if boxMesh then return boxMesh end
 
 		local axes = {Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)}
 		local quads = {}
 
-		-- Six panes, flush with the cube's faces
 		for i = 1, 3 do
 			local n = axes[i]
 			local u, v = axes[i % 3 + 1], axes[(i + 1) % 3 + 1]
 
 			for _, s in ipairs({1, -1}) do
-				quads[#quads + 1] = {c = n * s, u = u, v = v, n = n * s, glass = true}
-			end
-		end
-
-		-- Twelve rails: square bars centred on the cube's edges, so they stand
-		-- a little proud of the panes on both sides and close up at the corners
-		for i = 1, 3 do
-			local d = axes[i]
-			local u, v = axes[i % 3 + 1], axes[(i + 1) % 3 + 1]
-
-			for _, su in ipairs({1, -1}) do
-				for _, sv in ipairs({1, -1}) do
-					local o = u * su + v * sv
-					local du, dv = u * RAIL_T, v * RAIL_T
-
-					quads[#quads + 1] = {c = o + du, u = d, v = dv, n = u}
-					quads[#quads + 1] = {c = o - du, u = d, v = dv, n = -u}
-					quads[#quads + 1] = {c = o + dv, u = d, v = du, n = v}
-					quads[#quads + 1] = {c = o - dv, u = d, v = du, n = -v}
-					quads[#quads + 1] = {c = o + d, u = du, v = dv, n = d}
-					quads[#quads + 1] = {c = o - d, u = du, v = dv, n = -d}
-				end
+				quads[#quads + 1] = {c = n * s, u = u, v = v, n = n * s}
 			end
 		end
 
@@ -1234,7 +1219,7 @@ if CLIENT then
 		mesh.Begin(boxMesh, MATERIAL_TRIANGLES, #quads * 2)
 
 		for _, q in ipairs(quads) do
-			addQuad(q.c, q.u, q.v, q.n, q.glass)
+			addQuad(q.c, q.u, q.v, q.n)
 		end
 
 		mesh.End()
@@ -1246,6 +1231,11 @@ if CLIENT then
 	local BOX_SHADER_VS = "arcana_manabox_vs30"
 
 	local boxMat
+	-- One material for viewmodel and world: real depth test (screenspace_general
+	-- does none unless asked), no depth write (translucent glass).  The box is
+	-- drawn in PostDrawPlayerHands, AFTER the hands render, so it z-tests
+	-- against their depth: fingers in front occlude it, the palm behind shows
+	-- through the glass.
 	WaitForShaderMounted({BOX_SHADER_PS, BOX_SHADER_VS}, function(available)
 		if not available then return end
 
@@ -1257,35 +1247,62 @@ if CLIENT then
 			["$vertexalpha"] = 1,
 			["$translucent"] = 1,
 			["$ignorez"] = 0,
-			-- screenspace_general does no depth test unless asked for it, and
-			-- the box is real geometry sitting in the hand: it has to test
-			-- against the viewmodel, but never write (it is translucent)
 			["$depthtest"] = 1,
+			-- No depth writes: pure painter's order, far cull pass then near
 			["$writedepth"] = 0,
 			-- every $c component set at draw time must be declared here,
 			-- otherwise SetFloat on it is silently ignored
 			["$c0_x"] = 0, ["$c0_y"] = 0, ["$c0_z"] = 0, ["$c0_w"] = 0,
-			["$c1_x"] = 1, ["$c1_y"] = 1, ["$c1_z"] = 1, ["$c1_w"] = 0.16,
-			["$c2_x"] = 0.42, ["$c2_y"] = 0.86, ["$c2_z"] = 0.82, ["$c2_w"] = 1,
-			["$c3_x"] = 0.93, ["$c3_y"] = 1, ["$c3_z"] = 0.99, ["$c3_w"] = 0.55,
+			["$c1_x"] = 1, ["$c1_y"] = 1, ["$c1_z"] = 0, ["$c1_w"] = 0.16,
+			["$c2_x"] = 0.5, ["$c2_y"] = 0.5, ["$c2_z"] = 0.5, ["$c2_w"] = 1,
+			["$c3_x"] = 0.5, ["$c3_y"] = 0.49, ["$c3_z"] = 0.47, ["$c3_w"] = 0.55,
 		})
 	end)
+
+	-- Dormant the box is a dark gray slab; live it takes the holo panel's own
+	-- hologram blue (FRAME_COL), so box and panel read as one apparatus
+	local BOX_IDLE_TINT = Color(52, 54, 58)
 
 	local BOX_SCALE = Vector(1, 1, 1)
 
 	-- Two passes with opposite culling: the far half of the box, then whatever
 	-- lives inside it (core glow, compass arrow), then the near half.  A convex
 	-- shell has no self-overlap within either half, so that is the whole sort.
-	local function drawManaBox(center, ang, half, wep, drawInterior)
+	local function drawManaBox(mat, center, ang, half, wep, drawInterior)
 		local eyeLocal = WorldToLocal(EyePos(), angle_zero, center, ang) / half
 		local now = RealTime()
 
+		-- The box wakes when it is in use (sight panel up, or siphoning) and
+		-- goes back to dormant gray stone otherwise; the fraction is smoothed
+		-- so the transition sweeps instead of popping
+		local awake = false
 		local glow = 0.78 + 0.16 * math.sin(now * 2.2)
 		local fill = 1
 		if IsValid(wep) and wep.GetSourceKind then
+			awake = (wep.GetSightActive and wep:GetSightActive() or false) or wep:GetExtracting()
 			fill = wep:GetSourceKind() == KIND_NONE and 0.35 or (0.5 + 0.5 * wep:GetSourceStrength())
 			if wep:GetExtracting() then
 				glow = glow + 0.4 + 0.12 * math.sin(now * 14)
+			end
+		end
+
+		local active = Lerp(math.Clamp(FrameTime() * 5, 0, 1), wep._boxActive or 0, awake and 1 or 0)
+		wep._boxActive = active
+		glow = glow * (0.2 + 0.8 * active)
+
+		-- Live, the box throws the panel's light onto the hand and its
+		-- surroundings
+		if active > 0.05 then
+			local dl = DynamicLight(wep:EntIndex())
+			if dl then
+				dl.pos = center
+				dl.r = FRAME_COL.r
+				dl.g = FRAME_COL.g
+				dl.b = FRAME_COL.b
+				dl.brightness = 2.5 * active
+				dl.size = 60 * half * active
+				dl.decay = 1000
+				dl.dietime = CurTime() + 0.1
 			end
 		end
 
@@ -1296,18 +1313,26 @@ if CLIENT then
 		m:SetAngles(ang)
 		m:SetScale(BOX_SCALE)
 
-		boxMat:SetFloat("$c0_x", eyeLocal.x)
-		boxMat:SetFloat("$c0_y", eyeLocal.y)
-		boxMat:SetFloat("$c0_z", eyeLocal.z)
-		boxMat:SetFloat("$c0_w", math.fmod(now, 1000))
-		boxMat:SetFloat("$c1_x", glow)
-		boxMat:SetFloat("$c1_y", fill)
+		mat:SetFloat("$c0_x", eyeLocal.x)
+		mat:SetFloat("$c0_y", eyeLocal.y)
+		mat:SetFloat("$c0_z", eyeLocal.z)
+		mat:SetFloat("$c0_w", math.fmod(now, 1000))
+		mat:SetFloat("$c1_x", glow)
+		mat:SetFloat("$c1_y", fill)
+		mat:SetFloat("$c1_z", active)
+		mat:SetFloat("$c2_x", Lerp(active, BOX_IDLE_TINT.r, FRAME_COL.r) / 255)
+		mat:SetFloat("$c2_y", Lerp(active, BOX_IDLE_TINT.g, FRAME_COL.g) / 255)
+		mat:SetFloat("$c2_z", Lerp(active, BOX_IDLE_TINT.b, FRAME_COL.b) / 255)
 
 		local built = getBoxMesh()
-		render.SetMaterial(boxMat)
+		render.SetMaterial(mat)
 
+		-- Far half FIRST: with our winding the CCW pass rasterizes the panes
+		-- facing away (their insides), the CW pass the panes facing the eye.
+		-- Painter's order does the sorting, so the near glass must go last or
+		-- the interior walls paint over it.
 		cam.PushModelMatrix(m)
-		render.CullMode(MATERIAL_CULLMODE_CW)
+		render.CullMode(MATERIAL_CULLMODE_CCW)
 		built:Draw()
 		cam.PopModelMatrix()
 
@@ -1316,10 +1341,11 @@ if CLIENT then
 		end
 
 		cam.PushModelMatrix(m)
-		render.CullMode(MATERIAL_CULLMODE_CCW)
-		render.SetMaterial(boxMat)
+		render.CullMode(MATERIAL_CULLMODE_CW)
+		render.SetMaterial(mat)
 		built:Draw()
 		cam.PopModelMatrix()
+		render.CullMode(MATERIAL_CULLMODE_CCW)
 	end
 
 	-- The bugbait ball rides its own bones (the arms use the ValveBiped rig),
@@ -1393,8 +1419,13 @@ if CLIENT then
 		render.DrawSprite(center, 3.2 * pulse, 3.2 * pulse, ColorAlpha(COLOR_MANA, 60))
 	end
 
+	-- PostDrawPlayerHands, NOT PostDrawViewModel: the hands entity renders
+	-- after the viewmodel pass, so anything drawn from the vm hook gets painted
+	-- over by the hand (it writes no depth for the hand to test against).
+	-- Here both the vm's and the hands' depth is on screen and the box's
+	-- depth-tested material sorts against it for free.
 	local inVMMask = false
-	hook.Add("PostDrawViewModel", "arcana_mana_siphon_cube", function(vm, _, wep)
+	hook.Add("PostDrawPlayerHands", "arcana_mana_siphon_cube", function(hands, vm, _, wep)
 		if inVMMask then return end
 		if not IsValid(wep) or wep:GetClass() ~= "arcana_mana_siphon" then return end
 
@@ -1405,9 +1436,13 @@ if CLIENT then
 		local palmPos, palmAng = palmFrame(vm)
 		if not palmPos then return end
 
-		-- Forward runs up the fingers, Up comes out of the palm: sit the cube
-		-- clear of the surface and back toward the wrist, out of the fingers
-		local center = palmPos - palmAng:Forward() * 0.9 + palmAng:Up() * (CUBE_HALF + 1.4)
+		-- Forward runs up the fingers, Up comes out of the palm: rest the cube
+		-- ON the palm plane (bottom face just clear of the skin), shifted back
+		-- toward the wrist, out of the fingers
+		-- The palm frame's plane runs through the bone centres, inside the
+		-- flesh: the extra 1.8 is skin clearance.  The lift scales with the
+		-- cube so resizing it keeps the same clearance.
+		local center = palmPos - palmAng:Forward() * 0.3 - palmAng:Right() * 0.5 + palmAng:Up() * (CUBE_HALF + 2.4)
 
 		local sightOn = wep.GetSightActive and wep:GetSightActive() or false
 
@@ -1437,7 +1472,6 @@ if CLIENT then
 
 			-- The hands are a separate entity: re-rasterize them purely so
 			-- their silhouette lands in the mask (identical pixels repaint)
-			local hands = LocalPlayer():GetHands()
 			if IsValid(hands) then
 				inVMMask = true
 				hands:DrawModel()
@@ -1445,7 +1479,9 @@ if CLIENT then
 			end
 		end
 
-		-- The cavity's contents, drawn between the box's far and near halves
+		-- The cavity's contents, drawn between the box's far and near halves.
+		-- Plain depth-tested draws: the hand depth is already on screen, so
+		-- fingers curling in front occlude the arrow like they occlude the box
 		local function drawInterior()
 			render.SetMaterial(GRAIN_MAT)
 			render.DrawSprite(center, 2.6, 2.6, ColorAlpha(COLOR_GHOST, 90))
@@ -1453,7 +1489,7 @@ if CLIENT then
 		end
 
 		if boxMat then
-			drawManaBox(center, palmAng, CUBE_HALF, wep, drawInterior)
+			drawManaBox(boxMat, center, palmAng, CUBE_HALF, wep, drawInterior)
 		else
 			drawInterior()
 			drawCube(center, palmAng, CUBE_HALF)
@@ -1699,11 +1735,12 @@ if CLIENT then
 	function SWEP:DrawHUD()
 	end
 
-	-- The world model is the same box, at prop scale.  A held weapon's own
-	-- position is the owner's, so the box is anchored on the right hand bone
-	-- the way the grimoire anchors its book; only a dropped siphon uses its
-	-- own transform.
-	local WORLD_HALF = 4.5
+	-- The world model is the same box, at held-item scale (the vm cube reads
+	-- bigger than it is because of the vm fov).  A held weapon's own position
+	-- is the owner's, so the box is anchored on the right hand bone the way
+	-- the grimoire anchors its book; only a dropped siphon uses its own
+	-- transform.
+	local WORLD_HALF = 2.2
 	local HAND_ATTACHMENT_POS = Vector(2.676, -1.712, 0)
 	local HAND_ATTACHMENT_ROLL = 180
 
@@ -1737,36 +1774,86 @@ if CLIENT then
 		return nil
 	end
 
+	-- The palm frame from the finger bones, same construction as the vm path:
+	-- it tracks the actual pose, so the cube sits on the palm and its edges
+	-- align with the hand instead of hanging off a fixed attachment offset.
+	-- For a right hand (index - pinky) x (middle - hand) IS the outward palm
+	-- normal, no eye-flip needed.
+	local function worldPalmFrame(owner)
+		local function bonePos(name)
+			local b = owner:LookupBone(name)
+			local m = b and owner:GetBoneMatrix(b)
+			return m and m:GetTranslation()
+		end
+
+		local hand = bonePos("ValveBiped.Bip01_R_Hand")
+		local index = bonePos("ValveBiped.Bip01_R_Finger1")
+		local middle = bonePos("ValveBiped.Bip01_R_Finger2")
+		local pinky = bonePos("ValveBiped.Bip01_R_Finger4")
+		if not (hand and index and middle and pinky) then return nil end
+
+		local center = (hand + index + middle + pinky) * 0.25
+		local along = middle - hand
+		local normal = (index - pinky):Cross(along)
+		normal:Normalize()
+
+		return center, along:AngleEx(normal)
+	end
+
 	local function worldBoxFrame(wep)
 		local owner = wep:GetOwner()
-		local boneId = IsValid(owner) and getHandBone(owner) or nil
-		if not boneId then return wep:GetPos(), wep:GetAngles() end
+		if not IsValid(owner) then return wep:GetPos(), wep:GetAngles() end
 
 		-- Bone matrices can be stale on a player the client has not animated
 		-- this frame; the engine no-ops this when they are already fresh
 		owner:SetupBones()
 
-		local matrix = owner:GetBoneMatrix(boneId)
+		local palmPos, palmAng = worldPalmFrame(owner)
+		if palmPos then
+			-- Resting on the palm, nudged back toward the wrist like the vm cube
+			return palmPos - palmAng:Forward() * 0.3 + palmAng:Up() * (WORLD_HALF + 0.4), palmAng
+		end
+
+		-- Rigs without ValveBiped fingers: the rebuilt hand attachment frame
+		local boneId = getHandBone(owner)
+		local matrix = boneId and owner:GetBoneMatrix(boneId)
 		if not matrix then return wep:GetPos(), wep:GetAngles() end
 
 		local ang = matrix:GetAngles()
 		local pos = matrix:GetTranslation()
-		-- Rebuild the hand attachment frame from the bone (many playermodels
-		-- ship without anim_attachment_RH itself)
 		pos = pos + ang:Forward() * HAND_ATTACHMENT_POS.x + ang:Right() * HAND_ATTACHMENT_POS.y + ang:Up() * HAND_ATTACHMENT_POS.z
 		ang:RotateAroundAxis(ang:Forward(), HAND_ATTACHMENT_ROLL)
 
-		-- Out of the palm, clear of the fingers
-		return pos + ang:Up() * (WORLD_HALF + 1.5) - ang:Forward() * 1, ang
+		return pos + ang:Up() * (WORLD_HALF + 0.2) - ang:Forward() * 1, ang
 	end
 
-	function SWEP:DrawWorldModel()
-		if boxMat then
-			local pos, ang = worldBoxFrame(self)
-			drawManaBox(pos, ang, WORLD_HALF, self, nil)
+	-- The translucent box cannot draw from DrawWorldModel: that runs in entity
+	-- render order, often BEFORE the owner's body is in the depth buffer, so
+	-- the body (opaque, drawn later) paints over the glass and the box reads
+	-- as behind the player.  Drawing after all translucent renderables means
+	-- every body is already in the buffer and the depth test sorts it.
+	hook.Add("PostDrawTranslucentRenderables", "arcana_mana_siphon_worldbox", function(depth, skybox)
+		if depth or skybox then return end
+		if not boxMat then return end
 
-			return
+		local lp = LocalPlayer()
+		for _, wep in ipairs(ents.FindByClass("arcana_mana_siphon")) do
+			local owner = wep:GetOwner()
+
+			-- First person renders the palm cube instead
+			if IsValid(owner) and owner == lp and not lp:ShouldDrawLocalPlayer() then continue end
+			-- Holstered weapons on players are not visible
+			if IsValid(owner) and owner:IsPlayer() and owner:GetActiveWeapon() ~= wep then continue end
+			if wep:WorldSpaceCenter():DistToSqr(EyePos()) > 3000 * 3000 then continue end
+
+			local pos, ang = worldBoxFrame(wep)
+			drawManaBox(boxMat, pos, ang, WORLD_HALF, wep, nil)
 		end
+	end)
+
+	function SWEP:DrawWorldModel()
+		-- Shader path: drawn in PostDrawTranslucentRenderables above
+		if boxMat then return end
 
 		render.MaterialOverride(CUBE_GLASS)
 		render.SetColorModulation(CUBE_TINT.r / 255, CUBE_TINT.g / 255, CUBE_TINT.b / 255)

@@ -1,8 +1,8 @@
 #include "common.hlsl"
 
 // ---------------------------------------------------------------------------
-// The mana box: a hollow frosted-glass cube held in the palm, with thin metal
-// rails on its twelve edges.  Everything is analytic in BOX-LOCAL space (the
+// The mana box: a hollow frosted-glass cube held in the palm, a near-opaque
+// dark slab while dormant.  Everything is analytic in BOX-LOCAL space (the
 // cube spans [-1,1] on each axis, see arcana_manabox_vs30):
 //
 //   * the ray from the eye through the shaded point is traced to the far wall
@@ -13,19 +13,15 @@
 //     corner.
 //   * frost is 3D value noise contoured into ripples, so it lives on the glass
 //     surface instead of swimming in screen space.
-//   * the rails are shaded with a headlamp lambert + tight specular, which is
-//     what gives them the bright streak down each bar.
 // ---------------------------------------------------------------------------
 
 #define EYE_LOCAL    Constants0.xyz  // eye position in box-local units
 #define TIME         Constants0.w
 #define GLOW         Constants1.x    // interior light intensity (pulses)
 #define FILL         Constants1.y    // 0..1, how charged the box is
-#define OPACITY      Constants1.z
+#define ACTIVE       Constants1.z    // 0 = dormant gray stone box, 1 = panel live
 #define FROST        Constants1.w    // surface scatter amount
-#define TINT         Constants2.rgb  // glass aqua
-#define FRAME_LIGHT  Constants2.w
-#define CORE         Constants3.rgb  // interior light colour
+#define TINT         Constants2.rgb  // glass colour (Lua lerps dark gray -> panel blue)
 #define EDGE_GAIN    Constants3.w
 
 struct PS_IN
@@ -88,28 +84,25 @@ float4 main(PS_IN i) : COLOR
 	float3 rd = normalize(ro - EYE_LOCAL);
 	float3 toEye = -rd;
 
-	// Vertex colour tags the geometry: green channel 1 = glass pane, 0 = rail
-	float isGlass = saturate(i.color.g);
-
-	// -----------------------------------------------------------------------
-	// Metal rails
-	// -----------------------------------------------------------------------
-	float3 L = normalize(toEye + float3(0.28, 0.36, 0.62));
-	float lam = 0.34 + 0.66 * saturate(dot(n, L));
-	float spec = pow(saturate(dot(reflect(-L, n), toEye)), 42.0);
-	float rimM = pow(1.0 - saturate(dot(n, toEye)), 2.5);
-	float grain = 0.94 + 0.12 * fbm3(ro * 26.0);
-
-	float3 bronze = float3(0.66, 0.52, 0.41);
-	float3 frameCol = bronze * lam * grain * FRAME_LIGHT;
-	frameCol += float3(1.0, 0.95, 0.88) * spec * 1.15;
-	frameCol += float3(0.72, 0.86, 0.9) * rimM * 0.22;
-	frameCol += TINT * 0.12 * GLOW; // teal bounce out of the cavity
-
 	// -----------------------------------------------------------------------
 	// Glass: trace to the far wall of the cavity
 	// -----------------------------------------------------------------------
-	float ripple = frostRipple(ro + float3(0.0, 0.0, TIME * 0.015));
+	// Dormant, the frost is frozen in place; live, it drifts and energy
+	// currents wash across every face
+	float tA = TIME * ACTIVE;
+	float ripple = frostRipple(ro + float3(0.0, 0.0, tA * 0.2));
+
+	// The cube spans [-1,1]: noise below ~5x has features bigger than the box
+	// and reads as static, so the currents run fine and fast
+	float cw = fbm3(ro * 6.0 + tA * float3(1.6, 1.1, 2.0))
+	         + fbm3(ro * 10.0 - tA * float3(1.0, 1.9, 1.3));
+	float caustic = pow(saturate(0.5 + 0.5 * sin(cw * 9.0 - tA * 5.0)), 3.0) * ACTIVE;
+	// Darting filaments: knife-thin ridges of the same field, racing across
+	// the panes much faster than the caustic wash underneath
+	float fil = pow(1.0 - abs(frac(cw * 2.0 - tA * 2.2) * 2.0 - 1.0), 9.0) * ACTIVE;
+
+	// Interior light: neutral when dormant, the panel's hologram white-blue live
+	float3 core = lerp(float3(0.8, 0.8, 0.8), float3(0.8, 0.92, 1.08), ACTIVE);
 
 	// Frost scatters the ray a little, so the interior bands wobble instead of
 	// projecting like a clean lens
@@ -149,25 +142,40 @@ float4 main(PS_IN i) : COLOR
 	float seam = smoothstep(0.82, 0.995, m) * EDGE_GAIN;
 
 	float haze = saturate(chord / 2.55);
-	float fres = pow(1.0 - saturate(dot(n, toEye)), 3.0);
+	// abs(): the same panes are rasterized from inside in the far cull pass,
+	// where dot(n, toEye) goes negative and a naive fresnel saturates to 1,
+	// lighting interior walls up like full faces
+	float ndv = abs(dot(n, toEye));
+	float fres = pow(1.0 - saturate(ndv), 3.0);
+
+	// Interior walls recede: seen through the frosted front pane they keep a
+	// hint of shading but none of the face dressing, or they read as extra
+	// cube faces floating where none should be
+	float front = (dot(n, toEye) >= 0.0) ? 1.0 : 0.0;
+	float backFade = lerp(0.35, 1.0, front);
 
 	// Polished pane border: light piped through the pane's own thickness
 	float2 e = min(i.uv, 1.0 - i.uv);
-	float border = 1.0 - smoothstep(0.0, 0.055, min(e.x, e.y));
+	float border = (1.0 - smoothstep(0.0, 0.055, min(e.x, e.y))) * lerp(0.1, 1.0, front);
 
 	float inner = saturate(lit * GLOW * (0.45 + 0.55 * FILL));
 
-	float3 glassCol = lerp(TINT, CORE, inner);
-	glassCol = lerp(glassCol, CORE * 1.06, seam * 0.55);
-	glassCol = lerp(glassCol, CORE * 0.9, haze * 0.32);
+	float3 glassCol = lerp(TINT, core, inner);
+	glassCol = lerp(glassCol, core * 1.06, seam * 0.55);
+	glassCol = lerp(glassCol, core * 0.9, haze * 0.32);
 	glassCol *= 0.9 + 0.2 * ripple;
+	glassCol += core * (caustic * 1.1 + fil * 1.3) * backFade;
 	glassCol = lerp(glassCol, TINT * 1.12, border * 0.8);
 	glassCol = lerp(glassCol, TINT * 1.18, fres * 0.45);
 
-	float glassA = OPACITY * saturate(0.40 + 0.42 * fres + 0.5 * border + 0.3 * inner + 0.12 * ripple + 0.25 * seam);
+	float glassA = saturate(0.40 + 0.42 * fres + 0.5 * border + 0.3 * inner + 0.12 * ripple + 0.25 * seam + 0.35 * caustic + 0.4 * fil) * backFade;
 
-	float3 col = lerp(frameCol, glassCol, isGlass);
-	float alpha = lerp(1.0, glassA, isGlass) * i.color.a;
+	// Dormant the box is a near-opaque dark slab (TINT is dark gray then):
+	// frozen frost relief, a hint of rim light, none of the live translucency
+	float3 idleCol = TINT * (0.75 + 0.3 * ripple) + TINT * fres * 0.5;
+
+	float3 col = lerp(idleCol, glassCol, ACTIVE);
+	float alpha = lerp(0.94 * backFade, glassA, ACTIVE) * i.color.a;
 
 	return float4(col, alpha);
 }
