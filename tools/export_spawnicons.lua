@@ -165,6 +165,24 @@ local TARGETS = {
 		class = "grimoire", swep = true, fov = 40, dir = Vector(0, 0, 1), pad = 0.94, camRoll = 180, settle = 1,
 		stage = function(ent) ent:SetAngles(Angle(90, 0, 0)) end,
 	},
+	{
+		-- The condensator has no world mesh to photograph: DrawWorldModel bows out and a global
+		-- hook draws a procedural glass box at the entity's origin instead, 4.4 units across
+		-- inside a 12-unit placeholder cube, so the fit has to be told or the subject frames as a
+		-- speck. A 3/4 view is what shows three faces of a cube.
+		class = "arcana_condensator", swep = true, fov = 40, dir = Vector(1, -0.55, 0.42), pad = 1.12, radius = 3.3, settle = 2,
+		-- Dormant the box is a dark gray slab; mana sight is what lights the gold. The source
+		-- vars only feed the interior glow's intensity, and a live source is what makes it burn
+		-- at full (fill 1 rather than 0.35).
+		stage = function(ent)
+			ent:SetSightActive(true)
+			ent:SetSourceKind(2)
+			ent:SetSourceStrength(1)
+		end,
+		-- The wake ramp only advances on frames the box is actually drawn, so it depends on where
+		-- the player happened to be standing during settle. Pinned, the shot is deterministic.
+		preDraw = function(ent) ent._boxActive = 1 end,
+	},
 }
 
 local TARGET_BY_CLASS = {}

@@ -6,6 +6,8 @@ end
 require("shader_to_gma")
 
 if SERVER then
+	resource.AddFile("materials/entities/arcana_condensator.png")
+
 	resource.AddShader("arcana_manalens_ps30")
 	resource.AddShader("arcana_manacloud_ps30")
 	resource.AddShader("arcana_manacloud_dark_ps30")
@@ -15,13 +17,13 @@ if SERVER then
 	resource.AddShader("arcana_manabox_vs30")
 end
 
-SWEP.PrintName = "Mana Siphon"
+SWEP.PrintName = "Condensator"
 SWEP.Author = "Earu"
 SWEP.Category = "Arcana"
 SWEP.Purpose = "Locate mana concentrations and crystallize them into crystal dust"
-SWEP.Instructions = "LMB: Crystallize a mana source (mana sight required) | RMB: Toggle mana sight | R: Convert crystal shards into crystal dust"
+SWEP.Instructions = "LMB: Crystallize a mana source | RMB: Toggle mana sight"
 SWEP.Spawnable = true
-SWEP.AdminOnly = true
+SWEP.AdminOnly = false
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = true
 -- Bugbait viewmodel for the hands and grip; the bugbait itself is hidden and
@@ -64,8 +66,6 @@ local CHANNEL_TIME_MIN = 2
 local CHANNEL_TIME_MAX = 4
 -- Sources below this are not worth a channel (empty natural spots regenerating)
 local MIN_CRYSTALLIZE_VALUE = 10
-local SHARD_DUST_VALUE = 5
-local CONVERT_COOLDOWN = 0.4
 
 -- Mana sight: RMB toggles an overlay that reveals every nearby source through walls
 local SIGHT_SYNC_INTERVAL = 0.75
@@ -528,28 +528,6 @@ if SERVER then
 	end
 end
 
--- R turns stored crystal shards into crystal dust, one shard at a time.
-function SWEP:Reload()
-	if CLIENT then return end
-
-	local now = CurTime()
-	if now < (self._nextConvert or 0) then return end
-	self._nextConvert = now + CONVERT_COOLDOWN
-
-	local owner = self:GetOwner()
-	if not IsValid(owner) or not owner:IsPlayer() then return end
-
-	if Arcana.GetItemCount(owner, "mana_crystal_shard") < 1 then
-		Arcana.SendErrorNotification(owner, "No crystal shards to convert")
-		return
-	end
-
-	if not Arcana.TakeItem(owner, "mana_crystal_shard", 1, "Mana siphon") then return end
-
-	Arcana.GiveItem(owner, "crystal_dust", SHARD_DUST_VALUE, "Converted crystal shard")
-	owner:EmitSound("physics/glass/glass_cup_break1.wav", 60, 200, 0.5)
-end
-
 if CLIENT then
 	-- Art deco gold, like the altar's magic circle: the whole apparatus
 	-- (cube, panel, halos, arrow) speaks the station palette
@@ -583,13 +561,13 @@ if CLIENT then
 		sightSourcesAt = RealTime()
 	end)
 
-	-- Returns the deployed siphon, or nil
-	local function getActiveSiphon()
+	-- Returns the deployed condensator, or nil
+	local function getActiveCondensator()
 		local ply = LocalPlayer()
 		if not IsValid(ply) then return nil end
 
 		local wep = ply:GetActiveWeapon()
-		if not IsValid(wep) or wep:GetClass() ~= "arcana_mana_siphon" then return nil end
+		if not IsValid(wep) or wep:GetClass() ~= "arcana_condensator" then return nil end
 
 		return wep
 	end
@@ -1160,15 +1138,15 @@ if CLIENT then
 	end
 
 	-- World render pass for the dust and crystal arcs: simulate, catch each
-	-- weapon's channel completion (fling), draw.  Runs for EVERY siphon in
+	-- weapon's channel completion (fling), draw.  Runs for EVERY condensator in
 	-- view, not just the local player's, off the networked channel vars.
-	hook.Add("PostDrawTranslucentRenderables", "arcana_mana_siphon_dust", function(depth, skybox)
+	hook.Add("PostDrawTranslucentRenderables", "arcana_condensator_dust", function(depth, skybox)
 		if depth or skybox then return end
 
 		local now = RealTime()
 		local dt = FrameTime()
 
-		for _, wep in ipairs(ents.FindByClass("arcana_mana_siphon")) do
+		for _, wep in ipairs(ents.FindByClass("arcana_condensator")) do
 			if not IsValid(wep) or not wep.GetChanneling then continue end
 
 			updateWepDust(wep, now, dt)
@@ -1614,7 +1592,7 @@ if CLIENT then
 	-- ========================================================================
 	-- HOLO PANEL VISOR
 	-- ========================================================================
-	-- The lens is a holographic panel projected from the siphon hand: it
+	-- The lens is a holographic panel projected from the condensator hand: it
 	-- materializes out of the palm, then floats low-right of the view like a
 	-- held tablet, with spring lag and a little roll sway as the view turns.
 	-- The blueprint grading applies only to what is seen through its window.
@@ -1803,7 +1781,7 @@ if CLIENT then
 	-- (they wrap around cylinders in 3D), perfect as flat scrolling tickers
 	local BAND_MATS = {}
 	for i, tex in ipairs({"arcana/rings/ring_band", "arcana/rings/ring_band_2", "arcana/rings/ring_band_3"}) do
-		BAND_MATS[i] = CreateMaterial("arcana_siphon_band_" .. i, "UnlitGeneric", {
+		BAND_MATS[i] = CreateMaterial("arcana_condensator_band_" .. i, "UnlitGeneric", {
 			["$basetexture"] = tex,
 			["$translucent"] = 1,
 			["$vertexcolor"] = 1,
@@ -1945,7 +1923,7 @@ if CLIENT then
 	-- ========================================================================
 	-- CUBE COMPASS
 	-- ========================================================================
-	-- The siphon is a magical box: a hollow frosted-glass cube on thin metal
+	-- The condensator is a magical box: a hollow frosted-glass cube on thin metal
 	-- rails, lit from within, cradled in the palm.  Inside it a magical arrow
 	-- points at the closest mana source.  The bugbait mesh is hidden via bone
 	-- collapse and the box takes its place at the hand bone.
@@ -2133,7 +2111,7 @@ if CLIENT then
 		local eyeLocal = WorldToLocal(EyePos(), angle_zero, center, ang) / half
 		local now = RealTime()
 
-		-- The box wakes when it is in use (sight panel up, or siphoning) and
+		-- The box wakes when it is in use (sight panel up, or crystallizing) and
 		-- goes back to dormant gray stone otherwise; the fraction is smoothed
 		-- so the transition sweeps instead of popping
 		local awake = false
@@ -2310,9 +2288,9 @@ if CLIENT then
 	local WRIST_BACK = 5.5 -- wrist centre, back from the palm along the forearm
 	local WRIST_RING_R = 3.0 -- hugging the forearm
 
-	local SIPHON_GLYPH_MATS = {}
+	local WRIST_GLYPH_MATS = {}
 	for _, code in ipairs(GLYPH_CODES) do
-		SIPHON_GLYPH_MATS[code] = CreateMaterial("arcana_siphon_glyph_" .. code, "UnlitGeneric", {
+		WRIST_GLYPH_MATS[code] = CreateMaterial("arcana_condensator_glyph_" .. code, "UnlitGeneric", {
 			["$basetexture"] = "arcana/glyphs/glyph_" .. code,
 			["$translucent"] = 1,
 			["$vertexalpha"] = 1,
@@ -2357,7 +2335,7 @@ if CLIENT then
 
 			local pos, radial = glyphAnchor(wristPos, palmAng, i)
 			local size = 2.1 * (0.6 + 0.4 * a)
-			local mat = SIPHON_GLYPH_MATS[seq.codes[i]]
+			local mat = WRIST_GLYPH_MATS[seq.codes[i]]
 			if mat then
 				-- DrawQuadEasy is one-sided: glyphs on the far side of the
 				-- wrist face away from the camera and would backface-cull,
@@ -2552,9 +2530,9 @@ if CLIENT then
 	-- Here both the vm's and the hands' depth is on screen and the box's
 	-- depth-tested material sorts against it for free.
 	local inVMMask = false
-	hook.Add("PostDrawPlayerHands", "arcana_mana_siphon_cube", function(hands, vm, _, wep)
+	hook.Add("PostDrawPlayerHands", "arcana_condensator_cube", function(hands, vm, _, wep)
 		if inVMMask then return end
-		if not IsValid(wep) or wep:GetClass() ~= "arcana_mana_siphon" then return end
+		if not IsValid(wep) or wep:GetClass() ~= "arcana_condensator" then return end
 
 		hideBugbaitMesh(vm)
 
@@ -2698,8 +2676,8 @@ if CLIENT then
 	-- PreDrawHUD, not RenderScreenspaceEffects: the crystal's dispersion pass
 	-- (and other screenspace participants) must all be on screen before the
 	-- lens grades the frame, and hook order within one event is undefined
-	hook.Add("PreDrawHUD", "arcana_mana_siphon_sight", function()
-		local wep = getActiveSiphon()
+	hook.Add("PreDrawHUD", "arcana_condensator_sight", function()
+		local wep = getActiveCondensator()
 		if not wep then
 			wasSightOn = false
 			return
@@ -2731,7 +2709,7 @@ if CLIENT then
 			end
 		end
 
-		-- Channel edge watcher runs whenever the siphon is out: it catches the
+		-- Channel edge watcher runs whenever the condensator is out: it catches the
 		-- completion (flash + cloud suppression) even as the panel closes
 		updateChannelEdge(wep)
 
@@ -2901,7 +2879,7 @@ if CLIENT then
 	-- The world model is the same box, at held-item scale (the vm cube reads
 	-- bigger than it is because of the vm fov).  A held weapon's own position
 	-- is the owner's, so the box is anchored on the right hand bone the way
-	-- the grimoire anchors its book; only a dropped siphon uses its own
+	-- the grimoire anchors its book; only a dropped condensator uses its own
 	-- transform.
 	local WORLD_HALF = 2.2
 	local HAND_ATTACHMENT_POS = Vector(2.676, -1.712, 0)
@@ -2995,12 +2973,12 @@ if CLIENT then
 	-- the body (opaque, drawn later) paints over the glass and the box reads
 	-- as behind the player.  Drawing after all translucent renderables means
 	-- every body is already in the buffer and the depth test sorts it.
-	hook.Add("PostDrawTranslucentRenderables", "arcana_mana_siphon_worldbox", function(depth, skybox)
+	hook.Add("PostDrawTranslucentRenderables", "arcana_condensator_worldbox", function(depth, skybox)
 		if depth or skybox then return end
 		if not boxMat then return end
 
 		local lp = LocalPlayer()
-		for _, wep in ipairs(ents.FindByClass("arcana_mana_siphon")) do
+		for _, wep in ipairs(ents.FindByClass("arcana_condensator")) do
 			local owner = wep:GetOwner()
 
 			-- First person renders the palm cube instead
@@ -3026,10 +3004,10 @@ if CLIENT then
 	end
 end
 
-hook.Add("Initialize", "arcana_mana_siphon_items", function()
+hook.Add("Initialize", "arcana_condensator_items", function()
 	Arcana.RegisterItem("crystal_dust", {
 		name = "Crystal Dust",
-		description = "Mana crystallized into fine dust with a mana siphon.",
+		description = "Mana crystallized into fine dust with a condensator.",
 		model = "models/props_lab/jar01a.mdl",
 		color = Color(222, 198, 120),
 	})
