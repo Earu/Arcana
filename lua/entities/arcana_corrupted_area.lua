@@ -405,6 +405,12 @@ if SERVER then
 end
 
 if CLIENT then
+	-- Every corrupted area the client currently knows about. The effect is driven
+	-- from one render hook rather than from ENT:Draw (see the bottom of this
+	-- file), so it needs its own list instead of relying on the engine calling
+	-- each entity.
+	local activeAreas = {}
+
 	-- Invisible material used to write to the stencil buffer
 	local INVISIBLE_MAT = CreateMaterial("arcana_corruption_stencil", "UnlitGeneric", {
 		["$basetexture"] = "color/white",
@@ -484,11 +490,10 @@ if CLIENT then
 	-- edge is exactly the sphere/world intersection curve, which the shader
 	-- uses to draw flames along terrain, cliffs and buildings.
 	--
-	-- Built on the first corruption draw rather than at load. These four are
-	-- 35 MB at 1440p (2.25x that at 4K), and Source never frees a render target,
-	-- so allocating them up front charges every client for an effect most
-	-- sessions never spawn. Same lazy pattern arcana_mana_crystal uses for its
-	-- refraction RT. The materials bake the RT names in at creation time, so
+	-- Built on the first corruption draw rather than at load. Source never frees
+	-- a render target, so allocating up front charges every client for an effect
+	-- most sessions never spawn. Same lazy pattern arcana_mana_crystal uses for
+	-- its refraction RT. The materials bake the RT names in at creation time, so
 	-- they have to be built here too rather than when the shaders mount.
 	local CORR_SNAP_RT, CORR_MASK_RT, CORR_MBLUR_A, CORR_MBLUR_B
 	local shadersMounted = false
@@ -497,11 +502,16 @@ if CLIENT then
 		if corruptionMat or not shadersMounted then return end
 
 		local w, h = ScrW(), ScrH()
-		local halfW, halfH = math.floor(w / 2), math.floor(h / 2)
 
-		-- The snapshot restores the screen verbatim, so it keeps the full 8 bits
-		-- per channel - at 16 bit the restore would band visibly.
-		CORR_SNAP_RT = GetRenderTarget("arcana_corr_snap", w, h)
+		-- The snapshot restores the screen verbatim, so it keeps full resolution
+		-- and the full 8 bits per channel - at 16 bit the restore would band
+		-- visibly. It is the shared Arcana scratch buffer rather than a private
+		-- target: the crystal and the condensator lens need the same thing at
+		-- other moments in the frame, and one 33 MB target at 4K is enough for
+		-- all three. See arcana/system/vfx/scratch_rt.lua for the contract; this
+		-- path honours it (snapshot and restore both happen inside
+		-- buildIntersectionMask, which dispatches no other draw work).
+		CORR_SNAP_RT = Arcana.GetScreenScratchRT()
 
 		-- The mask chain only ever carries two channels: the shader reads
 		-- `tex2D(Tex1, i.uv).rg` and nothing else, red being "inside the true
@@ -513,12 +523,26 @@ if CLIENT then
 		-- CopyRenderTargetToTexture writes into a 565 target correctly.
 		-- Precision cost is 32 levels of red / 64 of green on the blurred edge,
 		-- which the flame noise hides.
+		--
+		-- Nothing in this chain is ever shown to the player. The shader's only
+		-- use of it is smoothstep(0.12, 0.4, max(mask.g, mask.r)), a soft
+		-- visibility fade fed by a gaussian, so detail finer than the blur width
+		-- cannot reach the screen through it. Half res for the rasterised mask,
+		-- quarter res for the blur ping-pong: 3 bytes/px down to 0.75.
+		--
+		-- The mask is filled by render.CopyRenderTargetToTexture off the real
+		-- framebuffer, which scales into the smaller target rather than cropping
+		-- to a corner (the bloom chain depends on the same behaviour). The blur
+		-- ping-pong is written by PushRenderTarget + DrawScreenQuad instead, so
+		-- its size was never in question.
+		local maskW, maskH = math.floor(w / 2), math.floor(h / 2)
+		local blurW, blurH = math.floor(w / 4), math.floor(h / 4)
 		local RT_FLAGS = bit.bor(4, 8, 256, 512) -- CLAMPS | CLAMPT | NOMIP | NOLOD (no TEXTUREFLAGS_* globals in GLua)
-		CORR_MASK_RT = GetRenderTargetEx("arcana_corr_mask", w, h,
+		CORR_MASK_RT = GetRenderTargetEx("arcana_corr_mask", maskW, maskH,
 			RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_NONE, RT_FLAGS, 0, IMAGE_FORMAT_RGB565)
-		CORR_MBLUR_A = GetRenderTargetEx("arcana_corr_mblur_a", halfW, halfH,
+		CORR_MBLUR_A = GetRenderTargetEx("arcana_corr_mblur_a", blurW, blurH,
 			RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_NONE, RT_FLAGS, 0, IMAGE_FORMAT_RGB565)
-		CORR_MBLUR_B = GetRenderTargetEx("arcana_corr_mblur_b", halfW, halfH,
+		CORR_MBLUR_B = GetRenderTargetEx("arcana_corr_mblur_b", blurW, blurH,
 			RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_NONE, RT_FLAGS, 0, IMAGE_FORMAT_RGB565)
 
 		corruptionMat = CreateShaderMaterial("arcana_corruption_fx", {
@@ -691,9 +715,14 @@ if CLIENT then
 		render.SetMaterial(blitMat)
 		render.DrawScreenQuad()
 
-		-- Soft edge for the visibility fade
-		maskBlurPass(CORR_MASK_RT, CORR_MBLUR_A, 1, 0, 3)
-		maskBlurPass(CORR_MBLUR_A, CORR_MBLUR_B, 0, 1, 3)
+		-- Soft edge for the visibility fade.  The blur step is texel-relative
+		-- (step = dir * TexBaseSize * radius in arcana_bloom_ps30), so the radius
+		-- has to track the SOURCE resolution of each pass or the screen-space
+		-- width moves.  Both sources are one step coarser than the original
+		-- full-res mask into half-res ping-pong, so both radii halve from 3 to
+		-- 1.5 and land on the same softness on screen.
+		maskBlurPass(CORR_MASK_RT, CORR_MBLUR_A, 1, 0, 1.5)
+		maskBlurPass(CORR_MBLUR_A, CORR_MBLUR_B, 0, 1, 1.5)
 	end
 
 	local render_UpdateScreenEffectTexture = _G.render.UpdateScreenEffectTexture
@@ -824,6 +853,7 @@ if CLIENT then
 		self._lastUpdate = CurTime()
 		self._lastIntensity = -1
 
+		activeAreas[self] = true
 		applyIntensityClient(self)
 	end
 
@@ -845,17 +875,78 @@ if CLIENT then
 		return true
 	end
 
-	-- The world-intersection flames make the boundary readable from inside,
-	-- so no interior wall sphere is drawn anymore.
+	-- Nothing renders per-entity. The corruption is a screen-space pass over the
+	-- whole frame, not a model, so the engine calling us once per entity per
+	-- render pass is the wrong shape entirely: it hands us the 3D skybox pass
+	-- (a second render from the map's sky_camera at 1/16 scale) as if it were
+	-- the player's view, and the analytic sphere projected against that camera
+	-- lands as a small graded disc floating in open sky. Drawing is driven from
+	-- one hook below instead. The world-intersection flames make the boundary
+	-- readable from inside, so no interior wall sphere is drawn either.
 	function ENT:DrawTranslucent()
 	end
 
 	function ENT:Draw()
-		self:_DrawCorruption()
 	end
 
 	function ENT:OnRemove()
+		activeAreas[self] = nil
 	end
+
+	-- PostDrawTranslucentRenderables, once per frame, for every area at once.
+	--
+	-- Why this hook:
+	--  * 3D rendering context with the scene depth buffer still intact, which
+	--    the stencil sphere in _DrawSphere z-tests against. The post-processing
+	--    hooks (RenderScreenspaceEffects, PostDrawEffects) are 2D contexts and
+	--    cannot do that.
+	--  * After translucent geometry, so glass, water, sprites and this system's
+	--    own corrupted wisps are inside the grade. Running at the opaque stage
+	--    would leave all of them sitting on top of the desaturated volume in
+	--    full colour. Translucent geometry does not write depth, so the stencil
+	--    sees exactly the same depth buffer either way.
+	--  * It reports the pass as an ARGUMENT of the same call, so the 3D skybox
+	--    is rejected inline with no flag held between calls. GM:PreDrawSkyBox
+	--    plus GM:PostDrawSkyBox would need such a flag and cannot be trusted to
+	--    balance: PreDrawSkyBox is cancellable, so any addon returning true from
+	--    it stops PostDrawSkyBox ever firing and the flag would latch on for the
+	--    rest of the session.
+	--
+	-- Only the third argument is read. The second is documented as possibly
+	-- always true on maps with a 2D skybox, which would blank the effect
+	-- everywhere. A missing third argument degrades to false, so the failure
+	-- direction is "renders as it does now", never "effect disappears".
+	--
+	-- Registered unconditionally so reloading this file rebinds it.
+	--
+	-- ENT:Draw used to be culled by the engine against the entity's render
+	-- bounds. Driving the pass ourselves means doing that gate here, or a
+	-- corrupted area behind the player would still pay for a full mask build
+	-- (two full-screen copies and a restore) every frame. Both tests below are
+	-- conservative: an area is skipped only when it provably cannot contribute.
+	local function areaContributes(area)
+		-- Under the threshold the shader outputs nothing. This has to be tested
+		-- before buildIntersectionMask, not inside _DrawSphere where it lives
+		-- today, or a dormant area still pays for the whole mask build first.
+		if math.Clamp(area:GetIntensity() or 1, 0, 2) < 0.5 then return false end
+
+		-- Entirely behind the plane through the eye, so no part of it can
+		-- project onto the screen. Standing inside the volume still passes.
+		local reach = math.max(1, area:GetRadius() or 500) * STENCIL_EXPAND
+		return (area:GetPos() - EyePos()):Dot(EyeVector()) >= -reach
+	end
+
+	hook.Add("PostDrawTranslucentRenderables", "Arcana_DrawCorruptedAreas", function(_, _, isDraw3DSkybox)
+		if isDraw3DSkybox then return end
+
+		for area in pairs(activeAreas) do
+			if not IsValid(area) then
+				activeAreas[area] = nil
+			elseif areaContributes(area) then
+				area:_DrawCorruption()
+			end
+		end
+	end)
 
 	-- HUD status message for players inside corruption
 	local corruptionCache = {

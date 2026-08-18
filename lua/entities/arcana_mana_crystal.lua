@@ -381,9 +381,13 @@ if CLIENT then
 	local render_SetBlend = _G.render.SetBlend
 	local DYNAMIC_LIGHT_OFFSET = Vector(0, 0, 50)
 
-	local CRYSTAL_RT_NAME = "arcana_crystal_refract_rt"
+	-- Shared with the corruption snapshot and the condensator lens: all three
+	-- want the current framebuffer and none of them keeps it past its own draw.
+	-- See arcana/system/vfx/scratch_rt.lua.
+	-- Resolved at draw time, not here: entity files can load before
+	-- arcana/init.lua has run its includes.
 	local function GetCrystalRefractRT()
-		return GetRenderTarget(CRYSTAL_RT_NAME, ScrW(), ScrH())
+		return Arcana.GetScreenScratchRT()
 	end
 	function ENT:Draw()
 		local distSqr = EyePos():DistToSqr(self:GetPos())

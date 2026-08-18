@@ -2747,7 +2747,9 @@ if CLIENT then
 
 			-- Lens pass, stencil-gated to the window
 			if sightMat then
-				local rt = GetRenderTarget("arcana_manasight_rt", w, h)
+				-- Shared framebuffer scratch (see arcana/system/vfx/scratch_rt.lua):
+				-- grabbed and consumed by the quad below, never held longer
+				local rt = Arcana.GetScreenScratchRT()
 				render.CopyRenderTargetToTexture(rt)
 				sightMat:SetTexture("$basetexture", rt)
 				sightMat:SetFloat("$c0_x", math.fmod(RealTime(), 1000))
