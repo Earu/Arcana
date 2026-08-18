@@ -280,7 +280,7 @@ if SERVER then
 		return pos
 	end
 
-	-- Consumes a hotspot outright (the siphon crystallizing it into dust).
+	-- Consumes a hotspot outright (the condensator crystallizing it into dust).
 	-- Natural spots are permanent geography: they empty and refill over time.
 	-- Cast-made hotspots are spent and removed.
 	function M:ConsumeHotspot(h)
@@ -301,7 +301,7 @@ if SERVER then
 	end
 
 	-- Tops the map up to the configured number of natural spots. They are ordinary
-	-- hotspots as far as the siphon is concerned, but never decay and refill over time.
+	-- hotspots as far as the condensator is concerned, but never decay and refill over time.
 	-- Placement must always end with at least one spot on the map: the dust economy has
 	-- no other bootstrap. Spacing relaxes by half each pass so small maps still fit
 	-- their spots, and the last resort anchors a spot near a player spawn.
@@ -602,7 +602,7 @@ if SERVER then
 			local h = Arcana.ManaCrystals.hotspots[i]
 
 			if h.natural then
-				-- Natural spots never decay or trim; they slowly refill after being siphoned
+				-- Natural spots never decay or trim; they slowly refill after being crystallized
 				local cap = cfg.naturalSpotCapacity or 70
 				h.value = math.min(cap, (h.value or 0) + (cfg.naturalSpotRegenPerSecond or 0.15))
 				continue

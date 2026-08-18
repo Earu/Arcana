@@ -1,6 +1,6 @@
 #include "common.hlsl"
 
-// Mana sight lens, projected as a holographic panel from the siphon hand.
+// Mana sight lens, projected as a holographic panel from the condensator hand.
 // The panel's four projected screen corners come from Lua; inside that quad
 // the scene is regraded as a dark brass etching (near-black umber base, etched
 // bright line work on edges, grain, scanlines); outside is untouched.  The

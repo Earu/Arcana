@@ -41,7 +41,7 @@ function ENT:_ApplyScale(scale)
 	self._maxScale = self._maxScale or 2.2
 	local s = math.Clamp(tonumber(scale) or 1, self._minScale, self._maxScale)
 
-	-- Interpolated so repeated growth/siphon ticks glide instead of stepping
+	-- Interpolated so repeated growth/drain ticks glide instead of stepping
 	self:SetModelScale(s, 0.25)
 	self:Activate()
 
@@ -230,7 +230,7 @@ if SERVER then
 		self:EmitSound("buttons/blip1.wav", 55, 140)
 	end
 
-	-- Siphoning counterpart to AddCrystalGrowth: removes growth points, shrinking the
+	-- Draining counterpart to AddCrystalGrowth: removes growth points, shrinking the
 	-- crystal, and returns how many points were actually drained. Crystals restored from
 	-- disk only get their scale set (_growth stays 0), so growth is re-derived from the
 	-- current scale whenever the tracked value lags behind it.
