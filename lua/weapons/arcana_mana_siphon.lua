@@ -8,6 +8,8 @@ require("shader_to_gma")
 if SERVER then
 	resource.AddShader("arcana_manalens_ps30")
 	resource.AddShader("arcana_manacloud_ps30")
+	resource.AddShader("arcana_manacloud_dark_ps30")
+	resource.AddShader("arcana_manacryst_ps30")
 	resource.AddShader("arcana_managhost_ps30")
 	resource.AddShader("arcana_manabox_ps30")
 	resource.AddShader("arcana_manabox_vs30")
@@ -16,8 +18,8 @@ end
 SWEP.PrintName = "Mana Siphon"
 SWEP.Author = "Earu"
 SWEP.Category = "Arcana"
-SWEP.Purpose = "Locate mana concentrations and collect them as mana dust"
-SWEP.Instructions = "LMB: Collect mana dust | RMB: Toggle mana sight | R: Convert crystal shards into mana dust"
+SWEP.Purpose = "Locate mana concentrations and crystallize them into crystal dust"
+SWEP.Instructions = "LMB: Crystallize a mana source (mana sight required) | RMB: Toggle mana sight | R: Convert crystal shards into crystal dust"
 SWEP.Spawnable = true
 SWEP.AdminOnly = true
 SWEP.DrawAmmo = false
@@ -48,18 +50,20 @@ local KIND_CRYSTAL = 2
 
 local SENSE_INTERVAL = 0.4
 local SENSE_MIN_HOTSPOT_VALUE = 10
-local EXTRACT_TICK = 0.25
+local CHANNEL_TICK = 0.1
 local HOTSPOT_EXTRACT_RANGE = 600
 local CRYSTAL_EXTRACT_RANGE = 350
--- Hotspots hold ~70 intensity at spawn threshold; crystals hold up to 300 growth.
--- Both drain to roughly 3 dust per second so neither source is strictly better.
-local HOTSPOT_DRAIN_PER_TICK = 1.5
-local DUST_PER_HOTSPOT_VALUE = 0.5
-local CRYSTAL_DRAIN_PER_TICK = 7.5
-local DUST_PER_GROWTH = 0.1
-local CRYSTAL_DISSOLVE_BONUS_DUST = 2
--- Dust is granted in batches so the pickup announcements don't fire every tick.
-local DUST_BATCH = 10
+-- Crystallization converts the WHOLE source at once when the channel
+-- completes.  Hotspots hold ~70 intensity at spawn threshold; crystals hold
+-- up to 300 growth: the same totals the old tick-drain economy paid out.
+local CRYSTAL_DUST_PER_HOTSPOT_VALUE = 0.5
+local CRYSTAL_DUST_PER_GROWTH = 0.1
+local CRYSTAL_DISSOLVE_BONUS = 2
+-- Channel duration scales with how much the source holds
+local CHANNEL_TIME_MIN = 2
+local CHANNEL_TIME_MAX = 4
+-- Sources below this are not worth a channel (empty natural spots regenerating)
+local MIN_CRYSTALLIZE_VALUE = 10
 local SHARD_DUST_VALUE = 5
 local CONVERT_COOLDOWN = 0.4
 
@@ -71,19 +75,22 @@ local SIGHT_MAX_SOURCES = 16
 function SWEP:SetupDataTables()
 	self:NetworkVar("Vector", 0, "SourcePos")
 	self:NetworkVar("Int", 0, "SourceKind")
-	self:NetworkVar("Int", 1, "BufferedDust")
 	self:NetworkVar("Float", 0, "SourceStrength")
-	self:NetworkVar("Bool", 0, "Extracting")
+	self:NetworkVar("Float", 1, "ChannelFrac")
+	self:NetworkVar("Bool", 0, "Channeling")
 	self:NetworkVar("Bool", 1, "SightActive")
 end
 
 function SWEP:Initialize()
 	self:SetHoldType(self.HoldType)
-	self._dustBuffer = 0
 end
 
 function SWEP:Deploy()
 	self:SetHoldType(self.HoldType)
+	-- The engine plays its dry-fire click (pistol_empty on the player) around
+	-- EVERY attack attempt, so this weapon never becomes attack-ready at all:
+	-- the channel reads IN_ATTACK directly and PrimaryAttack never runs
+	self:SetNextPrimaryFire(CurTime() + 1e5)
 	if SERVER then
 		self:SetSightActive(false)
 	end
@@ -98,11 +105,14 @@ function SWEP:SecondaryAttack()
 	local active = not self:GetSightActive()
 	self:SetSightActive(active)
 
-	-- Ethereal, not mechanical: a soft energy bloom, pitched up waking and
-	-- down going dormant, with a chime shimmer as the panel materializes
-	self:EmitSound("ambient/energy/whiteflash.wav", 60, active and 145 or 85, 0.55)
+	-- Ethereal, not mechanical: waking is a rising energy bloom with a chime
+	-- shimmer; turning off is just a soft gust (the descending bloom now
+	-- belongs to the crystallization's final poof)
 	if active then
+		self:EmitSound("ambient/energy/whiteflash.wav", 60, 145, 0.55)
 		self:EmitSound("ambient/levels/canals/windchime2.wav", 60, 125, 0.45)
+	else
+		self:EmitSound("ambient/wind/wind_snippet1.wav", 60, 105, 0.5)
 	end
 end
 
@@ -142,9 +152,9 @@ if SERVER then
 	-- Periodically points the needle at the nearest mana source on the map,
 	-- whether a hotspot (invisible concentration) or a grown crystal.
 	function SWEP:_UpdateSensedSource()
-		-- The extract tick owns the source vars during a channel; re-sensing here could
-		-- flip the needle to another source (or to none) while the beam is still running.
-		if self:GetExtracting() then return end
+		-- The channel owns the source vars while it runs; re-sensing here could
+		-- flip the needle to another source mid-crystallization.
+		if self:GetChanneling() then return end
 
 		local owner = self:GetOwner()
 		if not IsValid(owner) then
@@ -237,21 +247,6 @@ if SERVER then
 		net.Send(owner)
 	end
 
-	-- Grants whole buffered dust to the owner. Partial units stay buffered so slow
-	-- draining still adds up; a failed grant (inventory not loaded) keeps the buffer.
-	function SWEP:_BankDust()
-		local whole = math.floor(self._dustBuffer or 0)
-		if whole < 1 then return end
-
-		local owner = self:GetOwner()
-		if not IsValid(owner) or not owner:IsPlayer() then return end
-
-		if Arcana.GiveItem(owner, "mana_dust", whole, "Mana siphon") then
-			self._dustBuffer = self._dustBuffer - whole
-			self:SetBufferedDust(0)
-		end
-	end
-
 	function SWEP:_FindExtractTarget()
 		local owner = self:GetOwner()
 		if not IsValid(owner) then return nil, nil end
@@ -262,7 +257,9 @@ if SERVER then
 			return crystal, KIND_CRYSTAL
 		end
 
-		local hotspot, hotspotD2 = findNearestHotspot(pos, 0)
+		-- Sources below the floor are not worth a channel: empty natural spots
+		-- regenerating stay untargetable instead of paying out forever
+		local hotspot, hotspotD2 = findNearestHotspot(pos, MIN_CRYSTALLIZE_VALUE)
 		if hotspot and hotspotD2 <= HOTSPOT_EXTRACT_RANGE * HOTSPOT_EXTRACT_RANGE then
 			return hotspot, KIND_HOTSPOT
 		end
@@ -270,73 +267,234 @@ if SERVER then
 		return nil, nil
 	end
 
-	function SWEP:_StartExtractSound()
-		if self._extractSnd then return end
-		self._extractSnd = CreateSound(self, "ambient/levels/citadel/field_loop3.wav")
-		if self._extractSnd then
-			self._extractSnd:PlayEx(0.35, 130)
+	-- Two layers: the mystic field drone and an electric crackle riding it,
+	-- both swelling with the channel fraction
+	function SWEP:_StartChannelSound()
+		if self._channelSnd then return end
+
+		self._channelSnd = CreateSound(self, "ambient/levels/citadel/field_loop3.wav")
+		if self._channelSnd then
+			self._channelSnd:PlayEx(0.3, 100)
+		end
+
+		self._channelZapSnd = CreateSound(self, "ambient/energy/electric_loop.wav")
+		if self._channelZapSnd then
+			self._channelZapSnd:PlayEx(0.25, 95)
 		end
 	end
 
-	function SWEP:_StopExtractSound()
-		if self._extractSnd then
-			self._extractSnd:Stop()
-			self._extractSnd = nil
+	function SWEP:_StopChannelSound()
+		if self._channelSnd then
+			self._channelSnd:Stop()
+			self._channelSnd = nil
+		end
+
+		if self._channelZapSnd then
+			self._channelZapSnd:Stop()
+			self._channelZapSnd = nil
 		end
 	end
 
-	-- Gently dissolve a fully drained crystal. Unlike shattering it, this does not
-	-- feed the corruption system: siphoning is the slow but clean harvest.
-	local function dissolveCrystal(crystal)
-		local ed = EffectData()
-		ed:SetOrigin(crystal:WorldSpaceCenter())
-		util.Effect("GlassImpact", ed, true, true)
-		crystal:EmitSound("physics/glass/glass_sheet_break2.wav", 65, 160, 0.6)
+	-- Drops the channel without paying out: released LMB, target lost, sight
+	-- closed, weapon holstered
+	function SWEP:_AbortChannel()
+		self._channel = nil
+		self:SetChanneling(false)
+		self:SetChannelFrac(0)
+		self:_StopChannelSound()
+	end
+
+	-- Gently dissolve a crystallized crystal. Unlike shattering it, this does
+	-- not feed the corruption system: crystallization is the clean harvest.
+	-- impact (1..3) scales the send-off with the crystal's size: a tower of
+	-- crystal does not vanish with a shard's tinkle.
+	local function dissolveCrystal(crystal, impact)
+		impact = impact or 1
+		local center = crystal:WorldSpaceCenter()
+		local h = crystal:OBBMaxs().z * (crystal:GetModelScale() or 1)
+
+		for _ = 1, math.floor(impact * 2) do
+			local ed = EffectData()
+			ed:SetOrigin(center + VectorRand() * h * 0.4)
+			util.Effect("GlassImpact", ed, true, true)
+		end
+
+		crystal:EmitSound("physics/glass/glass_sheet_break2.wav", 60 + 8 * impact, 170 - 30 * impact, math.min(1, 0.5 + 0.2 * impact))
+
+		if impact > 1.5 then
+			crystal:EmitSound("physics/glass/glass_largesheet_break" .. math.random(1, 2) .. ".wav", 75, 110, 0.9)
+		end
+
 		SafeRemoveEntity(crystal)
 	end
 
+	local function hotspotStillExists(h)
+		local M = Arcana.ManaCrystals
+		if not M then return false end
+
+		for i = 1, #M.hotspots do
+			if M.hotspots[i] == h then return true end
+		end
+
+		return false
+	end
+
+	-- The whole source converts at once when the channel completes: one grant,
+	-- one moment of crystallization
+	function SWEP:_CompleteChannel(owner, ch)
+		local dust = 0
+
+		local impact = 1
+
+		if ch.kind == KIND_CRYSTAL then
+			if IsValid(ch.target) then
+				local bodyH = ch.target:OBBMaxs().z * (ch.target:GetModelScale() or 1)
+				impact = math.Clamp(bodyH / 60, 1, 3)
+
+				local growth = ch.target:DrainCrystalGrowth(math.huge) or 0
+				dust = math.ceil(growth * CRYSTAL_DUST_PER_GROWTH) + CRYSTAL_DISSOLVE_BONUS
+				dissolveCrystal(ch.target, impact)
+			end
+		else
+			dust = math.ceil((ch.target.value or 0) * CRYSTAL_DUST_PER_HOTSPOT_VALUE)
+
+			local M = Arcana.ManaCrystals
+			if M and M.ConsumeHotspot then
+				M:ConsumeHotspot(ch.target)
+			else
+				ch.target.value = 0
+			end
+		end
+
+		if dust > 0 then
+			Arcana.GiveItem(owner, "crystal_dust", dust, "Mana crystallization")
+		end
+
+		-- The moment it sets: a proper blast - electric detonation and
+		-- discharge, a glass ring, an arcane chime, a local kick, and the
+		-- descending energy bloom (the old sight-off sound) AT the source as
+		-- the final poof
+		self:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", 72, 135, 0.55)
+		self:EmitSound("ambient/energy/weld2.wav", 65, 120, 0.6)
+		self:EmitSound("physics/glass/glass_sheet_break1.wav", 60, 170, 0.5)
+		self:EmitSound("arcana/arcane_" .. math.random(1, 3) .. ".ogg", 60, 110, 0.6)
+
+		local srcPos = self:GetSourcePos()
+		sound.Play("ambient/energy/whiteflash.wav", srcPos, 65, 85, 0.6)
+		util.ScreenShake(srcPos, 2 + 2.5 * impact, 40, 0.35 + 0.15 * impact, 450 + 150 * impact)
+
+		self:_AbortChannel()
+	end
+
+	-- Never reached (the weapon is never attack-ready, see Deploy); kept as a
+	-- guard so the base class does nothing if something re-arms the attack
 	function SWEP:PrimaryAttack()
-		self:SetNextPrimaryFire(CurTime() + EXTRACT_TICK)
-		if CLIENT then return end
+		self:SetNextPrimaryFire(CurTime() + 1e5)
+	end
 
+	function SWEP:_ChannelTick(now)
 		local owner = self:GetOwner()
-		if not IsValid(owner) or not owner:IsPlayer() then return end
+		local pressing = IsValid(owner) and owner:IsPlayer() and owner:KeyDown(IN_ATTACK)
 
-		local target, kind = self:_FindExtractTarget()
-		if not kind then
-			self:SetExtracting(false)
-			self:_StopExtractSound()
+		-- Keep the attack frozen forever (anything that re-arms it lets the
+		-- engine's dry-fire click back in)
+		if self:GetNextPrimaryFire() < now + 1000 then
+			self:SetNextPrimaryFire(now + 1e5)
+		end
+
+		-- Press edge: the sight-required denial, once per press
+		local pressed = pressing and not self._wasPressing
+		self._wasPressing = pressing
+
+		if pressed and not self:GetSightActive() then
+			owner:EmitSound("ambient/energy/whiteflash.wav", 50, 55, 0.3)
+			Arcana.SendErrorNotification(owner, "Mana sight required")
+		end
+
+		local holding = pressing and self:GetSightActive()
+
+		if not holding then
+			if self._channel then
+				self:_AbortChannel()
+			end
+
 			return
 		end
 
-		local dust = 0
-		if kind == KIND_CRYSTAL then
-			local drained = target:DrainCrystalGrowth(CRYSTAL_DRAIN_PER_TICK)
-			if drained > 0 then
-				dust = drained * DUST_PER_GROWTH
+		local ch = self._channel
+		if not ch then
+			local target, kind = self:_FindExtractTarget()
+			if not kind then return end
+
+			-- Richer sources take longer to set
+			local magnitude
+			if kind == KIND_CRYSTAL then
+				local minS, maxS = 0.35, 2.2
+				local cfg = Arcana.ManaCrystals and Arcana.ManaCrystals.Config
+				if cfg then
+					minS = tonumber(cfg.crystalMinScale) or minS
+					maxS = tonumber(cfg.crystalMaxScale) or maxS
+				end
+
+				local s = target.GetCrystalScale and target:GetCrystalScale() or minS
+				magnitude = math.Clamp((s - minS) / math.max(0.0001, maxS - minS), 0, 1)
 			else
-				dust = CRYSTAL_DISSOLVE_BONUS_DUST
-				dissolveCrystal(target)
+				local threshold = (Arcana.ManaCrystals and Arcana.ManaCrystals.Config.hotspotSpawnThreshold) or 70
+				magnitude = math.Clamp((target.value or 0) / threshold, 0, 1)
 			end
 
-			self:SetSourcePos(IsValid(target) and target:WorldSpaceCenter() or self:GetSourcePos())
-			self:SetSourceKind(KIND_CRYSTAL)
-		else
-			local drained = math.min(target.value or 0, HOTSPOT_DRAIN_PER_TICK)
-			target.value = (target.value or 0) - drained
-			dust = drained * DUST_PER_HOTSPOT_VALUE
-			self:SetSourcePos(target.pos)
-			self:SetSourceKind(KIND_HOTSPOT)
+			ch = {
+				kind = kind,
+				target = target,
+				startedAt = now,
+				duration = CHANNEL_TIME_MIN + (CHANNEL_TIME_MAX - CHANNEL_TIME_MIN) * magnitude,
+			}
+			self._channel = ch
+			self:SetChanneling(true)
+			self:_StartChannelSound()
 		end
 
-		self._dustBuffer = (self._dustBuffer or 0) + dust
-		self._lastExtract = CurTime()
-		self:SetExtracting(true)
-		self:SetBufferedDust(math.floor(self._dustBuffer))
-		self:_StartExtractSound()
+		-- Validate the lock every tick: the target must still exist, hold
+		-- value, and be in range
+		local tpos
+		if ch.kind == KIND_CRYSTAL then
+			tpos = IsValid(ch.target) and ch.target:WorldSpaceCenter() or nil
+		elseif hotspotStillExists(ch.target) and (ch.target.value or 0) >= 1 then
+			tpos = ch.target.pos
+		end
 
-		if self._dustBuffer >= DUST_BATCH then
-			self:_BankDust()
+		if tpos then
+			local range = ch.kind == KIND_CRYSTAL and CRYSTAL_EXTRACT_RANGE or HOTSPOT_EXTRACT_RANGE
+			if tpos:DistToSqr(owner:WorldSpaceCenter()) > range * range then
+				tpos = nil
+			end
+		end
+
+		if not tpos then
+			self:_AbortChannel()
+			return
+		end
+
+		-- The needle locks onto whatever is being crystallized
+		self:SetSourceKind(ch.kind)
+		self:SetSourcePos(tpos)
+
+		local frac = math.Clamp((now - ch.startedAt) / ch.duration, 0, 1)
+		self:SetChannelFrac(frac)
+
+		-- NO ChangePitch/ChangeVolume on the loops mid-channel: every call
+		-- restarts the patch's wav and each restart is an audible click
+		-- (verified with an EntityEmitSound logger).  Escalation is carried by
+		-- the zap density instead.
+		-- Lightning snaps, denser and sharper toward completion (matches the
+		-- arc strobes on the client)
+		if now >= (self._nextZap or 0) then
+			self._nextZap = now + math.Rand(0.25, 0.6) * (1.25 - 0.6 * frac)
+			self:EmitSound("ambient/energy/zap" .. math.random(1, 9) .. ".wav", 62, math.random(95, 130), 0.22 + 0.38 * frac)
+		end
+
+		if frac >= 1 then
+			self:_CompleteChannel(owner, ch)
 		end
 	end
 
@@ -353,32 +511,24 @@ if SERVER then
 			self:_SyncSightSources()
 		end
 
-		-- The channel ended: cut the beam, then bank whatever was gathered.
-		if now - (self._lastExtract or 0) > 0.5 then
-			if self:GetExtracting() then
-				self:SetExtracting(false)
-				self:_StopExtractSound()
-			end
-
-			self:_BankDust()
+		if now >= (self._nextChannelTick or 0) then
+			self._nextChannelTick = now + CHANNEL_TICK
+			self:_ChannelTick(now)
 		end
 	end
 
 	function SWEP:Holster()
-		self:_StopExtractSound()
-		self:SetExtracting(false)
+		self:_AbortChannel()
 		self:SetSightActive(false)
-		self:_BankDust()
 		return true
 	end
 
 	function SWEP:OnRemove()
-		self:_StopExtractSound()
-		self:_BankDust()
+		self:_AbortChannel()
 	end
 end
 
--- R turns stored crystal shards into mana dust, one shard at a time.
+-- R turns stored crystal shards into crystal dust, one shard at a time.
 function SWEP:Reload()
 	if CLIENT then return end
 
@@ -396,7 +546,7 @@ function SWEP:Reload()
 
 	if not Arcana.TakeItem(owner, "mana_crystal_shard", 1, "Mana siphon") then return end
 
-	Arcana.GiveItem(owner, "mana_dust", SHARD_DUST_VALUE, "Converted crystal shard")
+	Arcana.GiveItem(owner, "crystal_dust", SHARD_DUST_VALUE, "Converted crystal shard")
 	owner:EmitSound("physics/glass/glass_cup_break1.wav", 60, 200, 0.5)
 end
 
@@ -404,16 +554,11 @@ if CLIENT then
 	-- Art deco gold, like the altar's magic circle: the whole apparatus
 	-- (cube, panel, halos, arrow) speaks the station palette
 	local COLOR_MANA = Color(226, 192, 110)
-	local OUTLINE_COL = Color(0, 0, 0, 220)
+	-- Pale gold dressing (the altar band circle's colour), matching the lens's
+	-- brass line work and edge glow
+	local FRAME_COL = Color(222, 198, 120)
 	local GRAIN_MAT = Material("sprites/light_glow02_add")
 	local BEAM_MAT = Material("trails/laser")
-
-	-- Where siphoned mana sinks in: just off the palm side of the view
-	local function siphonHandPos(owner)
-		local ea = owner:EyeAngles()
-		return owner:EyePos() + ea:Forward() * 12 + ea:Right() * 5 - ea:Up() * 5
-	end
-
 
 	-- ========================================================================
 	-- MANA SIGHT STATE
@@ -478,6 +623,49 @@ if CLIENT then
 		})
 	end)
 
+	-- Immature concentrations render as the cloud's negative: a lightless
+	-- black mass, unmistakably not ready for harvest
+	local DARK_CLOUD_SHADER = "arcana_manacloud_dark_ps30"
+
+	local darkCloudMat
+	WaitForShaderMounted({DARK_CLOUD_SHADER, "arcana_passthrough_vs30"}, function(available)
+		if not available then return end
+
+		darkCloudMat = CreateShaderMaterial(DARK_CLOUD_SHADER, {
+			["$pixshader"] = DARK_CLOUD_SHADER,
+			["$vertexshader"] = "arcana_passthrough_vs30",
+			["$ignorez"] = 1,
+			-- every $c component set at draw time must be declared here,
+			-- otherwise SetFloat on it is silently ignored
+			["$c0_x"] = 0, ["$c0_y"] = 0, ["$c0_z"] = 0, ["$c0_w"] = 100,
+			["$c1_x"] = 0, ["$c1_y"] = 0, ["$c1_z"] = 0, ["$c1_w"] = 0,
+			["$c2_x"] = 1, ["$c2_y"] = 0, ["$c2_z"] = 0, ["$c2_w"] = 1,
+			["$c3_x"] = 0, ["$c3_y"] = 1, ["$c3_z"] = 0, ["$c3_w"] = 1,
+		})
+	end)
+
+	-- The crystallizing volume: same raymarched plume, but the fork winds the
+	-- gas into a spiral and whitens it as the channel completes (c2_w carries
+	-- the channel fraction instead of strength)
+	local CRYST_SHADER = "arcana_manacryst_ps30"
+
+	local crystMat
+	WaitForShaderMounted({CRYST_SHADER, "arcana_passthrough_vs30"}, function(available)
+		if not available then return end
+
+		crystMat = CreateShaderMaterial(CRYST_SHADER, {
+			["$pixshader"] = CRYST_SHADER,
+			["$vertexshader"] = "arcana_passthrough_vs30",
+			["$ignorez"] = 1,
+			-- every $c component set at draw time must be declared here,
+			-- otherwise SetFloat on it is silently ignored
+			["$c0_x"] = 0, ["$c0_y"] = 0, ["$c0_z"] = 0, ["$c0_w"] = 100,
+			["$c1_x"] = 0, ["$c1_y"] = 0, ["$c1_z"] = 0, ["$c1_w"] = 0,
+			["$c2_x"] = 1, ["$c2_y"] = 0, ["$c2_z"] = 0, ["$c2_w"] = 0,
+			["$c3_x"] = 0, ["$c3_y"] = 1, ["$c3_z"] = 0, ["$c3_w"] = 1,
+		})
+	end)
+
 	-- Ghost fill: warps and chromatically splits the frame beneath the crystal
 	-- silhouette so it reads as shimmering glass, not a flat decal
 	local GHOST_SHADER = "arcana_managhost_ps30"
@@ -527,75 +715,725 @@ if CLIENT then
 		}
 	end
 
-	-- One raymarched volume: basePos is the volume's ground anchor
-	local function drawCloudVolume(calib, basePos, radius, strength)
+	-- One raymarched volume: basePos is the volume's ground anchor.  For the
+	-- cloud material c2_w is the gas strength; for the crystallizing fork it
+	-- is the channel fraction.
+	local function drawCloudVolume(calib, basePos, radius, strength, mat)
+		mat = mat or cloudMat
 		render.UpdateScreenEffectTexture()
-		cloudMat:SetTexture("$basetexture", render.GetScreenEffectTexture())
-		cloudMat:SetFloat("$c0_x", basePos.x)
-		cloudMat:SetFloat("$c0_y", basePos.y)
-		cloudMat:SetFloat("$c0_z", basePos.z)
-		cloudMat:SetFloat("$c0_w", radius)
-		cloudMat:SetFloat("$c1_x", calib.origin.x)
-		cloudMat:SetFloat("$c1_y", calib.origin.y)
-		cloudMat:SetFloat("$c1_z", calib.origin.z)
-		cloudMat:SetFloat("$c1_w", calib.time)
-		cloudMat:SetFloat("$c2_x", calib.fwd.x)
-		cloudMat:SetFloat("$c2_y", calib.fwd.y)
-		cloudMat:SetFloat("$c2_z", calib.fwd.z)
-		cloudMat:SetFloat("$c2_w", strength)
-		cloudMat:SetFloat("$c3_x", calib.rightW.x)
-		cloudMat:SetFloat("$c3_y", calib.rightW.y)
-		cloudMat:SetFloat("$c3_z", calib.rightW.z)
-		cloudMat:SetFloat("$c3_w", calib.halfH)
+		mat:SetTexture("$basetexture", render.GetScreenEffectTexture())
+		mat:SetFloat("$c0_x", basePos.x)
+		mat:SetFloat("$c0_y", basePos.y)
+		mat:SetFloat("$c0_z", basePos.z)
+		mat:SetFloat("$c0_w", radius)
+		mat:SetFloat("$c1_x", calib.origin.x)
+		mat:SetFloat("$c1_y", calib.origin.y)
+		mat:SetFloat("$c1_z", calib.origin.z)
+		mat:SetFloat("$c1_w", calib.time)
+		mat:SetFloat("$c2_x", calib.fwd.x)
+		mat:SetFloat("$c2_y", calib.fwd.y)
+		mat:SetFloat("$c2_z", calib.fwd.z)
+		mat:SetFloat("$c2_w", strength)
+		mat:SetFloat("$c3_x", calib.rightW.x)
+		mat:SetFloat("$c3_y", calib.rightW.y)
+		mat:SetFloat("$c3_z", calib.rightW.z)
+		mat:SetFloat("$c3_w", calib.halfH)
 
-		render.SetMaterial(cloudMat)
+		render.SetMaterial(mat)
 		render.DrawScreenQuad()
 	end
 
-	local function drawManaClouds(sources)
+	local function cloudKey(pos)
+		return string.format("%d:%d", math.floor(pos.x / 32), math.floor(pos.y / 32))
+	end
+
+	-- Clouds consumed by a completed channel are hidden immediately; the
+	-- server's next sight sync makes it permanent
+	local suppressedClouds = {}
+
+	-- The networked channel fraction steps at the server tick (10 Hz); every
+	-- visual reads this per-frame smoothed copy so nothing snaps
+	local channelFracSmooth = 0
+
+	local function drawManaClouds(wep, sources)
 		local calib = getCloudCalibration()
 		if not calib then return end
 
+		local now = RealTime()
+
 		for _, source in ipairs(sources) do
 			if source.kind ~= KIND_HOTSPOT then continue end
+
+			local key = cloudKey(source.pos)
+			if (suppressedClouds[key] or 0) > now then
+				cloudStrengths[key] = nil
+				continue
+			end
 
 			-- Skip sources fully behind the view
 			local toSource = source.pos - calib.origin
 			if toSource:Dot(calib.fwd) < 0 and toSource:LengthSqr() > 250 * 250 then continue end
 
-			local key = string.format("%d:%d", math.floor(source.pos.x / 32), math.floor(source.pos.y / 32))
-			local target = math.Clamp(source.strength or 0.5, 0.4, 1)
+			-- Immature sources (below the crystallize floor, value 10 over the
+			-- 70 spawn threshold) render as the cloud's NEGATIVE: a lightless
+			-- black mass, unmistakably not ready for harvest
+			local ready = (source.strength or 0) >= 0.15
+			local target = ready and math.Clamp(source.strength or 0.5, 0.4, 1) or 0.45
 			local strength = Lerp(math.Clamp(FrameTime() * 2.5, 0, 1), cloudStrengths[key] or target, target)
 			cloudStrengths[key] = strength
 
-			drawCloudVolume(calib, source.pos, 100 + 80 * strength, strength)
+			if ready or not darkCloudMat then
+				drawCloudVolume(calib, source.pos, 100 + 80 * strength, strength)
+			else
+				drawCloudVolume(calib, source.pos, 100 + 80 * strength, strength, darkCloudMat)
+			end
 		end
 	end
 
-	-- The siphoned gas itself: pieces of the cloud detach, billow along the
-	-- path and shrink into the hand, staggered into a continuous stream
-	local function drawSiphonGas(wep)
-		if not wep:GetExtracting() then return end
+	-- The whorl's world footprint, shared by the distortion pass and the
+	-- blast anchoring: its visual centre sits 0.55 * radius above the base
+	local WHORL_RADIUS = 200
+	local WHORL_CENTER_Z = WHORL_RADIUS * 0.55
 
-		local owner = wep:GetOwner()
-		if not IsValid(owner) then return end
+	-- Inscribed box of the lens window (uv), refreshed by the panel pass each
+	-- frame: the whorl's twisted samples are clamped into it so the twist can
+	-- never drag ungraded colours from outside the lens
+	local whorlClampMin = {x = 0, y = 0}
+	local whorlClampMax = {x = 1, y = 1}
+
+	-- The crystal entity standing at a channel target position, if any
+	local function findCrystalAt(pos)
+		for _, ent in ipairs(ents.FindByClass("arcana_mana_crystal")) do
+			if IsValid(ent) and ent:WorldSpaceCenter():DistToSqr(pos) < 40 * 40 then
+				return ent
+			end
+		end
+
+		return nil
+	end
+
+	-- Crystals are much tighter bodies than clouds: their whorl hugs them
+	local CRYSTAL_WHORL_RADIUS = 150
+
+	local function drawWhorl(wep)
+		if not crystMat then return end
+
+		local kind = wep:GetSourceKind()
+		if not (wep:GetChanneling() and kind ~= KIND_NONE) then return end
+		if channelFracSmooth <= 0.01 then return end
 
 		local calib = getCloudCalibration()
 		if not calib then return end
 
+		local isCloud = kind == KIND_HOTSPOT
+		local radius = WHORL_RADIUS
+		local volC
+
+		if isCloud then
+			volC = wep:GetSourcePos() + Vector(0, 0, WHORL_CENTER_Z)
+		else
+			-- The whorl must reach past the crystal's silhouette or the twist
+			-- has nothing contrasting to warp: scale with the actual body,
+			-- capped (uncapped it reads as a screen-wide smear), and centred
+			-- on the crystal's BASE (GetPos), not its body centre
+			radius = CRYSTAL_WHORL_RADIUS
+			local ent = findCrystalAt(wep:GetSourcePos())
+			if IsValid(ent) then
+				radius = math.Clamp(ent:OBBMaxs().z * (ent:GetModelScale() or 1) * 2.2, radius, 150)
+				volC = wep:GetSourcePos()
+			else
+				volC = wep:GetSourcePos()
+			end
+		end
+		local zc = (volC - calib.origin):Dot(calib.fwd)
+		if zc <= 1 then return end
+
+		local scr = volC:ToScreen()
+		if not scr.visible then return end
+
+		local angR = radius * 1.4 / zc
+
+		render.UpdateScreenEffectTexture()
+		crystMat:SetTexture("$basetexture", render.GetScreenEffectTexture())
+		crystMat:SetFloat("$c0_x", (scr.x / ScrW()) * 2 - 1)
+		crystMat:SetFloat("$c0_y", 1 - (scr.y / ScrH()) * 2)
+		crystMat:SetFloat("$c0_z", calib.rightW:Length())
+		crystMat:SetFloat("$c0_w", calib.halfH)
+		crystMat:SetFloat("$c1_x", 1 / angR)
+		crystMat:SetFloat("$c1_y", channelFracSmooth)
+		crystMat:SetFloat("$c1_z", calib.time)
+		crystMat:SetFloat("$c2_x", whorlClampMin.x)
+		crystMat:SetFloat("$c2_y", whorlClampMin.y)
+		crystMat:SetFloat("$c2_z", whorlClampMax.x)
+		crystMat:SetFloat("$c2_w", whorlClampMax.y)
+
+		render.SetMaterial(crystMat)
+		render.DrawScreenQuad()
+	end
+
+	-- ========================================================================
+	-- CRYSTALLIZATION CHANNEL VISUALS
+	-- ========================================================================
+	-- Electricity crackling around the source while it sets (the blackhole's
+	-- arc vocabulary + the lightning spells' layered bolts, in gold), the
+	-- completion flash, and the sunbeams from source and cube.  All of it is
+	-- drawn inside the panel stencil: nothing exists outside the lens.
+	local BOLT_MAT = Material("effects/laser1")
+	local ARC_INNER = Color(255, 240, 200)
+	-- World-space arcs speak mana blue (like the dust); in-lens arcs stay
+	-- gold, matching the graded panel
+	local ARC_INNER_COOL = Color(200, 225, 255)
+	local ARC_OUTER_COOL = Color(110, 170, 255)
+
+	-- One jagged bolt: three width layers (white-hot core, bright inner,
+	-- coloured outer glow), width swelling mid-path and tapering at the tips
+	local function drawArcPath(path, baseW, alpha, cool)
+		render.SetMaterial(BOLT_MAT)
+
+		local layers = {
+			{w = 1.5, col = cool and ARC_OUTER_COOL or FRAME_COL, a = alpha * 0.45},
+			{w = 0.8, col = cool and ARC_INNER_COOL or ARC_INNER, a = alpha * 0.8},
+			{w = 0.42, col = color_white, a = alpha},
+		}
+
+		local n = #path
+		for _, layer in ipairs(layers) do
+			render.StartBeam(n)
+			for k = 1, n do
+				local t = (k - 1) / (n - 1)
+				local taper = 0.45 + 0.75 * math.sin(t * math.pi)
+				render.AddBeam(path[k], baseW * layer.w * taper, t, ColorAlpha(layer.col, layer.a))
+			end
+			render.EndBeam()
+		end
+	end
+
+	-- A bolt path between two points on the source shell, with midpoint-heavy
+	-- jag and 1-2 short forks (the lightning-strike vocabulary)
+	local function buildArcBolt(pos, shell)
+		local a1 = math.Rand(0, math.pi * 2)
+		local dir1 = Vector(math.cos(a1), math.sin(a1), math.Rand(-0.4, 0.6))
+		dir1:Normalize()
+		local a2 = a1 + math.Rand(0.9, 2.4)
+		local dir2 = Vector(math.cos(a2), math.sin(a2), math.Rand(-0.4, 0.6))
+		dir2:Normalize()
+
+		local p1 = pos + dir1 * shell
+		local p2 = pos + dir2 * shell * math.Rand(0.7, 1.1)
+
+		local segs = 10
+		local path = {}
+		for s = 0, segs do
+			local t = s / segs
+			path[#path + 1] = LerpVector(t, p1, p2) + VectorRand() * (math.sin(t * math.pi) * shell * 0.3)
+		end
+
+		local branches = {}
+		for _ = 1, math.random(1, 2) do
+			local origin = path[math.random(3, segs - 2)]
+			local bdir = VectorRand()
+			bdir:Normalize()
+			local blen = shell * math.Rand(0.25, 0.5)
+
+			local bp = {}
+			for s = 0, 4 do
+				local t = s / 4
+				bp[#bp + 1] = origin + bdir * (blen * t) + VectorRand() * (math.sin(t * math.pi) * shell * 0.1)
+			end
+
+			branches[#branches + 1] = bp
+		end
+
+		return {path = path, branches = branches}
+	end
+
+	-- Bolts hold a STABLE path for a few hundredths of a second before
+	-- re-rolling: real crackle, not per-frame vibrating spaghetti
+	local arcCache = {}
+
+	local function drawChannelArcs(wep)
+		if not wep:GetChanneling() then return end
+
+		-- Clouds only: crystal channels crackle in WORLD space (see the dust
+		-- hook), since the crystal is a real object everyone can see
+		if wep:GetSourceKind() ~= KIND_HOTSPOT then return end
+
+		local frac = channelFracSmooth
+		local pos = wep:GetSourcePos() + Vector(0, 0, 50)
+		local shell = 95 * (1 - 0.35 * frac)
 		local now = RealTime()
-		local src = wep:GetSourcePos()
-		local hand = siphonHandPos(owner)
 
-		for i = 1, 3 do
-			local t = math.fmod(now * 0.4 + (i - 1) / 3, 1)
-			local ease = t ^ 1.15
-			local center = LerpVector(ease, src + Vector(0, 0, 26), hand)
-			center.z = center.z + math.sin(t * math.pi) * 22
+		local arcs = 3 + math.floor(frac * 4)
+		for i = 1, arcs do
+			local c = arcCache[i]
 
-			local radius = Lerp(t, 40, 12)
-			local strength = 1.15 * (1 - t * 0.25)
-			drawCloudVolume(calib, center - Vector(0, 0, radius * 0.8), radius, strength)
+			if not c or now > c.diesAt then
+				-- Duty cycle rises with the channel: gaps between crackles
+				-- close up as it completes
+				if math.Rand(0, 1) < 0.5 + 0.5 * frac then
+					c = buildArcBolt(pos, shell)
+					c.born = now
+					c.diesAt = now + math.Rand(0.06, 0.14)
+				else
+					c = {off = true, born = now, diesAt = now + math.Rand(0.05, 0.12)}
+				end
+
+				arcCache[i] = c
+			end
+
+			if not c.off then
+				-- Sharp attack, fast decay over the bolt's short life
+				local lifeF = 1 - (now - c.born) / math.max(0.01, c.diesAt - c.born)
+				local alpha = 255 * (0.5 + 0.5 * lifeF) * (0.45 + 0.55 * frac)
+				local w = shell * 0.12 * (0.5 + 0.5 * frac)
+
+				drawArcPath(c.path, w, alpha)
+				for _, bp in ipairs(c.branches) do
+					drawArcPath(bp, w * 0.5, alpha * 0.8)
+				end
+			end
+		end
+	end
+
+	-- ========================================================================
+	-- CRYSTALLIZATION DUST (world-space: everyone sees it, lens or not)
+	-- ========================================================================
+	-- Fantasy dust shed by the source while it crystallizes: a lot of tiny
+	-- mana-blue motes, jostled around by the channel's turbulence, flung
+	-- outward by the blast, then settling into a slow upward drift and fading
+	-- away.  Per-weapon state, driven from a world render hook off the
+	-- networked channel vars, so spectators get the show too.
+	local DUST_MAX = 140
+	local DUST_RATE = 45 -- spawns per second while channeling
+	local COLOR_DUST = Color(110, 170, 255)
+
+	local function updateWepDust(wep, now, dt)
+		local dust = wep._crystDust
+		local channeling = wep:GetChanneling() and wep:GetSourceKind() ~= KIND_NONE
+
+		if channeling then
+			dust = dust or {}
+			wep._crystDust = dust
+
+			local kind = wep:GetSourceKind()
+			local src = wep:GetSourcePos()
+			local frac = wep:GetChannelFrac()
+			local spread = kind == KIND_HOTSPOT and 90 or 42
+			local zBase = kind == KIND_HOTSPOT and 8 or -24
+
+			wep._dustAccum = (wep._dustAccum or 0) + DUST_RATE * dt * (0.5 + frac)
+			local n = math.floor(wep._dustAccum)
+			wep._dustAccum = wep._dustAccum - n
+
+			for _ = 1, n do
+				if #dust >= DUST_MAX then break end
+
+				local a = math.Rand(0, math.pi * 2)
+				local r = math.Rand(0.2, 1) * spread
+				dust[#dust + 1] = {
+					pos = src + Vector(math.cos(a) * r, math.sin(a) * r, zBase + math.Rand(0, spread * 1.3)),
+					vel = Vector(0, 0, math.Rand(4, 10)),
+					born = now,
+					life = math.Rand(2.5, 4.5),
+					size = math.Rand(1, 2.6),
+					phase = math.Rand(0, math.pi * 2),
+					seed = math.Rand(1, 6),
+				}
+			end
+		end
+
+		if not dust then return end
+
+		local frac = channeling and wep:GetChannelFrac() or 0
+		local write = 1
+		for read = 1, #dust do
+			local p = dust[read]
+
+			if now - p.born < p.life then
+				if channeling then
+					-- Jostled by the crystallization's turbulence
+					local j = 26 * (0.4 + frac)
+					p.vel.x = p.vel.x + math.sin(now * 3.1 * p.seed + p.phase) * j * dt
+					p.vel.y = p.vel.y + math.cos(now * 2.7 * p.seed + p.phase * 1.7) * j * dt
+					p.vel.z = p.vel.z + math.sin(now * 2.3 + p.phase) * j * 0.5 * dt
+				end
+
+				-- Always easing back toward the slow, dreamy ascent
+				p.vel.x = p.vel.x * (1 - math.min(dt * 2, 0.5))
+				p.vel.y = p.vel.y * (1 - math.min(dt * 2, 0.5))
+				p.vel.z = p.vel.z + (10 - p.vel.z) * math.min(dt * 0.8, 1)
+				p.pos = p.pos + p.vel * dt
+
+				dust[write] = p
+				write = write + 1
+			end
+		end
+
+		for i = write, #dust do
+			dust[i] = nil
+		end
+
+		if #dust == 0 and not channeling then
+			wep._crystDust = nil
+		end
+	end
+
+	-- The blast kicks every mote outward; the ascent easing then reels each
+	-- one back into its slow rise
+	local function flingWepDust(wep, blastPos)
+		for _, p in ipairs(wep._crystDust or {}) do
+			local dir = p.pos - blastPos
+			dir:Normalize()
+			p.vel = p.vel + dir * math.Rand(70, 170)
+		end
+	end
+
+	local function drawWepDust(wep, now)
+		local dust = wep._crystDust
+		if not dust or #dust == 0 then return end
+
+		render.SetMaterial(GRAIN_MAT)
+
+		for _, p in ipairs(dust) do
+			local age = now - p.born
+			local fadeIn = math.Clamp(age / 0.3, 0, 1)
+			local fadeOut = math.Clamp((p.life - age) / (p.life * 0.35), 0, 1)
+			local tw = 0.75 + 0.25 * math.sin(now * 3 * p.seed + p.phase)
+			local a = 235 * fadeIn * fadeOut * tw
+
+			if a > 2 then
+				render.DrawSprite(p.pos, p.size * tw, p.size * tw, ColorAlpha(COLOR_DUST, a))
+			end
+		end
+	end
+
+	-- Crystal channels crackle in world space: the crystal is a real object
+	-- everyone can see, so its lightning is too, in mana blue.  Per-weapon
+	-- bolt cache, same stable-path crackle rhythm as the lens arcs.
+	local function drawWorldCrystalArcs(wep, now)
+		local frac = wep:GetChannelFrac()
+		local srcPos = wep:GetSourcePos()
+		local pos = srcPos + Vector(0, 0, 20)
+
+		-- Tight to the body: the arcs hug the crystal instead of flailing
+		-- around it, and the size scaling is capped
+		local shell = 32
+		local ent = findCrystalAt(srcPos)
+		if IsValid(ent) then
+			shell = math.Clamp(ent:OBBMaxs().z * (ent:GetModelScale() or 1) * 0.55, 32, 85)
+		end
+		shell = shell * (1 - 0.25 * frac)
+
+		local cache = wep._worldArcCache
+		if not cache then
+			cache = {}
+			wep._worldArcCache = cache
+		end
+
+		local arcs = 3 + math.floor(frac * 4)
+		for i = 1, arcs do
+			local c = cache[i]
+
+			if not c or now > c.diesAt then
+				if math.Rand(0, 1) < 0.5 + 0.5 * frac then
+					c = buildArcBolt(pos, shell)
+					c.born = now
+					c.diesAt = now + math.Rand(0.06, 0.14)
+				else
+					c = {off = true, born = now, diesAt = now + math.Rand(0.05, 0.12)}
+				end
+
+				cache[i] = c
+			end
+
+			if not c.off then
+				local lifeF = 1 - (now - c.born) / math.max(0.01, c.diesAt - c.born)
+				local alpha = 255 * (0.5 + 0.5 * lifeF) * (0.45 + 0.55 * frac)
+				local w = shell * 0.12 * (0.5 + 0.5 * frac)
+
+				drawArcPath(c.path, w, alpha, true)
+				for _, bp in ipairs(c.branches) do
+					drawArcPath(bp, w * 0.5, alpha * 0.8, true)
+				end
+			end
+		end
+	end
+
+	-- World render pass for the dust and crystal arcs: simulate, catch each
+	-- weapon's channel completion (fling), draw.  Runs for EVERY siphon in
+	-- view, not just the local player's, off the networked channel vars.
+	hook.Add("PostDrawTranslucentRenderables", "arcana_mana_siphon_dust", function(depth, skybox)
+		if depth or skybox then return end
+
+		local now = RealTime()
+		local dt = FrameTime()
+
+		for _, wep in ipairs(ents.FindByClass("arcana_mana_siphon")) do
+			if not IsValid(wep) or not wep.GetChanneling then continue end
+
+			updateWepDust(wep, now, dt)
+
+			if wep:GetChanneling() then
+				wep._dustWasCh = true
+				wep._dustFrac = wep:GetChannelFrac()
+				wep._dustPos = wep:GetSourcePos()
+				wep._dustKind = wep:GetSourceKind()
+
+				if wep._dustKind == KIND_CRYSTAL then
+					drawWorldCrystalArcs(wep, now)
+				else
+					wep._worldArcCache = nil
+				end
+			elseif wep._dustWasCh then
+				wep._dustWasCh = false
+				wep._worldArcCache = nil
+
+				if (wep._dustFrac or 0) >= 0.9 and wep._dustPos then
+					flingWepDust(wep, wep._dustPos + (wep._dustKind == KIND_HOTSPOT and Vector(0, 0, WHORL_CENTER_Z) or Vector(0, 0, 10)))
+				end
+			end
+
+			drawWepDust(wep, now)
+		end
+	end)
+
+	-- Completion: a local energy blast at the source - flash, expanding
+	-- shockwave ring, radial one-shot bolts, and a two-class burst of sparks
+	-- and embers poofing outward (the cloud's send-off)
+	local CRYST_FLASH_TIME = 0.5
+	local crystFlash
+	local crystBurst
+	local crystBolts
+
+	-- pos is the blast centre itself (the whorl's visual centre for clouds).
+	-- bodyH, when given, is the crystal's real height: the burst spawns
+	-- throughout that body and its count scales with it, so a big crystal
+	-- shatters into proportionally more dust than a shard-sized one.
+	local function spawnCrystBurst(pos, now, bodyH)
+		-- 1..3 with crystal size: a tower disappearing must land like one
+		local impact = bodyH and math.Clamp(bodyH / 120, 1, 3) or 1
+		local parts = {}
+		local count = bodyH and math.Clamp(math.floor(42 * bodyH / 60), 32, 170) or 42
+
+		for i = 1, count do
+			local dir = VectorRand()
+			dir:Normalize()
+			dir.z = math.abs(dir.z) * 0.6
+
+			local origin
+			if bodyH then
+				local a = math.Rand(0, math.pi * 2)
+				local r = math.Rand(0, bodyH * 0.35)
+				origin = pos + Vector(math.cos(a) * r, math.sin(a) * r, math.Rand(-0.55, 0.55) * bodyH)
+			else
+				origin = pos + dir * math.Rand(4, 14)
+			end
+
+			local spark = i % 3 ~= 0
+			local velMul = 0.85 + 0.35 * impact
+			parts[i] = {
+				pos = origin,
+				vel = dir * (spark and math.Rand(260, 480) or math.Rand(90, 200)) * velMul,
+				born = now,
+				life = spark and math.Rand(0.3, 0.55) * (0.8 + 0.3 * impact) or math.Rand(0.7, 1.2),
+				size = (spark and math.Rand(4, 8) or math.Rand(9, 16)) * (0.85 + 0.35 * impact),
+			}
+		end
+
+		crystBurst = parts
+
+		-- Radial one-shot bolts lashing out of the blast, more and further
+		-- for bigger bodies
+		local bolts = {}
+		for i = 1, 3 + math.floor(impact * 2) do
+			local dir = VectorRand()
+			dir:Normalize()
+			dir.z = dir.z * 0.5
+
+			local origin = pos
+			local reach = math.Rand(130, 210) * impact
+			local segs = 8
+			local path = {}
+			for s = 0, segs do
+				local t = s / segs
+				path[#path + 1] = origin + dir * (reach * t) + VectorRand() * (math.sin(t * math.pi) * 26 * impact)
+			end
+
+			bolts[i] = path
+		end
+
+		crystBolts = {paths = bolts, born = now}
+	end
+
+	local BURST_BRIGHT = Color(255, 240, 200)
+
+	local function drawCrystFlash()
+		local now = RealTime()
+
+		if crystFlash then
+			local age = now - crystFlash.at
+			if age > CRYST_FLASH_TIME then
+				crystFlash = nil
+			else
+				local f = 1 - age / CRYST_FLASH_TIME
+				local pos = crystFlash.pos
+				local impact = crystFlash.impact or 1
+				local size = Lerp(1 - f, 100, 380) * (0.75 + 0.45 * impact)
+
+				render.SetMaterial(GRAIN_MAT)
+				render.DrawSprite(pos, size, size, ColorAlpha(color_white, 230 * f))
+				render.DrawSprite(pos, size * 1.8, size * 1.8, ColorAlpha(FRAME_COL, 160 * f))
+
+				-- Expanding shockwave ring, easing out as it thins.
+				-- Billboarded to the viewer: a flat world-plane ring seen from
+				-- ground level degenerates into a hard line across the lens
+				local ringF = age / 0.45
+				if ringF < 1 then
+					local rr = (30 + 300 * (1 - (1 - ringF) * (1 - ringF))) * (0.7 + 0.5 * impact)
+					local ea = EyeAngles()
+					local right, up = ea:Right(), ea:Up()
+					local segs = 28
+					render.SetMaterial(BOLT_MAT)
+					render.StartBeam(segs + 1)
+					for k = 0, segs do
+						local a = k / segs * math.pi * 2
+						render.AddBeam(pos + (right * math.cos(a) + up * math.sin(a)) * rr, 4 + 14 * (1 - ringF), k / segs, ColorAlpha(FRAME_COL, 220 * (1 - ringF)))
+					end
+					render.EndBeam()
+				end
+
+				local dl = DynamicLight(math.random(10000, 99999))
+				if dl then
+					dl.pos = pos
+					dl.r = FRAME_COL.r
+					dl.g = FRAME_COL.g
+					dl.b = FRAME_COL.b
+					dl.brightness = 5 * f * (0.8 + 0.3 * impact)
+					dl.Decay = 2000
+					dl.Size = 450 + 220 * impact
+					dl.DieTime = CurTime() + 0.1
+				end
+			end
+		end
+
+		-- The one-shot bolts lash out and die fast
+		if crystBolts then
+			local age = now - crystBolts.born
+			if age > 0.22 then
+				crystBolts = nil
+			else
+				local f = 1 - age / 0.22
+				for _, path in ipairs(crystBolts.paths) do
+					drawArcPath(path, 9 * f, 255 * f)
+				end
+			end
+		end
+
+		if crystBurst then
+			local dt = FrameTime()
+			local alive = false
+			render.SetMaterial(GRAIN_MAT)
+
+			for _, p in ipairs(crystBurst) do
+				local age = now - p.born
+				if age < p.life then
+					alive = true
+					p.vel = p.vel * (1 - math.min(dt * 3, 0.5))
+					p.pos = p.pos + p.vel * dt
+
+					local frac = age / p.life
+					local col = frac < 0.35 and BURST_BRIGHT or FRAME_COL
+					local size = p.size * (1 + frac * 1.8)
+					render.DrawSprite(p.pos, size, size, ColorAlpha(col, 230 * (1 - frac)))
+				end
+			end
+
+			if not alive then
+				crystBurst = nil
+			end
+		end
+	end
+
+	-- Watches the networked channel state for its falling edge: a channel that
+	-- ended at ~full fraction completed, so flash and hide the consumed cloud
+	local wasChanneling = false
+	local lastChFrac, lastChPos, lastChKind = 0, nil, KIND_NONE
+
+	local lastChBodyH
+
+	local function updateChannelEdge(wep)
+		if wep:GetChanneling() then
+			channelFracSmooth = Lerp(math.Clamp(FrameTime() * 6, 0, 1), channelFracSmooth, wep:GetChannelFrac())
+			wasChanneling = true
+			lastChFrac = wep:GetChannelFrac()
+			lastChPos = wep:GetSourcePos()
+			lastChKind = wep:GetSourceKind()
+
+			-- Capture the crystal's real height WHILE it still exists: by the
+			-- time the channel completes, the entity is already dissolved
+			if lastChKind == KIND_CRYSTAL then
+				for _, ent in ipairs(ents.FindByClass("arcana_mana_crystal")) do
+					if IsValid(ent) and ent:WorldSpaceCenter():DistToSqr(lastChPos) < 40 * 40 then
+						lastChBodyH = ent:OBBMaxs().z * (ent:GetModelScale() or 1) * 2
+						break
+					end
+				end
+			else
+				lastChBodyH = nil
+			end
+		elseif wasChanneling then
+			channelFracSmooth = 0
+			wasChanneling = false
+			arcCache = {}
+
+			if lastChFrac >= 0.9 and lastChPos then
+				-- The blast sits where the whorl's centre WAS: for clouds
+				-- that is well above the ground anchor, for crystals the
+				-- source position is already the body centre
+				local blastPos = lastChPos + (lastChKind == KIND_HOTSPOT and Vector(0, 0, WHORL_CENTER_Z) or Vector(0, 0, 10))
+				local bodyH = lastChKind == KIND_CRYSTAL and lastChBodyH or nil
+				crystFlash = {
+					pos = blastPos,
+					at = RealTime(),
+					impact = bodyH and math.Clamp(bodyH / 120, 1, 3) or 1,
+				}
+				spawnCrystBurst(blastPos, RealTime(), bodyH)
+
+				if lastChKind == KIND_HOTSPOT then
+					local key = cloudKey(lastChPos)
+					suppressedClouds[key] = RealTime() + 3
+					cloudStrengths[key] = nil
+				end
+			end
+		end
+	end
+
+	-- Sunbeams growing from the source and from the cube while the channel
+	-- runs.  They radially blur what is already on screen, so the rays pick up
+	-- the lens's gold grading for free.  Screen-space passes: must run inside
+	-- the panel stencil so nothing spills outside the window.
+	local function drawChannelSunbeams(wep)
+		if not wep:GetChanneling() then return end
+
+		local frac = channelFracSmooth
+		if frac <= 0.05 then return end
+
+		-- Quadratic ease: the rays creep in late and gentle instead of
+		-- flaring the moment the channel starts
+		local ease = frac * frac
+
+		local src = (wep:GetSourcePos() + Vector(0, 0, 40)):ToScreen()
+		if src.visible then
+			DrawSunbeams(0.01, 0.11 * ease, 0.05 + 0.04 * ease, src.x / ScrW(), src.y / ScrH())
+		end
+
+		-- The cube's vm position projects slightly off under the world camera
+		-- (vm fov); close enough for a beam origin
+		if wep._cubePos then
+			local cube = wep._cubePos:ToScreen()
+			if cube.visible then
+				DrawSunbeams(0.01, 0.06 * ease, 0.035, cube.x / ScrW(), cube.y / ScrH())
+			end
 		end
 	end
 
@@ -607,13 +1445,13 @@ if CLIENT then
 	-- geometry.  MaterialOverride is deliberately not involved anywhere: it is
 	-- not honoured for DrawModel in this render stage.
 	-- Stencil layout: bit 1 = panel window, bit 2 = crystal silhouette.
-	local function drawSightWorld()
+	local function drawSightWorld(wep)
 		local sources = getSightSources()
 		if #sources == 0 then return end
 
 		local now = RealTime()
 
-		drawManaClouds(sources)
+		drawManaClouds(wep, sources)
 
 		-- Mark silhouettes of crystals that have a client entity.  ZFAIL marks
 		-- too, so the whole silhouette shows through world geometry: crystals
@@ -660,6 +1498,12 @@ if CLIENT then
 			render.SetStencilTestMask(10)
 			render.SetStencilReferenceValue(2)
 			local pulse = 0.85 + 0.15 * math.sin(now * 2)
+
+			-- A crystal under the channel whitens: its ghost fill burns hotter
+			-- as the crystallization sets
+			if wep:GetChanneling() and wep:GetSourceKind() == KIND_CRYSTAL then
+				pulse = pulse * (1 + channelFracSmooth * 0.7)
+			end
 
 			-- Anchor the world-space veins to the nearest crystal in view
 			-- (sources are distance-sorted, so the first crystal wins)
@@ -742,6 +1586,28 @@ if CLIENT then
 				render.DrawSprite(source.pos, 16 * pulse, 16 * pulse, ColorAlpha(COLOR_GHOST, 200))
 			end
 		end
+
+
+		-- Crystallization electricity, drawn BEFORE the whorl pass so the
+		-- twist warps the bolts along with the cloud
+		drawChannelArcs(wep)
+		cam.End3D()
+
+		-- The crystallization whorl: a screen-space pass over everything
+		-- rendered at the source (cloud AND bolts), chromatic-fringed, zero
+		-- at the rim, winding tighter as the channel completes.  Test mask 9:
+		-- the whorl must also write over crystal-silhouette pixels (bit 2,
+		-- stencil value 3) or the ghost-filled crystal body stays undistorted,
+		-- while the hand (bit 8) stays excluded.
+		render.SetStencilTestMask(9)
+		render.SetStencilReferenceValue(1)
+		drawWhorl(wep)
+		render.SetStencilTestMask(255)
+		render.SetStencilReferenceValue(1)
+
+		-- The blast rides on top, untwisted
+		cam.Start3D()
+		drawCrystFlash()
 		cam.End3D()
 	end
 
@@ -933,10 +1799,6 @@ if CLIENT then
 		end
 	end
 
-	-- Pale gold dressing (the altar band circle's colour), matching the lens's
-	-- brass line work and edge glow
-	local FRAME_COL = Color(222, 198, 120)
-
 	-- The band-circle glyph strips: linear, horizontally tileable textures
 	-- (they wrap around cylinders in 3D), perfect as flat scrolling tickers
 	local BAND_MATS = {}
@@ -1013,18 +1875,6 @@ if CLIENT then
 		end
 
 		render.SetStencilEnable(false)
-
-		-- Extraction feedback sits INSIDE the panel, along the bottom edge
-		if wep:GetExtracting() then
-			local a, b = pts[4], pts[3]
-			local ang = math.deg(math.atan2(b.y - a.y, b.x - a.x))
-			local m = Matrix()
-			m:Translate(Vector((a.x + b.x) / 2, (a.y + b.y) / 2, 0))
-			m:Rotate(Angle(0, ang, 0))
-			cam.PushModelMatrix(m)
-			draw.SimpleTextOutlined(string.format("Collecting mana dust  +%d", wep:GetBufferedDust()), "Arcana_AncientSmall", 0, -16, ColorAlpha(ArtDeco.Colors.paleGold, 255 * ramp * alphaScale), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, ColorAlpha(OUTLINE_COL, 220 * ramp * alphaScale))
-			cam.PopModelMatrix()
-		end
 
 		drawEdgeHalos(pts, cx, cy, ramp * alphaScale)
 	end
@@ -1290,10 +2140,11 @@ if CLIENT then
 		local glow = 0.78 + 0.16 * math.sin(now * 2.2)
 		local fill = 1
 		if IsValid(wep) and wep.GetSourceKind then
-			awake = (wep.GetSightActive and wep:GetSightActive() or false) or wep:GetExtracting()
+			awake = (wep.GetSightActive and wep:GetSightActive() or false) or wep:GetChanneling()
 			fill = wep:GetSourceKind() == KIND_NONE and 0.35 or (0.5 + 0.5 * wep:GetSourceStrength())
-			if wep:GetExtracting() then
-				glow = glow + 0.4 + 0.12 * math.sin(now * 14)
+			if wep:GetChanneling() then
+				-- Overcharging while it beams the crystallization
+				glow = glow + (0.4 + 0.5 * channelFracSmooth) + 0.12 * math.sin(now * 14)
 			end
 		end
 
@@ -1813,11 +2664,13 @@ if CLIENT then
 			end
 		end
 
-		-- The delayed poof: fires as the retracting panel reaches the palm
+		-- The delayed poof: fires as the retracting panel reaches the palm.
+		-- A soft dust burst: an airy whoosh under a low energy bloom
 		if wep._poofAt and now >= wep._poofAt then
 			wep._poofAt = nil
 			spawnPoof(wep, center, palmAng, now)
-			LocalPlayer():EmitSound("ambient/wind/wind_hit1.wav", 55, 135, 0.35)
+			LocalPlayer():EmitSound("ambient/wind/wind_hit1.wav", 70, 110, 0.8)
+			LocalPlayer():EmitSound("ambient/energy/whiteflash.wav", 60, 70, 0.4)
 		end
 
 		local wristPos, bandAng = wristFrame(palmPos, palmAng)
@@ -1825,10 +2678,12 @@ if CLIENT then
 		drawWristGlyphsBloomed(wep, wristPos, palmAng, now)
 
 		-- The band ring itself is drawn from the panel pass (drawWristBand),
-		-- over the lens; this pass just publishes the wrist frame it anchors to
+		-- over the lens; this pass just publishes the wrist frame it anchors
+		-- to, and the cube centre for the channel sunbeams
 		wep._wristPos = wristPos
 		wep._bandAng = bandAng
 		wep._wristFrameAt = now
+		wep._cubePos = center
 
 		drawPoof(wep, now)
 	end)
@@ -1869,14 +2724,14 @@ if CLIENT then
 			end
 		end
 
+		-- Channel edge watcher runs whenever the siphon is out: it catches the
+		-- completion (flash + cloud suppression) even as the panel closes
+		updateChannelEdge(wep)
+
 		if not isOn and not closingFrac then
-			-- Sight off (or the wrist ceremony still running): only the
-			-- extraction visuals, in full colour, plus whatever the band ring
-			-- is doing (fading out, or growing in before the panel opens)
-			cam.Start3D()
-			drawSiphonGas(wep)
-			wep:_DrawSiphonMotes()
-			cam.End3D()
+			-- Sight off (or the wrist ceremony still running): nothing of the
+			-- crystallization exists outside the lens, only the band ring
+			-- (fading out, or growing in before the panel opens)
 			drawWristBand(wep)
 			return
 		end
@@ -1895,6 +2750,13 @@ if CLIENT then
 			for idx = 1, 4 do
 				pts[idx] = {x = uv[idx].x * w, y = uv[idx].y * h}
 			end
+
+			-- The lens window's inscribed box (corners: TL TR BR BL), shrunk a
+			-- hair, for the whorl's sample clamp
+			whorlClampMin.x = math.max(uv[1].x, uv[4].x) + 0.005
+			whorlClampMin.y = math.max(uv[1].y, uv[2].y) + 0.005
+			whorlClampMax.x = math.max(whorlClampMin.x, math.min(uv[2].x, uv[3].x) - 0.005)
+			whorlClampMax.y = math.max(whorlClampMin.y, math.min(uv[4].y, uv[3].y) - 0.005)
 
 			beginPanelStencil(pts)
 
@@ -1919,19 +2781,15 @@ if CLIENT then
 				render.DrawScreenQuad()
 			end
 
-			drawSightWorld()
+			drawSightWorld(wep)
+
+			-- Sunbeams from the source and the cube: screen-space passes that
+			-- must stay inside the window mask, so they run before the stencil
+			-- drops
+			drawChannelSunbeams(wep)
+
 			endPanelStencil()
 		end
-
-		-- The siphoned gas and motes stay vivid over the graded frame,
-		-- unmasked: mana keeps its colour whether seen through the panel or
-		-- beside it
-		cam.Start3D()
-		cam.IgnoreZ(true)
-		drawSiphonGas(wep)
-		wep:_DrawSiphonMotes()
-		cam.IgnoreZ(false)
-		cam.End3D()
 
 		if uv then
 			drawPanelFrame(uv, ramp, wep)
@@ -1940,97 +2798,6 @@ if CLIENT then
 		-- Last: the wrist band draws over everything the panel put up
 		drawWristBand(wep)
 	end)
-
-	-- ========================================================================
-	-- SIPHON MOTES
-	-- ========================================================================
-	-- The channel in Arcana's own language: the source sheds tiny dust motes
-	-- that spiral outward, then get drawn through the air to the hand in soft
-	-- converging arcs.  Each mote is simulated (attraction + damping), so every
-	-- path curls differently.  No beams.
-	local MOTE_SPAWN_INTERVAL = 0.04
-	local MOTE_MAX_AGE = 6
-
-	function SWEP:_UpdateSiphonMotes()
-		local motes = self._siphonMotes
-		if not motes then
-			motes = {}
-			self._siphonMotes = motes
-		end
-
-		local owner = self:GetOwner()
-		if not IsValid(owner) then return end
-
-		local now = RealTime()
-		local dt = FrameTime()
-		local hand = siphonHandPos(owner)
-
-		if self:GetExtracting() and now >= (self._nextSiphonMote or 0) then
-			self._nextSiphonMote = now + MOTE_SPAWN_INTERVAL
-
-			local src = self:GetSourcePos()
-			local spread = self:GetSourceKind() == KIND_CRYSTAL and 26 or 40
-			local offset = VectorRand() * spread
-			offset.z = math.abs(offset.z) * 0.8
-
-			-- Tangential launch: the mote unwinds from the source before the
-			-- pull toward the hand takes over
-			local tangent = Vector(-offset.y, offset.x, 0)
-			tangent:Normalize()
-
-			motes[#motes + 1] = {
-				pos = src + offset,
-				vel = tangent * math.Rand(30, 70) + Vector(0, 0, math.Rand(20, 45)),
-				size = math.Rand(1, 2.2),
-				born = now,
-			}
-		end
-
-		for i = #motes, 1, -1 do
-			local m = motes[i]
-			local toHand = hand - m.pos
-
-			if toHand:Length() < 10 or now - m.born > MOTE_MAX_AGE then
-				table.remove(motes, i)
-			else
-				-- The pull strengthens with age so fresh motes drift lazily
-				-- and old ones commit to the hand
-				local pull = 220 + (now - m.born) * 320
-				m.vel = m.vel + toHand:GetNormalized() * pull * dt
-				m.vel = m.vel * (1 - math.min(dt * 1.6, 0.5))
-				m.pos = m.pos + m.vel * dt
-			end
-		end
-	end
-
-	function SWEP:_DrawSiphonMotes()
-		local motes = self._siphonMotes
-		if not motes or #motes == 0 then
-			return
-		end
-
-		local now = RealTime()
-		render.SetMaterial(GRAIN_MAT)
-
-		for _, m in ipairs(motes) do
-			local age = now - m.born
-			local alpha = 255 * math.Clamp(age / 0.25, 0, 1)
-			render.DrawSprite(m.pos, m.size, m.size, ColorAlpha(COLOR_GHOST, alpha))
-		end
-
-		-- Faint shimmer where the dust sinks into the palm
-		if self:GetExtracting() then
-			local owner = self:GetOwner()
-			if IsValid(owner) then
-				local hand = siphonHandPos(owner)
-				for i = 1, 3 do
-					local a = now * 3.5 + i * (math.pi * 2 / 3)
-					local p = hand + Vector(math.cos(a) * 3.5, math.sin(a) * 3.5, math.sin(now * 2.5 + i) * 2)
-					render.DrawSprite(p, 1.5, 1.5, ColorAlpha(COLOR_MANA, 190))
-				end
-			end
-		end
-	end
 
 	-- ========================================================================
 	-- SOUND, LIFECYCLE
@@ -2079,21 +2846,19 @@ if CLIENT then
 
 	function SWEP:Holster()
 		self:_StopSightSound()
-		self._siphonMotes = nil
 		self:_ClearSightTransition()
 		restoreViewModelMaterials()
 		return true
 	end
 
 	function SWEP:Think()
-		self:_UpdateSiphonMotes()
-
-		-- Low hum while mana sight is on
+		-- The cube hums while awake.  Set-and-forget: modulating a sound patch
+		-- restarts its wav on every call, which clicks audibly
 		if self:GetSightActive() then
 			if not self._sightSnd then
 				self._sightSnd = CreateSound(self, "ambient/levels/citadel/field_loop2.wav")
 				if self._sightSnd then
-					self._sightSnd:PlayEx(0.22, 85)
+					self._sightSnd:PlayEx(0.42, 88)
 				end
 			end
 		else
@@ -2101,9 +2866,29 @@ if CLIENT then
 		end
 	end
 
-	-- No flat HUD in either mode: the cube compass is the sight-off locator,
-	-- and everything else lives on the holo panel
+	-- The only flat HUD element: crystallization progress, built exactly like
+	-- the spell casting bar (see hud.lua drawCastingBar) so the two read as
+	-- one interface.  Everything else lives on the holo panel.
 	function SWEP:DrawHUD()
+		if not self:GetChanneling() then return end
+
+		local frac = channelFracSmooth
+		local scrW, scrH = ScrW(), ScrH()
+		local barW, barH = math.floor(scrW * 0.36), 5 * (1440 / scrH)
+		local x = math.floor((scrW - barW) * 0.5)
+		local y = scrH - 150
+
+		ArtDeco.FillDecoPanel(x - 10, y - 16, barW + 20, barH + 32, ArtDeco.Colors.decoPanel, 10)
+		ArtDeco.DrawDecoFrame(x - 10, y - 16, barW + 20, barH + 32, ArtDeco.Colors.gold, 10)
+		draw.SimpleText("CRYSTALLIZING", "Arcana_Ancient", x, y - 14, ArtDeco.Colors.paleGold)
+
+		surface.SetDrawColor(60, 46, 34, 220)
+		surface.DrawRect(x, y, barW, barH)
+		surface.SetDrawColor(ArtDeco.Colors.xpFill)
+		surface.DrawRect(x + 2, y + 2, math.floor((barW - 4) * frac), barH - 4)
+
+		local what = self:GetSourceKind() == KIND_CRYSTAL and "Mana crystal" or "Mana concentration"
+		draw.SimpleText(string.format("%s  %d%%", what, math.floor(frac * 100)), "Arcana_AncientSmall", x + barW * 0.5, y + barH + 8, ArtDeco.Colors.textBright, TEXT_ALIGN_CENTER)
 	end
 
 	-- The world model is the same box, at held-item scale (the vm cube reads
@@ -2235,10 +3020,10 @@ if CLIENT then
 end
 
 hook.Add("Initialize", "arcana_mana_siphon_items", function()
-	Arcana.RegisterItem("mana_dust", {
-		name = "Mana Dust",
-		description = "Condensed mana in powder form, gathered with a mana siphon.",
+	Arcana.RegisterItem("crystal_dust", {
+		name = "Crystal Dust",
+		description = "Mana crystallized into fine dust with a mana siphon.",
 		model = "models/props_lab/jar01a.mdl",
-		color = Color(170, 140, 255),
+		color = Color(222, 198, 120),
 	})
 end)
