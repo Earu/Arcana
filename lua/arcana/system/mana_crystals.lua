@@ -34,7 +34,7 @@ if SERVER then
 		corruptionDestructionEscalation = 0.06, -- per-region escalation per successive destruction (linear)
 
 		-- Natural mana spots: places where mana concentrated before any player cast a
-		-- spell, so mana dust gathering (and the economy built on it) works on a fresh map
+		-- spell, so crystal dust gathering (and the economy built on it) works on a fresh map
 		naturalSpotCount = 8,             -- natural spots seeded per map
 		naturalSpotCapacity = 70,         -- max stored intensity of a natural spot
 		naturalSpotRegenPerSecond = 0.15, -- refill rate (empty to full in ~8 minutes)
@@ -278,6 +278,26 @@ if SERVER then
 		if not util.IsInWorld(pos) then return nil end
 
 		return pos
+	end
+
+	-- Consumes a hotspot outright (the siphon crystallizing it into dust).
+	-- Natural spots are permanent geography: they empty and refill over time.
+	-- Cast-made hotspots are spent and removed.
+	function M:ConsumeHotspot(h)
+		if not h then return end
+
+		if h.natural then
+			h.value = 0
+			h.touched = CurTime()
+			return
+		end
+
+		for i = 1, #self.hotspots do
+			if self.hotspots[i] == h then
+				table.remove(self.hotspots, i)
+				break
+			end
+		end
 	end
 
 	-- Tops the map up to the configured number of natural spots. They are ordinary
