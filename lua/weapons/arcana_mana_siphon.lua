@@ -2359,6 +2359,13 @@ if CLIENT then
 			local size = 2.1 * (0.6 + 0.4 * a)
 			local mat = SIPHON_GLYPH_MATS[seq.codes[i]]
 			if mat then
+				-- DrawQuadEasy is one-sided: glyphs on the far side of the
+				-- wrist face away from the camera and would backface-cull,
+				-- so flip those toward the viewer (a mirrored glyph is fine)
+				if (EyePos() - pos):Dot(radial) < 0 then
+					radial = -radial
+				end
+
 				render.SetMaterial(mat)
 				render.DrawQuadEasy(pos, radial, size, size, ColorAlpha(FRAME_COL, 255 * a * fadeMul * alphaScale), 0)
 			end
