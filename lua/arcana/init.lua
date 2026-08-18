@@ -31,6 +31,7 @@ if SERVER then
 	AddCSLuaFile("arcana/system/scenes.lua")
 	AddCSLuaFile("arcana/system/default_inventory.lua")
 
+	AddCSLuaFile("arcana/system/vfx/scratch_rt.lua")
 	AddCSLuaFile("arcana/system/vfx/casting.lua")
 	AddCSLuaFile("arcana/system/vfx/enchants.lua")
 	AddCSLuaFile("arcana/system/vfx/bloom.lua")
@@ -69,6 +70,7 @@ include("arcana/system/lifecycle.lua")
 include("arcana/system/environments.lua")
 include("arcana/system/scenes.lua")
 
+include("arcana/system/vfx/scratch_rt.lua")
 include("arcana/system/vfx/casting.lua")
 include("arcana/system/vfx/bloom.lua")
 
