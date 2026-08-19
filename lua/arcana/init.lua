@@ -90,7 +90,7 @@ includePath("arcana/spellcraft")
 -- Scene definitions (must load after arcana/system/scenes.lua)
 includePath("arcana/scenes")
 
--- Crystal garden and alchemy table: shared config plus the client meshes and
+-- Crystal garden and transmuter: shared config plus the client meshes and
 -- menus. ArtDeco is only touched at call time, so this may load before it.
 includePath("arcana/gardening")
 
