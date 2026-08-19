@@ -257,6 +257,14 @@ local function costSegments(cost)
 	return segs
 end
 
+-- Rates land on halves and tenths once the traits multiply out, and "2.8 dust a
+-- minute" should not print as "2.8000000000001" or round away to 3.
+local function fmtRate(n)
+	if math.abs(n - math.Round(n)) < 0.05 then return tostring(math.Round(n)) end
+
+	return string.format("%.1f", n)
+end
+
 local function canAfford(cost)
 	local ply = LocalPlayer()
 
@@ -294,8 +302,18 @@ local function attachHint(btn, buildFn)
 			if not IsValid(tip) then return end
 
 			-- Sized every tick: the yield gains a line as each elemental dust
-			-- starts accruing
-			tip:SetSize(200, 14 + 18 * math.max(1, #buildFn()))
+			-- starts accruing, and a trait's longest line sets the width
+			local lines = buildFn()
+			local widest = 0
+
+			for _, l in ipairs(lines) do
+				-- MeasureCostLine hands back a width and a height, and only the
+				-- width belongs in the comparison
+				local lw = ArtDeco.MeasureCostLine("Arcana_AncientSmall", {l})
+				widest = math.max(widest, lw)
+			end
+
+			tip:SetSize(math.max(200, widest + 26), 14 + 18 * math.max(1, #lines))
 
 			local mx, my = gui.MousePos()
 			tip:SetPos(math.Clamp(mx + 16, 0, ScrW() - tip:GetWide()), math.Clamp(my - 60, 0, ScrH() - tip:GetTall()))
@@ -427,7 +445,8 @@ local function OpenGardenMenu(garden)
 		local planted = 0
 
 		for i = 1, G.MAX_SLOTS do
-			if slots[i] then planted = planted + 1 end
+			-- Fallow ground occupies a slot without being a flower
+			if slots[i] and slots[i].id then planted = planted + 1 end
 		end
 
 		-- The bed count rides beside the title as a chip, the way the other
@@ -473,7 +492,7 @@ local function OpenGardenMenu(garden)
 	grid:SetSize(frame:GetWide() - GRID_LEFT - 24, CARD_H * 2 + 10)
 	grid.Paint = nil
 
-	local cols = 5
+	local cols = G.SLOT_COLUMNS
 	local cardW = (grid:GetWide() - (cols - 1) * 10) / cols
 	local showPicker
 
@@ -501,6 +520,19 @@ local function OpenGardenMenu(garden)
 				surface.SetDrawColor(C.gold.r, C.gold.g, C.gold.b, hovered and 165 or 70)
 				surface.DrawRect(cx - 11, cy - 2, 22, 3)
 				surface.DrawRect(cx - 2, cy - 11, 3, 22)
+
+				return
+			end
+
+			-- Ground a Blight has left behind: dead until it clears, so it takes
+			-- the empty card's dark fill in the poison colour, with no mark to
+			-- invite a click.
+			if slot.fallow then
+				local rot = G.DustColors.poison_dust
+				ArtDeco.FillDecoPanel(0, 0, w, h, EMPTY_IDLE, 10)
+				ArtDeco.DrawDecoFrame(0, 0, w, h, Color(rot.r * 0.6, rot.g * 0.6, rot.b * 0.6, 190), 10)
+				draw.SimpleText("Poisoned", "Arcana_AncientSmall", w * 0.5, h * 0.5 - 10, Color(rot.r, rot.g, rot.b, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText(string.format("%d:%02d", math.floor(slot.fallow / 60), slot.fallow % 60), "Arcana_AncientSmall", w * 0.5, h * 0.5 + 10, C.textDim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 				return
 			end
@@ -568,8 +600,15 @@ local function OpenGardenMenu(garden)
 			if not IsValid(garden) then return end
 
 			local slots = G.UnpackSlots(garden:GetGardenSlots())
+			local slot = slots[i]
 
-			if slots[i] then
+			if slot and slot.fallow then
+				surface.PlaySound("buttons/button10.wav")
+
+				return
+			end
+
+			if slot then
 				net.Start("Arcana_Garden_Uproot")
 				net.WriteEntity(garden)
 				net.WriteUInt(i, 8)
@@ -581,6 +620,50 @@ local function OpenGardenMenu(garden)
 			surface.PlaySound("buttons/button15.wav")
 		end
 
+		-- What this particular plant is doing right now, which is not the same
+		-- as what its kind does: the figures come out of the same ComputeMods
+		-- the server bills against, so what the bed owes is what is shown.
+		attachHint(card, function()
+			if not IsValid(garden) then return {} end
+
+			local slots = G.UnpackSlots(garden:GetGardenSlots())
+			local slot = slots[i]
+			local def = slot and slot.id and G.Flowers[slot.id]
+			if not def then return {} end
+
+			local m = G.ComputeMods(slots)[i]
+			local lines = {}
+
+			if def.selfFeeding then
+				lines[#lines + 1] = {text = "Needs no dust", color = def.color}
+			else
+				lines[#lines + 1] = {text = fmtRate((def.upkeepPerMin + m.upkeepAdd) * m.upkeep) .. " dust a minute", color = C.textBright}
+			end
+
+			if m.yield ~= 1 then
+				lines[#lines + 1] = {
+					text = string.format("Yields %d%% %s", math.Round(math.abs(m.yield - 1) * 100), m.yield > 1 and "more" or "less"),
+					color = m.yield > 1 and C.paleGold or WITHERING_COL,
+				}
+			end
+
+			if m.growth ~= 1 and slot.growth < 1 then
+				lines[#lines + 1] = {
+					text = string.format("Grows %d%% %s", math.Round(math.abs(m.growth - 1) * 100), m.growth > 1 and "faster" or "slower"),
+					color = C.textDim,
+				}
+			end
+
+			if def.rotPerSec and slot.growth >= 1 then
+				lines[#lines + 1] = {text = "Rotting, past saving", color = DYING_COL}
+			end
+
+			if m.witherAdd > 0 then
+				lines[#lines + 1] = {text = "Poisoned by a neighbour", color = DYING_COL}
+			end
+
+			return lines
+		end)
 	end
 
 	----------------------------------------------------------------------
@@ -603,21 +686,43 @@ local function OpenGardenMenu(garden)
 		list:SetSize(picker:GetWide() - 24, picker:GetTall() - 56)
 		ArtDeco.StyleScrollBar(list, 6)
 
+		-- The tooltip wraps, so it is cut to hold the longest trait line any
+		-- flower has: one width for all of them, no orphaned words
+		surface.SetFont("Arcana_AncientSmall")
+		local tipW = 0
+
+		for _, def in ipairs(G.FlowerOrder) do
+			for _, l in ipairs(def.traitLines or {}) do
+				tipW = math.max(tipW, surface.GetTextSize(l))
+			end
+		end
+
+		tipW = math.Clamp(tipW + 20, 260, 420)
+
 		for _, def in ipairs(G.FlowerOrder) do
 			local row = vgui.Create("DButton", list)
 			row:SetText("")
 			row:Dock(TOP)
 			row:DockMargin(0, 0, 0, 6)
-			row:SetTall(42)
+			row:SetTall(46)
 
 			row.Paint = function(pnl, w, h)
 				local afford = canAfford(def.plantCost)
-				ArtDeco.FillDecoPanel(0, 0, w, h, pnl:IsHovered() and C.cardHover or C.cardIdle, 8)
+				local hovered = pnl:IsHovered()
+				ArtDeco.FillDecoPanel(0, 0, w, h, hovered and C.cardHover or C.cardIdle, 8)
+				ArtDeco.DrawDecoFrame(0, 0, w, h, hovered and C.paleGold or C.brassInner, 8)
 
 				local col = def.color
 				drawRosette(26, h * 0.5, 11, afford and col or Color(col.r * 0.45, col.g * 0.45, col.b * 0.45), def.petals or 6)
 
-				draw.SimpleText(def.label, "Arcana_AncientSmall", 48, h * 0.5, afford and C.textBright or C.textDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				-- The name rides up to make room for the trait, and a plain
+				-- crystal has none, so it stays centred
+				local nameY = def.traitShort and h * 0.5 - 9 or h * 0.5
+				draw.SimpleText(def.label, "Arcana_AncientSmall", 48, nameY, afford and C.textBright or C.textDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+
+				if def.traitShort then
+					draw.SimpleText(def.traitShort, "Arcana_AncientSmall", 48, h * 0.5 + 10, afford and Color(col.r, col.g, col.b, 215) or C.textDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				end
 
 				local segs = costSegments(def.plantCost)
 
@@ -646,6 +751,18 @@ local function OpenGardenMenu(garden)
 				surface.PlaySound("buttons/button15.wav")
 				picker:Remove()
 			end
+
+			-- The row carries the headline; the whole bargain is behind an info
+			-- icon rather than firing at anyone who sweeps the cursor down the
+			-- list, the way the enchanter's rows do it.  It rides the name's own
+			-- line rather than the row's middle: centred on the row it would
+			-- straddle both lines and the trait would run under it.
+			surface.SetFont("Arcana_AncientSmall")
+			local nameW = surface.GetTextSize(def.label)
+			local rowH = row:GetTall()
+			local nameCY = def.traitShort and rowH * 0.5 - 9 or rowH * 0.5
+			local icon = ArtDeco.CreateInfoIcon(row, table.concat(def.traitLines or {}, "\n"), tipW)
+			icon:SetPos(48 + nameW + 3, math.floor(nameCY - 10))
 		end
 
 		local cancel = vgui.Create("DButton", picker)

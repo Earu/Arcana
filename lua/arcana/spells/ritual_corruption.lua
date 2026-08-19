@@ -16,6 +16,7 @@ Arcana.RegisterRitualSpell({
 	ritual_items = {
 		poison = 20,
 		radioactive = 10,
+		poison_dust = 10,
 	},
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end
@@ -59,5 +60,3 @@ Arcana.RegisterRitualSpell({
 		selfEnt:EmitSound("ambient/levels/citadel/strange_talk5.wav", 70, 90)
 	end,
 })
-
-

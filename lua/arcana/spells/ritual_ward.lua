@@ -16,6 +16,7 @@ Arcana.RegisterRitualSpell({
 	ritual_items = {
 		mana_crystal_shard = 20,
 		battery = 5,
+		arcane_dust = 5,
 	},
 	ritual_replenishable = true,
 	ritual_replenish_cost = 2000,

@@ -337,7 +337,10 @@ if SERVER then
 
 			if have < amt then
 				if Arcana.SendErrorNotification then
-					Arcana.SendErrorNotification(ply, "Missing item: " .. tostring(name))
+					-- The registered name, not the class: "Missing item:
+					-- fire_dust" tells a player nothing they can act on
+					local data = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[name]
+					Arcana.SendErrorNotification(ply, "Missing item: " .. ((data and data.name) or tostring(name)))
 				end
 
 				return
@@ -936,6 +939,31 @@ if CLIENT then
 	-- Semi-transparent panel fill so the themed background shows through.
 	local PANEL_BG = Color(24, 19, 12, 180)
 
+	-- Only shards have an icon, so every other required item is named instead.
+	-- Arcana's own registry knows what it registered; msitems is the fallback
+	-- for anything a host inventory owns.
+	local function itemName(class)
+		local data = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[class]
+		if data and data.name then return string.lower(data.name) end
+
+		if _G.msitems and _G.msitems.GetInventoryInfo then
+			local info = _G.msitems.GetInventoryInfo(class)
+			if info and info.name then return string.lower(info.name) end
+		end
+
+		return class
+	end
+
+	local function itemColor(class)
+		local G = Arcana.Gardening
+		local dust = G and G.DustColors and G.DustColors[class]
+		if dust then return dust end
+
+		local data = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[class]
+
+		return data and data.color or ArtDeco.Colors.textDim
+	end
+
 	local GLYPH_MATS
 	local function getGlyphMats()
 		if GLYPH_MATS then return GLYPH_MATS end
@@ -1059,10 +1087,18 @@ if CLIENT then
 		content.Paint = nil
 		-- Selected enchantments (ids) available to all child builders
 		local selected = {}
-		-- Selection totals (for progress bars)
-		local needCoins, needShards = 0, 0
+		-- Selection totals (for progress bars).  Every required item is tallied,
+		-- not just shards: elemental enchantments also want the matching dust off
+		-- a crystal garden, and a cost the panel does not show is a cost the
+		-- player finds out about by being refused.
+		local needCoins = 0
+		local needItems = {}
+		-- Fixed order, so the lines do not shuffle between frames
+		local needOrder = {}
 		local function computeTotals()
-			needCoins, needShards = 0, 0
+			needCoins = 0
+			needItems = {}
+			needOrder = {}
 			for id, on in pairs(selected) do
 				if on then
 					local e = Arcana.RegisteredEnchantments and Arcana.RegisteredEnchantments[id]
@@ -1071,13 +1107,21 @@ if CLIENT then
 						for _, it in ipairs(e.cost_items or {}) do
 							local name = tostring(it.name or "")
 							local amt = math.max(1, math.floor(tonumber(it.amount) or 1))
-							if name == "mana_crystal_shard" then
-								needShards = needShards + amt
+							if name ~= "" then
+								if not needItems[name] then needOrder[#needOrder + 1] = name end
+								needItems[name] = (needItems[name] or 0) + amt
 							end
 						end
 					end
 				end
 			end
+
+			-- Shards lead, then the rest alphabetically
+			table.sort(needOrder, function(a, b)
+				if (a == "mana_crystal_shard") ~= (b == "mana_crystal_shard") then return a == "mana_crystal_shard" end
+
+				return a < b
+			end)
 		end
 
 		-- Track applied enchantment set to refresh UI when it changes
@@ -1124,17 +1168,63 @@ if CLIENT then
 			-- Selection cost and success chance under the slotted weapon's
 			-- name, have / need, each line in its own color.
 			local infoY = cy + radius + 36
-			if needCoins > 0 or needShards > 0 then
+			if needCoins > 0 or #needOrder > 0 then
 				local haveCoins = Arcana.GetCoins(ply)
-				local haveShards = Arcana.GetItemCount(ply, "mana_crystal_shard")
-				ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, {
-					{text = string.Comma(haveCoins) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold},
-				}, TEXT_ALIGN_CENTER)
-				infoY = infoY + 18
-				ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, {
-					{text = string.Comma(haveShards) .. " / " .. string.Comma(needShards), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue},
-				}, TEXT_ALIGN_CENTER)
-				infoY = infoY + 18
+				-- There is only a band the height of three lines between the
+				-- weapon's name and the button strip, so the two icon costs
+				-- share a line where they fit and the named ones are packed
+				-- several to a line under them.  A single elemental enchantment
+				-- then takes exactly the room coins and shards used to.
+				local coinSeg = {text = string.Comma(haveCoins) .. " / " .. string.Comma(needCoins), icon = ArtDeco.Icons.coin, color = ArtDeco.Colors.coinGold}
+				local shardSeg, named = nil, {}
+
+				for _, name in ipairs(needOrder) do
+					local text = string.Comma(Arcana.GetItemCount(ply, name)) .. " / " .. string.Comma(needItems[name])
+
+					if name == "mana_crystal_shard" then
+						shardSeg = {text = text, icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.shardBlue}
+					else
+						named[#named + 1] = {text = text .. " " .. itemName(name), color = itemColor(name)}
+					end
+				end
+
+				local rows = {}
+				local maxW = w - 40
+
+				if shardSeg then
+					local pair = {coinSeg, shardSeg}
+					local pairW = ArtDeco.MeasureCostLine("Arcana_AncientSmall", pair)
+
+					if pairW <= maxW then
+						rows[1] = pair
+					else
+						-- A fortune in coins is wide enough to need its own line
+						rows[1] = {coinSeg}
+						rows[2] = {shardSeg}
+					end
+				else
+					rows[1] = {coinSeg}
+				end
+
+				local line = {}
+
+				for _, seg in ipairs(named) do
+					line[#line + 1] = seg
+					local lw = ArtDeco.MeasureCostLine("Arcana_AncientSmall", line)
+
+					if lw > maxW and #line > 1 then
+						line[#line] = nil
+						rows[#rows + 1] = line
+						line = {seg}
+					end
+				end
+
+				if #line > 0 then rows[#rows + 1] = line end
+
+				for _, segs in ipairs(rows) do
+					ArtDeco.DrawCostLine("Arcana_AncientSmall", cx, infoY, segs, TEXT_ALIGN_CENTER)
+					infoY = infoY + 18
+				end
 			end
 
 			if IsValid(machine) and (machine:GetContainedClass() or "") ~= "" then
@@ -1509,14 +1599,7 @@ if CLIENT then
 							costSegs[#costSegs + 1] = {text = string.Comma(amt), icon = ArtDeco.Icons.shard, color = ArtDeco.Colors.textDim}
 						else
 							-- No icon for arbitrary items, keep the word form
-							local pretty = name
-							if _G.msitems and _G.msitems.GetInventoryInfo then
-								local info = _G.msitems.GetInventoryInfo(name)
-								if info and info.name then
-									pretty = string.lower(info.name)
-								end
-							end
-							costSegs[#costSegs + 1] = {text = string.Comma(amt) .. " " .. pretty, color = ArtDeco.Colors.textDim}
+							costSegs[#costSegs + 1] = {text = string.Comma(amt) .. " " .. itemName(name), color = ArtDeco.Colors.textDim}
 						end
 					end
 

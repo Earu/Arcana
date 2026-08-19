@@ -29,8 +29,6 @@ local INTERIOR_Y = 10 * GARDEN_SCALE
 local SOIL_EDGE = 4 -- height of the soil where it meets the walls
 local SOIL_PEAK = 14 -- height at the middle of the heap
 
-local SLOT_COLUMNS = 5
-
 -- Soil heaped into the box: full in the middle, tapering to a lip at the
 -- walls, with a little deterministic roughness so it does not read as a
 -- moulded dome.  u and v run -1..1 across the interior.
@@ -59,9 +57,10 @@ end
 -- Local position of a planting slot, laid out two rows deep across the bed and
 -- seated on the soil surface rather than a flat plane.
 function ENT:SlotLocalPos(index)
-	local col = (index - 1) % SLOT_COLUMNS
-	local row = math.floor((index - 1) / SLOT_COLUMNS)
-	local u = -0.76 + col * (1.52 / (SLOT_COLUMNS - 1))
+	local cols = Arcana.Gardening.SLOT_COLUMNS
+	local col = (index - 1) % cols
+	local row = math.floor((index - 1) / cols)
+	local u = -0.76 + col * (1.52 / (cols - 1))
 	local v = row == 0 and -0.42 or 0.42
 
 	return Vector(u * INTERIOR_X, v * INTERIOR_Y, soilHeight(u, v))
@@ -105,6 +104,7 @@ if SERVER then
 
 		self._nextUse = 0
 		self._flowers = {}
+		self._fallow = {}
 		self._reserve = 0
 		self._pending = 0
 		self._pendingElem = {}
@@ -184,7 +184,7 @@ if SERVER then
 
 	function ENT:_PushState()
 		local G = Arcana.Gardening
-		local packed = G.PackSlots(self._flowers)
+		local packed = G.PackSlots(self._flowers, self._fallow)
 
 		if packed ~= self._lastPacked then
 			self._lastPacked = packed
@@ -200,54 +200,131 @@ if SERVER then
 		self:SendState()
 	end
 
+	-- Adds one flower's produce to the unharvested piles.  Elemental dust only
+	-- comes off a plant that has finished growing.
+	function ENT:_Yield(item, amount, mature)
+		local G = Arcana.Gardening
+
+		if item == "crystal_dust" then
+			self._pending = math.min(G.PENDING_CAP, self._pending + amount)
+		elseif mature then
+			self._pendingElem[item] = math.min(G.PENDING_ELEM_CAP, (self._pendingElem[item] or 0) + amount)
+		end
+	end
+
+	-- A Storm flower letting go of its charge: the burst pays out at once, and
+	-- the bolt has to land on something.  One planted neighbour catches it and
+	-- is either scorched or jolted into growing.
+	function ENT:_Discharge(index, dis, mult)
+		for item, amount in pairs(dis.yield) do
+			self:_Yield(item, amount * mult, true)
+		end
+
+		local targets = {}
+
+		for _, j in ipairs(Arcana.Gardening.Neighbours(index)) do
+			if self._flowers[j] then targets[#targets + 1] = j end
+		end
+
+		local hit = self._flowers[targets[math.random(#targets)] or 0]
+
+		if hit then
+			if math.random() < 0.5 then
+				hit.wither = math.min(1, hit.wither + dis.scorch)
+			else
+				hit.growth = math.min(1, hit.growth + dis.jolt)
+			end
+		end
+
+		self:EmitSound("ambient/energy/zap1.wav", 60, 130, 0.4)
+	end
+
 	function ENT:_Step(dt)
 		local G = Arcana.Gardening
 		local flowers = self._flowers
+		-- Traits resolve against the whole bed before anything is charged for:
+		-- what a flower costs and yields depends on what is planted beside it.
+		local mods = G.ComputeMods(flowers)
 		local owed = 0
 
 		for i = 1, G.MAX_SLOTS do
 			local f = flowers[i]
 			local def = f and G.Flowers[f.id]
-			if def then owed = owed + def.upkeepPerMin * dt / 60 end
+
+			if def and not def.selfFeeding then
+				local m = mods[i]
+				owed = owed + (def.upkeepPerMin + m.upkeepAdd) * m.upkeep * dt / 60
+			end
 		end
 
 		local fed = owed <= 0 or self._reserve >= owed
 		self._reserve = fed and math.max(0, self._reserve - owed) or 0
 
+		for slot, left in pairs(self._fallow) do
+			self._fallow[slot] = left > dt and (left - dt) or nil
+		end
+
 		for i = 1, G.MAX_SLOTS do
 			local f = flowers[i]
 			local def = f and G.Flowers[f.id]
+			local m = mods[i]
 
 			if not def then
 				flowers[i] = nil
 			else
-				if fed then
+				-- A self feeding flower is never starved, whatever the bed owes
+				local supplied = fed or def.selfFeeding
+
+				if def.rotPerSec and f.growth >= 1 then
+					-- Rot is not starvation: no amount of dust reverses it
+					f.wither = f.wither + dt * def.rotPerSec
+				elseif supplied then
 					f.wither = math.max(0, f.wither - dt / G.RECOVER_TIME)
 				else
-					f.wither = f.wither + dt / G.WITHER_TIME
+					f.wither = f.wither + (dt / G.WITHER_TIME) * m.wither
 				end
 
+				-- Whatever the neighbours are doing to it lands on top, and a
+				-- full reserve is no protection from it
+				f.wither = f.wither + dt * m.witherAdd
+
 				if f.wither >= 1 then
-					flowers[i] = nil
+					self:_Clear(i, def)
 					self:EmitSound("physics/glass/glass_bottle_break1.wav", 60, 70, 0.45)
-				elseif fed then
+				elseif supplied then
 					-- Starved plants only wither: without this the reserve buys
 					-- nothing and a bed left empty still grows out and pays.
-					f.growth = math.min(1, f.growth + dt / G.MATURITY_TIME)
+					f.growth = math.min(1, f.growth + (dt / G.MATURITY_TIME) * m.growth)
 
-					local rate = f.growth * (1 - f.wither)
+					local rate = f.growth * (1 - f.wither) * m.yield
 
 					for item, perMin in pairs(def.yieldPerMin) do
-						local amount = perMin * (dt / 60) * rate
+						self:_Yield(item, perMin * (dt / 60) * rate, f.growth >= 1)
+					end
 
-						if item == "crystal_dust" then
-							self._pending = math.min(G.PENDING_CAP, self._pending + amount)
-						elseif f.growth >= 1 then
-							self._pendingElem[item] = math.min(G.PENDING_ELEM_CAP, (self._pendingElem[item] or 0) + amount)
+					local dis = def.discharge
+
+					if dis and f.growth >= 1 then
+						f.charge = (f.charge or 0) + dt
+
+						while f.charge >= dis.interval do
+							f.charge = f.charge - dis.interval
+							self:_Discharge(i, dis, rate)
 						end
 					end
 				end
 			end
+		end
+	end
+
+	-- Frees a slot, poisoning the ground behind it where the flower calls for
+	-- it.  Death and uprooting go through here alike, so waiting for a Blight to
+	-- rot is no way to dodge the fallow ground it leaves.
+	function ENT:_Clear(index, def)
+		self._flowers[index] = nil
+
+		if def and def.fallowOnUproot then
+			self._fallow[index] = Arcana.Gardening.FALLOW_TIME
 		end
 	end
 
@@ -355,9 +432,16 @@ if SERVER then
 		if slot < 1 or slot > G.MAX_SLOTS then return end
 		if ent._flowers[slot] then return end
 
+		if (ent._fallow[slot] or 0) > 0 then
+			Arcana.SendErrorNotification(ply, "Nothing will take root in poisoned ground yet")
+
+			return
+		end
+
 		-- A bed with nothing in the reserve cannot feed what it is given, so
-		-- it refuses rather than taking the cost and letting it wither
-		if ent._reserve < def.upkeepPerMin then
+		-- it refuses rather than taking the cost and letting it wither.  A
+		-- flower that feeds itself has no such problem.
+		if not def.selfFeeding and ent._reserve < def.upkeepPerMin then
 			Arcana.SendErrorNotification(ply, "The garden needs Crystal Dust before anything will grow")
 
 			return
@@ -388,9 +472,11 @@ if SERVER then
 		local slot = net.ReadUInt(8)
 		if not ent then return end
 		if slot < 1 or slot > G.MAX_SLOTS then return end
-		if not ent._flowers[slot] then return end
 
-		ent._flowers[slot] = nil
+		local f = ent._flowers[slot]
+		if not f then return end
+
+		ent:_Clear(slot, G.Flowers[f.id])
 		ent:_PushState()
 		ent:EmitSound("physics/surfaces/sand_impact_bullet3.wav", 60, 95)
 	end)
