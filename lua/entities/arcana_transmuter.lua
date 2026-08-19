@@ -10,7 +10,7 @@ ENT.PrintName = "Transmuter"
 ENT.Author = "Earu"
 ENT.Category = "Arcana"
 ENT.Spawnable = true
-ENT.AdminOnly = false
+ENT.AdminOnly = true
 ENT.RenderGroup = RENDERGROUP_BOTH
 ENT.UseCooldown = 0.75
 
