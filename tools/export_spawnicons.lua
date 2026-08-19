@@ -118,7 +118,7 @@ local TARGETS = {
 			ent:_PushState()
 		end,
 	},
-	{class = "arcana_alchemy_table", fov = 40, dir = Vector(1, -0.40, 0.38), pad = 1.18, settle = 2},
+	{class = "arcana_transmuter", fov = 40, dir = Vector(1, -0.40, 0.38), pad = 1.18, settle = 2},
 	{
 		class = "arcana_spell_caster", fov = 40, dir = Vector(1, -0.55, 0.45), pad = 1.30, settle = 1,
 		-- Draws a green aim line and a spell readout to whoever owns it while they hold a physgun.

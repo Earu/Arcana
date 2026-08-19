@@ -1,4 +1,4 @@
--- Shared tuning for the crystal garden and the alchemy table.
+-- Shared tuning for the crystal garden and the transmuter.
 -- Both realms read this: the client uses it to grey out unaffordable actions
 -- without a round trip, the server re-validates everything anyway.
 
@@ -282,8 +282,8 @@ function G.ComputeMods(flowers)
 	return mods
 end
 
--- Dust variants produced at the alchemy table. Every ingredient is an item
--- that already exists in the addon, so no new sources are needed.
+-- Dust variants produced at the transmuter. Every ingredient is an item that
+-- already exists in the addon, so no new sources are needed.
 G.Recipes = {
 	{
 		id = "fire_dust",
@@ -328,10 +328,11 @@ for _, r in ipairs(G.Recipes) do
 	G.RecipeById[r.id] = r
 end
 
--- Coins paid per unit when exchanging dust at the alchemy table.  The rates
--- track how hard each one is to farm: Blight pours poison dust out, Rime and
--- Arcane barely trickle.
-G.SellRates = {
+-- Coins the transmuter returns per unit of dust given to it.  Nothing is sold
+-- here: dust goes in and coin comes back, the same trade every other station
+-- makes in the other direction.  The rates track how hard each one is to farm:
+-- Blight pours poison dust out, Rime and Arcane barely trickle.
+G.ExchangeRates = {
 	crystal_dust = 5,
 	poison_dust = 30,
 	fire_dust = 45,
@@ -340,8 +341,12 @@ G.SellRates = {
 	arcane_dust = 90,
 }
 
--- Ordered so the exchange list does not shuffle between openings.
-G.SellOrder = {"crystal_dust", "fire_dust", "frost_dust", "lightning_dust", "poison_dust", "arcane_dust"}
+-- Ordered so the menu does not shuffle between openings.
+G.ExchangeOrder = {"crystal_dust", "fire_dust", "frost_dust", "lightning_dust", "poison_dust", "arcane_dust"}
+
+-- How many things may be laid out at once.  The recipes need two; the third
+-- is there for handing over several dusts in one go.
+G.MAX_INPUTS = 3
 
 G.DustColors = {
 	crystal_dust = Color(120, 200, 255),
@@ -351,6 +356,118 @@ G.DustColors = {
 	poison_dust = Color(120, 210, 70),
 	arcane_dust = Color(180, 120, 255),
 }
+
+-- Everything the transmuter will accept: recipe ingredients first in recipe
+-- order, then whatever else it values in coin.
+G.Accepted = {}
+
+do
+	local seen = {}
+
+	local function accept(item)
+		if seen[item] then return end
+		seen[item] = true
+		G.Accepted[#G.Accepted + 1] = item
+	end
+
+	for _, item in ipairs(G.ExchangeOrder) do accept(item) end
+
+	for _, r in ipairs(G.Recipes) do
+		for item in pairs(r.ingredients) do accept(item) end
+	end
+end
+
+-- Works out what an offering returns.  Pure and shared: the menu shows the
+-- answer, the server works it out again and never takes the client's word for
+-- it.  `inputs` is an array of item ids; nil comes back when they make nothing.
+--
+-- An exact ingredient match transmutes.  Anything else the table values goes
+-- back as coin instead, one unit of each per exchange.
+function G.ResolveExchange(inputs)
+	if not inputs or #inputs == 0 or #inputs > G.MAX_INPUTS then return end
+
+	local set = {}
+
+	for _, id in ipairs(inputs) do
+		-- The same thing cannot be laid out twice
+		if set[id] then return end
+		set[id] = true
+	end
+
+	for _, r in ipairs(G.Recipes) do
+		local needed, matched = 0, 0
+
+		for item in pairs(r.ingredients) do
+			needed = needed + 1
+			if set[item] then matched = matched + 1 end
+		end
+
+		if matched == needed and needed == #inputs then
+			return {kind = "recipe", recipe = r, cost = r.ingredients, give = r.output, color = r.color}
+		end
+	end
+
+	local coins, cost = 0, {}
+
+	for _, id in ipairs(inputs) do
+		local rate = G.ExchangeRates[id]
+		if not rate then return end
+		coins = coins + rate
+		cost[id] = 1
+	end
+
+	return {kind = "coins", cost = cost, coins = coins}
+end
+
+-- How many times an exchange can be repeated with what is on hand.  countFn
+-- resolves an item id to how many the player holds.
+function G.MaxRepeats(cost, countFn)
+	local best
+
+	for item, amount in pairs(cost) do
+		local n = math.floor((countFn(item) or 0) / amount)
+		best = best and math.min(best, n) or n
+	end
+
+	return best or 0
+end
+
+-- Recipes the current offering is still on the way to: everything laid out
+-- belongs to them, and something is still missing.  An empty offering matches
+-- them all, which is what makes the menu double as the recipe book.
+function G.PotentialRecipes(inputs)
+	local set = {}
+
+	for _, id in ipairs(inputs or {}) do set[id] = true end
+
+	local out = {}
+
+	for _, r in ipairs(G.Recipes) do
+		local stray = false
+
+		for id in pairs(set) do
+			if not r.ingredients[id] then
+				stray = true
+				break
+			end
+		end
+
+		if not stray then
+			local missing = {}
+
+			for item in pairs(r.ingredients) do
+				if not set[item] then missing[#missing + 1] = item end
+			end
+
+			if #missing > 0 then
+				table.sort(missing)
+				out[#out + 1] = {recipe = r, missing = missing}
+			end
+		end
+	end
+
+	return out
+end
 
 -- Packs the server side flower table into the networked slot string.
 -- Format: one entry per slot, "-" when empty, "x:<seconds>" while the ground is
