@@ -282,92 +282,39 @@ function G.ComputeMods(flowers)
 	return mods
 end
 
--- Dust variants produced at the transmuter. Every ingredient is an item that
--- already exists in the addon, so no new sources are needed.
-G.Recipes = {
-	{
-		id = "fire_dust",
-		label = "Ember Dust",
-		ingredients = {crystal_dust = 25, radioactive = 1},
-		output = {fire_dust = 5},
-		color = Color(255, 120, 40),
-	},
-	{
-		id = "frost_dust",
-		label = "Rime Dust",
-		ingredients = {crystal_dust = 25, waterbottle = 1},
-		output = {frost_dust = 5},
-		color = Color(170, 220, 255),
-	},
-	{
-		id = "lightning_dust",
-		label = "Storm Dust",
-		ingredients = {crystal_dust = 25, battery = 1},
-		output = {lightning_dust = 5},
-		color = Color(150, 200, 255),
-	},
-	{
-		id = "poison_dust",
-		label = "Blight Dust",
-		ingredients = {crystal_dust = 25, solidified_spores = 1},
-		output = {poison_dust = 5},
-		color = Color(120, 210, 70),
-	},
-	{
-		id = "arcane_dust",
-		label = "Arcane Dust",
-		ingredients = {crystal_dust = 25, mana_crystal_shard = 1},
-		output = {arcane_dust = 5},
-		color = Color(180, 120, 255),
-	},
-}
-
-G.RecipeById = {}
-
-for _, r in ipairs(G.Recipes) do
-	G.RecipeById[r.id] = r
-end
-
 -- Coins the transmuter returns per unit of dust given to it.  Nothing is sold
 -- here: dust goes in and coin comes back, the same trade every other station
--- makes in the other direction.  The rates track how hard each one is to farm:
--- Blight pours poison dust out, Rime and Arcane barely trickle.
+-- makes in the other direction.  Recipe dusts add their own rates when they
+-- register below.
 G.ExchangeRates = {
 	crystal_dust = 5,
-	poison_dust = 30,
-	fire_dust = 45,
-	lightning_dust = 55,
-	frost_dust = 65,
-	arcane_dust = 90,
 }
 
 -- Ordered so the menu does not shuffle between openings.
-G.ExchangeOrder = {"crystal_dust", "fire_dust", "frost_dust", "lightning_dust", "poison_dust", "arcane_dust"}
+G.ExchangeOrder = {"crystal_dust"}
 
 -- How many things may be laid out at once.  The recipes need two; the third
 -- is there for handing over several dusts in one go.
 G.MAX_INPUTS = 3
 
+G.Recipes = {}
+G.RecipeById = {}
+
 G.DustColors = {
 	crystal_dust = Color(120, 200, 255),
-	fire_dust = Color(255, 120, 40),
-	frost_dust = Color(170, 220, 255),
-	lightning_dust = Color(150, 200, 255),
-	poison_dust = Color(120, 210, 70),
-	arcane_dust = Color(180, 120, 255),
 }
 
--- Everything the transmuter will accept: recipe ingredients first in recipe
--- order, then whatever else it values in coin.
+-- Everything the transmuter will accept: coin-exchange items first in menu
+-- order, then recipe ingredients in recipe order.
 G.Accepted = {}
 
-do
-	local seen = {}
+local function rebuildAccepted()
+	local out, seen = {}, {}
 
 	local function accept(item)
 		if seen[item] then return end
 		seen[item] = true
-		G.Accepted[#G.Accepted + 1] = item
+		out[#out + 1] = item
 	end
 
 	for _, item in ipairs(G.ExchangeOrder) do accept(item) end
@@ -375,7 +322,140 @@ do
 	for _, r in ipairs(G.Recipes) do
 		for item in pairs(r.ingredients) do accept(item) end
 	end
+
+	G.Accepted = out
 end
+
+-- The inventory loads after this file, so dust items registered from recipes
+-- wait here until Arcana.RegisterItem exists.  Initialize runs on both realms.
+local pendingItems = {}
+
+local function registerRecipeItem(def)
+	Arcana.RegisterItem(def.id, {
+		name = def.item.name or def.label,
+		description = def.item.description,
+		model = def.item.model,
+		color = def.color,
+	})
+end
+
+hook.Add("Initialize", "Arcana_Gardening_RecipeItems", function()
+	for _, def in pairs(pendingItems) do
+		registerRecipeItem(def)
+	end
+
+	pendingItems = {}
+end)
+
+-- One definition per recipe: match, cost, output, color, coin rate and the
+-- output item itself all come from here, so adding a recipe is a single call.
+-- Optional fields: `rate` (coins per unit when handed back on its own) and
+-- `item` ({name, description, model}, name falls back to the label) to
+-- register the output dust as an inventory item.
+function G.RegisterRecipe(def)
+	if not istable(def) or not isstring(def.id) or not istable(def.ingredients) or not istable(def.output) then
+		ErrorNoHalt("Arcana: invalid transmuter recipe\n")
+
+		return
+	end
+
+	local count = table.Count(def.ingredients)
+
+	if count == 0 or count > G.MAX_INPUTS then
+		-- More ingredients than slots could never match ResolveExchange
+		ErrorNoHalt(string.format("Arcana: recipe %q needs between 1 and %d ingredients\n", def.id, G.MAX_INPUTS))
+
+		return
+	end
+
+	-- Replace-by-id keeps the array index stable across file reloads
+	local index = #G.Recipes + 1
+
+	for i, r in ipairs(G.Recipes) do
+		if r.id == def.id then
+			index = i
+			break
+		end
+	end
+
+	G.Recipes[index] = def
+	G.RecipeById[def.id] = def
+	G.DustColors[def.id] = def.color
+
+	if def.rate then
+		if not G.ExchangeRates[def.id] then
+			G.ExchangeOrder[#G.ExchangeOrder + 1] = def.id
+		end
+
+		G.ExchangeRates[def.id] = def.rate
+	end
+
+	rebuildAccepted()
+
+	if def.item then
+		if Arcana.RegisterItem then
+			registerRecipeItem(def)
+		else
+			pendingItems[def.id] = def
+		end
+	end
+end
+
+-- Dust variants produced at the transmuter.  Every ingredient is an item that
+-- already exists in the addon, so no new sources are needed.  The rates track
+-- how hard each one is to farm: Blight pours poison dust out, Rime and Arcane
+-- barely trickle.
+local JAR_MODEL = "models/props_lab/jar01a.mdl"
+
+G.RegisterRecipe({
+	id = "fire_dust",
+	label = "Ember Dust",
+	ingredients = {crystal_dust = 25, radioactive = 1},
+	output = {fire_dust = 5},
+	color = Color(255, 120, 40),
+	rate = 45,
+	item = {description = "Crystal dust fused with radioactive matter. Warm to the touch.", model = JAR_MODEL},
+})
+
+G.RegisterRecipe({
+	id = "frost_dust",
+	label = "Rime Dust",
+	ingredients = {crystal_dust = 25, waterbottle = 1},
+	output = {frost_dust = 5},
+	color = Color(170, 220, 255),
+	rate = 65,
+	item = {description = "Crystal dust bound to still water. It never quite melts.", model = JAR_MODEL},
+})
+
+G.RegisterRecipe({
+	id = "lightning_dust",
+	label = "Storm Dust",
+	ingredients = {crystal_dust = 25, battery = 1},
+	output = {lightning_dust = 5},
+	color = Color(150, 200, 255),
+	rate = 55,
+	item = {description = "Crystal dust holding a charge. It clings to the jar.", model = JAR_MODEL},
+})
+
+G.RegisterRecipe({
+	id = "poison_dust",
+	label = "Blight Dust",
+	ingredients = {crystal_dust = 25, solidified_spores = 1},
+	output = {poison_dust = 5},
+	color = Color(120, 210, 70),
+	rate = 30,
+	item = {description = "Crystal dust cut with spores. Best handled with gloves.", model = JAR_MODEL},
+})
+
+G.RegisterRecipe({
+	id = "arcane_dust",
+	label = "Arcane Dust",
+	ingredients = {crystal_dust = 25, mana_crystal_shard = 1},
+	output = {arcane_dust = 5},
+	color = Color(180, 120, 255),
+	rate = 90,
+	item = {description = "Crystal dust refined with a shard. The finest grade there is.", model = JAR_MODEL},
+})
 
 -- Works out what an offering returns.  Pure and shared: the menu shows the
 -- answer, the server works it out again and never takes the client's word for
