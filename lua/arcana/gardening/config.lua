@@ -405,7 +405,7 @@ end
 -- already exists in the addon, so no new sources are needed.  The rates track
 -- how hard each one is to farm: Blight pours poison dust out, Rime and Arcane
 -- barely trickle.
-local JAR_MODEL = "models/props_lab/jar01a.mdl"
+local DUST_MODEL = "models/props_junk/cardboard_box004a.mdl"
 
 G.RegisterRecipe({
 	id = "fire_dust",
@@ -414,7 +414,7 @@ G.RegisterRecipe({
 	output = {fire_dust = 5},
 	color = Color(255, 120, 40),
 	rate = 45,
-	item = {description = "Crystal dust fused with radioactive matter. Warm to the touch.", model = JAR_MODEL},
+	item = {description = "Crystal dust fused with radioactive matter. Warm to the touch.", model = DUST_MODEL},
 })
 
 G.RegisterRecipe({
@@ -424,7 +424,7 @@ G.RegisterRecipe({
 	output = {frost_dust = 5},
 	color = Color(170, 220, 255),
 	rate = 65,
-	item = {description = "Crystal dust bound to still water. It never quite melts.", model = JAR_MODEL},
+	item = {description = "Crystal dust bound to still water. It never quite melts.", model = DUST_MODEL},
 })
 
 G.RegisterRecipe({
@@ -434,7 +434,7 @@ G.RegisterRecipe({
 	output = {lightning_dust = 5},
 	color = Color(150, 200, 255),
 	rate = 55,
-	item = {description = "Crystal dust holding a charge. It clings to the jar.", model = JAR_MODEL},
+	item = {description = "Crystal dust holding a charge. It clings to whatever holds it.", model = DUST_MODEL},
 })
 
 G.RegisterRecipe({
@@ -444,7 +444,7 @@ G.RegisterRecipe({
 	output = {poison_dust = 5},
 	color = Color(120, 210, 70),
 	rate = 30,
-	item = {description = "Crystal dust cut with spores. Best handled with gloves.", model = JAR_MODEL},
+	item = {description = "Crystal dust cut with spores. Best handled with gloves.", model = DUST_MODEL},
 })
 
 G.RegisterRecipe({
@@ -454,7 +454,7 @@ G.RegisterRecipe({
 	output = {arcane_dust = 5},
 	color = Color(180, 120, 255),
 	rate = 90,
-	item = {description = "Crystal dust refined with a shard. The finest grade there is.", model = JAR_MODEL},
+	item = {description = "Crystal dust refined with a shard. The finest grade there is.", model = DUST_MODEL},
 })
 
 -- Works out what an offering returns.  Pure and shared: the menu shows the

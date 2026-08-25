@@ -3010,7 +3010,7 @@ hook.Add("Initialize", "arcana_condensator_items", function()
 	Arcana.RegisterItem("crystal_dust", {
 		name = "Crystal Dust",
 		description = "Mana crystallized into fine dust with a condensator.",
-		model = "models/props_lab/jar01a.mdl",
+		model = "models/props_junk/cardboard_box004a.mdl",
 		-- Ground mana crystal, so it carries the crystal's own blue rather
 		-- than a brass tone (matches mana_crystal_shard).
 		color = Color(120, 200, 255),
