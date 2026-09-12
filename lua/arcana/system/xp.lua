@@ -345,6 +345,35 @@ if SERVER then
 		Arcana.SyncPlayerData(ply)
 		return corrected
 	end
+
+	-- Recalculates a player's level from their stored XP and overwrites the stored value.
+	-- KP is re-derived afterwards because it is a function of level, and any divine pacts
+	-- the corrected level now qualifies for are granted.
+	-- Silent by design: no level-up announcement, since this repairs drift rather than
+	-- rewarding progress.
+	-- Returns the corrected level and the previous one.
+	function Arcana.RecalculateAndRepairLevel(ply)
+		local data = Arcana.GetPlayerData(ply)
+		if not data then return 1, 1 end
+
+		local oldLevel = data.level or 1
+		local maxXP = Arcana.GetTotalXPForLevel(Arcana.Config.MAX_LEVEL)
+		data.xp = math.Clamp(tonumber(data.xp) or 0, 0, maxXP)
+
+		local newLevel = Arcana.CalculateLevel(data.xp)
+		data.level = newLevel
+		data.knowledge_points = Arcana.CalculateExpectedKnowledgePoints(ply)
+
+		for spellId, spell in pairs(Arcana.RegisteredSpells) do
+			if spell.is_divine_pact and not data.unlocked_spells[spellId] and newLevel >= spell.level_required then
+				Arcana.UnlockSpell(ply, spellId, true)
+			end
+		end
+
+		Arcana.SavePlayerData(ply)
+		Arcana.SyncPlayerData(ply)
+		return newLevel, oldLevel
+	end
 end
 
 if SERVER then
