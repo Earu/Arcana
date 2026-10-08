@@ -124,8 +124,9 @@ if SERVER then
 	end
 
 	util.AddNetworkString("shader_to_gma")
+	local CHUNK_SIZE = 60000
 	local shaderFiles = {}
-	local gmaData
+	local gmaChunks = {}
 
 	function resource.AddShader(shaderName)
 		local path = "shaders/fxc/" .. shaderName .. ".vcs"
@@ -155,7 +156,11 @@ if SERVER then
 		})
 
 		if ok then
-			gmaData = res
+			local compressed = util.Compress(res)
+			gmaChunks = {}
+			for i = 1, #compressed, CHUNK_SIZE do
+				gmaChunks[#gmaChunks + 1] = string.sub(compressed, i, i + CHUNK_SIZE - 1)
+			end
 		end
 	end
 
@@ -165,9 +170,33 @@ if SERVER then
 	end)
 
 	local function sendGMA(ply)
-		net.Start("shader_to_gma")
-		net.WriteString(gmaData and util.Base64Encode(gmaData) or "")
-		net.Send(ply)
+		local chunks = gmaChunks
+		local total = #chunks
+		if total == 0 then
+			net.Start("shader_to_gma")
+			net.WriteUInt(0, 16)
+			net.WriteUInt(0, 16)
+			net.Send(ply)
+			return
+		end
+
+		local timerName = "shader_to_gma_" .. ply:UserID()
+		local index = 0
+		timer.Create(timerName, 0, total, function()
+			if not IsValid(ply) then
+				timer.Remove(timerName)
+				return
+			end
+
+			index = index + 1
+			local chunk = chunks[index]
+			net.Start("shader_to_gma")
+			net.WriteUInt(index, 16)
+			net.WriteUInt(total, 16)
+			net.WriteUInt(#chunk, 16)
+			net.WriteData(chunk, #chunk)
+			net.Send(ply)
+		end)
 	end
 
 	hook.Add("SetupMove", "shader_to_gma", function(ply, _, ucmd)
@@ -180,13 +209,27 @@ end
 
 if CLIENT then
 	SHADER_MOUNTED = _G.SHADER_MOUNTED or false
+	local receivedChunks = {}
 	net.Receive("shader_to_gma", function()
-		local base64 = net.ReadString()
-		local reason
-		if base64 == "" then
+		local index = net.ReadUInt(16)
+		local total = net.ReadUInt(16)
+		if index > 0 then
+			if index == 1 then receivedChunks = {} end
+			receivedChunks[index] = net.ReadData(net.ReadUInt(16))
+			if index < total then return end
+		end
+
+		local compressed = table.concat(receivedChunks, "", 1, total)
+		receivedChunks = {}
+
+		local data, reason
+		if total == 0 then
 			reason = "Nothing to mount"
 		elseif not system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
 			reason = "Shaders not supported on this platform"
+		else
+			data = util.Decompress(compressed)
+			if not data then reason = "Failed to decompress GMA" end
 		end
 
 		if reason then
@@ -195,8 +238,6 @@ if CLIENT then
 			hook.Run("ShaderMounted", reason)
 			return
 		end
-
-		local data = util.Base64Decode(base64)
 
 		-- clear old gma files
 		local files = file.Find("data/shader_to_gma_*.gma", "MOD")
