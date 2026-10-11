@@ -55,6 +55,8 @@ Arcana.RegisterSpell({
 				target._arcanaminified = true
 
 				timer.Simple(20, function()
+					if not IsValid(target) then return end
+
 					target:SetKidMode(false)
 					minify_bandvfx(target)
 					target._arcanaminified = nil
@@ -66,6 +68,8 @@ Arcana.RegisterSpell({
 				target._arcanaminified = true
 
 				timer.Simple(20, function()
+					if not IsValid(target) then return end
+
 					target:SetModelScale(1, .5)
 					target._arcanaminified = nil
 					minify_bandvfx(target)
