@@ -288,7 +288,7 @@ if CLIENT then
 		}
 	]==]
 
-	function CreateShaderMaterial(name, opts)
+	function CreateShaderMaterial(name, opts, shader)
 		local key_values = util.KeyValuesToTable(shader_mat, false, true)
 
 		if opts then
@@ -297,7 +297,7 @@ if CLIENT then
 			end
 		end
 
-		return CreateMaterial(name, "screenspace_general", key_values)
+		return CreateMaterial(name, shader or "screenspace_general", key_values)
 	end
 
 	local internalHookIndex = 0
