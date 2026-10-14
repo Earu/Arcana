@@ -182,7 +182,7 @@ if SERVER then
 
 		local timerName = "shader_to_gma_" .. ply:UserID()
 		local index = 0
-		timer.Create(timerName, 0, total, function()
+		timer.Create(timerName, 1, total, function()
 			if not IsValid(ply) then
 				timer.Remove(timerName)
 				return
