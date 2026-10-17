@@ -275,6 +275,7 @@ local function OpenTransmuterMenu(station)
 	frame:MakePopup()
 
 	ArtDeco.MakeDraggableByBand(frame, 44)
+	ArtDeco.StationView.Begin(station, frame, {keepSize = true})
 
 	hook.Add("HUDPaint", frame, function()
 		local x, y = frame:LocalToScreen(0, 0)

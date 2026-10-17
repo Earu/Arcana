@@ -390,6 +390,10 @@ if CLIENT then
 		-- self:DrawModel()
 	end
 
+	function ENT:GetStationViewFocus()
+		return self:GetPos(), (self:OBBMaxs() - self:OBBMins()):Length() * 0.5 + 30
+	end
+
 	local function getOrbPos(self)
 		-- Calculate orb position at the merge point between the two separated parts
 		return self:GetPos()
@@ -825,6 +829,7 @@ if CLIENT then
 		local bgSeed = math.random(1, 10 ^ 9)
 
 		ArtDeco.MakeDraggableByBand(frame, 44)
+		ArtDeco.StationView.Begin(altar, frame, {keepSize = true})
 
 		hook.Add("HUDPaint", frame, function()
 			local x, y = frame:LocalToScreen(0, 0)

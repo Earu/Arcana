@@ -466,6 +466,17 @@ if CLIENT then
 		return self:_GroundPos() + Angle(0, yaw, 0):Forward() * SHELF_RADIUS, yaw
 	end
 
+	function ENT:GetStationViewFocus()
+		return self:WorldSpaceCenter(), (self:OBBMaxs() - self:OBBMins()):Length() * 0.5
+	end
+
+	function ENT:GetStationViewYaw(yaw)
+		local step = 360 / SHELF_COUNT
+		local gap = self:GetAngles().y + step * 0.5
+
+		return gap + math.Round(math.AngleDifference(yaw, gap) / step) * step
+	end
+
 	function ENT:_EnsureShelves()
 		for i = 1, SHELF_COUNT do
 			if not IsValid(self._shelves[i]) then

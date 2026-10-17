@@ -1104,6 +1104,167 @@ if CLIENT then
 		panel:SetCamPos((dir or MODEL_PANEL_DIR):GetNormalized() * (radius / tanHalf) * (padding or 1.15))
 		panel:SetLookAt(vector_origin)
 	end
+
+	local StationView = {}
+	ArtDeco.StationView = StationView
+
+	local STATION_CVAR = CreateClientConVar("arcana_station_view", "1", true, false, "Frame stations with the camera while their menu is open (0 = classic centered menus)", 0, 1)
+
+	local STATION_VIEW_FOV = 50
+	local STATION_VIEW_PITCH = 14
+	local STATION_VIEW_YAW = 22
+	local STATION_FIT_PADDING = 1.05
+	local STATION_BLEND_TIME = 0.45
+	local STATION_UI_MARGIN = 20
+	local STATION_UI_MIN_W = 900
+	local STATION_UI_MAX_ASPECT = 1.25
+	local STATION_HULL_MIN = Vector(-6, -6, -6)
+	local STATION_HULL_MAX = Vector(6, 6, 6)
+
+	local stationState
+
+	function StationView.GetLayout()
+		local w, h = ScrW(), ScrH()
+		local uiW = math.floor(math.min(w * 2 / 3, h * STATION_UI_MAX_ASPECT))
+		local colW = w - uiW
+
+		return colW + STATION_UI_MARGIN, STATION_UI_MARGIN, uiW - STATION_UI_MARGIN * 2, h - STATION_UI_MARGIN * 2, colW
+	end
+
+	function StationView.IsAvailable()
+		if not STATION_CVAR:GetBool() then return false end
+		local _, _, uiW = StationView.GetLayout()
+
+		return uiW >= STATION_UI_MIN_W
+	end
+
+	function StationView.IsActive()
+		return stationState ~= nil and stationState.blend > 0
+	end
+
+	local function getStationFocus(ent)
+		if ent.GetStationViewFocus then return ent:GetStationViewFocus() end
+
+		local mins, maxs = ent:GetRenderBounds()
+
+		return ent:LocalToWorld((mins + maxs) * 0.5), (maxs - mins):Length() * 0.5
+	end
+
+	function StationView.Begin(ent, frame, opts)
+		if not IsValid(ent) or not IsValid(frame) then return false end
+		if not StationView.IsAvailable() then return false end
+
+		local x, y, w, h, colW = StationView.GetLayout()
+		local focusX = colW * 0.5
+		if opts and opts.keepSize then
+			local frameW, frameH = math.min(frame:GetWide(), w), math.min(frame:GetTall(), h)
+			local groupX = math.floor((ScrW() - (colW + STATION_UI_MARGIN + frameW)) * 0.5)
+			focusX = groupX + colW * 0.5
+			x = groupX + colW + STATION_UI_MARGIN
+			y = y + math.floor((h - frameH) * 0.5)
+			w, h = frameW, frameH
+		end
+		frame:SetDraggable(false)
+		frame:SetSizable(false)
+		frame.OnMousePressed = nil
+		frame.OnMouseReleased = nil
+		frame.OnCursorMoved = nil
+		frame:SetPos(x, y)
+		frame:SetSize(w, h)
+
+		local center = getStationFocus(ent)
+		local yaw = (center - EyePos()):Angle().y + STATION_VIEW_YAW
+		if ent.GetStationViewYaw then
+			yaw = ent:GetStationViewYaw(yaw)
+		end
+
+		stationState = {
+			ent = ent,
+			frame = frame,
+			yaw = yaw,
+			focusX = focusX,
+			blend = stationState and stationState.blend or 0,
+			target = 1,
+		}
+
+		return true
+	end
+
+	local function computeStationView()
+		local ent = stationState.ent
+		local center, radius = getStationFocus(ent)
+		local w, h = ScrW(), ScrH()
+		local _, _, _, _, colW = StationView.GetLayout()
+
+		local tanV = math.tan(math.rad(STATION_VIEW_FOV * 0.5)) * 0.75
+		local tanH = tanV * (w / h)
+		local ndcX = (stationState.focusX - w * 0.5) / (w * 0.5)
+		local fitTan = math.min(tanH * colW / w, tanV)
+		local dist = radius * STATION_FIT_PADDING / fitTan
+
+		local lookAng = Angle(STATION_VIEW_PITCH, stationState.yaw, 0)
+		local desired = center - lookAng:Forward() * dist
+
+		local tr = util.TraceHull({
+			start = center,
+			endpos = desired,
+			mins = STATION_HULL_MIN,
+			maxs = STATION_HULL_MAX,
+			filter = {ent, LocalPlayer()},
+			mask = MASK_SOLID_BRUSHONLY,
+		})
+
+		local viewAng = Angle(lookAng.p, lookAng.y, 0)
+		viewAng:RotateAroundAxis(viewAng:Up(), math.deg(math.atan(ndcX * tanH)))
+
+		return tr.Hit and tr.HitPos or desired, viewAng
+	end
+
+	local function blendAngle(e, from, to)
+		return Angle(
+			from.p + math.AngleDifference(to.p, from.p) * e,
+			from.y + math.AngleDifference(to.y, from.y) * e,
+			from.r + math.AngleDifference(to.r, from.r) * e
+		)
+	end
+
+	hook.Add("Think", "Arcana_StationView", function()
+		if not stationState then return end
+
+		local ply = LocalPlayer()
+		if stationState.target == 1 and (not IsValid(stationState.frame) or not IsValid(stationState.ent) or not IsValid(ply) or not ply:Alive()) then
+			stationState.target = 0
+		end
+
+		stationState.blend = math.Approach(stationState.blend, stationState.target, FrameTime() / STATION_BLEND_TIME)
+
+		if stationState.target == 0 and stationState.blend <= 0 then
+			stationState = nil
+		end
+	end)
+
+	hook.Add("CalcView", "Arcana_StationView", function(ply, pos, angles, fov)
+		if not stationState or stationState.blend <= 0 or not IsValid(stationState.ent) then return end
+
+		local t = stationState.blend
+		local e = t * t * (3 - 2 * t)
+		local origin, viewAng = computeStationView()
+
+		return {
+			origin = LerpVector(e, pos, origin),
+			angles = blendAngle(e, angles, viewAng),
+			fov = Lerp(e, fov, STATION_VIEW_FOV),
+			drawviewer = false,
+		}
+	end)
+
+	hook.Add("PreDrawViewModel", "Arcana_StationView", function()
+		if StationView.IsActive() then return true end
+	end)
+
+	hook.Add("HUDShouldDraw", "Arcana_StationView", function(name)
+		if name == "CHudCrosshair" and StationView.IsActive() then return false end
+	end)
 end
 
 -- Store in global scope

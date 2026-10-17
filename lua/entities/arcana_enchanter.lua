@@ -988,7 +988,7 @@ if CLIENT then
 	-- plate with concentric rings radiating out from the magic circle,
 	-- the enchantment rippling through the bench: and faint runes sinking
 	-- slowly down into the weapon.
-	local function drawEnchanterBackground(w, h, seed)
+	local function drawEnchanterBackground(w, h, seed, ccx, ccy)
 		-- Clip everything to the art-deco octagon using the stencil buffer.
 		local x, y = 6, 6
 		local ww, hh = w - 12, h - 12
@@ -1003,7 +1003,7 @@ if CLIENT then
 
 		-- Concentric rings radiating from where the magic circle sits (the
 		-- left panel), creeping outward slowly and fading with distance.
-		local ccx, ccy = x + w * 0.28, y + h * 0.42
+		ccx, ccy = ccx or (x + w * 0.28), ccy or (y + h * 0.42)
 		local maxR = math.sqrt((w - ccx) ^ 2 + (h - ccy) ^ 2)
 		local spacing = 40
 		local drift = (t * 6) % spacing
@@ -1050,6 +1050,7 @@ if CLIENT then
 		local bgSeed = math.random(1, 10 ^ 9)
 
 		ArtDeco.MakeDraggableByBand(frame, 44)
+		ArtDeco.StationView.Begin(machine, frame, {keepSize = true})
 
 		-- Screen-space blur behind frame (like grimoire)
 		hook.Add("HUDPaint", frame, function()
@@ -1061,9 +1062,18 @@ if CLIENT then
 
 		-- Declared here so the title can measure the band down to the panels' frames.
 		local content
+		local left
 
 		frame.Paint = function(pnl, w, h)
-			drawEnchanterBackground(w, h, bgSeed)
+			local ccx, ccy
+			if IsValid(left) then
+				local fx, fy = pnl:LocalToScreen(0, 0)
+				local lx, ly = left:LocalToScreen(0, 0)
+				ccx = lx - fx + left:GetWide() * 0.5
+				ccy = ly - fy + left:GetTall() * 0.40
+			end
+
+			drawEnchanterBackground(w, h, bgSeed, ccx, ccy)
 			ArtDeco.DrawDecoFrame(6, 6, w - 12, h - 12, ArtDeco.Colors.gold, 14)
 
 			-- The title centers in the band between the frame's top line and the
@@ -1143,7 +1153,7 @@ if CLIENT then
 		local rebuild
 
 		-- Left: Engraved circle with weapon model/name + controls
-		local left = vgui.Create("DPanel", content)
+		left = vgui.Create("DPanel", content)
 		left:Dock(LEFT)
 		left:SetWide(520)
 		left:NoClipping(true)

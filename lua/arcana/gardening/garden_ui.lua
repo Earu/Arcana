@@ -403,6 +403,7 @@ local function OpenGardenMenu(garden)
 	frame:MakePopup()
 
 	ArtDeco.MakeDraggableByBand(frame, 44)
+	ArtDeco.StationView.Begin(garden, frame, {keepSize = true})
 
 	-- Keyed to the garden itself rather than rolled per opening, so a given bed
 	-- keeps the same root pattern every time you walk up to it.

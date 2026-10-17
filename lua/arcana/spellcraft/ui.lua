@@ -429,6 +429,7 @@ local function OpenSpellcraftMenu(machine)
 	frame:MakePopup()
 
 	ArtDeco.MakeDraggableByBand(frame, 44)
+	ArtDeco.StationView.Begin(machine, frame)
 
 	local bgSeed = math.random(1, 10 ^ 9)
 
