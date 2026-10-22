@@ -13,14 +13,13 @@ if SERVER then
 		return string.lower(p)
 	end
 
-	-- Binary packing helpers (little-endian)
 	local function u8(n)
 		return string.char(bit.band(n or 0, 0xFF))
 	end
 
 	local function u32le(n)
 		n = math.floor(tonumber(n) or 0)
-		n = n % 4294967296 -- 2^32
+		n = n % 4294967296
 		local b1 = bit.band(n, 0xFF)
 		local b2 = bit.band(bit.rshift(n, 8), 0xFF)
 		local b3 = bit.band(bit.rshift(n, 16), 0xFF)
@@ -50,19 +49,16 @@ if SERVER then
 	end
 
 	local function crc32_num(data)
-		local s = util.CRC(data or "") -- returns decimal string
+		local s = util.CRC(data or "")
 		local n = tonumber(s) or 0
 
 		return n % 4294967296
 	end
 
-	-- Pure GLua GMA writer (GMAD v3 style)
-	-- files: array of GAME-relative paths e.g. { "materials/my/tex.vmt", "materials/my/tex.vtf" }
 	local function createGMA(files, meta)
 		meta = meta or {}
 		if not istable(files) or #files == 0 then return false, "no files" end
 
-		-- Prepare entries
 		local entries = {}
 		local fileDatas = {}
 
@@ -83,22 +79,19 @@ if SERVER then
 			fileDatas[#fileDatas + 1] = data
 		end
 
-		-- Build header + directory + data in memory
 		local chunks = {}
 
-		-- Header
-		chunks[#chunks + 1] = "GMAD" -- magic
-		chunks[#chunks + 1] = u8(3) -- version 3
-		chunks[#chunks + 1] = u64le(0, 0) -- steamid (unused)
+		chunks[#chunks + 1] = "GMAD"
+		chunks[#chunks + 1] = u8(3)
+		chunks[#chunks + 1] = u64le(0, 0)
 		local t = os.time() or 0
-		chunks[#chunks + 1] = u64le(t, 0) -- timestamp
-		chunks[#chunks + 1] = u8(0) -- unused
+		chunks[#chunks + 1] = u64le(t, 0)
+		chunks[#chunks + 1] = u8(0)
 		chunks[#chunks + 1] = cstr(meta.title or "shader_to_gma")
 		chunks[#chunks + 1] = cstr(meta.description or "")
 		chunks[#chunks + 1] = cstr(meta.author or "")
 		chunks[#chunks + 1] = u32le(tonumber(meta.addon_version) or 1)
 
-		-- Directory entries
 		for _, e in ipairs(entries) do
 			chunks[#chunks + 1] = u32le(e.id)
 			chunks[#chunks + 1] = cstr(e.path)
@@ -106,15 +99,12 @@ if SERVER then
 			chunks[#chunks + 1] = u32le(e.crc)
 		end
 
-		-- End of directory
 		chunks[#chunks + 1] = u32le(0)
 
-		-- File data (in the same order)
 		for _, data in ipairs(fileDatas) do
 			chunks[#chunks + 1] = data
 		end
 
-		-- Final CRC32 of everything so far
 		local pre = table.concat(chunks)
 		local finalCrc = crc32_num(pre)
 		chunks[#chunks + 1] = u32le(finalCrc)
@@ -142,7 +132,6 @@ if SERVER then
 
 		shaderFiles[shaderName] = { path = path, realm = realm }
 
-		-- clean up possible broken shader references
 		for existingShaderName, existingShaderData in pairs(shaderFiles) do
 			if existingShaderName == shaderName then continue end
 
@@ -225,7 +214,7 @@ if CLIENT then
 		local data, reason
 		if total == 0 then
 			reason = "Nothing to mount"
-		elseif not system.IsWindows() then -- dont load shader on non-windows platforms because it causes weirdness
+		elseif not system.IsWindows() then
 			reason = "Shaders not supported on this platform"
 		else
 			data = util.Decompress(compressed)
@@ -239,13 +228,11 @@ if CLIENT then
 			return
 		end
 
-		-- clear old gma files
 		local files = file.Find("data/shader_to_gma_*.gma", "MOD")
 		for _, f in ipairs(files) do
 			file.Delete(f)
 		end
 
-		-- create new gma file
 		local fileName = "shader_to_gma_" .. os.time() .. ".gma"
 		file.Write(fileName, data)
 
@@ -289,11 +276,14 @@ if CLIENT then
 	]==]
 
 	function CreateShaderMaterial(name, opts, shader)
-		local key_values = util.KeyValuesToTable(shader_mat, false, true)
+		local key_values = {}
+		for k, v in pairs(util.KeyValuesToTable(shader_mat, false, true)) do
+			key_values[k:lower()] = v
+		end
 
 		if opts then
 			for k, v in pairs(opts) do
-				key_values[k] = v
+				key_values[k:lower()] = v
 			end
 		end
 
