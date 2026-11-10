@@ -5,7 +5,7 @@ if SERVER then
 	local M = Arcana.ManaCrystals
 
 	-- Configuration
-	M.Config = M.Config or {
+	local defaults = {
 		hotspotJoinRadius = 2000,    -- distance to merge reports into an existing hotspot
 		hotspotDecayPerSecond = 6,  -- how fast hotspot intensity decays
 		hotspotSpawnThreshold = 70, -- intensity required to attempt a spawn (increased from 40)
@@ -42,9 +42,30 @@ if SERVER then
 		naturalSpotCapacity = 70,         -- max stored intensity of a natural spot
 		naturalSpotRegenPerSecond = 0.15, -- refill rate (empty to full in ~8 minutes)
 		naturalSpotMinSpacing = 3000,     -- minimum distance between natural spots
+
+		activityInterval = 15,
+		activityCellXY = 1024,
+		activityCellZ = 512,
+		activityPositionsPerCell = 4,
+		activityMaxCells = 3000,
+		activityMinSamples = 30,
+		activityPlacementShare = 0.8,
+		activityScatter = 700,
+		activitySpacing = 1500,
+		navTrustMinSamples = 10,
+		navTrustMinShare = 0.5,
+		navTrustDistance = 300,
+		staleRadius = 2000,
+		stalePlaytime = 1800,
 	}
 
+	M.Config = M.Config or {}
+	for key, value in pairs(defaults) do
+		if M.Config[key] == nil then M.Config[key] = value end
+	end
+
 	M.hotspots = M.hotspots or {}
+	M.activity = M.activity or {samples = 0, navHits = 0, cells = {}}
 	M.regions = M.regions or {}
 	M._saveDir = "arcana"
 
@@ -289,8 +310,10 @@ if SERVER then
 		return M._navPool or nil
 	end
 
+	local navTrusted, trustedNavPool
+
 	local function tryFindNavSpotPos()
-		local pool = navPool()
+		local pool = trustedNavPool()
 		if not pool then return nil end
 
 		local roll = math.Rand(0, pool.total)
@@ -306,10 +329,146 @@ if SERVER then
 		return pos
 	end
 
+	-- A navmesh players never stand on (stale, partial, generated for other
+	-- spaces) would steer every spot away from the actual play space
+	navTrusted = function()
+		if not navmesh.IsLoaded() then return false end
+
+		local act, cfg = M.activity, M.Config
+		if act.samples < cfg.navTrustMinSamples then return true end
+
+		return act.navHits / act.samples >= cfg.navTrustMinShare
+	end
+
+	trustedNavPool = function()
+		if not navTrusted() then return nil end
+
+		return navPool()
+	end
+
+	local function activityKey(pos)
+		local cfg = M.Config
+		return string.format("%d:%d:%d", math.floor(pos.x / cfg.activityCellXY), math.floor(pos.y / cfg.activityCellXY), math.floor(pos.z / cfg.activityCellZ))
+	end
+
+	function M:RecordActivity()
+		local cfg = self.Config
+		local act = self.activity
+		local positions = {}
+
+		for _, ply in ipairs(player.GetAll()) do
+			if ply:Alive() then
+				local pos = ply:GetPos()
+				positions[#positions + 1] = pos
+
+				if ply:IsOnGround() and not ply:InVehicle() and ply:GetMoveType() ~= MOVETYPE_NOCLIP then
+					local key = activityKey(pos)
+					local cell = act.cells[key]
+					if not cell then
+						cell = {n = 0, pts = {}}
+						act.cells[key] = cell
+					end
+
+					cell.n = cell.n + 1
+					local stand = pos + vector_up * 8
+					if #cell.pts < cfg.activityPositionsPerCell then
+						cell.pts[#cell.pts + 1] = stand
+					elseif math.random() < 0.25 then
+						cell.pts[math.random(#cell.pts)] = stand
+					end
+
+					act.samples = act.samples + 1
+					if navmesh.IsLoaded() and navmesh.GetNearestNavArea(pos, false, cfg.navTrustDistance, false, true) then
+						act.navHits = act.navHits + 1
+					end
+				end
+			end
+		end
+
+		if #positions == 0 then return end
+
+		local r2 = cfg.staleRadius * cfg.staleRadius
+		for _, h in ipairs(self.hotspots) do
+			if h.natural then
+				local seen = false
+				for _, pos in ipairs(positions) do
+					if pos:DistToSqr(h.pos) <= r2 then
+						seen = true
+						break
+					end
+				end
+
+				h.unvisited = seen and 0 or (h.unvisited or 0) + cfg.activityInterval
+			end
+		end
+
+		local count = table.Count(act.cells)
+		if count > cfg.activityMaxCells then
+			local list = {}
+			for key, cell in pairs(act.cells) do list[#list + 1] = {key, cell.n} end
+			table.sort(list, function(a, b) return a[2] < b[2] end)
+			for i = 1, count - cfg.activityMaxCells do act.cells[list[i][1]] = nil end
+		end
+	end
+
+	local function activityPool()
+		local act = M.activity
+		if act.samples < M.Config.activityMinSamples then return nil end
+
+		local cells, weights, total = {}, {}, 0
+		for _, cell in pairs(act.cells) do
+			if #cell.pts > 0 then
+				total = total + math.sqrt(cell.n)
+				cells[#cells + 1] = cell
+				weights[#weights + 1] = total
+			end
+		end
+
+		if #cells == 0 then return nil end
+
+		return {cells = cells, weights = weights, total = total}
+	end
+
+	local function tryFindActivitySpotPos(pool)
+		local roll = math.Rand(0, pool.total)
+		local lo, hi = 1, #pool.weights
+		while lo < hi do
+			local mid = math.floor((lo + hi) / 2)
+			if pool.weights[mid] < roll then lo = mid + 1 else hi = mid end
+		end
+
+		local cell = pool.cells[lo]
+		local base = cell.pts[math.random(#cell.pts)]
+		local scatter = VectorRand()
+		scatter.z = 0
+		scatter:Normalize()
+		scatter = scatter * math.Rand(0, M.Config.activityScatter)
+
+		local across = util.TraceLine({
+			start = base + vector_up * 32,
+			endpos = base + vector_up * 32 + scatter,
+			mask = MASK_SOLID_BRUSHONLY,
+		})
+		if across.StartSolid then return nil end
+
+		local probe = across.HitPos - scatter:GetNormalized() * 16
+		local down = util.TraceLine({
+			start = probe,
+			endpos = probe - Vector(0, 0, 256),
+			mask = MASK_SOLID_BRUSHONLY,
+		})
+		if not down.Hit or down.StartSolid or down.HitNormal.z < 0.7 then return nil end
+
+		local pos = down.HitPos + vector_up * 8
+		if not isUsableSpot(pos) then return nil end
+
+		return pos
+	end
+
 	local UNITS_TO_M2 = 0.0254 * 0.0254
 
 	local function walkableAreaM2()
-		local pool = navPool()
+		local pool = trustedNavPool()
 		if pool then return pool.total * UNITS_TO_M2 end
 
 		local world = game.GetWorld()
@@ -340,7 +499,8 @@ if SERVER then
 	end
 
 	function M:PruneNaturalSpots()
-		local requireNav = navPool() ~= nil
+		local requireNav = trustedNavPool() ~= nil
+		local evictStale = self.activity.samples >= self.Config.activityMinSamples
 
 		for i = #self.hotspots, 1, -1 do
 			local h = self.hotspots[i]
@@ -348,6 +508,9 @@ if SERVER then
 				local bad = not isUsableSpot(h.pos)
 				if not bad and requireNav then
 					bad = navmesh.GetNearestNavArea(h.pos, false, 256, false, true) == nil
+				end
+				if not bad and evictStale then
+					bad = (h.unvisited or 0) >= self.Config.stalePlaytime
 				end
 
 				if bad then
@@ -418,6 +581,12 @@ if SERVER then
 	-- no other bootstrap. Spacing relaxes by half each pass so small maps still fit
 	-- their spots, and the last resort anchors a spot near a player spawn.
 	function M:EnsureNaturalSpots()
+		local trusted = navTrusted()
+		if trusted ~= self._navTrustedLast then
+			self._navTrustedLast = trusted
+			self._naturalTarget = nil
+		end
+
 		self:PruneNaturalSpots()
 
 		local cfg = self.Config
@@ -428,12 +597,13 @@ if SERVER then
 		end
 		if have >= want then return end
 
-		local function addSpot(pos)
+		local function addSpot(pos, fromActivity)
 			local now = CurTime()
 			table.insert(self.hotspots, {
 				pos = pos,
 				value = cfg.naturalSpotCapacity or 70,
 				natural = true,
+				fromActivity = fromActivity or nil,
 				touched = now,
 				_lastIncrease = now,
 			})
@@ -449,6 +619,28 @@ if SERVER then
 			end
 
 			return false
+		end
+
+		local played = activityPool()
+		if played then
+			local quota = math.ceil(want * cfg.activityPlacementShare)
+			local current = 0
+			for _, h in ipairs(self.hotspots) do
+				if h.natural and h.fromActivity then current = current + 1 end
+			end
+
+			for _, spacingMul in ipairs({1, 0.5}) do
+				local spacing = cfg.activitySpacing * spacingMul
+				local attempts = (quota - current) * 40
+				while current < quota and have < want and attempts > 0 do
+					attempts = attempts - 1
+					local pos = tryFindActivitySpotPos(played)
+					if pos and not isTooClose(pos, spacing) then
+						addSpot(pos, true)
+						current = current + 1
+					end
+				end
+			end
 		end
 
 		local baseSpacing = cfg.naturalSpotMinSpacing or 3000
@@ -588,7 +780,15 @@ if SERVER then
 		-- Hotspots: pos, value, natural flag (natural spots keep their place across restarts)
 		for i = 1, #self.hotspots do
 			local h = self.hotspots[i]
-			state.hotspots[#state.hotspots + 1] = {pos = encodeVector(h.pos), value = tonumber(h.value) or 0, natural = h.natural and true or nil}
+			state.hotspots[#state.hotspots + 1] = {pos = encodeVector(h.pos), value = tonumber(h.value) or 0, natural = h.natural and true or nil, unvisited = h.natural and h.unvisited or nil, fromActivity = h.fromActivity or nil}
+		end
+
+		local act = self.activity
+		state.activity = {samples = act.samples, navHits = act.navHits, cells = {}}
+		for key, cell in pairs(act.cells) do
+			local pts = {}
+			for i, p in ipairs(cell.pts) do pts[i] = encodeVector(p) end
+			state.activity.cells[#state.activity.cells + 1] = {k = key, n = cell.n, p = pts}
 		end
 
 		-- Corruption areas: center, intensity
@@ -665,8 +865,22 @@ if SERVER then
 			local pos = decodeVector(h.pos or {})
 			local value = tonumber(h.value) or 0
 			local now = CurTime()
-			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, natural = h.natural and true or nil, touched = now, _lastIncrease = now}
+			self.hotspots[#self.hotspots + 1] = {pos = pos, value = value, natural = h.natural and true or nil, unvisited = tonumber(h.unvisited), fromActivity = h.fromActivity and true or nil, touched = now, _lastIncrease = now}
 		end
+
+		local act = {samples = 0, navHits = 0, cells = {}}
+		if istable(data.activity) then
+			act.samples = tonumber(data.activity.samples) or 0
+			act.navHits = tonumber(data.activity.navHits) or 0
+			for _, c in ipairs(data.activity.cells or {}) do
+				if isstring(c.k) then
+					local pts = {}
+					for i, p in ipairs(c.p or {}) do pts[i] = decodeVector(p) end
+					act.cells[c.k] = {n = tonumber(c.n) or 0, pts = pts}
+				end
+			end
+		end
+		self.activity = act
 
 		-- Restore crystals
 		for _, c in ipairs(data.crystals or {}) do
@@ -702,6 +916,28 @@ if SERVER then
 	timer.Create("Arcana_ManaEnvironment_NaturalSpots", 60, 0, function()
 		if not Arcana or not Arcana.ManaCrystals then return end
 		Arcana.ManaCrystals:EnsureNaturalSpots()
+	end)
+
+	timer.Create("Arcana_ManaEnvironment_Activity", M.Config.activityInterval, 0, function()
+		if not Arcana or not Arcana.ManaCrystals then return end
+		Arcana.ManaCrystals:RecordActivity()
+	end)
+
+	concommand.Add("arcana_mana_reseed", function(ply)
+		if IsValid(ply) and not ply:IsSuperAdmin() then return end
+
+		local mc = Arcana.ManaCrystals
+		for i = #mc.hotspots, 1, -1 do
+			if mc.hotspots[i].natural then table.remove(mc.hotspots, i) end
+		end
+		mc._naturalTarget = nil
+		mc:EnsureNaturalSpots()
+		mc:SaveState()
+
+		local n = 0
+		for _, h in ipairs(mc.hotspots) do if h.natural then n = n + 1 end end
+		local msg = string.format("[Arcana] Reseeded %d natural mana spots (activity samples: %d, navmesh trusted: %s)", n, mc.activity.samples, tostring(mc._navTrustedLast))
+		if IsValid(ply) then ply:PrintMessage(HUD_PRINTCONSOLE, msg) else print(msg) end
 	end)
 
 	-- Hotspot decay timer (similar to corruption decay)
