@@ -72,7 +72,6 @@ Arcana.RegisterEnchantment({
     cost_coins = 1200,
     cost_items = {
         { name = "mana_crystal_shard", amount = 40 },
-        { name = "poison_dust", amount = 10 },
     },
     can_apply = function(ply, wep)
         return IsValid(wep) and Arcana.WeaponClassification.Get(wep) == "MELEE"

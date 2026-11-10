@@ -102,28 +102,6 @@ local TARGETS = {
 	},
 	{class = "arcana_enchanter",    fov = 40, dir = Vector(1, -0.35, 0.35), pad = 1.15, settle = 2},
 	{
-		-- An unplanted bed is an empty crate, so the icon gets a full spread: three stages of
-		-- growth on the front row and the elemental tiers behind, which is also what shows the
-		-- per-element tints. radius covers the flowers, which stand well above the crate mesh.
-		class = "arcana_garden", fov = 40, dir = Vector(1, -0.36, 0.34), pad = 1.20, radius = 70, settle = 2,
-		stage = function(ent)
-			ent._flowers[1] = {id = "basic", growth = 0.35, wither = 0}
-			ent._flowers[2] = {id = "basic", growth = 1, wither = 0}
-			ent._flowers[3] = {id = "fire", growth = 1, wither = 0}
-			ent._flowers[4] = {id = "frost", growth = 1, wither = 0}
-			ent._flowers[6] = {id = "arcane", growth = 1, wither = 0}
-			ent._flowers[7] = {id = "poison", growth = 1, wither = 0}
-			ent._flowers[8] = {id = "lightning", growth = 0.7, wither = 0}
-			ent._reserve = Arcana.Gardening.RESERVE_CAP
-			ent:_PushState()
-		end,
-	},
-	{
-		-- radius covers the hovering plates and glyph stream above the table mesh,
-		-- settle lets the plates evolve in before the shot.
-		class = "arcana_transmuter", fov = 40, dir = Vector(1, -0.40, 0.38), pad = 1.18, radius = 70, settle = 4,
-	},
-	{
 		class = "arcana_spell_caster", fov = 40, dir = Vector(1, -0.55, 0.45), pad = 1.30, settle = 1,
 		-- Draws a green aim line and a spell readout to whoever owns it while they hold a physgun.
 		-- Staging makes the exporting player the owner, so disown it and that branch returns early.

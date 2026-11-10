@@ -15,7 +15,6 @@ Arcana.RegisterRitualSpell({
 	ritual_coin_cost = 10000,
 	ritual_items = {
 		mana_crystal_shard = 15,
-		arcane_dust = 5,
 	},
 	on_activate = function(selfEnt, ply, caster)
 		if not SERVER then return end

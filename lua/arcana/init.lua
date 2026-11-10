@@ -90,10 +90,6 @@ includePath("arcana/spellcraft")
 -- Scene definitions (must load after arcana/system/scenes.lua)
 includePath("arcana/scenes")
 
--- Crystal garden and transmuter: shared config plus the client meshes and
--- menus. ArtDeco is only touched at call time, so this may load before it.
-includePath("arcana/gardening")
-
 if SERVER then
 	include("arcana/system/mana_crystals.lua")
 	include("arcana/system/default_inventory.lua")

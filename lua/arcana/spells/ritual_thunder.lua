@@ -15,7 +15,6 @@ Arcana.RegisterRitualSpell({
 	ritual_coin_cost = 1000,
 	ritual_items = {
 		battery = 10,
-		lightning_dust = 5,
 	},
 	ritual_replenishable = true,
 	ritual_replenish_cost = 500,

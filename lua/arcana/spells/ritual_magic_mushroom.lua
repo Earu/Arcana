@@ -23,7 +23,6 @@ if Arcana then
 		ritual_coin_cost = 1000,
 		ritual_items = {
 			solidified_spores = 3,
-			poison_dust = 5,
 		},
 		can_cast = function(caster)
 			local tr = caster:GetEyeTrace()

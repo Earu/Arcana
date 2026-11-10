@@ -18,7 +18,6 @@ Arcana.RegisterRitualSpell({
 	ritual_items = {
 		mana_crystal_shard = 50,
 		battery = 8,
-		arcane_dust = 15,
 	},
 	on_activate = function(selfEnt, activatingPly, caster)
 		if not SERVER then return end

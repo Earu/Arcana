@@ -338,7 +338,7 @@ if SERVER then
 			if have < amt then
 				if Arcana.SendErrorNotification then
 					-- The registered name, not the class: "Missing item:
-					-- fire_dust" tells a player nothing they can act on
+					-- crystal_dust" tells a player nothing they can act on
 					local data = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[name]
 					Arcana.SendErrorNotification(ply, "Missing item: " .. ((data and data.name) or tostring(name)))
 				end
@@ -955,10 +955,6 @@ if CLIENT then
 	end
 
 	local function itemColor(class)
-		local G = Arcana.Gardening
-		local dust = G and G.DustColors and G.DustColors[class]
-		if dust then return dust end
-
 		local data = Arcana.Inventory and Arcana.Inventory.Items and Arcana.Inventory.Items[class]
 
 		return data and data.color or ArtDeco.Colors.textDim
@@ -1098,9 +1094,8 @@ if CLIENT then
 		-- Selected enchantments (ids) available to all child builders
 		local selected = {}
 		-- Selection totals (for progress bars).  Every required item is tallied,
-		-- not just shards: elemental enchantments also want the matching dust off
-		-- a crystal garden, and a cost the panel does not show is a cost the
-		-- player finds out about by being refused.
+		-- not just shards: a cost the panel does not show is a cost the player
+		-- finds out about by being refused.
 		local needCoins = 0
 		local needItems = {}
 		-- Fixed order, so the lines do not shuffle between frames

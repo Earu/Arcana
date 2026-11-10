@@ -1,7 +1,0 @@
-"VertexlitGeneric"
-{
-	"$basetexture" "models/arcana/transmuter/rope"
-	"$model" "1"
-	"$nodecal" "1"
-	"$halflambert" "1"
-}

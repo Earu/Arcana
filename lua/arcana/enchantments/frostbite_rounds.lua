@@ -52,7 +52,6 @@ Arcana.RegisterEnchantment({
 	cost_coins = 1000,
 	cost_items = {
 		{ name = "mana_crystal_shard", amount = 50 },
-		{ name = "frost_dust", amount = 10 },
 	},
 	can_apply = function(ply, wep)
 		-- Ranged hitscan firearms, with or without real bullets
