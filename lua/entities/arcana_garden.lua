@@ -5,7 +5,7 @@
 AddCSLuaFile()
 
 ENT.Type = "anim"
-ENT.Base = "base_anim"
+ENT.Base = "base_gmodentity"
 ENT.PrintName = "Crystal Garden"
 ENT.Author = "Earu"
 ENT.Category = "Arcana"
