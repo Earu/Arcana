@@ -254,7 +254,9 @@ function SWEP:PrimaryAttack()
 end
 
 function SWEP:SecondaryAttack()
-	if CLIENT and IsFirstTimePredicted() then
+	if SERVER and game.SinglePlayer() then
+		self:CallOnClient("OpenGrimoireMenu")
+	elseif CLIENT and IsFirstTimePredicted() then
 		self:OpenGrimoireMenu()
 	end
 
@@ -266,7 +268,11 @@ function SWEP:Reload()
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return false end
 
-	if CLIENT and IsFirstTimePredicted() then
+	if SERVER and game.SinglePlayer() then
+		if owner:KeyPressed(IN_RELOAD) then
+			self:CallOnClient("ToggleRadialMenu")
+		end
+	elseif CLIENT and IsFirstTimePredicted() then
 		self:ToggleRadialMenu()
 	end
 
