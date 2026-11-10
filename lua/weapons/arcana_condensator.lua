@@ -21,7 +21,7 @@ SWEP.PrintName = "Condensator"
 SWEP.Author = "Earu"
 SWEP.Category = "Arcana"
 SWEP.Purpose = "Locate mana concentrations and crystallize them into crystal dust"
-SWEP.Instructions = "LMB: Crystallize a mana source | RMB: Toggle mana sight"
+SWEP.Instructions = "LMB: Crystallize a mana source | RMB: Toggle mana sight | R: Refine crystal dust"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 SWEP.DrawAmmo = false
@@ -79,6 +79,7 @@ function SWEP:SetupDataTables()
 	self:NetworkVar("Float", 1, "ChannelFrac")
 	self:NetworkVar("Bool", 0, "Channeling")
 	self:NetworkVar("Bool", 1, "SightActive")
+	self:NetworkVar("Bool", 2, "CanExtract")
 end
 
 function SWEP:Initialize()
@@ -96,6 +97,16 @@ function SWEP:Deploy()
 	end
 
 	return true
+end
+
+function SWEP:Reload()
+	if CLIENT then return end
+
+	local owner = self:GetOwner()
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:KeyPressed(IN_RELOAD) then return end
+	if self:GetChanneling() then return end
+
+	Arcana.CondensatorExchange.Open(owner)
 end
 
 function SWEP:SecondaryAttack()
@@ -402,15 +413,6 @@ if SERVER then
 			self:SetNextPrimaryFire(now + 1e5)
 		end
 
-		-- Press edge: the sight-required denial, once per press
-		local pressed = pressing and not self._wasPressing
-		self._wasPressing = pressing
-
-		if pressed and not self:GetSightActive() then
-			owner:EmitSound("ambient/energy/whiteflash.wav", 50, 55, 0.3)
-			Arcana.SendErrorNotification(owner, "Mana sight required")
-		end
-
 		local holding = pressing and self:GetSightActive()
 
 		if not holding then
@@ -504,6 +506,7 @@ if SERVER then
 		if now >= (self._nextSense or 0) then
 			self._nextSense = now + SENSE_INTERVAL
 			self:_UpdateSensedSource()
+			self:SetCanExtract(self:GetSightActive() and select(2, self:_FindExtractTarget()) ~= nil)
 		end
 
 		if self:GetSightActive() and now >= (self._nextSightSync or 0) then
@@ -693,12 +696,80 @@ if CLIENT then
 		}
 	end
 
+	local panelRect = {x1 = 0, y1 = 0, x2 = 0, y2 = 0, active = false}
+
+	local function setPanelScissor()
+		render.SetScissorRect(panelRect.x1, panelRect.y1, panelRect.x2, panelRect.y2, true)
+	end
+
+	local MAX_CLOUDS = 8
+	local cloudBatch = {copied = false, rects = {}}
+
+	local function beginCloudBatch()
+		cloudBatch.copied = false
+		cloudBatch.rects = {}
+	end
+
+	local function rectsOverlap(a, b)
+		return a.x1 < b.x2 and b.x1 < a.x2 and a.y1 < b.y2 and b.y1 < a.y2
+	end
+
+	local function cloudScreenRect(calib, volCenter, volRadius)
+		if not panelRect.active then return nil end
+
+		local toC = volCenter - calib.origin
+		local z = toC:Dot(calib.fwd)
+		local near = z - volRadius
+
+		if toC:LengthSqr() > volRadius * volRadius and near > 1 then
+			local scr = volCenter:ToScreen()
+			local tanR = volRadius / near * 1.25
+			local rx = tanR / math.max(0.05, calib.rightW:Length()) * ScrW() * 0.5
+			local ry = tanR / math.max(0.05, calib.halfH) * ScrH() * 0.5
+			local x1 = math.max(panelRect.x1, math.floor(scr.x - rx))
+			local y1 = math.max(panelRect.y1, math.floor(scr.y - ry))
+			local x2 = math.min(panelRect.x2, math.ceil(scr.x + rx))
+			local y2 = math.min(panelRect.y2, math.ceil(scr.y + ry))
+			if x2 <= x1 or y2 <= y1 then return nil end
+
+			return {x1 = x1, y1 = y1, x2 = x2, y2 = y2}
+		end
+
+		if z < -volRadius then return nil end
+
+		return {x1 = panelRect.x1, y1 = panelRect.y1, x2 = panelRect.x2, y2 = panelRect.y2}
+	end
+
 	-- One raymarched volume: basePos is the volume's ground anchor.  For the
 	-- cloud material c2_w is the gas strength; for the crystallizing fork it
-	-- is the channel fraction.
+	-- is the channel fraction.  Only the volume's on-screen footprint inside
+	-- the panel is shaded, and the screen copy is shared with earlier volumes
+	-- of the batch unless their footprints overlap.  Returns whether it drew.
 	local function drawCloudVolume(calib, basePos, radius, strength, mat)
 		mat = mat or cloudMat
-		render.UpdateScreenEffectTexture()
+
+		local rect = cloudScreenRect(calib, basePos + Vector(0, 0, radius * 0.8), radius * 1.5)
+		if not rect then return false end
+
+		local needCopy = not cloudBatch.copied
+		if not needCopy then
+			for _, r in ipairs(cloudBatch.rects) do
+				if rectsOverlap(r, rect) then
+					needCopy = true
+					break
+				end
+			end
+		end
+
+		if needCopy then
+			render.UpdateScreenEffectTexture()
+			cloudBatch.copied = true
+			cloudBatch.rects = {}
+		end
+
+		cloudBatch.rects[#cloudBatch.rects + 1] = rect
+		render.SetScissorRect(rect.x1, rect.y1, rect.x2, rect.y2, true)
+
 		mat:SetTexture("$basetexture", render.GetScreenEffectTexture())
 		mat:SetFloat("$c0_x", basePos.x)
 		mat:SetFloat("$c0_y", basePos.y)
@@ -719,6 +790,9 @@ if CLIENT then
 
 		render.SetMaterial(mat)
 		render.DrawScreenQuad()
+		setPanelScissor()
+
+		return true
 	end
 
 	local function cloudKey(pos)
@@ -738,8 +812,11 @@ if CLIENT then
 		if not calib then return end
 
 		local now = RealTime()
+		local drawn = 0
+		beginCloudBatch()
 
 		for _, source in ipairs(sources) do
+			if drawn >= MAX_CLOUDS then break end
 			if source.kind ~= KIND_HOTSPOT then continue end
 
 			local key = cloudKey(source.pos)
@@ -760,10 +837,9 @@ if CLIENT then
 			local strength = Lerp(math.Clamp(FrameTime() * 2.5, 0, 1), cloudStrengths[key] or target, target)
 			cloudStrengths[key] = strength
 
-			if ready or not darkCloudMat then
-				drawCloudVolume(calib, source.pos, 100 + 80 * strength, strength)
-			else
-				drawCloudVolume(calib, source.pos, 100 + 80 * strength, strength, darkCloudMat)
+			local mat = (ready or not darkCloudMat) and cloudMat or darkCloudMat
+			if drawCloudVolume(calib, source.pos, 100 + 80 * strength, strength, mat) then
+				drawn = drawn + 1
 			end
 		end
 	end
@@ -1537,6 +1613,7 @@ if CLIENT then
 			if calib then
 				render.SetStencilTestMask(9)
 				render.SetStencilReferenceValue(1)
+				beginCloudBatch()
 
 				for _, source in ipairs(sources) do
 					if source.kind == KIND_CRYSTAL then
@@ -1862,7 +1939,7 @@ if CLIENT then
 	-- swallowing the shapes
 	local FRAME_BLOOM_ALPHA = 0.45
 
-	local function drawPanelFrame(uv, ramp, wep)
+	local function panelFrameDrawer(uv, ramp, wep)
 		local w, h = ScrW(), ScrH()
 		local pts = {}
 		local cx, cy = 0, 0
@@ -1872,15 +1949,9 @@ if CLIENT then
 			cy = cy + pts[idx].y * 0.25
 		end
 
-		local bloom = Arcana.Bloom
-		if bloom and bloom.ProcessBloom then
-			bloom.ProcessBloom(function()
-				drawFrameLayers(pts, cx, cy, ramp, wep, FRAME_BLOOM_ALPHA)
-			end)
-			bloom.RenderBloom(0.35, true)
+		return function(alphaScale)
+			drawFrameLayers(pts, cx, cy, ramp, wep, alphaScale)
 		end
-
-		drawFrameLayers(pts, cx, cy, ramp, wep, 1)
 	end
 
 	-- Constrains the through-wall reveal (clouds, crystal ghosts, grains) to
@@ -1914,9 +1985,27 @@ if CLIENT then
 		render.SetStencilWriteMask(255)
 		render.SetStencilCompareFunction(STENCIL_EQUAL)
 		render.SetStencilPassOperation(STENCIL_KEEP)
+
+		local w, h = ScrW(), ScrH()
+		local x1, y1, x2, y2 = w, h, 0, 0
+		for idx = 1, 4 do
+			x1 = math.min(x1, pts[idx].x)
+			y1 = math.min(y1, pts[idx].y)
+			x2 = math.max(x2, pts[idx].x)
+			y2 = math.max(y2, pts[idx].y)
+		end
+
+		panelRect.x1 = math.Clamp(math.floor(x1), 0, w)
+		panelRect.y1 = math.Clamp(math.floor(y1), 0, h)
+		panelRect.x2 = math.Clamp(math.ceil(x2), 0, w)
+		panelRect.y2 = math.Clamp(math.ceil(y2), 0, h)
+		panelRect.active = true
+		setPanelScissor()
 	end
 
 	local function endPanelStencil()
+		panelRect.active = false
+		render.SetScissorRect(0, 0, 0, 0, false)
 		render.SetStencilEnable(false)
 	end
 
@@ -2436,17 +2525,17 @@ if CLIENT then
 	-- than scenery under it.  It renders through a camera replicating the
 	-- engine's vm projection (the enchant-ring pattern), anchored on the wrist
 	-- frame the hands pass cached this frame.
-	local function drawWristBand(wep)
+	local function wristBandDrawer(wep)
 		local bc = wep._wristBand
-		if not bc then return end
+		if not bc then return nil end
 
 		if not (bc.IsActive and bc:IsActive()) then
 			wep._wristBand = nil
-			return
+			return nil
 		end
 
 		-- No fresh wrist frame (thirdperson, vm hidden): nothing to anchor to
-		if RealTime() - (wep._wristFrameAt or 0) > 0.1 then return end
+		if RealTime() - (wep._wristFrameAt or 0) > 0.1 then return nil end
 
 		bc.position = wep._wristPos
 		bc.angles = wep._bandAng
@@ -2458,29 +2547,37 @@ if CLIENT then
 
 		-- vm depth range so the band z-tests against the arm already in the
 		-- buffer instead of raw world depth
-		local function bandCam()
+		return function(alphaScale)
+			local col = bc.color
+			if alphaScale ~= 1 then
+				bc.color = ColorAlpha(col, (col.a or 255) * alphaScale)
+			end
+
 			cam.Start3D(view.origin, view.angles, vmFov, 0, 0, ScrW(), ScrH(), vmZNear, vmZFar)
 			render.DepthRange(0, 0.1)
+			bc:Draw()
+			cam.End3D()
+			render.DepthRange(0, 1)
+			bc.color = col
 		end
+	end
 
-		-- Faint copy feeds the bloom, crisp bands on top (panel pattern)
+	-- Panel frame and wrist band share one bloom capture: a faint copy of
+	-- both feeds the bloom, then the crisp copies draw on top, band last
+	local function drawGlowLayers(frame, band)
+		if not frame and not band then return end
+
 		local bloom = Arcana.Bloom
 		if bloom and bloom.ProcessBloom then
-			local col = bc.color
-			bc.color = ColorAlpha(col, (col.a or 255) * FRAME_BLOOM_ALPHA)
 			bloom.ProcessBloom(function()
-				bandCam()
-				bc:Draw()
-				cam.End3D()
+				if frame then frame(FRAME_BLOOM_ALPHA) end
+				if band then band(FRAME_BLOOM_ALPHA) end
 			end)
-			bc.color = col
 			bloom.RenderBloom(0.35, true)
 		end
 
-		bandCam()
-		bc:Draw()
-		cam.End3D()
-		render.DepthRange(0, 1)
+		if frame then frame(1) end
+		if band then band(1) end
 	end
 
 	local POOF_BRIGHT = Color(255, 228, 165)
@@ -2717,7 +2814,7 @@ if CLIENT then
 			-- Sight off (or the wrist ceremony still running): nothing of the
 			-- crystallization exists outside the lens, only the band ring
 			-- (fading out, or growing in before the panel opens)
-			drawWristBand(wep)
+			drawGlowLayers(nil, wristBandDrawer(wep))
 			return
 		end
 
@@ -2778,12 +2875,8 @@ if CLIENT then
 			endPanelStencil()
 		end
 
-		if uv then
-			drawPanelFrame(uv, ramp, wep)
-		end
-
 		-- Last: the wrist band draws over everything the panel put up
-		drawWristBand(wep)
+		drawGlowLayers(uv and panelFrameDrawer(uv, ramp, wep), wristBandDrawer(wep))
 	end)
 
 	-- ========================================================================
@@ -2857,7 +2950,14 @@ if CLIENT then
 	-- the spell casting bar (see hud.lua drawCastingBar) so the two read as
 	-- one interface.  Everything else lives on the holo panel.
 	function SWEP:DrawHUD()
-		if not self:GetChanneling() then return end
+		if not self:GetChanneling() then
+			if self:GetCanExtract() and self:GetSightActive() then
+				local key = string.upper(input.LookupBinding("+attack") or "+attack")
+				draw.SimpleTextOutlined("Hold [" .. key .. "] to extract crystal dust", "Arcana_AncientSmall", ScrW() * 0.5, ScrH() - 150, ArtDeco.Colors.paleGold, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 200))
+			end
+
+			return
+		end
 
 		local frac = channelFracSmooth
 		local scrW, scrH = ScrW(), ScrH()

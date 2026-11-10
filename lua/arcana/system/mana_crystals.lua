@@ -35,7 +35,10 @@ if SERVER then
 
 		-- Natural mana spots: places where mana concentrated before any player cast a
 		-- spell, so crystal dust gathering (and the economy built on it) works on a fresh map
-		naturalSpotCount = 8,             -- natural spots seeded per map
+		naturalSpotMin = 10,
+		naturalSpotMax = 40,
+		naturalSpotAreaDivisor = 50,
+		naturalSpotSurfacesPerSpot = 2500,
 		naturalSpotCapacity = 70,         -- max stored intensity of a natural spot
 		naturalSpotRegenPerSecond = 0.15, -- refill rate (empty to full in ~8 minutes)
 		naturalSpotMinSpacing = 3000,     -- minimum distance between natural spots
@@ -215,6 +218,23 @@ if SERVER then
 	-- (out of world), so the column is walked downward, restarting just below each
 	-- out-of-world hit, until an in-world floor is found. Restarted traces may begin
 	-- inside a brush: StartSolid is fine, only AllSolid means solid all the way down.
+	local function inSkybox(pos)
+		local cam = M._skyCamera
+		if cam == nil or (cam ~= false and not IsValid(cam)) then
+			cam = ents.FindByClass("sky_camera")[1] or false
+			M._skyCamera = cam
+		end
+
+		return cam ~= false and cam:TestPVS(pos)
+	end
+
+	local function isUsableSpot(pos)
+		if not util.IsInWorld(pos) or inSkybox(pos) then return false end
+		if bit.band(util.PointContents(pos), CONTENTS_WATER) ~= 0 then return false end
+
+		return true
+	end
+
 	local function tryFindNaturalSpotPos()
 		local world = game.GetWorld()
 		if not world or not world.GetModelBounds then return nil end
@@ -223,26 +243,118 @@ if SERVER then
 		local x = math.Rand(mins.x, maxs.x)
 		local y = math.Rand(mins.y, maxs.y)
 
+		local floors = {}
 		local z = maxs.z
-		for _ = 1, 8 do
+		for _ = 1, 12 do
 			local tr = util.TraceLine({
 				start = Vector(x, y, z),
 				endpos = Vector(x, y, mins.z),
 				mask = MASK_SOLID_BRUSHONLY,
 			})
 
-			if not tr.Hit or tr.AllSolid then return nil end
+			if not tr.Hit or tr.AllSolid then break end
 
 			local pos = tr.HitPos + vector_up * 8
-			if tr.HitNormal.z >= 0.7 and util.IsInWorld(pos) then
-				return pos
+			if tr.HitNormal.z >= 0.7 and isUsableSpot(pos) then
+				floors[#floors + 1] = pos
 			end
 
-			if tr.HitPos.z <= mins.z + 1 then return nil end
+			if tr.HitPos.z <= mins.z + 1 then break end
 			z = tr.HitPos.z - 1
 		end
 
-		return nil
+		if #floors == 0 then return nil end
+
+		return floors[math.random(#floors)]
+	end
+
+	local MIN_NAV_AREA = 32 * 32
+
+	local function navPool()
+		if M._navPool ~= nil then return M._navPool or nil end
+		if not navmesh.IsLoaded() then return nil end
+
+		local areas, weights, total = {}, {}, 0
+		for _, a in ipairs(navmesh.GetAllNavAreas()) do
+			local size = a:GetSizeX() * a:GetSizeY()
+			if size >= MIN_NAV_AREA and not a:IsUnderwater() then
+				total = total + size
+				areas[#areas + 1] = a
+				weights[#weights + 1] = total
+			end
+		end
+
+		M._navPool = #areas > 0 and {areas = areas, weights = weights, total = total} or false
+
+		return M._navPool or nil
+	end
+
+	local function tryFindNavSpotPos()
+		local pool = navPool()
+		if not pool then return nil end
+
+		local roll = math.Rand(0, pool.total)
+		local lo, hi = 1, #pool.weights
+		while lo < hi do
+			local mid = math.floor((lo + hi) / 2)
+			if pool.weights[mid] < roll then lo = mid + 1 else hi = mid end
+		end
+
+		local pos = pool.areas[lo]:GetRandomPoint() + vector_up * 8
+		if not isUsableSpot(pos) then return nil end
+
+		return pos
+	end
+
+	local UNITS_TO_M2 = 0.0254 * 0.0254
+
+	local function walkableAreaM2()
+		local pool = navPool()
+		if pool then return pool.total * UNITS_TO_M2 end
+
+		local world = game.GetWorld()
+		if not world or not world.GetModelBounds then return 0 end
+
+		local mins, maxs = world:GetModelBounds()
+		local samples, hits = 400, 0
+		for _ = 1, samples do
+			if tryFindNaturalSpotPos() then hits = hits + 1 end
+		end
+
+		return (hits / samples) * (maxs.x - mins.x) * (maxs.y - mins.y) * UNITS_TO_M2
+	end
+
+	function M:GetNaturalSpotTarget()
+		if self._naturalTarget then return self._naturalTarget end
+
+		local cfg = self.Config
+		local world = game.GetWorld()
+		local surfaces = world and world.GetBrushSurfaces and world:GetBrushSurfaces() or {}
+		local sizeTerm = math.sqrt(walkableAreaM2()) / (cfg.naturalSpotAreaDivisor or 50)
+		local complexityTerm = #surfaces / (cfg.naturalSpotSurfacesPerSpot or 2500)
+		local minCount = cfg.naturalSpotMin or 10
+
+		self._naturalTarget = math.Clamp(minCount + math.Round(sizeTerm + complexityTerm), minCount, cfg.naturalSpotMax or 40)
+
+		return self._naturalTarget
+	end
+
+	function M:PruneNaturalSpots()
+		local requireNav = navPool() ~= nil
+
+		for i = #self.hotspots, 1, -1 do
+			local h = self.hotspots[i]
+			if h.natural then
+				local bad = not isUsableSpot(h.pos)
+				if not bad and requireNav then
+					bad = navmesh.GetNearestNavArea(h.pos, false, 256, false, true) == nil
+				end
+
+				if bad then
+					table.remove(self.hotspots, i)
+				end
+			end
+		end
 	end
 
 	-- Fallback sampling anchored on player spawn points: always lands in reachable play
@@ -300,14 +412,16 @@ if SERVER then
 		end
 	end
 
-	-- Tops the map up to the configured number of natural spots. They are ordinary
+	-- Tops the map up to its target number of natural spots (GetNaturalSpotTarget). They are ordinary
 	-- hotspots as far as the condensator is concerned, but never decay and refill over time.
 	-- Placement must always end with at least one spot on the map: the dust economy has
 	-- no other bootstrap. Spacing relaxes by half each pass so small maps still fit
 	-- their spots, and the last resort anchors a spot near a player spawn.
 	function M:EnsureNaturalSpots()
+		self:PruneNaturalSpots()
+
 		local cfg = self.Config
-		local want = cfg.naturalSpotCount or 8
+		local want = self:GetNaturalSpotTarget()
 		local have = 0
 		for i = 1, #self.hotspots do
 			if self.hotspots[i].natural then have = have + 1 end
@@ -343,7 +457,7 @@ if SERVER then
 			local attempts = (want - have) * 50
 			while have < want and attempts > 0 do
 				attempts = attempts - 1
-				local pos = tryFindNaturalSpotPos()
+				local pos = tryFindNavSpotPos() or tryFindNaturalSpotPos()
 				if pos and not isTooClose(pos, spacing) then
 					addSpot(pos)
 				end

@@ -90,6 +90,8 @@ includePath("arcana/spellcraft")
 -- Scene definitions (must load after arcana/system/scenes.lua)
 includePath("arcana/scenes")
 
+includePath("arcana/condensator")
+
 if SERVER then
 	include("arcana/system/mana_crystals.lua")
 	include("arcana/system/default_inventory.lua")
