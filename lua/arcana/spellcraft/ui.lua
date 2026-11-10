@@ -466,14 +466,6 @@ local function OpenSpellcraftMenu(machine)
 		local bandTop = 6 + 1
 		local bandBottom = IsValid(content) and content:GetY() or (bandTop + 38)
 		local titleRight = ArtDeco.DrawTitle("Arcana_AncientLarge", "THE EMISSARY", bandTop, bandBottom, C.paleGold)
-
-		-- Dropped rather than crammed if the frame is too narrow to hold both.
-		local hint = "Drag to look around  ·  Scroll to zoom  ·  Left-click takes, right-click gives back"
-		surface.SetFont("Arcana_AncientSmall")
-		local hintW = surface.GetTextSize(hint)
-		if w - 46 - hintW > titleRight + 24 then
-			draw.SimpleText(hint, "Arcana_AncientSmall", w - 46, (bandTop + bandBottom) * 0.5, C.textDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-		end
 	end
 
 	content = vgui.Create("DPanel", frame)
