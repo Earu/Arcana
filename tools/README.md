@@ -41,6 +41,7 @@ These stay PNG: the spawnmenu looks icons up at `materials/entities/<class>.png`
 | --- | --- |
 | [export_glyphs.py](export_glyphs.py) | Pulsian glyphs to PNG, from `resource/fonts/pulsian.ttf`. |
 | [export_currency_icons.py](export_currency_icons.py) | Coin and shard icons into `materials/arcana/icons/`. |
+| [build_golden_sun_voices.py](build_golden_sun_voices.py) | Golden Sun voice lines and Midas laughs into `sound/arcana/scenes/golden_sun/`. Lines come from the `text`/`voice` pairs in `golden_sun.lua`, laughs from `LAUGHS` in the script. Needs macOS `say` and ffmpeg. Pass file names (`start laugh_2`) to render only those. |
 | [debug_attachments.lua](debug_attachments.lua) | Attachment markers on the held weapon. `lua_openscript_cl`, then `arcana_debug_attachments 1`. |
 
 ## shadercompile/

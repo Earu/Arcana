@@ -33,7 +33,7 @@ local LAUGH_COOLDOWN = 4 -- Minimum seconds between laughs (per player)
 local LAUGH_DISTANCE = 550
 local LAUGH_SOUNDLEVEL = 72
 local LAUGH_REVERB_DSP = 14 -- Cavernous reverb preset (tweak to taste)
-local LAUGH_DSP_HOLD = 4 -- Seconds to hold the reverb before restoring
+local LAUGH_DSP_HOLD = 7 -- Seconds to hold the reverb before restoring
 
 -- The curse lasts one hour of real time. The absolute expiry is persisted per
 -- player (via PData) so it keeps counting down across disconnects and cannot be
@@ -414,23 +414,19 @@ if CLIENT then
 		end)
 	end)
 
-	-- Father Grigori's mad laughter, pitched into something that is not him:
-	-- deep, warped, rolling in from far off and drowned in reverb.
+	-- The Golden Sun's laughter, rendered by tools/build_golden_sun_voices.py
 	local LAUGHS = {
-		"vo/ravenholm/madlaugh01.wav",
-		"vo/ravenholm/madlaugh02.wav",
-		"vo/ravenholm/madlaugh03.wav",
-		"vo/ravenholm/madlaugh04.wav",
+		"arcana/scenes/golden_sun/laugh_1.ogg",
+		"arcana/scenes/golden_sun/laugh_2.ogg",
+		"arcana/scenes/golden_sun/laugh_3.ogg",
+		"arcana/scenes/golden_sun/laugh_4.ogg",
 	}
 
 	-- Delay / volume / pitch-offset per echo tap (first two = detuned double)
 	local LAUGH_TAPS = {
 		{0.00, 0.9, 0},
-		{0.05, 0.5, 4},
-		{0.34, 0.55, -3},
-		{0.72, 0.36, 3},
-		{1.20, 0.22, -5},
-		{1.75, 0.12, 5},
+		{0.05, 0.5, -3},
+		{0.60, 0.3, -6},
 	}
 
 	net.Receive("Arcana_Midas_Laugh", function()
@@ -438,7 +434,7 @@ if CLIENT then
 		if not IsValid(lp) then return end
 
 		local snd = LAUGHS[math.random(#LAUGHS)]
-		local basePitch = math.random(12, 20) -- deep and slowed
+		local basePitch = math.random(94, 104)
 		local origin = lp:GetPos() + Vector(0, 0, 40)
 
 		-- A vast, cavernous space swallows the sound while it plays

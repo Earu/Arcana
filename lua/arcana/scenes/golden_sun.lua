@@ -11,7 +11,13 @@
 --
 -- Start it with: Arcana.StartGoldenSunSequence()
 
-if SERVER then return end
+if SERVER then
+	for _, f in ipairs(file.Find("sound/arcana/scenes/golden_sun/*.ogg", "GAME")) do
+		resource.AddFile("sound/arcana/scenes/golden_sun/" .. f)
+	end
+
+	return
+end
 
 local SCENE_ID = "golden_sun"
 local GOLD_MATERIAL = "models/player/shared/gold_player"
@@ -590,7 +596,7 @@ hook.Add("Think", "Arcana_GoldenSunScene_Aura", function()
 
 	-- Only while the scenes space is actually shown
 	local phase = scenes.phase
-	if phase ~= "scenes" and phase ~= "fade_from_black" and
+	if phase ~= "scene" and phase ~= "fade_from_black" and
 	   phase ~= "show_panel" and phase ~= "fade_to_white" then return end
 
 	local now = SysTime()
@@ -625,6 +631,7 @@ end)
 local NODES = {
 	START = {
 		text = "A soul. It walks, it wants. Come closer, little flame. The light has never once bitten.",
+		voice = "arcana/scenes/golden_sun/start.ogg",
 		choices = {
 			{ text = "What are you?", ["next"] = "WHO_ARE_YOU" },
 			{ text = "Where am I?", ["next"] = "WHAT_IS_THIS" },
@@ -632,6 +639,7 @@ local NODES = {
 	},
 	WHO_ARE_YOU = {
 		text = "The statue is a mouth. Call what speaks the Golden Sun. It is the shape you can hold.",
+		voice = "arcana/scenes/golden_sun/who_are_you.ogg",
 		choices = {
 			{ text = "What is all this gold?", ["next"] = "THE_GOLD" },
 			{ text = "What do you want from me?", ["next"] = "THE_OFFER" },
@@ -639,6 +647,7 @@ local NODES = {
 	},
 	WHAT_IS_THIS = {
 		text = "A fold of Elysion. The coins fall because falling pleases. Do not look for reasons here.",
+		voice = "arcana/scenes/golden_sun/what_is_this.ogg",
 		choices = {
 			{ text = "What are you?", ["next"] = "WHO_ARE_YOU" },
 			{ text = "What do you want from me?", ["next"] = "THE_OFFER" },
@@ -646,12 +655,14 @@ local NODES = {
 	},
 	THE_GOLD = {
 		text = "What remains where we have rested. Keep some, if you like.",
+		voice = "arcana/scenes/golden_sun/the_gold.ogg",
 		choices = {
 			{ text = "What do you want from me?", ["next"] = "THE_OFFER" },
 		}
 	},
 	THE_OFFER = {
 		text = "Coins. More than you can spend, and then more. In return: a touch. Yours.",
+		voice = "arcana/scenes/golden_sun/the_offer.ogg",
 		choices = {
 			{ text = "A touch?", ["next"] = "THE_PRICE" },
 			{ text = "Why offer this to me?", ["next"] = "WHY_ME" },
@@ -659,12 +670,14 @@ local NODES = {
 	},
 	WHY_ME = {
 		text = "Why does the sun fall on one field and not another?",
+		voice = "arcana/scenes/golden_sun/why_me.ogg",
 		choices = {
 			{ text = "...What do you ask in exchange?", ["next"] = "THE_PRICE" },
 		}
 	},
 	THE_PRICE = {
 		text = "A small thing. You will hardly miss it. Everything you want, for everything you hold. Shall we conclude?",
+		voice = "arcana/scenes/golden_sun/the_price.ogg",
 		choices = {
 			{
 				text = "Give me the gold.",
@@ -692,9 +705,11 @@ local NODES = {
 	},
 	ACCEPTED = {
 		text = "How it hurries. Go home, little flame. What was agreed will arrive.",
+		voice = "arcana/scenes/golden_sun/accepted.ogg",
 	},
 	REFUSED = {
 		text = "It believes refusing is a thing it can do. The offer does not expire.",
+		voice = "arcana/scenes/golden_sun/refused.ogg",
 	}
 }
 

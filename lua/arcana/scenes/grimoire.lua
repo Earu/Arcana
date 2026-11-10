@@ -5,8 +5,8 @@
 
 if SERVER then
 	-- add the sound files for the scene
-	for _, f in ipairs(file.Find("sound/arcana/tutorials/grimoire/*.ogg", "GAME")) do
-		resource.AddFile("sound/arcana/tutorials/grimoire/" .. f)
+	for _, f in ipairs(file.Find("sound/arcana/scenes/grimoire_intro/*.ogg", "GAME")) do
+		resource.AddFile("sound/arcana/scenes/grimoire_intro/" .. f)
 	end
 
 	return
@@ -373,7 +373,7 @@ end)
 local NODES = {
 	START = {
 		text = "Ah. Mortal. You have found something of consequence...",
-		voice = "arcana/tutorials/grimoire/start.ogg",
+		voice = "arcana/scenes/grimoire_intro/start.ogg",
 		choices = {
 			{ text = "Who are you?", ["next"] = "WHO_ARE_YOU" },
 			{ text = "What is this place?", ["next"] = "WHAT_IS_THIS" },
@@ -382,7 +382,7 @@ local NODES = {
 	},
 	WHO_ARE_YOU = {
 		text = "I am Iara. I tend the balance of this world and preserve its truths.. I oversee its equilibrium along with its souls, like yours.",
-		voice = "arcana/tutorials/grimoire/who_are_you.ogg", -- redo
+		voice = "arcana/scenes/grimoire_intro/who_are_you.ogg", -- redo
 		choices = {
 			{ text = "What is this place?", ["next"] = "WHAT_IS_THIS" },
 			{ text = "Why am I here?", ["next"] = "WHY_AM_I_HERE" },
@@ -390,7 +390,7 @@ local NODES = {
 	},
 	WHAT_IS_THIS = {
 		text = "This is Elysion, the astral plane. A space removed from matter, where intent may be addressed without consequence to the physical world. Only your soul is present.",
-		voice = "arcana/tutorials/grimoire/what_is_this.ogg",
+		voice = "arcana/scenes/grimoire_intro/what_is_this.ogg",
 		choices = {
 			{ text = "Who are you?", ["next"] = "WHO_ARE_YOU" },
 			{ text = "Why did you bring me here?", ["next"] = "WHY_AM_I_HERE" },
@@ -398,7 +398,7 @@ local NODES = {
 	},
 	WHY_AM_I_HERE = {
 		text = "I summoned you because you now carry an artifact that interacts directly with the laws I uphold. The grimoire does not forgive ignorance. Without guidance, it will extract payment regardless of your intent.",
-		voice = "arcana/tutorials/grimoire/why_am_i_here.ogg",
+		voice = "arcana/scenes/grimoire_intro/why_am_i_here.ogg",
 		choices = {
 			{ text = "Is it really that powerful?", ["next"] = "GRIMOIRE_EXPLANATION" },
 			{ text = "LET ME GO. NOW.", ["next"] = "END_RUDE" },
@@ -406,7 +406,7 @@ local NODES = {
 	},
 	GRIMOIRE_EXPLANATION = {
 		text = "Yes. Through it, you may impose your will upon the world - briefly. Such imposition requires balance. An offering satisfies this exchange. Without one, the cost is reclaimed from you instead.",
-		voice = "arcana/tutorials/grimoire/grimoire_explanation.ogg",
+		voice = "arcana/scenes/grimoire_intro/grimoire_explanation.ogg",
 		choices = {
 			{ text = "So how does it work?", ["next"] = "SPELL_EXPLANATION" },
 			{ text = "From me... ?", ["next"] = "OFFERING_EXPLANATION" },
@@ -414,14 +414,14 @@ local NODES = {
 	},
 	OFFERING_EXPLANATION = {
 		text = "You do not possess mana, and so you have the world do your biding, we make this possible, but to uphold balance an offering is required. Your body and your life will qualify as such if you do not offer something else.",
-		voice = "arcana/tutorials/grimoire/offering_explanation.ogg",
+		voice = "arcana/scenes/grimoire_intro/offering_explanation.ogg",
 		choices = {
 			{ text = "So how does it work?", ["next"] = "SPELL_EXPLANATION" },
 		}
 	},
 	SPELL_EXPLANATION = {
 		text = "The grimoire grows as you do. Each spell cast, each ritual completed, each risk endured refines your understanding. Experience becomes knowledge. Knowledge allows new inscriptions, rituals, and pacts to be recorded at altars. I have also blessed you with a first spell...",
-		voice = "arcana/tutorials/grimoire/spell_explanation.ogg",
+		voice = "arcana/scenes/grimoire_intro/spell_explanation.ogg",
 		choices = {
 			{ text = "You said it could be dangerous?", ["next"] = "CORRUPTION_WARNING" },
 			{ text = "What spell?", ["next"] = "FIREBALL_EXPLANATION" },
@@ -429,25 +429,25 @@ local NODES = {
 	},
 	FIREBALL_EXPLANATION = {
 		text = "I have entrusted you with the \"Fireball\" incantation. It condenses ambient mana into a volatile fiery orb that releases its energy on impact. I am sure you will find it useful.",
-		voice = "arcana/tutorials/grimoire/fireball_explanation.ogg",
+		voice = "arcana/scenes/grimoire_intro/fireball_explanation.ogg",
 		choices = {
 			{ text = "You said it could be dangerous?", ["next"] = "CORRUPTION_WARNING" },
 		}
 	},
 	CORRUPTION_WARNING = {
 		text = "Repeated casting draws ambient mana inward. Where it gathers too densely, it hardens. When disturbed, it may rupture - and corruption follows. Such areas are unstable and indifferent to life. Beware...",
-		voice = "arcana/tutorials/grimoire/corruption_warning.ogg",
+		voice = "arcana/scenes/grimoire_intro/corruption_warning.ogg",
 		choices = {
 			{ text = "Corruption... ?", ["next"] = "END" },
 		}
 	},
 	END = {
 		text = "Ah, it seems I am required elsewhere. That is all for now, we will speak again... soon.",
-		voice = "arcana/tutorials/grimoire/end.ogg", -- redo
+		voice = "arcana/scenes/grimoire_intro/end.ogg", -- redo
 	},
 	END_RUDE = {
 		text = "Very well. You shall be released and your choice will be remembered. No further assistance will be provided, your choices are now your own.",
-		voice = "arcana/tutorials/grimoire/end_rude.ogg",
+		voice = "arcana/scenes/grimoire_intro/end_rude.ogg",
 	}
 }
 
