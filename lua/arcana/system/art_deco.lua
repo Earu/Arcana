@@ -1120,8 +1120,65 @@ if CLIENT then
 	local STATION_UI_MAX_ASPECT = 1.25
 	local STATION_HULL_MIN = Vector(-6, -6, -6)
 	local STATION_HULL_MAX = Vector(6, 6, 6)
+	local STATION_VIEWER_MIN_DIST = 24
+	local STATION_HOOK = "Arcana_StationView"
 
 	local stationState
+	local stashedCalcViews
+	local stationCalcView
+
+	local function claimCalcView()
+		stashedCalcViews = stashedCalcViews or {}
+
+		local hooks = hook.GetTable().CalcView
+		if hooks then
+			local names = {}
+			for name in pairs(hooks) do
+				if name ~= STATION_HOOK then
+					names[#names + 1] = name
+				end
+			end
+
+			for _, name in ipairs(names) do
+				stashedCalcViews[name] = hooks[name]
+				hook.Remove("CalcView", name)
+			end
+		end
+
+		hooks = hook.GetTable().CalcView
+		if not hooks or hooks[STATION_HOOK] ~= stationCalcView then
+			hook.Add("CalcView", STATION_HOOK, stationCalcView)
+		end
+	end
+
+	local function releaseCalcView()
+		hook.Remove("CalcView", STATION_HOOK)
+		if not stashedCalcViews then return end
+
+		local hooks = hook.GetTable().CalcView
+		for name, fn in pairs(stashedCalcViews) do
+			if not (hooks and hooks[name]) then
+				hook.Add("CalcView", name, fn)
+			end
+		end
+
+		stashedCalcViews = nil
+	end
+
+	local function stashedBaseView(ply, pos, angles, fov, znear, zfar)
+		for name, fn in pairs(stashedCalcViews) do
+			local view
+			if isstring(name) then
+				view = fn(ply, pos, angles, fov, znear, zfar)
+			elseif IsValid(name) then
+				view = fn(name, ply, pos, angles, fov, znear, zfar)
+			end
+
+			if view ~= nil then return view end
+		end
+
+		return GAMEMODE:CalcView(ply, pos, angles, fov, znear, zfar)
+	end
 
 	function StationView.GetLayout()
 		local w, h = ScrW(), ScrH()
@@ -1186,6 +1243,7 @@ if CLIENT then
 			blend = stationState and stationState.blend or 0,
 			target = 1,
 		}
+		claimCalcView()
 
 		return true
 	end
@@ -1228,11 +1286,17 @@ if CLIENT then
 		)
 	end
 
-	hook.Add("Think", "Arcana_StationView", function()
+	hook.Add("Think", STATION_HOOK, function()
 		if not stationState then return end
 
+		if not IsValid(stationState.ent) then
+			stationState = nil
+			releaseCalcView()
+			return
+		end
+
 		local ply = LocalPlayer()
-		if stationState.target == 1 and (not IsValid(stationState.frame) or not IsValid(stationState.ent) or not IsValid(ply) or not ply:Alive()) then
+		if stationState.target == 1 and (not IsValid(stationState.frame) or not IsValid(ply) or not ply:Alive()) then
 			stationState.target = 0
 		end
 
@@ -1240,23 +1304,29 @@ if CLIENT then
 
 		if stationState.target == 0 and stationState.blend <= 0 then
 			stationState = nil
+			releaseCalcView()
+			return
 		end
+
+		claimCalcView()
 	end)
 
-	hook.Add("CalcView", "Arcana_StationView", function(ply, pos, angles, fov)
-		if not stationState or stationState.blend <= 0 or not IsValid(stationState.ent) then return end
+	stationCalcView = function(ply, pos, angles, fov, znear, zfar)
+		if not stationState or not stashedCalcViews or not IsValid(stationState.ent) then return end
 
+		local base = stashedBaseView(ply, pos, angles, fov, znear, zfar) or {}
 		local t = stationState.blend
 		local e = t * t * (3 - 2 * t)
 		local origin, viewAng = computeStationView()
+		local viewOrigin = LerpVector(e, base.origin or pos, origin)
 
 		return {
-			origin = LerpVector(e, pos, origin),
-			angles = blendAngle(e, angles, viewAng),
-			fov = Lerp(e, fov, STATION_VIEW_FOV),
-			drawviewer = false,
+			origin = viewOrigin,
+			angles = blendAngle(e, base.angles or angles, viewAng),
+			fov = Lerp(e, base.fov or fov, STATION_VIEW_FOV),
+			drawviewer = base.drawviewer or viewOrigin:DistToSqr(pos) > STATION_VIEWER_MIN_DIST * STATION_VIEWER_MIN_DIST,
 		}
-	end)
+	end
 
 	hook.Add("PreDrawViewModel", "Arcana_StationView", function()
 		if StationView.IsActive() then return true end
