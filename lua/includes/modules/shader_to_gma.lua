@@ -64,10 +64,7 @@ if SERVER then
 
 		for i = 1, #files do
 			local p = lowerFixPath(files[i].path)
-			local realm = files[i].realm
-			local data = readGameFile(p, realm)
-			if not data then return false, "missing " .. realm .. " file: " .. p end
-
+			local data = files[i].data
 			local crc = crc32_num(data)
 			entries[#entries + 1] = {
 				id = i,
@@ -116,7 +113,49 @@ if SERVER then
 	util.AddNetworkString("shader_to_gma")
 	local CHUNK_SIZE = 60000
 	local shaderFiles = {}
+	local shaderNames = {}
 	local gmaChunks = {}
+	local dirty = false
+
+	local function hashedName(name, data)
+		local hash = string.sub(util.SHA256(data), 1, 8)
+		local base, suffix = string.match(name, "^(.+)(_[pv]s%w+)$")
+		if not base then return name .. "_" .. hash end
+
+		return base .. "_" .. hash .. suffix
+	end
+
+	local function buildGMA()
+		dirty = false
+		gmaChunks = {}
+		shaderNames = {}
+
+		local files = {}
+		for name, src in SortedPairs(shaderFiles) do
+			local data = readGameFile(src.path, src.realm)
+			if not data then
+				shaderFiles[name] = nil
+			else
+				local hashed = hashedName(name, data)
+				shaderNames[name] = hashed
+				files[#files + 1] = { path = "shaders/fxc/" .. hashed .. ".vcs", data = data }
+			end
+		end
+
+		local ok, res = createGMA(files, {
+			title = "shader_to_gma"
+		})
+
+		if not ok then
+			log("Failed to build GMA:", res)
+			return
+		end
+
+		local compressed = util.Compress(res)
+		for i = 1, #compressed, CHUNK_SIZE do
+			gmaChunks[#gmaChunks + 1] = string.sub(compressed, i, i + CHUNK_SIZE - 1)
+		end
+	end
 
 	function resource.AddShader(shaderName)
 		local path = "shaders/fxc/" .. shaderName .. ".vcs"
@@ -131,26 +170,7 @@ if SERVER then
 		end
 
 		shaderFiles[shaderName] = { path = path, realm = realm }
-
-		for existingShaderName, existingShaderData in pairs(shaderFiles) do
-			if existingShaderName == shaderName then continue end
-
-			if not file.Exists(existingShaderData.path, existingShaderData.realm) then
-				shaderFiles[existingShaderName] = nil
-			end
-		end
-
-		local ok, res = createGMA(table.ClearKeys(shaderFiles), {
-			title = "shader_to_gma"
-		})
-
-		if ok then
-			local compressed = util.Compress(res)
-			gmaChunks = {}
-			for i = 1, #compressed, CHUNK_SIZE do
-				gmaChunks[#gmaChunks + 1] = string.sub(compressed, i, i + CHUNK_SIZE - 1)
-			end
-		end
+		dirty = true
 	end
 
 	local justSpawned = {}
@@ -159,7 +179,10 @@ if SERVER then
 	end)
 
 	local function sendGMA(ply)
+		if dirty then buildGMA() end
+
 		local chunks = gmaChunks
+		local names = shaderNames
 		local total = #chunks
 		if total == 0 then
 			net.Start("shader_to_gma")
@@ -182,6 +205,13 @@ if SERVER then
 			net.Start("shader_to_gma")
 			net.WriteUInt(index, 16)
 			net.WriteUInt(total, 16)
+			if index == 1 then
+				net.WriteUInt(table.Count(names), 16)
+				for name, hashed in pairs(names) do
+					net.WriteString(name)
+					net.WriteString(hashed)
+				end
+			end
 			net.WriteUInt(#chunk, 16)
 			net.WriteData(chunk, #chunk)
 			net.Send(ply)
@@ -198,12 +228,35 @@ end
 
 if CLIENT then
 	SHADER_MOUNTED = _G.SHADER_MOUNTED or false
+	SHADER_NAMES = _G.SHADER_NAMES or {}
+
+	local function resolveShaderName(name)
+		return SHADER_NAMES[name] or name
+	end
+
+	local function shaderPath(name)
+		return "shaders/fxc/" .. resolveShaderName(name) .. ".vcs"
+	end
+
+	function ShaderExists(name)
+		return file.Exists(shaderPath(name), "GAME")
+	end
+
 	local receivedChunks = {}
+	local pendingNames = {}
 	net.Receive("shader_to_gma", function()
 		local index = net.ReadUInt(16)
 		local total = net.ReadUInt(16)
 		if index > 0 then
-			if index == 1 then receivedChunks = {} end
+			if index == 1 then
+				receivedChunks = {}
+				pendingNames = {}
+				for _ = 1, net.ReadUInt(16) do
+					local name = net.ReadString()
+					local hashed = net.ReadString()
+					pendingNames[name] = hashed
+				end
+			end
 			receivedChunks[index] = net.ReadData(net.ReadUInt(16))
 			if index < total then return end
 		end
@@ -242,6 +295,7 @@ if CLIENT then
 		else
 			log("Mounted GMA")
 			PrintTable(filesOrErr)
+			SHADER_NAMES = pendingNames
 			hook.Run("ShaderMounted", filesOrErr)
 			SHADER_MOUNTED = true
 		end
@@ -287,7 +341,15 @@ if CLIENT then
 			end
 		end
 
-		return CreateMaterial(name, shader or "screenspace_general", key_values)
+		for _, key in ipairs({ "$pixshader", "$vertexshader" }) do
+			if isstring(key_values[key]) and key_values[key] ~= "" then
+				key_values[key] = resolveShaderName(key_values[key])
+			end
+		end
+
+		local shaders = tostring(key_values["$pixshader"]) .. tostring(key_values["$vertexshader"])
+
+		return CreateMaterial(name .. "_" .. util.CRC(shaders), shader or "screenspace_general", key_values)
 	end
 
 	local internalHookIndex = 0
@@ -301,7 +363,7 @@ if CLIENT then
 
 		local allAvailable = true
 		for _, shaderName in pairs(shaderNames) do
-			if not file.Exists("shaders/fxc/" .. shaderName .. ".vcs", "GAME") then
+			if not ShaderExists(shaderName) then
 				allAvailable = false
 				break
 			end
@@ -325,8 +387,7 @@ if CLIENT then
 
 				allAvailable = true
 				for _, shaderName in pairs(shaderNames) do
-					local shaderPath = "shaders/fxc/" .. shaderName .. ".vcs"
-					if not table.HasValue(filesOrErr, shaderPath) then
+					if not table.HasValue(filesOrErr, shaderPath(shaderName)) then
 						allAvailable = false
 						break
 					end
