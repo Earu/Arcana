@@ -112,10 +112,10 @@ if SERVER then
 
 	util.AddNetworkString("shader_to_gma")
 	local CHUNK_SIZE = 60000
-	local shaderFiles = {}
-	local shaderNames = {}
-	local gmaChunks = {}
-	local dirty = false
+
+	SHADER_TO_GMA = SHADER_TO_GMA or { files = {}, names = {}, chunks = {}, spawning = {}, ready = {} }
+	local state = SHADER_TO_GMA
+	state.dirty = true
 
 	local function hashedName(name, data)
 		local hash = string.sub(util.SHA256(data), 1, 8)
@@ -125,22 +125,38 @@ if SERVER then
 		return base .. "_" .. hash .. suffix
 	end
 
-	local function buildGMA()
-		dirty = false
-		gmaChunks = {}
-		shaderNames = {}
+	local function sameNames(a, b)
+		for k, v in pairs(a) do
+			if b[k] ~= v then return false end
+		end
 
-		local files = {}
-		for name, src in SortedPairs(shaderFiles) do
+		for k in pairs(b) do
+			if a[k] == nil then return false end
+		end
+
+		return true
+	end
+
+	local function buildGMA()
+		local names, files = {}, {}
+		for name, src in SortedPairs(state.files) do
 			local data = readGameFile(src.path, src.realm)
 			if not data then
-				shaderFiles[name] = nil
+				state.files[name] = nil
 			else
 				local hashed = hashedName(name, data)
-				shaderNames[name] = hashed
+				names[name] = hashed
 				files[#files + 1] = { path = "shaders/fxc/" .. hashed .. ".vcs", data = data }
 			end
 		end
+
+		local changed = not sameNames(names, state.names)
+		if not changed and not state.dirty then return false end
+
+		state.dirty = false
+		state.names = names
+		state.chunks = {}
+		if #files == 0 then return changed end
 
 		local ok, res = createGMA(files, {
 			title = "shader_to_gma"
@@ -148,13 +164,15 @@ if SERVER then
 
 		if not ok then
 			log("Failed to build GMA:", res)
-			return
+			return changed
 		end
 
 		local compressed = util.Compress(res)
 		for i = 1, #compressed, CHUNK_SIZE do
-			gmaChunks[#gmaChunks + 1] = string.sub(compressed, i, i + CHUNK_SIZE - 1)
+			state.chunks[#state.chunks + 1] = string.sub(compressed, i, i + CHUNK_SIZE - 1)
 		end
+
+		return changed
 	end
 
 	function resource.AddShader(shaderName)
@@ -169,20 +187,24 @@ if SERVER then
 			end
 		end
 
-		shaderFiles[shaderName] = { path = path, realm = realm }
-		dirty = true
+		state.files[shaderName] = { path = path, realm = realm }
+		state.dirty = true
 	end
 
-	local justSpawned = {}
 	hook.Add("PlayerInitialSpawn", "shader_to_gma", function(ply)
-		justSpawned[ply] = true
+		state.spawning[ply] = true
+	end)
+
+	hook.Add("PlayerDisconnected", "shader_to_gma", function(ply)
+		state.spawning[ply] = nil
+		state.ready[ply] = nil
 	end)
 
 	local function sendGMA(ply)
-		if dirty then buildGMA() end
+		if state.dirty then buildGMA() end
 
-		local chunks = gmaChunks
-		local names = shaderNames
+		local chunks = state.chunks
+		local names = state.names
 		local total = #chunks
 		if total == 0 then
 			net.Start("shader_to_gma")
@@ -219,9 +241,18 @@ if SERVER then
 	end
 
 	hook.Add("SetupMove", "shader_to_gma", function(ply, _, ucmd)
-		if justSpawned[ply] and not ucmd:IsForced() then
-			justSpawned[ply] = nil
+		if state.spawning[ply] and not ucmd:IsForced() then
+			state.spawning[ply] = nil
+			state.ready[ply] = true
 			sendGMA(ply)
+		end
+	end)
+
+	hook.Add("OnRefreshLua", "shader_to_gma", function()
+		if not buildGMA() then return end
+
+		for ply in pairs(state.ready) do
+			if IsValid(ply) then sendGMA(ply) end
 		end
 	end)
 end
@@ -229,9 +260,27 @@ end
 if CLIENT then
 	SHADER_MOUNTED = _G.SHADER_MOUNTED or false
 	SHADER_NAMES = _G.SHADER_NAMES or {}
+	SHADER_TO_GMA = SHADER_TO_GMA or { materials = setmetatable({}, { __mode = "k" }) }
+	local materials = SHADER_TO_GMA.materials
 
 	local function resolveShaderName(name)
 		return SHADER_NAMES[name] or name
+	end
+
+	local function retargetMaterials()
+		for mat, entry in pairs(materials) do
+			local changed = false
+			for key, shaderName in pairs(entry.names) do
+				local resolved = resolveShaderName(shaderName)
+				if entry.resolved[key] ~= resolved then
+					entry.resolved[key] = resolved
+					mat:SetString(key, resolved)
+					changed = true
+				end
+			end
+
+			if changed then mat:Recompute() end
+		end
 	end
 
 	local function shaderPath(name)
@@ -296,6 +345,7 @@ if CLIENT then
 			log("Mounted GMA")
 			PrintTable(filesOrErr)
 			SHADER_NAMES = pendingNames
+			retargetMaterials()
 			hook.Run("ShaderMounted", filesOrErr)
 			SHADER_MOUNTED = true
 		end
@@ -341,15 +391,21 @@ if CLIENT then
 			end
 		end
 
+		local entry = { names = {}, resolved = {} }
 		for _, key in ipairs({ "$pixshader", "$vertexshader" }) do
-			if isstring(key_values[key]) and key_values[key] ~= "" then
-				key_values[key] = resolveShaderName(key_values[key])
+			local shaderName = key_values[key]
+			if isstring(shaderName) and shaderName ~= "" then
+				entry.names[key] = shaderName
+				entry.resolved[key] = resolveShaderName(shaderName)
+				key_values[key] = entry.resolved[key]
 			end
 		end
 
 		local shaders = tostring(key_values["$pixshader"]) .. tostring(key_values["$vertexshader"])
+		local mat = CreateMaterial(name .. "_" .. util.CRC(shaders), shader or "screenspace_general", key_values)
+		materials[mat] = entry
 
-		return CreateMaterial(name .. "_" .. util.CRC(shaders), shader or "screenspace_general", key_values)
+		return mat
 	end
 
 	local internalHookIndex = 0
