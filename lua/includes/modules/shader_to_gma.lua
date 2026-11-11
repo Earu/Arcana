@@ -239,7 +239,7 @@ if CLIENT then
 	end
 
 	function ShaderExists(name)
-		return file.Exists(shaderPath(name), "GAME")
+		return SHADER_NAMES[name] ~= nil and file.Exists(shaderPath(name), "GAME")
 	end
 
 	local receivedChunks = {}
