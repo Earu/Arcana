@@ -24,8 +24,8 @@ if SERVER then
 	util.AddNetworkString("Arcana_Condensator_OpenExchange")
 	util.AddNetworkString("Arcana_Condensator_Convert")
 	util.AddNetworkString("Arcana_Condensator_Game")
+	util.AddNetworkString("Arcana_Condensator_Ack")
 	util.AddNetworkString("Arcana_Condensator_Input")
-	util.AddNetworkString("Arcana_Condensator_Signal")
 	util.AddNetworkString("Arcana_Condensator_Converted")
 
 	local INPUTS_PER_SECOND = 40
@@ -38,6 +38,10 @@ if SERVER then
 
 	local function timerName(ply)
 		return "Arcana_CondensatorGame_" .. ply:EntIndex()
+	end
+
+	local function latency(ply, st)
+		return st.rtt or ply:Ping() / 1000
 	end
 
 	local function payout(ply, recipe, amount)
@@ -56,7 +60,7 @@ if SERVER then
 
 		local pct = FAIL_PENALTY
 		if success then
-			local t = (now - st.start) - st.timing.lead - ply:Ping() / 1000
+			local t = (now - st.start) - st.timing.lead - latency(ply, st)
 			pct = math.Round(SUCCESS_BONUS * X.SpeedFrac(st.timing, t))
 		end
 
@@ -138,6 +142,13 @@ if SERVER then
 		net.Send(ply)
 	end)
 
+	net.Receive("Arcana_Condensator_Ack", function(_, ply)
+		local st = ply._arcanaExchange
+		if not st or st.rtt or net.ReadUInt(16) ~= st.id then return end
+
+		st.rtt = math.min(SysTime() - st.start, 1)
+	end)
+
 	net.Receive("Arcana_Condensator_Input", function(_, ply)
 		local st = ply._arcanaExchange
 		if not st or net.ReadUInt(16) ~= st.id then return end
@@ -154,14 +165,7 @@ if SERVER then
 		local values = {}
 		for i = 1, net.ReadUInt(3) do values[i] = net.ReadInt(16) end
 
-		local result, signal = X.Games[st.game].input(st, values, now, ply:Ping() / 1000)
-
-		if signal then
-			net.Start("Arcana_Condensator_Signal", true)
-			net.WriteUInt(st.id, 16)
-			net.WriteUInt(signal, 8)
-			net.Send(ply)
-		end
+		local result = X.Games[st.game].input(st, values, now, latency(ply, st))
 
 		if result == "success" then
 			resolve(ply, st, true, now)
@@ -671,16 +675,11 @@ net.Receive("Arcana_Condensator_Game", function()
 		return
 	end
 
-	startGame(frameRef, id, gameIndex, recipe, times, public)
-end)
+	net.Start("Arcana_Condensator_Ack", true)
+	net.WriteUInt(id, 16)
+	net.SendToServer()
 
-net.Receive("Arcana_Condensator_Signal", function()
-	local id = net.ReadUInt(16)
-	local value = net.ReadUInt(8)
-	local g = IsValid(frameRef) and frameRef._state.game
-	if g and g.id == id and g.def.client.signal then
-		g.def.client.signal(g, value)
-	end
+	startGame(frameRef, id, gameIndex, recipe, times, public)
 end)
 
 net.Receive("Arcana_Condensator_Converted", function()

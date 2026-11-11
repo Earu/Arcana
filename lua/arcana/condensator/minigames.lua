@@ -26,20 +26,13 @@ function X.SpeedFrac(timing, t)
 	return math.Clamp((timing.slow - t) / (timing.slow - timing.fast), 0, 1)
 end
 
-local TUNE_TOLERANCE = 12
-local TUNE_HOLD = 0.7
-local TUNE_GAP = 0.3
 local SPARK_PERIOD = 2.4
 local SPARK_WINDOW = 18
-local SPARK_CLOCK_SLACK = 0.12
+local SPARK_CLOCK_SLACK = 0.25
 local ECHO_STEP = 0.6
 local ECHO_LENGTH = 5
 local RING_COUNT = 3
 local RING_NOTCHES = 8
-
-local function tuneSignal(diff)
-	return math.Clamp(1 - diff / 70, 0, 1) ^ 2
-end
 
 local function sparkPar(p)
 	local t = 0
@@ -66,32 +59,6 @@ local function ringsAligned(init, moves)
 end
 
 X.Games = {
-	{
-		name = "Resonance",
-		hint = "Sweep the ring, hold click where the signal peaks",
-		timing = function()
-			return {fast = 2.5, slow = 9, timeout = 20, lead = 0}
-		end,
-		generate = function()
-			return {target = math.random(0, 359)}, {}
-		end,
-		input = function(st, v, now)
-			if not isInt(v[1], 0, 3599) or not isInt(v[2], 0, 1) then return "ignore" end
-
-			local diff = angleDiff(v[1] / 10, st.secret.target)
-			local gap = now - (st.lastInput or now)
-			st.lastInput = now
-
-			if v[2] == 1 and diff <= TUNE_TOLERANCE then
-				if not st.holdStart or gap > TUNE_GAP then st.holdStart = now end
-				if now - st.holdStart >= TUNE_HOLD then return "success" end
-			else
-				st.holdStart = nil
-			end
-
-			return "continue", math.Round(tuneSignal(diff) * 255)
-		end,
-	},
 	{
 		name = "Cipher",
 		hint = "Pick the glyphs in the order shown above",
@@ -169,12 +136,12 @@ X.Games = {
 
 			return pub, pub
 		end,
-		input = function(st, v, now, ping)
+		input = function(st, v, now, rtt)
 			if not isInt(v[1], 0, 32000) then return "ignore" end
 
 			local t = v[1] / 1000
-			local expected = now - st.start - ping
-			if math.abs(t - expected) > SPARK_CLOCK_SLACK + ping * 0.5 then return "fail" end
+			local elapsed = now - st.start
+			if t > elapsed + 0.05 or t < elapsed - rtt - SPARK_CLOCK_SLACK then return "fail" end
 			if t <= (st.lastT or 0) then return "fail" end
 			st.lastT = t
 
@@ -208,9 +175,9 @@ X.Games = {
 
 			return pub, pub
 		end,
-		input = function(st, v, now, ping)
+		input = function(st, v, now, rtt)
 			if not isInt(v[1], 1, 6) then return "ignore" end
-			if now - st.start - ping < st.timing.lead - 0.15 then return "ignore" end
+			if now - st.start - rtt < st.timing.lead - 0.15 then return "ignore" end
 
 			st.step = st.step or 1
 			if v[1] ~= st.public.seq[st.step] then return "fail" end
@@ -258,10 +225,6 @@ local function polar(cx, cy, r, rel)
 	return cx + math.cos(rad) * r, cy + math.sin(rad) * r
 end
 
-local function relAngle(cx, cy, x, y)
-	return (math.deg(math.atan2(y - cy, x - cx)) + 90) % 360
-end
-
 local function arc(cx, cy, r, from, to, col, thick)
 	surface.SetDrawColor(col)
 	local steps = math.max(2, math.ceil(math.abs(to - from) / 6))
@@ -293,65 +256,6 @@ local function geometry(g)
 	return cx, cy, r
 end
 
-X.Games[1].client = {
-	init = function(g)
-		g.angle, g.signal, g.serverSignal, g.hold, g.nextSend = 0, 0, 0, 0, 0
-	end,
-	signal = function(g, value)
-		g.serverSignal = value / 255
-	end,
-	think = function(g, now, dt, mx, my, held)
-		local cx, cy = geometry(g)
-		g.angle = relAngle(cx, cy, mx, my)
-		g.signal = Lerp(math.min(1, dt * 10), g.signal, g.serverSignal)
-
-		if held and g.serverSignal >= tuneSignal(TUNE_TOLERANCE) then
-			g.hold = math.min(TUNE_HOLD, g.hold + dt)
-		else
-			g.hold = math.max(0, g.hold - dt * 2)
-		end
-
-		if now >= g.nextSend then
-			g.nextSend = now + 0.05
-			g.send({math.Round(g.angle * 10) % 3600, held and 1 or 0})
-		end
-	end,
-	draw = function(g, now)
-		local cx, cy, r = geometry(g)
-		local s = g.signal
-
-		arc(cx, cy, r, 0, 360, ColorAlpha(brass, 160), 2)
-		ticks(cx, cy, r + 4, 48, ColorAlpha(gold, 60), 6, function(rel)
-			return math.Clamp(1 - angleDiff(rel, g.angle) / 25, 0, 1) * (0.3 + 0.7 * s)
-		end)
-
-		local amp = r * 0.22
-		local x0, x1 = cx - r * 0.75, cx + r * 0.75
-		local px, py
-		surface.SetDrawColor(COLOR_DUST.r, COLOR_DUST.g, COLOR_DUST.b, 120 + 135 * s)
-		for i = 0, 72 do
-			local x = x0 + (x1 - x0) * i / 72
-			local env = math.sin(math.pi * i / 72)
-			local clean = math.sin(i * 0.42 + now * 9) * (0.25 + 0.75 * s)
-			local noise = math.sin(i * 2.7 + now * 31) * math.sin(i * 1.3 + now * 17) * (1 - s)
-			local y = cy + (clean + noise) * amp * env
-			if px then surface.DrawLine(px, py, x, y) end
-			px, py = x, y
-		end
-
-		glow(cx, cy, r * (0.8 + 1.4 * s), COLOR_DUST, 40 + 160 * s)
-
-		local nx, ny = polar(cx, cy, r, g.angle)
-		surface.SetDrawColor(pale.r, pale.g, pale.b, 120 + 135 * s)
-		surface.DrawLine(cx, cy, nx, ny)
-		glow(nx, ny, 26 + 40 * s, pale, 120 + 135 * s)
-
-		if g.hold > 0 then
-			arc(cx, cy, r + 14, g.angle - 20, g.angle - 20 + 40 * (g.hold / TUNE_HOLD), pale, 3)
-		end
-	end,
-}
-
 local CELL, CELL_GAP = 58, 10
 local SLOT = 44
 
@@ -369,7 +273,7 @@ local function cipherCell(g, i)
 	return x0 + col * (CELL + CELL_GAP), y0 + row * (CELL + CELL_GAP)
 end
 
-X.Games[2].client = {
+X.Games[1].client = {
 	init = function(g)
 		g.step, g.used = 1, {}
 	end,
@@ -428,7 +332,7 @@ local function ringRadius(r, k)
 	return r * (0.36 + 0.3 * (k - 1))
 end
 
-X.Games[3].client = {
+X.Games[2].client = {
 	init = function(g)
 		g.moves = {0, 0, 0}
 		g.disp = {}
@@ -493,7 +397,7 @@ X.Games[3].client = {
 	end,
 }
 
-X.Games[4].client = {
+X.Games[3].client = {
 	init = function(g)
 		g.step = 1
 	end,
@@ -558,7 +462,7 @@ local function echoPos(g, i)
 	return polar(cx, cy, r * 0.82, (i - 1) * 60)
 end
 
-X.Games[5].client = {
+X.Games[4].client = {
 	init = function(g)
 		g.input, g.flash = {}, {}
 	end,

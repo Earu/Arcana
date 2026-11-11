@@ -329,8 +329,6 @@ if SERVER then
 		return pos
 	end
 
-	-- A navmesh players never stand on (stale, partial, generated for other
-	-- spaces) would steer every spot away from the actual play space
 	navTrusted = function()
 		if not navmesh.IsLoaded() then return false end
 

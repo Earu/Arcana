@@ -1483,7 +1483,7 @@ if CLIENT then
 
 		-- The cube's vm position projects slightly off under the world camera
 		-- (vm fov); close enough for a beam origin
-		if wep._cubePos then
+		if wep._cubePos and RealTime() - (wep._wristFrameAt or 0) < 0.1 then
 			local cube = wep._cubePos:ToScreen()
 			if cube.visible then
 				DrawSunbeams(0.01, 0.06 * ease, 0.035, cube.x / ScrW(), cube.y / ScrH())
@@ -1960,7 +1960,7 @@ if CLIENT then
 	-- bit 8 = the viewmodel's silhouette (marked by the viewmodel pass, see
 	-- the vmmask hook).  All panel layers require bit 1 set AND bit 8 clear,
 	-- so the hand keeps its original rendering on top of the hologram.
-	local function beginPanelStencil(pts)
+	local function beginPanelStencil(pts, keepHand)
 		render.SetStencilEnable(true)
 		render.SetStencilTestMask(255)
 		render.SetStencilFailOperation(STENCIL_KEEP)
@@ -1973,7 +1973,7 @@ if CLIENT then
 		surface.SetDrawColor(255, 255, 255, 255)
 
 		-- Clear everything EXCEPT the hand bit the viewmodel pass just wrote
-		render.SetStencilWriteMask(247)
+		render.SetStencilWriteMask(keepHand and 247 or 255)
 		render.SetStencilReferenceValue(0)
 		surface.DrawRect(0, 0, ScrW(), ScrH())
 
@@ -2562,8 +2562,6 @@ if CLIENT then
 		end
 	end
 
-	-- Panel frame and wrist band share one bloom capture: a faint copy of
-	-- both feeds the bloom, then the crisp copies draw on top, band last
 	local function drawGlowLayers(frame, band)
 		if not frame and not band then return end
 
@@ -2709,9 +2707,7 @@ if CLIENT then
 		-- the whole frame and kill the panel (see the panel notes above).
 		local now = RealTime()
 
-		if wep._sightWas == nil then
-			wep._sightWas = sightOn
-		elseif sightOn ~= wep._sightWas then
+		if sightOn ~= (wep._sightWas or false) then
 			wep._sightWas = sightOn
 
 			if sightOn then
@@ -2784,7 +2780,24 @@ if CLIENT then
 		-- only once the band ring has replaced the glyphs, so the lens
 		-- materializes out of the finished ritual (edge detection below then
 		-- starts the iris at that moment)
-		local isOn = (wep.GetSightActive and wep:GetSightActive() or false) and wep._panelReady == true
+		local ply = LocalPlayer()
+		local sightActive = wep.GetSightActive and wep:GetSightActive() or false
+		if IsValid(ply) and ply:ShouldDrawLocalPlayer() then
+			if sightActive and not wep._panelReady then
+				wep._panelReady = true
+				wep._sightWas = true
+				wep._glyphSeq = nil
+			elseif not sightActive and wep._panelReady then
+				wep._panelReady = nil
+				wep._sightWas = false
+				if wep._wristBand then
+					wep._wristBand:Remove()
+					wep._wristBand = nil
+				end
+			end
+		end
+
+		local isOn = sightActive and wep._panelReady == true
 
 		if isOn and not wasSightOn then
 			sightOnSince = RealTime()
@@ -2818,11 +2831,6 @@ if CLIENT then
 			return
 		end
 
-		-- The visor is a first-person apparatus: in thirdperson (or any view
-		-- that draws the local player) the panel makes no sense
-		local ply = LocalPlayer()
-		if IsValid(ply) and ply:ShouldDrawLocalPlayer() then return end
-
 		local corners, ramp = computePanelCorners(closingFrac)
 		local uv = projectCorners(corners)
 
@@ -2840,7 +2848,7 @@ if CLIENT then
 			whorlClampMax.x = math.max(whorlClampMin.x, math.min(uv[2].x, uv[3].x) - 0.005)
 			whorlClampMax.y = math.max(whorlClampMin.y, math.min(uv[4].y, uv[3].y) - 0.005)
 
-			beginPanelStencil(pts)
+			beginPanelStencil(pts, RealTime() - (wep._wristFrameAt or 0) < 0.1)
 
 			-- Lens pass, stencil-gated to the window
 			if sightMat then
