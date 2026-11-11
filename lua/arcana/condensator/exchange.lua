@@ -6,12 +6,16 @@ local X = Arcana.CondensatorExchange
 local DUST = "crystal_dust"
 local MAX_TIMES = 10000
 local SUCCESS_BONUS = 40
-local FAIL_PENALTY = -50
+local FAIL_PENALTY = -25
 
 X.Recipes = {
-	{label = "Crystallize", cost = 20, give = "mana_crystal_shard"},
-	{label = "Exchange", cost = 1, give = "coins"},
+	{label = "Crystallize", cost = 20, give = "mana_crystal_shard", amount = 1},
+	{label = "Exchange", cost = 1, give = "coins", amount = 10},
 }
+
+function X.BaseOutput(recipeIndex, times)
+	return times * X.Recipes[recipeIndex].amount
+end
 
 function X.BonusAmount(times, pct)
 	local raw = times * pct / 100
@@ -64,7 +68,7 @@ if SERVER then
 			pct = math.Round(SUCCESS_BONUS * X.SpeedFrac(st.timing, t))
 		end
 
-		local raw = st.times * (1 + pct / 100)
+		local raw = X.BaseOutput(st.recipe, st.times) * (1 + pct / 100)
 		local gained = math.floor(raw)
 		if pct == SUCCESS_BONUS then
 			gained = math.ceil(raw)
@@ -82,7 +86,7 @@ if SERVER then
 		net.WriteUInt(st.times, 14)
 		net.WriteBool(success)
 		net.WriteInt(pct, 8)
-		net.WriteUInt(gained, 16)
+		net.WriteUInt(gained, 32)
 		net.Send(ply)
 	end
 
@@ -283,7 +287,7 @@ local function drawReveal(anim, t, cx, cy, now)
 	local shadow = Color(0, 0, 0, alpha * 0.8)
 	draw.SimpleTextOutlined("+" .. string.Comma(anim.gained), "Arcana_AncientLarge", cx, cy - rise + 46 * grow, ColorAlpha(anim.gained > 0 and col or ArtDeco.Colors.textDim, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, shadow)
 
-	local diff = anim.gained - anim.times
+	local diff = anim.gained - X.BaseOutput(anim.recipe, anim.times)
 	local segments
 	if not anim.success then
 		segments = {{text = "FAILED"}, {text = "-" .. string.Comma(-diff), icon = icon}}
@@ -436,7 +440,7 @@ local function drawGameChrome(g, w, h, now)
 		draw.SimpleText("SETTLING", "Arcana_AncientSmall", w * 0.5, by - 16, ColorAlpha(ArtDeco.Colors.paleGold, 150 + 100 * math.sin(now * 6)), TEXT_ALIGN_CENTER)
 	elseif elapsed >= lead then
 		local pct = math.Round(SUCCESS_BONUS * X.SpeedFrac(g.timing, elapsed - lead))
-		local bonus = X.BonusAmount(g.times, pct)
+		local bonus = X.BonusAmount(X.BaseOutput(g.recipe, g.times), pct)
 		local isCoin = X.Recipes[g.recipe].give == "coins"
 		local col = bonus > 0 and (isCoin and ArtDeco.Colors.coinGold or ArtDeco.Colors.shardBlue) or ArtDeco.Colors.textDim
 		local seg = {{text = "+" .. string.Comma(bonus), icon = isCoin and ArtDeco.Icons.coin or ArtDeco.Icons.shard, color = col}}
@@ -580,7 +584,7 @@ local function buildCard(parent, state, index)
 		local lineY = math.floor((h - th) * 0.5)
 		local rx = ArtDeco.DrawCostLine("Arcana_Ancient", pad + 4, lineY, {{text = recipe.cost .. " DUST", color = COLOR_DUST}}, TEXT_ALIGN_LEFT)
 		drawChevron(rx + 14, lineY + th * 0.5, ArtDeco.Colors.paleGold)
-		ArtDeco.DrawCostLine("Arcana_Ancient", rx + 28, lineY, {{text = "1", icon = outIcon, color = outCol}}, TEXT_ALIGN_LEFT)
+		ArtDeco.DrawCostLine("Arcana_Ancient", rx + 28, lineY, {{text = tostring(recipe.amount), icon = outIcon, color = outCol}}, TEXT_ALIGN_LEFT)
 	end
 
 	card.PerformLayout = function(_, w, h)
@@ -687,7 +691,7 @@ net.Receive("Arcana_Condensator_Converted", function()
 	local times = net.ReadUInt(14)
 	local success = net.ReadBool()
 	local pct = net.ReadInt(8)
-	local gained = net.ReadUInt(16)
+	local gained = net.ReadUInt(32)
 
 	if IsValid(frameRef) then
 		local state = frameRef._state
