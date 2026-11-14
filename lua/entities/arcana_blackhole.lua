@@ -311,6 +311,10 @@ if CLIENT then
 				local distance = math.Rand(coreRadius * 2.8, diskRadius * 1.6)
 				local particlePos = pos + Vector(math.cos(rad) * distance, math.sin(rad) * distance, math.Rand(-distance * 0.2, distance * 0.2))
 
+				if not self.Emitter then
+					self.Emitter = ParticleEmitter(self:GetPos())
+				end
+
 				local particle = self.Emitter:Add("effects/blueflare1", particlePos)
 				if particle then
 					local dir = (pos - particlePos):GetNormalized()
