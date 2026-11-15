@@ -5,6 +5,13 @@ local function log(...)
 	print(...)
 end
 
+local function toglName(name)
+	local base, suffix = string.match(name, "^(.+)(_[pv]s%w+)$")
+	if not base then return name .. "_togl" end
+
+	return base .. "_togl" .. suffix
+end
+
 if SERVER then
 	local function lowerFixPath(p)
 		p = string.gsub(p, "\\", "/")
@@ -53,6 +60,192 @@ if SERVER then
 		local n = tonumber(s) or 0
 
 		return n % 4294967296
+	end
+
+	local BLOCK_END = 0xFFFFFFFF
+	local BLOCK_RAW = 0x80000000
+	local BLOCK_LZMA = 0x40000000
+	local BLOCK_SIZE_MASK = 0x3FFFFFFF
+
+	local OP_MOV, OP_DCL, OP_TEXLD, OP_CMP, OP_TEXLDD, OP_TEXLDL = 0x01, 0x1F, 0x42, 0x58, 0x5D, 0x5F
+	local OP_COMMENT, OP_END = 0xFFFE, 0xFFFF
+	local LITERALS = { [0x1F] = true, [0x2F] = true, [0x30] = true, [0x51] = true }
+	local REG_TEMP, REG_DEPTHOUT, REG_SAMPLER, SAMPLER_2D, SAMPLER_VOLUME = 0, 9, 10, 2, 4
+	local MAX_TEMPS = 32
+	local RESULT_MODIFIER = 0x00F00000
+	local PREDICATED = 0x10000000
+	local TOGL_REJECTED = {
+		[20] = true, [21] = true, [22] = true, [23] = true, [24] = true,
+		[25] = true, [26] = true, [27] = true, [28] = true, [29] = true, [30] = true,
+		[34] = true, [44] = true, [80] = true, [89] = true, [94] = true, [96] = true,
+		[OP_TEXLDD] = true,
+	}
+
+	local function u32at(s, offset)
+		local a, b, c, d = string.byte(s, offset + 1, offset + 4)
+		if not d then return nil end
+
+		return a + b * 0x100 + c * 0x10000 + d * 0x1000000
+	end
+
+	local function registerType(token)
+		return bit.bor(bit.band(bit.rshift(token, 28), 0x7), bit.band(bit.rshift(token, 8), 0x18))
+	end
+
+	local function highestTemp(code, i, length, highest)
+		for k = 1, length do
+			local operand = u32at(code, (i + k) * 4)
+			if registerType(operand) == REG_TEMP then highest = math.max(highest, bit.band(operand, 0x7FF)) end
+		end
+
+		return highest
+	end
+
+	local function patchBytecode(code)
+		local count = math.floor(#code / 4)
+		local vertex = bit.rshift(u32at(code, 0), 16) == 0xFFFE
+		local samplers, patches, depthWrites = {}, {}, {}
+		local supported, highest = true, -1
+		local i = 1
+		while i < count do
+			local token = u32at(code, i * 4)
+			local op = bit.band(token, 0xFFFF)
+			if op == OP_END then break end
+
+			if op == OP_COMMENT then
+				i = i + 1 + bit.band(bit.rshift(token, 16), 0x7FFF)
+			else
+				local length = bit.band(bit.rshift(token, 24), 0xF)
+				if not LITERALS[op] then highest = highestTemp(code, i, length, highest) end
+
+				if bit.band(token, PREDICATED) ~= 0 or TOGL_REJECTED[op] or (vertex and (op == OP_TEXLD or op == OP_TEXLDL)) then
+					supported = false
+				elseif op == OP_DCL then
+					local dst = u32at(code, (i + 2) * 4)
+					if registerType(dst) == REG_SAMPLER then
+						samplers[bit.band(dst, 0x7FF)] = bit.band(bit.rshift(u32at(code, (i + 1) * 4), 27), 0xF)
+					end
+				elseif op == OP_TEXLDL then
+					local kind = samplers[bit.band(u32at(code, (i + 3) * 4), 0x7FF)]
+					if kind == SAMPLER_VOLUME then
+						patches[#patches + 1] = { i, 1, u32le(bit.bor(bit.band(token, 0xFFFF0000), OP_TEXLD)) }
+					elseif kind ~= SAMPLER_2D then
+						supported = false
+					end
+				elseif op == OP_CMP and registerType(u32at(code, (i + 1) * 4)) == REG_DEPTHOUT then
+					depthWrites[#depthWrites + 1] = { i, length }
+				end
+
+				i = i + 1 + length
+			end
+		end
+
+		local temp = highest + 1
+		if #depthWrites > 0 and temp >= MAX_TEMPS then supported = false end
+
+		for _, write in ipairs(depthWrites) do
+			local at, length = write[1], write[2]
+			local dst = u32at(code, (at + 1) * 4)
+			patches[#patches + 1] = { at + 1, length, u32le(bit.bor(0x80010000, bit.band(dst, RESULT_MODIFIER), temp))
+				.. string.sub(code, (at + 2) * 4 + 1, (at + 1 + length) * 4)
+				.. u32le(bit.bor(0x02000000, OP_MOV)) .. u32le(bit.band(dst, bit.bnot(RESULT_MODIFIER))) .. u32le(bit.bor(0x80000000, temp)) }
+		end
+
+		if #patches == 0 then return code, 0, supported end
+
+		table.sort(patches, function(a, b) return a[1] < b[1] end)
+
+		local parts, last = {}, 0
+		for _, patch in ipairs(patches) do
+			parts[#parts + 1] = string.sub(code, last + 1, patch[1] * 4)
+			parts[#parts + 1] = patch[3]
+			last = (patch[1] + patch[2]) * 4
+		end
+		parts[#parts + 1] = string.sub(code, last + 1)
+
+		return table.concat(parts), #patches, supported
+	end
+
+	local function decodeBlock(header, block)
+		if bit.band(header, BLOCK_RAW) ~= 0 then return block end
+		if bit.band(header, BLOCK_LZMA) == 0 or string.sub(block, 1, 4) ~= "LZMA" then return nil end
+
+		local actual, size = u32at(block, 4), u32at(block, 8)
+		local data = util.Decompress(string.sub(block, 13, 17) .. string.sub(block, 5, 8) .. "\0\0\0\0" .. string.sub(block, 18, 17 + size))
+		if not data or #data ~= actual then return nil end
+
+		return data
+	end
+
+	local function patchCombos(data)
+		local parts, changed, supported, offset = {}, 0, true, 0
+		while offset + 8 <= #data do
+			local size = u32at(data, offset + 4)
+			local code, count, ok = patchBytecode(string.sub(data, offset + 9, offset + 8 + size))
+			parts[#parts + 1] = string.sub(data, offset + 1, offset + 4) .. u32le(#code) .. code
+			changed = changed + count
+			supported = supported and ok
+			offset = offset + 8 + size
+		end
+
+		return table.concat(parts), changed, supported
+	end
+
+	local function toglVariant(data)
+		if u32at(data, 0) ~= 6 then return nil, false end
+
+		local records = u32at(data, 20)
+		local tableEnd = 28 + records * 8
+		local prefixEnd = tableEnd + 4 + u32at(data, tableEnd) * 8
+		local ids, bodies = {}, {}
+		local changed, supported = 0, true
+		for r = 1, records do
+			local offset = u32at(data, 24 + r * 8)
+			ids[r] = u32at(data, 20 + r * 8)
+			if ids[r] ~= BLOCK_END then
+				local body = {}
+				while true do
+					local header = u32at(data, offset)
+					if not header then return nil, false end
+					if header == BLOCK_END then break end
+
+					local size = bit.band(header, BLOCK_SIZE_MASK)
+					local decoded = decodeBlock(header, string.sub(data, offset + 5, offset + 4 + size))
+					if not decoded then return nil, false end
+
+					local combos, count, ok = patchCombos(decoded)
+					body[#body + 1] = u32le(BLOCK_RAW + #combos) .. combos
+					changed = changed + count
+					supported = supported and ok
+					offset = offset + 4 + size
+				end
+
+				body[#body + 1] = u32le(BLOCK_END)
+				bodies[r] = table.concat(body)
+			end
+		end
+
+		if not supported then return nil, false end
+		if changed == 0 then return nil, true end
+
+		local offsets, position = {}, prefixEnd
+		for r = 1, records do
+			if bodies[r] then
+				offsets[r] = position
+				position = position + #bodies[r]
+			end
+		end
+
+		local out = { string.sub(data, 1, 28) }
+		for r = 1, records do
+			out[#out + 1] = u32le(ids[r]) .. u32le(offsets[r] or position)
+		end
+		out[#out + 1] = string.sub(data, tableEnd + 1, prefixEnd)
+		for r = 1, records do
+			if bodies[r] then out[#out + 1] = bodies[r] end
+		end
+
+		return table.concat(out), true
 	end
 
 	local function createGMA(files, meta)
@@ -147,6 +340,16 @@ if SERVER then
 				local hashed = hashedName(name, data)
 				names[name] = hashed
 				files[#files + 1] = { path = "shaders/fxc/" .. hashed .. ".vcs", data = data }
+
+				local variant, supported = toglVariant(data)
+				local togl = toglName(name)
+				if not supported then
+					names[togl] = ""
+				elseif variant then
+					local hashedTogl = hashedName(togl, variant)
+					names[togl] = hashedTogl
+					files[#files + 1] = { path = "shaders/fxc/" .. hashedTogl .. ".vcs", data = variant }
+				end
 			end
 		end
 
@@ -263,7 +466,15 @@ if CLIENT then
 	SHADER_TO_GMA = SHADER_TO_GMA or { materials = setmetatable({}, { __mode = "k" }) }
 	local materials = SHADER_TO_GMA.materials
 
+	local TOGL = not system.IsWindows()
+	local UNSUPPORTED = system.IsOSX()
+
 	local function resolveShaderName(name)
+		if TOGL then
+			local togl = SHADER_NAMES[toglName(name)]
+			if togl then return togl end
+		end
+
 		return SHADER_NAMES[name] or name
 	end
 
@@ -288,7 +499,7 @@ if CLIENT then
 	end
 
 	function ShaderExists(name)
-		return SHADER_NAMES[name] ~= nil and file.Exists(shaderPath(name), "GAME")
+		return SHADER_NAMES[name] ~= nil and resolveShaderName(name) ~= "" and file.Exists(shaderPath(name), "GAME")
 	end
 
 	local receivedChunks = {}
@@ -316,7 +527,7 @@ if CLIENT then
 		local data, reason
 		if total == 0 then
 			reason = "Nothing to mount"
-		elseif not system.IsWindows() then
+		elseif UNSUPPORTED then
 			reason = "Shaders not supported on this platform"
 		else
 			data = util.Decompress(compressed)
@@ -410,7 +621,7 @@ if CLIENT then
 
 	local internalHookIndex = 0
 	function WaitForShaderMounted(shaderNames, callback)
-		if not system.IsWindows() then
+		if UNSUPPORTED then
 			callback(false)
 			return
 		end
