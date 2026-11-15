@@ -7,14 +7,25 @@ local DUST = "crystal_dust"
 local MAX_TIMES = 10000
 local SUCCESS_BONUS = 40
 local FAIL_PENALTY = -25
+local MAX_LEVEL_BONUS = 19
 
 X.Recipes = {
 	{label = "Crystallize", cost = 20, give = "mana_crystal_shard", amount = 1},
 	{label = "Exchange", cost = 1, give = "coins", amount = 10},
 }
 
-function X.BaseOutput(recipeIndex, times)
-	return times * X.Recipes[recipeIndex].amount
+function X.LevelMultiplier(ply)
+	local maxLevel = Arcana.Config.MAX_LEVEL
+	local t = math.Clamp((Arcana.GetLevel(ply) - 1) / math.max(1, maxLevel - 1), 0, 1)
+	return 1 + MAX_LEVEL_BONUS * t
+end
+
+function X.UnitOutput(ply, recipeIndex)
+	return X.Recipes[recipeIndex].amount * X.LevelMultiplier(ply)
+end
+
+function X.BaseOutput(ply, recipeIndex, times)
+	return times * X.UnitOutput(ply, recipeIndex)
 end
 
 function X.BonusAmount(times, pct)
@@ -68,7 +79,7 @@ if SERVER then
 			pct = math.Round(SUCCESS_BONUS * X.SpeedFrac(st.timing, t))
 		end
 
-		local raw = X.BaseOutput(st.recipe, st.times) * (1 + pct / 100)
+		local raw = X.BaseOutput(ply, st.recipe, st.times) * (1 + pct / 100)
 		local gained = math.floor(raw)
 		if pct == SUCCESS_BONUS then
 			gained = math.ceil(raw)
@@ -287,12 +298,12 @@ local function drawReveal(anim, t, cx, cy, now)
 	local shadow = Color(0, 0, 0, alpha * 0.8)
 	draw.SimpleTextOutlined("+" .. string.Comma(anim.gained), "Arcana_AncientLarge", cx, cy - rise + 46 * grow, ColorAlpha(anim.gained > 0 and col or ArtDeco.Colors.textDim, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, shadow)
 
-	local diff = anim.gained - X.BaseOutput(anim.recipe, anim.times)
+	local diff = math.Round(anim.gained - X.BaseOutput(LocalPlayer(), anim.recipe, anim.times))
 	local segments
 	if not anim.success then
-		segments = {{text = "FAILED"}, {text = "-" .. string.Comma(-diff), icon = icon}}
+		segments = {{text = "FAILED"}, {text = "-" .. string.Comma(math.max(0, -diff)), icon = icon}}
 		segments[1].color, segments[2].color = ColorAlpha(COLOR_FAIL, alpha), ColorAlpha(COLOR_FAIL, alpha)
-	elseif diff > 0 then
+	elseif anim.pct > 0 and diff > 0 then
 		segments = {{text = "PERFECT", color = ColorAlpha(ArtDeco.Colors.paleGold, alpha)}, {text = "+" .. string.Comma(diff), icon = icon, color = ColorAlpha(col, alpha)}}
 	else
 		segments = {{text = "NO BONUS", color = ColorAlpha(ArtDeco.Colors.textDim, alpha)}}
@@ -440,7 +451,7 @@ local function drawGameChrome(g, w, h, now)
 		draw.SimpleText("SETTLING", "Arcana_AncientSmall", w * 0.5, by - 16, ColorAlpha(ArtDeco.Colors.paleGold, 150 + 100 * math.sin(now * 6)), TEXT_ALIGN_CENTER)
 	elseif elapsed >= lead then
 		local pct = math.Round(SUCCESS_BONUS * X.SpeedFrac(g.timing, elapsed - lead))
-		local bonus = X.BonusAmount(X.BaseOutput(g.recipe, g.times), pct)
+		local bonus = X.BonusAmount(X.BaseOutput(LocalPlayer(), g.recipe, g.times), pct)
 		local isCoin = X.Recipes[g.recipe].give == "coins"
 		local col = bonus > 0 and (isCoin and ArtDeco.Colors.coinGold or ArtDeco.Colors.shardBlue) or ArtDeco.Colors.textDim
 		local seg = {{text = "+" .. string.Comma(bonus), icon = isCoin and ArtDeco.Icons.coin or ArtDeco.Icons.shard, color = col}}
@@ -584,7 +595,7 @@ local function buildCard(parent, state, index)
 		local lineY = math.floor((h - th) * 0.5)
 		local rx = ArtDeco.DrawCostLine("Arcana_Ancient", pad + 4, lineY, {{text = recipe.cost .. " DUST", color = COLOR_DUST}}, TEXT_ALIGN_LEFT)
 		drawChevron(rx + 14, lineY + th * 0.5, ArtDeco.Colors.paleGold)
-		ArtDeco.DrawCostLine("Arcana_Ancient", rx + 28, lineY, {{text = tostring(recipe.amount), icon = outIcon, color = outCol}}, TEXT_ALIGN_LEFT)
+		ArtDeco.DrawCostLine("Arcana_Ancient", rx + 28, lineY, {{text = tostring(math.Round(X.UnitOutput(LocalPlayer(), index), 2)), icon = outIcon, color = outCol}}, TEXT_ALIGN_LEFT)
 	end
 
 	card.PerformLayout = function(_, w, h)
