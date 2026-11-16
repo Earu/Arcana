@@ -501,6 +501,52 @@ if CLIENT then
 		return SHADER_NAMES[name] ~= nil and resolveShaderName(name) ~= "" and file.Exists(shaderPath(name), "GAME")
 	end
 
+	local function saltName(name, salt)
+		local base, suffix = string.match(name, "^(.+)(_[pv]s%w+)$")
+		if not base then return name .. "_" .. salt end
+
+		return base .. "_" .. salt .. suffix
+	end
+
+	local function u32le(n)
+		return string.char(n % 256, math.floor(n / 256) % 256, math.floor(n / 65536) % 256, math.floor(n / 16777216) % 256)
+	end
+
+	local function saltGMA(data, salt)
+		local pos = 22
+		while true do
+			local stop = string.find(data, "\0", pos, true)
+			local required = string.sub(data, pos, stop - 1)
+			pos = stop + 1
+			if required == "" then break end
+		end
+
+		for _ = 1, 3 do
+			pos = string.find(data, "\0", pos, true) + 1
+		end
+		pos = pos + 4
+
+		local out = { string.sub(data, 1, pos - 1) }
+		while true do
+			local id = string.sub(data, pos, pos + 3)
+			out[#out + 1] = id
+			pos = pos + 4
+			if id == "\0\0\0\0" then break end
+
+			local stop = string.find(data, "\0", pos, true)
+			local path = string.sub(data, pos, stop - 1)
+			local dir, stem, ext = string.match(path, "^(shaders/fxc/)(.+)(%.vcs)$")
+			if dir then path = dir .. saltName(stem, salt) .. ext end
+			out[#out + 1] = path .. "\0" .. string.sub(data, stop + 1, stop + 12)
+			pos = stop + 13
+		end
+
+		out[#out + 1] = string.sub(data, pos, #data - 4)
+		local body = table.concat(out)
+
+		return body .. u32le(tonumber(util.CRC(body)) or 0)
+	end
+
 	local receivedChunks = {}
 	local pendingNames = {}
 	net.Receive("shader_to_gma", function()
@@ -536,6 +582,14 @@ if CLIENT then
 			SHADER_MOUNTED = true
 			hook.Run("ShaderMounted", reason)
 			return
+		end
+
+		if TOGL then
+			local salt = string.format("%x", os.time())
+			data = saltGMA(data, salt)
+			for name, hashed in pairs(pendingNames) do
+				if hashed ~= "" then pendingNames[name] = saltName(hashed, salt) end
+			end
 		end
 
 		local files = file.Find("data/shader_to_gma_*.gma", "MOD")
