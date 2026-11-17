@@ -467,6 +467,7 @@ if CLIENT then
 	local materials = SHADER_TO_GMA.materials
 
 	local TOGL = not system.IsWindows()
+	local UNSUPPORTED = TOGL and BRANCH ~= "x86-64"
 
 	local function resolveShaderName(name)
 		if TOGL then
@@ -572,6 +573,8 @@ if CLIENT then
 		local data, reason
 		if total == 0 then
 			reason = "Nothing to mount"
+		elseif UNSUPPORTED then
+			reason = "Shaders need the x86-64 branch on this platform"
 		else
 			data = util.Decompress(compressed)
 			if not data then reason = "Failed to decompress GMA" end
@@ -672,6 +675,11 @@ if CLIENT then
 
 	local internalHookIndex = 0
 	function WaitForShaderMounted(shaderNames, callback)
+		if UNSUPPORTED then
+			callback(false)
+			return
+		end
+
 		if not istable(shaderNames) and isstring(shaderNames) then shaderNames = { shaderNames } end
 
 		local allAvailable = true
